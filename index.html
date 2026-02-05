@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Girl Scout Cookie Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="node_modules/tippy.js/dist/tippy.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🍪 Girl Scout Cookie Tracker</h1>
+      <p>Smart Cookie + Digital Cookie</p>
+    </header>
+
+    <main>
+      <section class="import-section">
+        <h2>Data Sync & Status</h2>
+        <div class="button-group">
+          <button id="refreshFromWebBtn" class="btn btn-primary">🔄 Sync from Websites</button>
+          <button id="configureLoginsBtn" class="btn btn-secondary">⚙️ Configure Logins</button>
+        </div>
+        <p id="setupHint" class="table-hint" style="margin-top: 10px; display: none;">💡 First time? Click "Configure Logins" to set up credentials, then use "Sync from Websites" to download data</p>
+
+        <!-- Smart Cookie Progress & Status (PRIMARY SOURCE OF TRUTH) -->
+        <div class="sync-card" style="border-color: #4CAF50; border-width: 3px;">
+          <div class="sync-header">
+            <h3>Smart Cookie <span style="font-size: 0.7em; color: #4CAF50; font-weight: 600;">PRIMARY</span></h3>
+            <span id="scStatus" class="sync-status">Not Synced</span>
+          </div>
+          <div id="scProgress" class="scrape-progress" style="display: none;">
+            <div class="progress-bar">
+              <div id="scProgressFill" class="progress-fill"></div>
+            </div>
+            <div id="scProgressText" class="progress-text"></div>
+          </div>
+          <p id="scLastSync" class="sync-last">Never synced</p>
+          <p style="font-size: 0.85em; color: #666; margin-top: 5px;">Source of truth for billing, inventory, and financial tracking</p>
+
+          <!-- Collapsible Order Data -->
+          <div style="margin-top: 15px;">
+            <button id="toggleScDataBtn" class="btn btn-secondary btn-small" style="width: 100%;">
+              <span id="scDataIcon">▶</span> View Data
+            </button>
+            <div id="scDataContainer" class="table-container" style="display: none; margin-top: 10px;">
+              <p class="placeholder">No data loaded</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Digital Cookie Progress & Status (SUPPLEMENTAL) -->
+        <div class="sync-card">
+          <div class="sync-header">
+            <h3>Digital Cookie <span style="font-size: 0.7em; color: #666;">SUPPLEMENTAL</span></h3>
+            <span id="dcStatus" class="sync-status">Not Synced</span>
+          </div>
+          <div id="dcProgress" class="scrape-progress" style="display: none;">
+            <div class="progress-bar">
+              <div id="dcProgressFill" class="progress-fill"></div>
+            </div>
+            <div id="dcProgressText" class="progress-text"></div>
+          </div>
+          <p id="dcLastSync" class="sync-last">Never synced</p>
+          <p style="font-size: 0.85em; color: #666; margin-top: 5px;">Provides order details and customer information</p>
+
+          <!-- Collapsible Order Data -->
+          <div style="margin-top: 15px;">
+            <button id="toggleDcDataBtn" class="btn btn-secondary btn-small" style="width: 100%;">
+              <span id="dcDataIcon">▶</span> View Data
+            </button>
+            <div id="dcDataContainer" class="table-container" style="display: none; margin-top: 10px;">
+              <p class="placeholder">No data loaded</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="importStatus" class="status-message"></div>
+      </section>
+
+      <section class="reports-section">
+        <h2>Reports</h2>
+        <div class="button-group">
+          <button id="troopSummaryBtn" class="btn btn-secondary" disabled>Troop Summary</button>
+          <button id="summaryReportBtn" class="btn btn-secondary" disabled>Scout Summary</button>
+          <button id="inventoryReportBtn" class="btn btn-secondary" disabled>Inventory</button>
+          <button id="varietyReportBtn" class="btn btn-secondary" disabled>Cookie Varieties</button>
+          <button id="donationAlertBtn" class="btn btn-secondary" disabled>Virtual Cookie Share</button>
+        </div>
+        <div id="reportContainer" class="report-container"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Login Configuration Modal -->
+  <div id="loginModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Configure Website Logins</h2>
+        <button id="closeModal" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="credentials-section">
+          <h3>Digital Cookie</h3>
+          <div class="form-group">
+            <label for="dcUsername">Username:</label>
+            <input type="text" id="dcUsername" class="form-input" placeholder="Enter username">
+          </div>
+          <div class="form-group">
+            <label for="dcPassword">Password:</label>
+            <input type="password" id="dcPassword" class="form-input" placeholder="Enter password">
+          </div>
+          <div class="form-group">
+            <label for="dcRole">Role (optional):</label>
+            <input type="text" id="dcRole" class="form-input" placeholder="Leave empty to auto-select first Troop role">
+            <small class="form-hint">Leave blank to auto-select, or enter exact role name (e.g., "Troop 1234 of Service Unit 567")</small>
+          </div>
+        </div>
+
+        <div class="credentials-section">
+          <h3>Smart Cookie</h3>
+          <div class="form-group">
+            <label for="scUsername">Username:</label>
+            <input type="text" id="scUsername" class="form-input" placeholder="Enter username">
+          </div>
+          <div class="form-group">
+            <label for="scPassword">Password:</label>
+            <input type="password" id="scPassword" class="form-input" placeholder="Enter password">
+          </div>
+        </div>
+
+        <p class="modal-note">🔒 Credentials are encrypted using your OS keychain (macOS Keychain, Windows Credential Manager).</p>
+      </div>
+      <div class="modal-actions">
+        <button id="cancelModal" class="btn btn-secondary">Cancel</button>
+        <button id="saveCredentials" class="btn btn-primary">Save Credentials</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="app-footer">
+    <span id="appVersion">v1.0.0</span>
+  </footer>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

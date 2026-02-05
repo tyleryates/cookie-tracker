@@ -1,0 +1,57 @@
+{
+  "name": "cookie-tracker",
+  "version": "1.0.0",
+  "description": "Girl Scout Cookie Inventory and Order Tracker",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+  "keywords": ["girl-scouts", "cookies", "inventory", "electron", "desktop-app"],
+  "author": "Tyler Yates",
+  "license": "MIT",
+  "type": "commonjs",
+  "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "axios": "^1.13.4",
+    "axios-cookiejar-support": "^6.0.5",
+    "cheerio": "^1.2.0",
+    "electron-updater": "^6.1.7",
+    "tippy.js": "^6.3.7",
+    "tough-cookie": "^6.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^40.1.0",
+    "electron-builder": "^26.0.0"
+  },
+  "build": {
+    "appId": "com.gscookies.tracker",
+    "productName": "Cookie Tracker",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "renderer.js",
+      "index.html",
+      "styles.css",
+      "data-reconciler.js",
+      "cookie-constants.js",
+      "credentials-manager.js",
+      "scraper-utils.js",
+      "scrapers/**/*",
+      "node_modules/**/*"
+    ],
+    "electronLanguages": ["en", "en-US"],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "zip"
+    },
+    "win": {
+      "target": "zip"
+    }
+  }
+}
