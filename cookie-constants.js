@@ -30,6 +30,8 @@ const PHYSICAL_COOKIE_TYPES = [
 
 // Smart Cookie API numeric ID to cookie name mapping
 // Verified against Smart Cookie CSV export
+// Can also be fetched dynamically from: GET https://app.abcsmartcookies.com/webapi/api/me/allcookies
+// (includes pricing, sequence, and availability data)
 const COOKIE_ID_MAP = {
   1: 'Caramel deLites',
   2: 'Peanut Butter Patties',

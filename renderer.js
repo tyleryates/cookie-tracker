@@ -924,12 +924,18 @@ function generateSummaryReport() {
         totalPackages: 0,  // All packages including shipped
         inventory: 0,  // Track inventory picked up (physical only)
         boothCredits: 0,  // Track virtual booth sales (credit only)
+        creditedPackages: 0,  // Track troop-allocated direct ship (credited sales)
+        creditedBoothPackages: 0,  // Track booth allocation separately
+        creditedDirectShipPackages: 0,  // Track direct ship allocation separately
         shippedPackages: 0,  // Track direct ship orders total
         revenue: 0,
         donations: 0,  // Track Cookie Share donations
         varieties: {},
         inventoryVarieties: {},  // Track inventory by variety
         boothVarieties: {},  // Track booth sales by variety
+        creditedVarieties: {},  // Track troop-allocated (combined) by variety
+        creditedBoothVarieties: {},  // Track troop girl delivered by variety
+        creditedDirectShipVarieties: {},  // Track troop direct ship by variety
         shippedVarieties: {},  // Track direct ship orders by variety
         orderDetails: [],
         isSiteOrder: isSiteOrder  // Flag for booth sales
@@ -953,10 +959,21 @@ function generateSummaryReport() {
     const isDonationOnly = orderType === 'Donation';
 
     if (isSiteOrder) {
-      // Site orders are booth sales (credited) - regardless of shipping method
-      // Don't add to totalPackages since they go to boothCredits (would double-count in Total Sold)
-      if (!isDonationOnly) {
-        scoutSummary[name].boothCredits += physicalPackages;
+      // Site orders: Track by type to calculate unallocated amounts
+      // Type 3: Troop DC Site → Direct Ship (allocated via Direct Ship Divider)
+      // Type 4: Troop DC Site → Girl Delivery (allocated via Virtual Booth Divider)
+
+      if (!scoutSummary[name].siteDirectShip) {
+        scoutSummary[name].siteDirectShip = 0;
+        scoutSummary[name].siteGirlDelivery = 0;
+      }
+
+      if (isShipped) {
+        // Type 3: Troop direct ship orders
+        scoutSummary[name].siteDirectShip += physicalPackages;
+      } else if (!isDonationOnly) {
+        // Type 4: Troop girl delivery orders
+        scoutSummary[name].siteGirlDelivery += physicalPackages;
       }
     } else {
       // Regular scout orders - track in totalPackages
@@ -977,20 +994,20 @@ function generateSummaryReport() {
     if (donations > 0) {
       scoutSummary[name].donations += donations;
       if (isSiteOrder) {
-        // Site orders are booth sales - track as booth varieties
-        scoutSummary[name].boothVarieties['Cookie Share'] = (scoutSummary[name].boothVarieties['Cookie Share'] || 0) + donations;
+        // Site orders - Cookie Share will be tracked via virtual booth allocations
+        // Don't track at site level
       } else {
         scoutSummary[name].varieties['Cookie Share'] = (scoutSummary[name].varieties['Cookie Share'] || 0) + donations;
       }
     }
 
-    // Cookie varieties - track shipped and booth sales separately
+    // Cookie varieties - track shipped separately
     cookieTypes.forEach(type => {
       const count = parseInt(row[type]) || 0;
       if (count > 0) {
         if (isSiteOrder) {
-          // Site orders are always booth sales (credited) - regardless of shipping method
-          scoutSummary[name].boothVarieties[type] = (scoutSummary[name].boothVarieties[type] || 0) + count;
+          // Site orders - varieties will be tracked via virtual booth allocations in Credited column
+          // Don't track at site level
         } else if (isShipped) {
           // Scout's direct ship orders - track separately (no physical inventory needed)
           scoutSummary[name].shippedVarieties[type] = (scoutSummary[name].shippedVarieties[type] || 0) + count;
@@ -1029,6 +1046,16 @@ function generateSummaryReport() {
     });
   });
 
+  // Build girlId to scout name mapping from reconciler.scouts
+  const girlIdToName = new Map();
+  if (reconciler && reconciler.scouts) {
+    reconciler.scouts.forEach((scoutData, scoutName) => {
+      if (scoutData.scoutId) {
+        girlIdToName.set(scoutData.scoutId, scoutName);
+      }
+    });
+  }
+
   // Add inventory data from T2G transfers
   if (reconciler && reconciler.transfers) {
     reconciler.transfers.forEach(transfer => {
@@ -1058,17 +1085,24 @@ function generateSummaryReport() {
               });
             }
           } else {
-            // Track virtual booth credits separately (total and by variety)
-            scoutSummary[name].boothCredits = (scoutSummary[name].boothCredits || 0) + (transfer.packages || 0);
+            // Virtual booth allocations (Type 4: Troop girl delivery) go to Credited column
+            const packages = transfer.packages || 0;
+            scoutSummary[name].creditedPackages = (scoutSummary[name].creditedPackages || 0) + packages;
+            scoutSummary[name].creditedBoothPackages = (scoutSummary[name].creditedBoothPackages || 0) + packages;
 
-            // Track booth varieties separately
-            if (!scoutSummary[name].boothVarieties) {
-              scoutSummary[name].boothVarieties = {};
+            // Track credited varieties by source
+            if (!scoutSummary[name].creditedVarieties) {
+              scoutSummary[name].creditedVarieties = {};
+            }
+            if (!scoutSummary[name].creditedBoothVarieties) {
+              scoutSummary[name].creditedBoothVarieties = {};
             }
             if (transfer.varieties) {
               Object.entries(transfer.varieties).forEach(([variety, count]) => {
-                scoutSummary[name].boothVarieties[variety] =
-                  (scoutSummary[name].boothVarieties[variety] || 0) + count;
+                scoutSummary[name].creditedVarieties[variety] =
+                  (scoutSummary[name].creditedVarieties[variety] || 0) + count;
+                scoutSummary[name].creditedBoothVarieties[variety] =
+                  (scoutSummary[name].creditedBoothVarieties[variety] || 0) + count;
               });
             }
           }
@@ -1077,8 +1111,54 @@ function generateSummaryReport() {
     });
   }
 
-  // Calculate total virtual booth allocations (packages allocated from site to scouts)
+  // Add direct ship allocations from Smart Direct Ship Divider
+  // These are Type 3: Troop direct ship orders credited to individual scouts
+  if (reconciler && reconciler.directShipAllocations) {
+    reconciler.directShipAllocations.forEach(allocation => {
+      const scoutName = girlIdToName.get(allocation.girlId);
+      if (scoutName && scoutSummary[scoutName]) {
+        // Initialize creditedPackages if not present
+        if (!scoutSummary[scoutName].creditedPackages) {
+          scoutSummary[scoutName].creditedPackages = 0;
+        }
+        if (!scoutSummary[scoutName].creditedDirectShipPackages) {
+          scoutSummary[scoutName].creditedDirectShipPackages = 0;
+        }
+        if (!scoutSummary[scoutName].creditedVarieties) {
+          scoutSummary[scoutName].creditedVarieties = {};
+        }
+        if (!scoutSummary[scoutName].creditedDirectShipVarieties) {
+          scoutSummary[scoutName].creditedDirectShipVarieties = {};
+        }
+
+        // Add direct ship allocation to credited packages
+        const packages = allocation.packages || 0;
+        scoutSummary[scoutName].creditedPackages += packages;
+        scoutSummary[scoutName].creditedDirectShipPackages += packages;
+
+        // Track credited varieties by source
+        if (allocation.varieties) {
+          Object.entries(allocation.varieties).forEach(([variety, count]) => {
+            scoutSummary[scoutName].creditedVarieties[variety] =
+              (scoutSummary[scoutName].creditedVarieties[variety] || 0) + count;
+            scoutSummary[scoutName].creditedDirectShipVarieties[variety] =
+              (scoutSummary[scoutName].creditedDirectShipVarieties[variety] || 0) + count;
+          });
+        }
+      }
+    });
+  }
+
+  // Calculate allocated amounts to show unallocated site orders
+  let totalDirectShipAllocated = 0;
   let totalVirtualBoothAllocated = 0;
+
+  if (reconciler && reconciler.directShipAllocations) {
+    reconciler.directShipAllocations.forEach(allocation => {
+      totalDirectShipAllocated += allocation.packages || 0;
+    });
+  }
+
   if (reconciler && reconciler.transfers) {
     reconciler.transfers.forEach(transfer => {
       if (transfer.type === 'T2G' && transfer.virtualBooth) {
@@ -1087,21 +1167,31 @@ function generateSummaryReport() {
     });
   }
 
-  // Adjust site order entry to show only UNALLOCATED packages
-  // Site orders start with all packages in boothCredits, then we subtract what's been allocated to scouts
-  // (Site orders don't go into totalPackages, so we only adjust boothCredits)
+  // Update Site row to show only UNALLOCATED packages
   Object.keys(scoutSummary).forEach(name => {
     if (name.endsWith(' Site')) {
-      scoutSummary[name].boothCredits -= totalVirtualBoothAllocated;
+      const scout = scoutSummary[name];
+
+      // Calculate unallocated amounts
+      const unallocatedDirectShip = (scout.siteDirectShip || 0) - totalDirectShipAllocated;
+      const unallocatedGirlDelivery = (scout.siteGirlDelivery || 0) - totalVirtualBoothAllocated;
+
+      // Store for display
+      scout.unallocatedDirectShip = Math.max(0, unallocatedDirectShip);
+      scout.unallocatedGirlDelivery = Math.max(0, unallocatedGirlDelivery);
+      scout.totalUnallocated = scout.unallocatedDirectShip + scout.unallocatedGirlDelivery;
+
+      // Mark as warning if any unallocated
+      scout.hasUnallocated = scout.totalUnallocated > 0;
     }
   });
 
   const sortedScouts = Object.keys(scoutSummary).sort();
 
   let html = '<div class="report-visual"><h3>Scout Summary Report</h3>';
-  html += '<p class="table-hint">💡 Click on any scout to see detailed breakdown. <strong>Sales</strong> = physical packages for in-person delivery. <strong>Booth</strong> = troop booth credits. <strong>Shipped</strong> = shipped from supplier.</p>';
+  html += '<p class="table-hint">💡 Click on any scout to see detailed breakdown. <strong>Sales</strong> = physical packages for in-person delivery. <strong>Booth</strong> = other troop credits. <strong>Credited</strong> = troop booth sales + direct ship allocated to scout. <strong>Shipped</strong> = scout\'s own direct ship orders.</p>';
   html += startTable('table-normal scout-table');
-  html += createTableHeader(['Scout', 'Orders', 'Sales', 'Picked Up', 'Inventory', 'Booth', 'Shipped', 'Donations', 'Total Sold', 'Revenue']);
+  html += createTableHeader(['Scout', 'Orders', 'Sales', 'Picked Up', 'Inventory', 'Booth', 'Credited', 'Shipped', 'Donations', 'Total Sold', 'Revenue']);
 
   sortedScouts.forEach((name, idx) => {
     const scout = scoutSummary[name];
@@ -1109,21 +1199,68 @@ function generateSummaryReport() {
     // Calculate net inventory: T2G received - packages needing physical inventory
     const netInventory = (scout.inventory || 0) - scout.packages;
 
+    // Check if any individual cookie variety has negative inventory
+    const negativeVarieties = [];
+    if (scout.inventoryVarieties && scout.varieties) {
+      PHYSICAL_COOKIE_TYPES.forEach(variety => {
+        const pickedUp = scout.inventoryVarieties[variety] || 0;
+        const sold = scout.varieties[variety] || 0;
+        const varietyNet = pickedUp - sold;
+        if (varietyNet < 0) {
+          negativeVarieties.push(`${variety}: ${varietyNet}`);
+        }
+      });
+    }
+
+    // Build inventory cell with warning if any variety is negative
+    let inventoryCell = `${netInventory}`;
+    if (negativeVarieties.length > 0) {
+      const tooltipText = `Warning: Negative inventory\n${negativeVarieties.join('\n')}`;
+      inventoryCell = `<span class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}" style="color: #f44336; font-weight: 600;">${netInventory} ⚠️</span>`;
+    }
+
+    // Calculate total credited (booth + troop direct ship)
+    const totalCredited = (scout.boothCredits || 0) + (scout.creditedPackages || 0);
+
+    // Special handling for Site row - show unallocated with warning
+    const isSiteRow = name.endsWith(' Site');
+    let creditedCell = `${scout.creditedPackages || 0}`;
+
+    if (isSiteRow && scout.totalUnallocated > 0) {
+      // Show unallocated with warning
+      const tooltipText = `UNALLOCATED - Action Required\nDirect Ship: ${scout.unallocatedDirectShip}\nGirl Delivery: ${scout.unallocatedGirlDelivery}\n\nAllocate in Smart Cookie:${scout.unallocatedDirectShip > 0 ? '\n- Troop Direct Ship Orders Divider' : ''}${scout.unallocatedGirlDelivery > 0 ? '\n- Smart Virtual Booth Divider' : ''}`;
+      creditedCell = `<span class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}" style="color: #f44336; font-weight: 600;">${scout.totalUnallocated} ⚠️</span>`;
+    } else if (!isSiteRow && scout.creditedPackages > 0) {
+      // Show source breakdown tooltip for regular scouts
+      const sources = [];
+      if (scout.creditedBoothPackages > 0) {
+        sources.push(`Troop Girl Delivered: ${scout.creditedBoothPackages}`);
+      }
+      if (scout.creditedDirectShipPackages > 0) {
+        sources.push(`Troop Direct Ship: ${scout.creditedDirectShipPackages}`);
+      }
+      if (sources.length > 0) {
+        const tooltipText = sources.join('\n');
+        creditedCell = `<span class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}">${scout.creditedPackages}</span>`;
+      }
+    }
+
     // Main row (clickable)
     html += `<tr class="scout-row" data-scout-index="${idx}">`;
     html += `<td><span class="expand-icon" style="margin-right: 8px;">▶</span><strong>${escapeHtml(name)}</strong></td>`;
     html += `<td>${scout.orders}</td>`;
     html += `<td>${scout.packages}</td>`;
     html += `<td>${scout.inventory || 0}</td>`;
-    html += `<td>${netInventory}</td>`;
+    html += `<td>${inventoryCell}</td>`;
     html += `<td>${scout.boothCredits || 0}</td>`;
+    html += `<td>${creditedCell}</td>`;
     html += `<td>${scout.shippedPackages || 0}</td>`;
     html += `<td>${scout.donations || 0}</td>`;
 
     // Build tooltip for Total Sold breakdown (Direct vs Credited)
-    const totalSold = scout.totalPackages + (scout.boothCredits || 0);
+    const totalSold = scout.totalPackages + totalCredited;
     const directSales = scout.packages + (scout.shippedPackages || 0) + (scout.donations || 0);
-    const creditedSales = scout.boothCredits || 0;
+    const creditedSales = totalCredited;
     const tooltipBreakdown = [
       `Direct: ${directSales}`,
       `Credited: ${creditedSales}`
@@ -1135,18 +1272,19 @@ function generateSummaryReport() {
 
     // Detail row (expandable)
     html += `<tr class="scout-detail" data-scout-index="${idx}" style="display: none;">`;
-    html += '<td colspan="10">';  // Updated to match new column count
+    html += '<td colspan="11">';  // Updated to match new column count (11 columns now)
     html += '<div class="scout-breakdown">';
 
     // Combined Sales vs Inventory breakdown
     html += '<h5>Cookie Breakdown</h5>';
     html += startTable('table-compact');
-    html += createTableHeader(['Variety', 'Sales', 'Picked Up', 'Inventory', 'Booth', 'Shipped']);
+    html += createTableHeader(['Variety', 'Sales', 'Picked Up', 'Inventory', 'Other', 'Credited', 'Shipped']);
 
-    // Get all varieties including shipped
+    // Get all varieties including shipped and credited
     const allVarieties = getCompleteVarieties({
       ...scout.varieties,
-      ...scout.shippedVarieties
+      ...scout.shippedVarieties,
+      ...scout.creditedVarieties
     });
 
     sortVarietiesByOrder(Object.entries(allVarieties))
@@ -1154,6 +1292,9 @@ function generateSummaryReport() {
         const pickedUp = (scout.inventoryVarieties && scout.inventoryVarieties[variety]) || 0;
         const sold = (scout.varieties && scout.varieties[variety]) || 0;
         const booth = (scout.boothVarieties && scout.boothVarieties[variety]) || 0;
+        const credited = (scout.creditedVarieties && scout.creditedVarieties[variety]) || 0;
+        const creditedBooth = (scout.creditedBoothVarieties && scout.creditedBoothVarieties[variety]) || 0;
+        const creditedDirectShip = (scout.creditedDirectShipVarieties && scout.creditedDirectShipVarieties[variety]) || 0;
         const shipped = (scout.shippedVarieties && scout.shippedVarieties[variety]) || 0;
         const net = pickedUp - sold;
 
@@ -1163,12 +1304,27 @@ function generateSummaryReport() {
         const netClass = net < 0 ? 'warning-text' : (net > 0 ? 'success-text' : '');
         const netDisplay = isCookieShare ? '<span style="color: #999;">N/A</span>' : (net === 0 ? '—' : (net > 0 ? `+${net}` : net));
 
+        // Build tooltip for credited breakdown
+        let creditedDisplay = credited > 0 ? credited : '—';
+        if (credited > 0 && (creditedBooth > 0 || creditedDirectShip > 0)) {
+          const sources = [];
+          if (creditedBooth > 0) {
+            sources.push(`Troop Girl Delivered: ${creditedBooth}`);
+          }
+          if (creditedDirectShip > 0) {
+            sources.push(`Troop Direct Ship: ${creditedDirectShip}`);
+          }
+          const tooltipText = sources.join('\n');
+          creditedDisplay = `<span class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}">${credited}</span>`;
+        }
+
         html += `<tr>`;
         html += `<td><strong>${escapeHtml(variety)}</strong></td>`;
         html += `<td>${sold}</td>`;
         html += `<td>${pickedUpDisplay}</td>`;
         html += `<td class="${isCookieShare ? '' : netClass}">${netDisplay}</td>`;
         html += `<td>${booth > 0 ? booth : '—'}</td>`;
+        html += `<td>${creditedDisplay}</td>`;
         html += `<td>${shipped > 0 ? shipped : '—'}</td>`;
         html += `</tr>`;
       });
@@ -1309,6 +1465,16 @@ function generateVarietyReport() {
 function generateDonationAlertReport() {
   let html = '<div class="report-visual"><h3>Virtual Cookie Share</h3>';
 
+  // Build girlId to scout name mapping from reconciler.scouts
+  const girlIdToName = new Map();
+  if (reconciler && reconciler.scouts) {
+    reconciler.scouts.forEach((scoutData, scoutName) => {
+      if (scoutData.scoutId) {
+        girlIdToName.set(scoutData.scoutId, scoutName);
+      }
+    });
+  }
+
   // Calculate total Cookie Share from Digital Cookie
   let totalDCDonations = 0;
   let autoSyncDonations = 0;
@@ -1339,22 +1505,47 @@ function generateDonationAlertReport() {
 
   // Calculate total Cookie Share from Smart Cookie
   let totalSCCookieShare = 0;
+  let manualCookieShareEntries = 0; // COOKIE_SHARE transfer type (manual adjustments)
   if (reconciler && reconciler.transfers) {
     reconciler.transfers.forEach(transfer => {
       // Look for Cookie Share in transfer varieties
       if (transfer.varieties && transfer.varieties['Cookie Share']) {
         totalSCCookieShare += transfer.varieties['Cookie Share'];
       }
+
+      // Track COOKIE_SHARE transfer type separately (manual entries made in SC)
+      if (transfer.type && transfer.type.includes('COOKIE_SHARE')) {
+        manualCookieShareEntries += transfer.packages || 0;
+      }
     });
   }
 
+  // Calculate adjustment needed: what needs manual entry - what's already entered
+  const adjustmentNeeded = manualEntryDonations - manualCookieShareEntries;
+
   // Reconciliation section at the top
   html += '<h4 style="margin-top: 20px;">📊 Cookie Share Reconciliation</h4>';
+
+  // Determine adjustment display
+  let adjustmentDisplay = '';
+  let adjustmentColor = '#4CAF50'; // Green for reconciled
+  if (adjustmentNeeded > 0) {
+    adjustmentDisplay = `+${adjustmentNeeded}`;
+    adjustmentColor = '#ff9800'; // Orange for needs more entries
+  } else if (adjustmentNeeded < 0) {
+    adjustmentDisplay = `${adjustmentNeeded}`;
+    adjustmentColor = '#f44336'; // Red for too many entries
+  } else {
+    adjustmentDisplay = '—';
+    adjustmentColor = '#4CAF50'; // Green for reconciled
+  }
+
   html += createHorizontalStats([
     { label: 'DC Total', value: totalDCDonations, description: 'All donations', color: '#2196F3' },
     { label: 'DC Auto-Sync', value: autoSyncDonations, description: 'Credit card', color: '#4CAF50' },
     { label: 'DC Manual Entry', value: manualEntryDonations, description: 'CASH + girl delivery', color: '#ff9800' },
-    { label: 'SC Cookie Share', value: totalSCCookieShare, description: 'From Smart Cookie', color: '#9C27B0' }
+    { label: 'SC Manual Entries', value: manualCookieShareEntries, description: 'COOKIE_SHARE transfers', color: '#9C27B0' },
+    { label: 'Adjustment', value: adjustmentDisplay, description: 'Packages to add/remove', color: adjustmentColor }
   ]);
 
   // Build scout-by-scout breakdown
@@ -1385,19 +1576,21 @@ function generateDonationAlertReport() {
     });
   }
 
-  // Check if reconciliation matches
-  const isReconciled = totalDCDonations === totalSCCookieShare;
-  const difference = totalDCDonations - totalSCCookieShare;
-
-  if (isReconciled) {
+  // Check if manual entries are reconciled
+  if (adjustmentNeeded === 0) {
     html += '<div style="padding: 15px; background: #C8E6C9; border-radius: 8px; margin: 15px 0; border-left: 4px solid #2E7D32;">';
-    html += '<p style="margin: 0; color: #2E7D32; font-weight: 600;">✓ Cookie Share Reconciled!</p>';
-    html += '<p style="margin: 8px 0 0 0; color: #2E7D32; font-size: 0.9em;">Digital Cookie donations match Smart Cookie Cookie Share transfers.</p>';
+    html += '<p style="margin: 0; color: #2E7D32; font-weight: 600;">✓ Manual Entries Reconciled!</p>';
+    html += '<p style="margin: 8px 0 0 0; color: #2E7D32; font-size: 0.9em;">All manual Cookie Share donations have been entered in Smart Cookie.</p>';
+    html += '</div>';
+  } else if (adjustmentNeeded > 0) {
+    html += '<div style="padding: 15px; background: #FFE0B2; border-radius: 8px; margin: 15px 0; border-left: 4px solid #F57F17;">';
+    html += '<p style="margin: 0; color: #E65100; font-weight: 600;">⚠️ Manual Entry Needed</p>';
+    html += `<p style="margin: 8px 0 0 0; color: #E65100; font-size: 0.9em;">You need to add <strong>${adjustmentNeeded}</strong> more Cookie Share packages in Smart Cookie (Orders → Virtual Cookie Share).</p>`;
     html += '</div>';
   } else {
-    html += '<div style="padding: 15px; background: #FFE0B2; border-radius: 8px; margin: 15px 0; border-left: 4px solid #F57F17;">';
-    html += '<p style="margin: 0; color: #E65100; font-weight: 600;">⚠️ Cookie Share Mismatch</p>';
-    html += `<p style="margin: 8px 0 0 0; color: #E65100; font-size: 0.9em;">Digital Cookie shows <strong>${totalDCDonations}</strong> Cookie Share packages, but Smart Cookie shows <strong>${totalSCCookieShare}</strong>. Difference: <strong>${difference > 0 ? '+' : ''}${difference}</strong> packages.</p>`;
+    html += '<div style="padding: 15px; background: #FFCDD2; border-radius: 8px; margin: 15px 0; border-left: 4px solid #C62828;">';
+    html += '<p style="margin: 0; color: #C62828; font-weight: 600;">⚠️ Too Many Manual Entries</p>';
+    html += `<p style="margin: 8px 0 0 0; color: #C62828; font-size: 0.9em;">Smart Cookie has <strong>${Math.abs(adjustmentNeeded)}</strong> more Cookie Share packages than Digital Cookie. You may need to remove some manual entries.</p>`;
     html += '</div>';
   }
 
@@ -1414,7 +1607,8 @@ function generateDonationAlertReport() {
       if (!scoutManualEntries[scoutName]) {
         scoutManualEntries[scoutName] = {
           total: 0,
-          autoSync: 0
+          autoSync: 0,
+          manualEntered: 0
         };
       }
 
@@ -1431,23 +1625,64 @@ function generateDonationAlertReport() {
     }
   });
 
+  // Add Virtual Cookie Share allocations (manual entries already made) per scout
+  // Use the detailed per-scout breakdown from Smart Cookie API
+  if (reconciler && reconciler.virtualCookieShareAllocations && girlIdToName.size > 0) {
+    reconciler.virtualCookieShareAllocations.forEach((quantity, girlId) => {
+      const scoutName = girlIdToName.get(girlId);
+      if (scoutName) {
+        if (!scoutManualEntries[scoutName]) {
+          scoutManualEntries[scoutName] = {
+            total: 0,
+            autoSync: 0,
+            manualEntered: 0
+          };
+        }
+        scoutManualEntries[scoutName].manualEntered += quantity;
+      }
+    });
+  }
+
   // Scout-by-scout manual entry breakdown
   if (Object.keys(scoutManualEntries).length > 0) {
     html += '<h5 style="margin-top: 20px;">📋 Virtual Cookie Share Manual Entry Guide:</h5>';
-    html += '<p style="margin-bottom: 10px; font-size: 0.9em; color: #666;">Use this table to enter Virtual Cookie Share orders in Smart Cookie (Orders → Virtual Cookie Share).</p>';
+    html += '<p style="margin-bottom: 10px; font-size: 0.9em; color: #666;">Use this table to adjust Virtual Cookie Share in Smart Cookie (Orders → Virtual Cookie Share).</p>';
     html += startTable('table-normal');
-    html += createTableHeader(['Scout', 'Total Cookie Share', 'Auto-Sync', '⚠️ Manual Entry Needed']);
+    html += createTableHeader(['Scout', 'DC Total', 'Auto-Sync', 'SC Entered', 'Manual Needed', 'Adjustment']);
 
     Object.keys(scoutManualEntries).sort().forEach(scoutName => {
       const scout = scoutManualEntries[scoutName];
-      const manualEntry = scout.total - scout.autoSync;
-      const rowClass = manualEntry > 0 ? 'style="background: #fff3cd;"' : '';
+      const manualNeeded = scout.total - scout.autoSync;
+      const adjustment = manualNeeded - scout.manualEntered;
+
+      // Color code the row based on adjustment needed
+      let rowClass = '';
+      let adjustmentDisplay = adjustment;
+      let adjustmentStyle = '';
+
+      if (adjustment > 0) {
+        // Need to add more
+        rowClass = 'style="background: #fff3cd;"';
+        adjustmentDisplay = `+${adjustment}`;
+        adjustmentStyle = 'style="color: #ff9800; font-weight: 600;"';
+      } else if (adjustment < 0) {
+        // Too many entries
+        rowClass = 'style="background: #ffcdd2;"';
+        adjustmentDisplay = `${adjustment}`;
+        adjustmentStyle = 'style="color: #f44336; font-weight: 600;"';
+      } else {
+        // Reconciled
+        adjustmentDisplay = '—';
+        adjustmentStyle = 'style="color: #4CAF50; font-weight: 600;"';
+      }
 
       html += createTableRow([
         `<td><strong>${escapeHtml(scoutName)}</strong></td>`,
         `<td>${scout.total}</td>`,
         `<td>${scout.autoSync}</td>`,
-        `<td><strong>${manualEntry}</strong></td>`
+        `<td>${scout.manualEntered}</td>`,
+        `<td>${manualNeeded}</td>`,
+        `<td ${adjustmentStyle}><strong>${adjustmentDisplay}</strong></td>`
       ], rowClass);
     });
 
@@ -1457,9 +1692,14 @@ function generateDonationAlertReport() {
     html += '<p style="margin: 0 0 8px 0;"><strong>💡 How to use this table:</strong></p>';
     html += '<ol style="margin: 0; padding-left: 20px;">';
     html += '<li>Log in to Smart Cookie and go to <strong>Orders → Virtual Cookie Share</strong></li>';
-    html += '<li>For each scout with packages in the "Manual Entry Needed" column, enter that number of Cookie Share packages</li>';
-    html += '<li>Click Save after entering each scout\'s packages</li>';
-    html += '<li>Refresh this report to verify the reconciliation matches</li>';
+    html += '<li>Edit the COOKIE_SHARE row for each scout based on the "Adjustment" column:</li>';
+    html += '<ul style="margin: 5px 0; padding-left: 20px;">';
+    html += '<li><strong>+N</strong> (orange): Add N packages to that scout\'s COOKIE_SHARE row</li>';
+    html += '<li><strong>-N</strong> (red): Remove N packages from that scout\'s COOKIE_SHARE row</li>';
+    html += '<li><strong>—</strong> (green): Already reconciled, no changes needed</li>';
+    html += '</ul>';
+    html += '<li>Click Save after adjusting each scout\'s packages</li>';
+    html += '<li>Refresh this report to verify all adjustments show —</li>';
     html += '</ol>';
     html += '</div>';
   }
@@ -1547,7 +1787,63 @@ function generateDonationAlertReport() {
 function enableReportButtons() {
   if (troopSummaryBtn) troopSummaryBtn.disabled = false;
   if (inventoryReportBtn) inventoryReportBtn.disabled = false;
-  if (summaryReportBtn) summaryReportBtn.disabled = false;
+  if (summaryReportBtn) {
+    summaryReportBtn.disabled = false;
+
+    // Check if any scout has negative inventory for any variety
+    let hasNegativeInventory = false;
+
+    // Build scout summary to check for negative inventory
+    const scoutSummary = {};
+    digitalCookieData.forEach(row => {
+      const name = `${row['Girl First Name'] || ''} ${row['Girl Last Name'] || ''}`.trim();
+      if (!scoutSummary[name]) {
+        scoutSummary[name] = {
+          varieties: {},
+          inventoryVarieties: {}
+        };
+      }
+
+      // Track varieties sold
+      PHYSICAL_COOKIE_TYPES.forEach(type => {
+        const count = parseInt(row[type]) || 0;
+        if (count > 0) {
+          scoutSummary[name].varieties[type] = (scoutSummary[name].varieties[type] || 0) + count;
+        }
+      });
+    });
+
+    // Add inventory from T2G transfers
+    if (reconciler && reconciler.transfers) {
+      reconciler.transfers.forEach(transfer => {
+        if (transfer.type === 'T2G') {
+          const name = transfer.to;
+          if (scoutSummary[name] && transfer.varieties) {
+            Object.entries(transfer.varieties).forEach(([variety, count]) => {
+              if (variety !== 'Cookie Share' && !transfer.virtualBooth) {
+                scoutSummary[name].inventoryVarieties[variety] =
+                  (scoutSummary[name].inventoryVarieties[variety] || 0) + count;
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // Check for negative inventory
+    Object.values(scoutSummary).forEach(scout => {
+      PHYSICAL_COOKIE_TYPES.forEach(variety => {
+        const pickedUp = scout.inventoryVarieties[variety] || 0;
+        const sold = scout.varieties[variety] || 0;
+        if (pickedUp - sold < 0) {
+          hasNegativeInventory = true;
+        }
+      });
+    });
+
+    summaryReportBtn.textContent = hasNegativeInventory ? '⚠️ Scout Summary' : 'Scout Summary';
+  }
+
   if (varietyReportBtn) varietyReportBtn.disabled = false;
   if (donationAlertBtn) {
     donationAlertBtn.disabled = false;

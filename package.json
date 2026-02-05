@@ -48,9 +48,11 @@
     "electronLanguages": ["en", "en-US"],
     "mac": {
       "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
       "target": "zip"
     },
     "win": {
+      "icon": "build/icon.ico.png",
       "target": "zip"
     }
   }

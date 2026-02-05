@@ -348,11 +348,84 @@ class DataReconciler {
       }
     });
 
+    // Process direct ship divider allocations if present
+    if (apiData.directShipDivider && apiData.directShipDivider.girls) {
+      this.importDirectShipDivider(apiData.directShipDivider);
+    }
+
+    // Process virtual cookie share allocations if present
+    if (apiData.virtualCookieShares && apiData.virtualCookieShares.length > 0) {
+      this.importVirtualCookieShares(apiData.virtualCookieShares);
+    }
+
     this.metadata.lastImportSC = new Date().toISOString();
     this.metadata.sources.push({
       type: 'SC-API',
       date: new Date().toISOString(),
       records: orders.length
+    });
+  }
+
+  // Import Smart Direct Ship Divider allocations
+  // Shows how troop direct ship orders are allocated to scouts
+  importDirectShipDivider(dividerData) {
+    const girls = dividerData.girls || [];
+
+    girls.forEach(girl => {
+      const girlId = girl.id;
+      const cookies = girl.cookies || [];
+
+      // Parse varieties from cookies array
+      const { varieties, totalPackages } = this.parseVarietiesFromAPI(cookies);
+
+      // Store direct ship allocation for this girl
+      // We'll match girlId to scout name later in the renderer
+      const allocation = {
+        girlId: girlId,
+        packages: totalPackages,
+        varieties: varieties,
+        source: 'DirectShipDivider'
+      };
+
+      // Store in a new array for direct ship allocations
+      if (!this.directShipAllocations) {
+        this.directShipAllocations = [];
+      }
+      this.directShipAllocations.push(allocation);
+    });
+  }
+
+  // Import Virtual Cookie Share allocations
+  // Shows manual Cookie Share entries per scout
+  importVirtualCookieShares(virtualCookieShares) {
+    if (!this.virtualCookieShareAllocations) {
+      this.virtualCookieShareAllocations = new Map(); // Key: girlId, Value: total packages
+    }
+
+    virtualCookieShares.forEach(cookieShare => {
+      const girls = cookieShare.girls || [];
+
+      girls.forEach(girl => {
+        const girlId = girl.id;
+        const quantity = girl.quantity || 0;
+        const scoutName = `${girl.first_name || ''} ${girl.last_name || ''}`.trim();
+
+        // Store scout name by girlId if not already in scouts map
+        // This provides the girlId -> name mapping even without Smart Cookie Report data
+        if (girlId && scoutName && !this.scouts.has(scoutName)) {
+          this.updateScoutData(scoutName, {}, { scoutId: girlId });
+        } else if (girlId && scoutName && this.scouts.has(scoutName)) {
+          // Update existing scout with girlId if missing
+          const scout = this.scouts.get(scoutName);
+          if (!scout.scoutId) {
+            scout.scoutId = girlId;
+          }
+        }
+
+        // Accumulate quantities if there are multiple COOKIE_SHARE orders
+        const current = this.virtualCookieShareAllocations.get(girlId) || 0;
+        this.virtualCookieShareAllocations.set(girlId, current + quantity);
+      });
     });
   }
 

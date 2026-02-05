@@ -213,9 +213,104 @@ class SmartCookieApiScraper {
   }
 
   /**
+   * Fetch Smart Direct Ship Divider allocations
+   * Shows how troop direct ship orders are allocated to individual scouts
+   */
+  async fetchDirectShipDivider() {
+    this.sendProgress('Smart Cookie API: Fetching direct ship allocations...', 60);
+
+    if (!this.xsrfToken) {
+      throw new Error('XSRF token not available. Must login first.');
+    }
+
+    try {
+      const response = await this.client.get('/webapi/api/troops/directship/smart-directship-divider', {
+        headers: {
+          'x-xsrf-token': this.xsrfToken,
+          'Referer': 'https://app.abcsmartcookies.com/'
+        }
+      });
+
+      if (response.status !== 200) {
+        throw new Error(`Direct ship divider fetch failed with status ${response.status}`);
+      }
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(`Direct ship divider fetch failed: ${error.response.status} ${error.response.statusText}`);
+      }
+      throw new Error(`Direct ship divider fetch failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Fetch Virtual Cookie Share details for a specific order
+   * Returns per-scout allocation breakdown
+   */
+  async fetchVirtualCookieShare(orderId) {
+    if (!this.xsrfToken) {
+      throw new Error('XSRF token not available. Must login first.');
+    }
+
+    try {
+      const response = await this.client.get(`/webapi/api/cookie-shares/virtual/${orderId}`, {
+        headers: {
+          'x-xsrf-token': this.xsrfToken,
+          'Referer': 'https://app.abcsmartcookies.com/'
+        }
+      });
+
+      if (response.status !== 200) {
+        throw new Error(`Virtual cookie share fetch failed with status ${response.status}`);
+      }
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(`Virtual cookie share fetch failed: ${error.response.status} ${error.response.statusText}`);
+      }
+      throw new Error(`Virtual cookie share fetch failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Fetch all Virtual Cookie Share allocations
+   * Finds all COOKIE_SHARE transfers and fetches their per-scout breakdowns
+   */
+  async fetchAllVirtualCookieShares(ordersData) {
+    this.sendProgress('Smart Cookie API: Fetching virtual cookie share details...', 65);
+
+    const virtualCookieShares = [];
+
+    // Find all COOKIE_SHARE transfers that aren't from Digital Cookie
+    const cookieShareOrders = (ordersData.orders || []).filter(order => {
+      const type = order.transfer_type || order.type || '';
+      const orderNum = String(order.order_number || '');
+      // COOKIE_SHARE type and order number doesn't start with 'D' (not from DC)
+      return type.includes('COOKIE_SHARE') && !orderNum.startsWith('D');
+    });
+
+    // Fetch details for each COOKIE_SHARE order
+    for (const order of cookieShareOrders) {
+      const orderId = order.id || order.order_id;
+      if (orderId) {
+        try {
+          const details = await this.fetchVirtualCookieShare(orderId);
+          virtualCookieShares.push(details);
+        } catch (error) {
+          console.warn(`Warning: Could not fetch virtual cookie share ${orderId}:`, error.message);
+        }
+      }
+    }
+
+    return virtualCookieShares;
+  }
+
+  /**
    * Save orders data to JSON file
    */
-  async saveOrdersData(ordersData) {
+  async saveOrdersData(ordersData, directShipDivider, virtualCookieShares) {
     this.sendProgress('Smart Cookie API: Saving data...', 80);
 
     // Ensure output directory exists
@@ -227,8 +322,15 @@ class SmartCookieApiScraper {
     const timestamp = getTimestamp();
     const filePath = path.join(this.inDir, `SC-${timestamp}.json`);
 
+    // Combine orders, direct ship divider, and virtual cookie share data
+    const combinedData = {
+      ...ordersData,
+      directShipDivider: directShipDivider || null,
+      virtualCookieShares: virtualCookieShares || []
+    };
+
     // Write JSON file with pretty formatting
-    fs.writeFileSync(filePath, JSON.stringify(ordersData, null, 2));
+    fs.writeFileSync(filePath, JSON.stringify(combinedData, null, 2));
 
     this.sendProgress('Smart Cookie API: Data saved', 90);
 
@@ -249,8 +351,14 @@ class SmartCookieApiScraper {
       // Step 2: Fetch orders data
       const ordersData = await this.fetchOrders();
 
-      // Step 3: Save to file
-      const filePath = await this.saveOrdersData(ordersData);
+      // Step 3: Fetch direct ship divider allocations
+      const directShipDivider = await this.fetchDirectShipDivider();
+
+      // Step 4: Fetch virtual cookie share allocations
+      const virtualCookieShares = await this.fetchAllVirtualCookieShares(ordersData);
+
+      // Step 5: Save to file
+      const filePath = await this.saveOrdersData(ordersData, directShipDivider, virtualCookieShares);
 
       this.sendProgress('Smart Cookie API: Complete', 100);
 
