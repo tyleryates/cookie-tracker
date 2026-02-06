@@ -1,6 +1,6 @@
 {
   "name": "cookie-tracker",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Girl Scout Cookie Inventory and Order Tracker",
   "main": "main.js",
   "scripts": {
