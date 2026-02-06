@@ -493,34 +493,7 @@ tr:hover {
   cursor: help;
 }
 
-/* Legacy alias for backwards compatibility */
-.report-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-  font-size: 0.95em;
-  background: white;
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-}
-
-.report-table th {
-  background: var(--primary);
-  color: white;
-  padding: 14px 16px;
-  text-align: left;
-  font-weight: 600;
-}
-
-.report-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--gray-200);
-}
-
-.report-table tr:hover {
-  background: var(--gray-50);
-}
+/* Note: .report-table removed - use .table-normal or .table-compact instead */
 
 .table-hint {
   font-size: 0.9em;

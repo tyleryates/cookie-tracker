@@ -1,7 +1,7 @@
 # Girl Scout Cookie Systems - Overview & Edge Cases
 
 **Created from official GSSD documentation**
-**Last Updated:** 2026-02-04
+**Last Updated:** 2026-02-05
 
 ---
 

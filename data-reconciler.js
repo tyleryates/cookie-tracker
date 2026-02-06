@@ -2,7 +2,54 @@
 // Standardizes and merges data from Digital Cookie and Smart Cookie
 
 const { PHYSICAL_COOKIE_TYPES, COOKIE_ID_MAP, COOKIE_COLUMN_MAP, COOKIE_ABBR_MAP } = require('./cookie-constants.js');
+const {
+  PACKAGES_PER_CASE,
+  EXCEL_EPOCH,
+  MS_PER_DAY,
+  ORDER_TYPES,
+  DC_COLUMNS,
+  SC_REPORT_COLUMNS,
+  SC_API_COLUMNS
+} = require('./constants');
+const Logger = require('./logger');
 
+const {
+  parseVarietiesFromDC,
+  parseVarietiesFromSCReport,
+  parseVarietiesFromAPI,
+  parseVarietiesFromSCTransfer,
+  parseExcelDate,
+  importDigitalCookie,
+  importSmartCookieReport,
+  importSmartCookieAPI,
+  importDirectShipDivider,
+  importVirtualCookieShares,
+  importSmartCookie,
+  updateScoutData
+} = require('./data-processing/data-importers.js');
+
+const {
+  buildUnifiedDataset
+} = require('./data-processing/data-calculators.js');
+
+// Data source identifiers
+const DATA_SOURCES = {
+  DIGITAL_COOKIE: 'DC',
+  SMART_COOKIE: 'SC',
+  SMART_COOKIE_REPORT: 'SC-Report',
+  SMART_COOKIE_API: 'SC-API',
+  DIRECT_SHIP_DIVIDER: 'DirectShipDivider'
+};
+
+/**
+ * DataReconciler - Merges and standardizes data from multiple sources
+ *
+ * IMPORTANT CONVENTION: Properties prefixed with $ are calculated/derived fields
+ * - These are computed from raw imported data during buildUnifiedDataset()
+ * - Examples: $varietyBreakdowns, $issues, $cookieShare
+ * - Do not import these directly - they are rebuilt on each reconciliation
+ * - This convention helps distinguish between source data and computed values
+ */
 class DataReconciler {
   constructor() {
     this.orders = new Map(); // Key: order number
@@ -106,459 +153,68 @@ class DataReconciler {
   // Get metadata key for source
   getMetadataKey(source) {
     const keyMap = {
-      'DC': 'dc',
-      'SC': 'sc',
-      'SC-Report': 'scReport',
-      'SC-API': 'scApi'
+      [DATA_SOURCES.DIGITAL_COOKIE]: 'dc',
+      [DATA_SOURCES.SMART_COOKIE]: 'sc',
+      [DATA_SOURCES.SMART_COOKIE_REPORT]: 'scReport',
+      [DATA_SOURCES.SMART_COOKIE_API]: 'scApi'
     };
     return keyMap[source] || source.toLowerCase();
   }
 
-  // Variety parsing helpers
+  // Delegation wrappers for variety parsing
   parseVarietiesFromDC(row) {
-    const varieties = {};
-    PHYSICAL_COOKIE_TYPES.forEach(type => {
-      const count = parseInt(row[type]) || 0;
-      if (count > 0) varieties[type] = count;
-    });
-    return varieties;
+    return parseVarietiesFromDC(row);
   }
 
   parseVarietiesFromSCReport(row) {
-    const varieties = {};
-    let totalCases = 0;
-    let totalPackages = 0;
-
-    Object.entries(COOKIE_COLUMN_MAP).forEach(([col, name]) => {
-      const value = row[col] || '0/0';
-      const parts = String(value).split('/');
-      const cases = parseInt(parts[0]) || 0;
-      const packages = parseInt(parts[1]) || 0;
-
-      if (packages > 0) {
-        varieties[name] = packages;
-      }
-      totalCases += Math.abs(cases);
-      totalPackages += Math.abs(packages);
-    });
-
-    return { varieties, totalCases, totalPackages };
+    return parseVarietiesFromSCReport(row);
   }
 
   parseVarietiesFromAPI(cookiesArray) {
-    const varieties = {};
-    let totalPackages = 0;
-
-    (cookiesArray || []).forEach(cookie => {
-      const cookieId = cookie.id || cookie.cookieId;
-      const cookieName = COOKIE_ID_MAP[cookieId];
-      if (cookieName && cookie.quantity !== 0) {
-        varieties[cookieName] = Math.abs(cookie.quantity);
-        totalPackages += Math.abs(cookie.quantity);
-      }
-    });
-
-    return { varieties, totalPackages };
+    return parseVarietiesFromAPI(cookiesArray);
   }
 
   parseVarietiesFromSCTransfer(row) {
-    const varieties = {};
-
-    Object.entries(COOKIE_ABBR_MAP).forEach(([abbr, name]) => {
-      const count = parseInt(row[abbr]) || 0;
-      if (count !== 0) varieties[name] = count;
-    });
-
-    return varieties;
+    return parseVarietiesFromSCTransfer(row);
   }
 
-  // Import Digital Cookie data
-  importDigitalCookie(dcData) {
-    dcData.forEach(row => {
-      const orderNum = String(row['Order Number']);
-      const scout = `${row['Girl First Name'] || ''} ${row['Girl Last Name'] || ''}`.trim();
-
-      // Parse varieties
-      const varieties = this.parseVarietiesFromDC(row);
-
-      const orderData = {
-        orderNumber: orderNum,
-        scout: scout,
-        date: this.parseExcelDate(row['Order Date (Central Time)']),
-        type: row['Order Type'],
-        packages: (parseInt(row['Total Packages (Includes Donate & Gift)']) || 0) -
-                 (parseInt(row['Refunded Packages']) || 0),
-        amount: parseFloat(row['Current Sale Amount']) || 0,
-        status: row['Order Status'],
-        paymentStatus: row['Payment Status'],
-        shipStatus: row['Ship Status'],
-        varieties: varieties
-      };
-
-      // Merge or create order (DC is source of truth for order details)
-      this.mergeOrCreateOrder(orderNum, orderData, 'DC', row);
-
-      // Update scout data
-      this.updateScoutData(scout, {
-        soldDC: orderData.packages,
-        revenueDC: orderData.amount,
-        ordersDC: 1
-      });
-    });
-
-    this.metadata.lastImportDC = new Date().toISOString();
-    this.metadata.sources.push({
-      type: 'DC',
-      date: new Date().toISOString(),
-      records: dcData.length
-    });
-  }
-
-  // Import Smart Cookie Report (ReportExport.xlsx)
-  importSmartCookieReport(reportData) {
-    reportData.forEach(row => {
-      const orderNum = String(row['OrderID'] || row['RefNumber']);
-      const scout = row['GirlName'] || '';
-
-      // Parse varieties from C1-C13 columns (format: "cases/packages")
-      const { varieties, totalCases, totalPackages } = this.parseVarietiesFromSCReport(row);
-
-      // Parse total (also in "cases/packages" format)
-      const totalParts = String(row['Total'] || '0/0').split('/');
-      const totalFromField = parseInt(totalParts[1]) || totalPackages;
-
-      const orderData = {
-        orderNumber: orderNum,
-        scout: scout,
-        scoutId: row['GirlID'],
-        gsusaId: row['GSUSAID'],
-        gradeLevel: row['GradeLevel'],
-        date: row['OrderDate'],
-        type: row['OrderTypeDesc'],
-        packages: totalFromField,
-        cases: totalCases,
-        includedInIO: row['IncludedInIO'],
-        isVirtual: row['CShareVirtual'] === 'TRUE',
-        varieties: varieties,
-        troopId: row['TroopID'],
-        serviceUnit: row['ServiceUnitDesc'],
-        council: row['CouncilDesc'],
-        district: row['ParamTitle'] ? row['ParamTitle'].match(/District = ([^;]+)/)?.[1]?.trim() : null
-      };
-
-      // Merge or create order with enrichment
-      this.mergeOrCreateOrder(orderNum, orderData, 'SC-Report', row, (existing, newData) => {
-        existing.scoutId = newData.scoutId;
-        existing.gsusaId = newData.gsusaId;
-        existing.gradeLevel = newData.gradeLevel;
-        existing.includedInIO = newData.includedInIO;
-        existing.isVirtual = newData.isVirtual;
-        existing.cases = newData.cases;
-        existing.organization = {
-          troopId: newData.troopId,
-          serviceUnit: newData.serviceUnit,
-          council: newData.council,
-          district: newData.district
-        };
-      });
-
-      // Update scout data with metadata (updateScoutData now handles metadata directly)
-      this.updateScoutData(scout, {
-        ordersSCReport: 1,
-        scoutId: orderData.scoutId,
-        gsusaId: orderData.gsusaId,
-        gradeLevel: orderData.gradeLevel,
-        serviceUnit: orderData.serviceUnit
-      });
-    });
-
-    this.metadata.lastImportSCReport = new Date().toISOString();
-    this.metadata.sources.push({
-      type: 'SC-Report',
-      date: new Date().toISOString(),
-      records: reportData.length
-    });
-  }
-
-  // Import Smart Cookie API data (JSON format from API)
-  importSmartCookieAPI(apiData) {
-    const orders = apiData.orders || [];
-
-    orders.forEach(order => {
-      // Handle both old format and new /orders/search API format
-      // Use transfer_type for actual transfer type (C2T(P), T2G, D, etc.)
-      // order.type is just "TRANSFER" for all transfers
-      const type = order.transfer_type || order.type || order.orderType || '';
-      const orderNum = String(order.order_number || order.orderNumber || '');
-      const to = order.to || '';
-      const from = order.from || '';
-
-      // Parse varieties from cookies array
-      // Handle both formats: cookies[].id (new API) or cookies[].cookieId (old format)
-      const { varieties, totalPackages } = this.parseVarietiesFromAPI(order.cookies);
-
-      const transferData = {
-        date: order.date || order.createdDate,
-        type: type,
-        orderNumber: orderNum,
-        from: from,
-        to: to,
-        packages: totalPackages,
-        cases: Math.round(Math.abs(order.total_cases || 0) / 12), // Convert packages to cases (12 packages per case)
-        varieties: varieties,
-        amount: Math.abs(parseFloat(order.total || order.totalPrice) || 0),
-        virtualBooth: order.virtual_booth || false,
-        status: order.status || '',
-        actions: order.actions || {},
-        source: 'SC-API'
-      };
-
-      // Create transfer record
-      this.transfers.push(this.createTransfer(transferData));
-
-      // Handle Digital Cookie orders in Smart Cookie (orderNumber starts with D)
-      if (orderNum.startsWith('D')) {
-        const dcOrderNum = orderNum.substring(1); // Remove 'D' prefix
-
-        // Merge or create order from SC-API
-        this.mergeOrCreateOrder(dcOrderNum, {
-          orderNumber: dcOrderNum,
-          scout: to,
-          date: transferData.date,
-          type: type,
-          packages: Math.abs(transferData.packages),
-          amount: Math.abs(transferData.amount),
-          status: 'In SC Only',
-          varieties: varieties
-        }, 'SC-API', order);
-      }
-
-      // Track scout pickups (T2G - Troop to Girl)
-      if (type === 'T2G' && to !== from) {
-        this.updateScoutData(to, {
-          pickedUp: Math.abs(transferData.packages)
-        });
-      }
-
-      // Track Digital Cookie sales in SC (COOKIE_SHARE)
-      if (type.includes('COOKIE_SHARE')) {
-        this.updateScoutData(to, {
-          soldSC: Math.abs(transferData.packages)
-        });
-      }
-    });
-
-    // Process direct ship divider allocations if present
-    if (apiData.directShipDivider && apiData.directShipDivider.girls) {
-      this.importDirectShipDivider(apiData.directShipDivider);
-    }
-
-    // Process virtual cookie share allocations if present
-    if (apiData.virtualCookieShares && apiData.virtualCookieShares.length > 0) {
-      this.importVirtualCookieShares(apiData.virtualCookieShares);
-    }
-
-    this.metadata.lastImportSC = new Date().toISOString();
-    this.metadata.sources.push({
-      type: 'SC-API',
-      date: new Date().toISOString(),
-      records: orders.length
-    });
-  }
-
-  // Import Smart Direct Ship Divider allocations
-  // Shows how troop direct ship orders are allocated to scouts
-  importDirectShipDivider(dividerData) {
-    const girls = dividerData.girls || [];
-
-    girls.forEach(girl => {
-      const girlId = girl.id;
-      const cookies = girl.cookies || [];
-
-      // Parse varieties from cookies array
-      const { varieties, totalPackages } = this.parseVarietiesFromAPI(cookies);
-
-      // Store direct ship allocation for this girl
-      // We'll match girlId to scout name later in the renderer
-      const allocation = {
-        girlId: girlId,
-        packages: totalPackages,
-        varieties: varieties,
-        source: 'DirectShipDivider'
-      };
-
-      // Store in a new array for direct ship allocations
-      if (!this.directShipAllocations) {
-        this.directShipAllocations = [];
-      }
-      this.directShipAllocations.push(allocation);
-    });
-  }
-
-  // Import Virtual Cookie Share allocations
-  // Shows manual Cookie Share entries per scout
-  importVirtualCookieShares(virtualCookieShares) {
-    if (!this.virtualCookieShareAllocations) {
-      this.virtualCookieShareAllocations = new Map(); // Key: girlId, Value: total packages
-    }
-
-    virtualCookieShares.forEach(cookieShare => {
-      const girls = cookieShare.girls || [];
-
-      girls.forEach(girl => {
-        const girlId = girl.id;
-        const quantity = girl.quantity || 0;
-        const scoutName = `${girl.first_name || ''} ${girl.last_name || ''}`.trim();
-
-        // Store scout name by girlId if not already in scouts map
-        // This provides the girlId -> name mapping even without Smart Cookie Report data
-        if (girlId && scoutName && !this.scouts.has(scoutName)) {
-          this.updateScoutData(scoutName, {}, { scoutId: girlId });
-        } else if (girlId && scoutName && this.scouts.has(scoutName)) {
-          // Update existing scout with girlId if missing
-          const scout = this.scouts.get(scoutName);
-          if (!scout.scoutId) {
-            scout.scoutId = girlId;
-          }
-        }
-
-        // Accumulate quantities if there are multiple COOKIE_SHARE orders
-        const current = this.virtualCookieShareAllocations.get(girlId) || 0;
-        this.virtualCookieShareAllocations.set(girlId, current + quantity);
-      });
-    });
-  }
-
-  // Import Smart Cookie data
-  importSmartCookie(scData) {
-    scData.forEach(row => {
-      const type = row['TYPE'] || '';
-      const orderNum = String(row['ORDER #'] || '');
-      const to = row['TO'] || '';
-      const from = row['FROM'] || '';
-
-      // Parse varieties
-      const varieties = this.parseVarietiesFromSCTransfer(row);
-
-      const transferData = {
-        date: row['DATE'],
-        type: type,
-        orderNumber: orderNum,
-        from: from,
-        to: to,
-        packages: parseInt(row['TOTAL']) || 0,
-        varieties: varieties,
-        amount: parseFloat(row['TOTAL $']) || 0,
-        source: 'SC'
-      };
-
-      // Create transfer record
-      this.transfers.push(this.createTransfer(transferData));
-
-      // Handle Digital Cookie orders in Smart Cookie (COOKIE_SHARE with D prefix)
-      if (type.includes('COOKIE_SHARE') && orderNum.startsWith('D')) {
-        const dcOrderNum = orderNum.substring(1); // Remove 'D' prefix
-
-        // Merge or create order from SC
-        this.mergeOrCreateOrder(dcOrderNum, {
-          orderNumber: dcOrderNum,
-          scout: to,
-          date: transferData.date,
-          type: type,
-          packages: Math.abs(transferData.packages),
-          amount: Math.abs(transferData.amount),
-          status: 'In SC Only',
-          varieties: varieties
-        }, 'SC', row);
-      }
-
-      // Extract troop number from C2T transfers (Council to Troop)
-      if ((type === 'C2T' || type === 'C2T(P)' || type.startsWith('C2T')) && to && !this.troopNumber) {
-        this.troopNumber = to;
-      }
-
-      // Track scout pickups (T2G - Troop to Girl)
-      // Check if transfer is FROM troop TO scout (not troop-to-troop)
-      if (type === 'T2G' && this.troopNumber && from === this.troopNumber && to !== this.troopNumber) {
-        this.updateScoutData(to, {
-          pickedUp: Math.abs(transferData.packages)
-        });
-      }
-
-      // Track Digital Cookie sales in SC
-      if (type.includes('COOKIE_SHARE') && this.troopNumber && from === this.troopNumber) {
-        this.updateScoutData(to, {
-          soldSC: Math.abs(transferData.packages)
-        });
-      }
-    });
-
-    this.metadata.lastImportSC = new Date().toISOString();
-    this.metadata.sources.push({
-      type: 'SC',
-      date: new Date().toISOString(),
-      records: scData.length
-    });
-  }
-
-  // Update scout aggregated data
-  // Supports both numeric fields (additive) and metadata fields (direct set)
-  updateScoutData(scoutName, updates, metadata = {}) {
-    // Metadata fields that should be set directly (not added)
-    const metadataFields = ['scoutId', 'gsusaId', 'gradeLevel', 'serviceUnit', 'troopId', 'council', 'district'];
-
-    if (!this.scouts.has(scoutName)) {
-      this.scouts.set(scoutName, {
-        name: scoutName,
-        pickedUp: 0,
-        soldDC: 0,
-        soldSC: 0,
-        revenueDC: 0,
-        ordersDC: 0,
-        ordersSCReport: 0,
-        remaining: 0,
-        // Metadata fields
-        scoutId: null,
-        gsusaId: null,
-        gradeLevel: null,
-        serviceUnit: null,
-        troopId: null,
-        council: null,
-        district: null
-      });
-    }
-
-    const scout = this.scouts.get(scoutName);
-
-    // Handle numeric updates (additive)
-    Object.keys(updates).forEach(key => {
-      if (metadataFields.includes(key)) {
-        // Metadata: set directly if not null
-        if (updates[key] !== null && updates[key] !== undefined) {
-          scout[key] = updates[key];
-        }
-      } else {
-        // Numeric: add to existing value
-        scout[key] = (scout[key] || 0) + updates[key];
-      }
-    });
-
-    // Handle separate metadata object (for backward compatibility)
-    Object.keys(metadata).forEach(key => {
-      if (metadata[key] !== null && metadata[key] !== undefined) {
-        scout[key] = metadata[key];
-      }
-    });
-
-    scout.remaining = scout.pickedUp - scout.soldDC;
-  }
-
-  // Utility: Parse Excel date
   parseExcelDate(excelDate) {
-    if (!excelDate || typeof excelDate !== 'number') return null;
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const excelEpoch = new Date(1899, 11, 30);
-    return new Date(excelEpoch.getTime() + excelDate * msPerDay).toISOString();
+    return parseExcelDate(excelDate);
+  }
+
+  // Delegation wrappers for import methods
+  importDigitalCookie(dcData) {
+    return importDigitalCookie(this, dcData);
+  }
+
+  importSmartCookieReport(reportData) {
+    return importSmartCookieReport(this, reportData);
+  }
+
+  importSmartCookieAPI(apiData) {
+    return importSmartCookieAPI(this, apiData);
+  }
+
+  importDirectShipDivider(dividerData) {
+    return importDirectShipDivider(this, dividerData);
+  }
+
+  importVirtualCookieShares(virtualCookieShares) {
+    return importVirtualCookieShares(this, virtualCookieShares);
+  }
+
+  importSmartCookie(scData) {
+    return importSmartCookie(this, scData);
+  }
+
+  updateScoutData(scoutName, updates, metadata) {
+    return updateScoutData(this, scoutName, updates, metadata);
+  }
+
+  // Delegation wrapper for unified dataset builder
+  buildUnifiedDataset() {
+    this.unified = buildUnifiedDataset(this);
+    return this.unified;
   }
 
   // Get reconciled data

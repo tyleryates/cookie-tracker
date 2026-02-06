@@ -71,6 +71,11 @@ Smart Cookie's "Packages Sold" metric counts T2G + D + DIRECT_SHIP + COOKIE_SHAR
 
 **Test:** Sum all varieties shown in Smart Cookie dashboard → Should equal our "Packages Sold" number
 
+**See also:**
+- [DATA-FORMATS.md - Transfer Type Field](DATA-FORMATS.md#critical-type-vs-transfer_type-field) - API structure details
+- [IMPLEMENTATION-NOTES.md - Transfer Type Filtering](IMPLEMENTATION-NOTES.md#transfer-type-filtering) - Code implementation
+- [DATA-SOURCES-PRIORITY.md](DATA-SOURCES-PRIORITY.md) - Why Smart Cookie totals are authoritative
+
 ---
 
 ## Transfer Types & What They Mean
@@ -177,6 +182,10 @@ Not all Cookie Share orders auto-sync to Smart Cookie. Requires manual entry if:
 - "Shipped with Donation" + credit card (`CAPTURED`)
 - "Donation" only + credit card (`CAPTURED`)
 
+**See also:**
+- [EDGE-CASES.md - Cookie Share Edge Cases](EDGE-CASES.md#cookie-share-donations-edge-cases) - Display patterns and pricing
+- [PROGRAM-KNOWLEDGE.md - Virtual Cookie Share](PROGRAM-KNOWLEDGE.md) - Domain context and workflow
+
 ---
 
 ## Site Orders & Booth Sales
@@ -221,19 +230,13 @@ totalInventory -= siteOrdersPhysical;
 
 ### Reporting Site Orders
 
-**In Scout Summary:** Site orders show under "Booth Sales" column, not regular "Sales"
+**In Scout Summary:** Site orders are classified as TROOP_GIRL_DELIVERY or TROOP_DIRECT_SHIP.
 
-```javascript
-const isSiteOrder = lastName === 'Site';
+**Current Implementation:** Site orders are handled during `buildSiteOrdersDataset()` and allocations are tracked in `scout.credited` fields.
 
-if (isSiteOrder) {
-  scoutSummary[name].boothCredits += physicalPackages;
-  scoutSummary[name].boothVarieties[type] += count;
-} else {
-  scoutSummary[name].packages += physicalPackages;
-  scoutSummary[name].varieties[type] += count;
-}
-```
+**See:**
+- [SALES-TYPES.md - Type 3 & 4](SALES-TYPES.md) for complete site order classification
+- [RECONCILIATION.md - buildSiteOrdersDataset](RECONCILIATION.md#build-site-orders-dataset-with-allocations) for implementation details
 
 ---
 

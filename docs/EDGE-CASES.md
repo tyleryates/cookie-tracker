@@ -8,33 +8,12 @@ This document captures critical edge cases and behaviors discovered in the codeb
 
 ### Transfer Type Field Bug (CRITICAL)
 
-**The Problem:**
-Smart Cookie API returns TWO fields that look like "type":
-- `order.type` - ALWAYS "TRANSFER" for all transfers (not useful)
-- `order.transfer_type` - Contains the ACTUAL type: "T2G", "C2T(P)", "D", etc.
+⚠️ **See [DATA-FORMATS.md - Transfer Type Field](DATA-FORMATS.md#critical-type-vs-transfer_type-field) for complete explanation and code examples.**
 
-**Historical Bug:**
-Early versions of the app used `order.type` instead of `order.transfer_type`, causing:
-1. All transfers appeared as generic "TRANSFER" type
-2. Couldn't distinguish C2T (inventory in) from T2G (inventory out)
-3. Inventory completely disappeared from reports
-4. C2T transfers (pickups from council) weren't recognized
-
-**Root Cause:**
-```javascript
-// WRONG - uses generic type field
-const type = order.type; // Always "TRANSFER"
-
-// CORRECT - uses specific transfer type
-const type = order.transfer_type || order.type || order.orderType || '';
-```
-
-**Additional Gotchas:**
-- Transfer types have suffixes: `C2T(P)` not just `C2T`
-- Must use `startsWith('C2T')` or exact match with suffix
-- Example: `type === 'C2T(P)' || type.startsWith('C2T')`
-
-**Impact:** Using wrong field makes inventory tracking completely broken. ALWAYS use `transfer_type`.
+**Quick Summary:**
+- Smart Cookie API has TWO type fields: `order.type` (always "TRANSFER") and `order.transfer_type` (actual type)
+- **MUST use `transfer_type` field** - using `type` breaks all inventory tracking
+- Transfer types have suffixes (e.g., `C2T(P)`) - use `startsWith('C2T')` pattern
 
 ### Reconciler Duplicate Accumulation Bug
 
@@ -89,15 +68,8 @@ const scFiles = result.files
 - `packages` = ONLY packages requiring physical inventory
 - `physicalPackages` = total - donations (excludes virtual Cookie Share)
 
-**Calculation**:
-```javascript
-const totalPkgs = parseInt(row['Total Packages (Includes Donate & Gift)']) || 0;
-const refundedPkgs = parseInt(row['Refunded Packages']) || 0;
-const donations = parseInt(row['Donation']) || 0;
-
-const packages = totalPkgs - refundedPkgs;  // Net packages
-const physicalPackages = packages - donations;  // Exclude virtual Cookie Share
-```
+**Calculation:**
+Net packages are calculated by subtracting refunded packages from the total. Physical packages are then calculated by subtracting donations (virtual Cookie Share) from net packages. This ensures accurate tracking of packages requiring physical inventory.
 
 ### Refunded Packages
 **Important**: The `Total Packages (Includes Donate & Gift)` field INCLUDES refunded packages
@@ -112,10 +84,7 @@ const physicalPackages = packages - donations;  // Exclude virtual Cookie Share
 ### Case-Insensitive Matching Required
 **Issue**: Order types can vary in capitalization
 **Examples**: `"Shipped"`, `"shipped"`, `"Shipped with Donation"`
-**Solution**: Use `.includes()` with lowercase comparison or case-insensitive matching
-```javascript
-const isShipped = orderType.includes('Shipped') || orderType.includes('shipped');
-```
+**Solution**: Check for both capitalization variants using `.includes()` method to handle inconsistent API data.
 
 ### Donation-Only Orders
 **Type**: `Order Type === "Donation"` (exact match)
@@ -240,28 +209,39 @@ function determineManualEntryNeeds(order) {
 
 ---
 
-## Virtual Booth Tracking Buckets
+## Virtual Booth Tracking
 
-### Why Four Separate Tracking Objects?
+### What Are Virtual Booth Credits?
 
-The system maintains **four distinct variety tracking objects** per scout to accurately separate physical inventory from virtual credits:
+**Virtual booth credits** are T2G transfers where scouts receive sales credit without physically receiving packages.
 
-1. **`varieties`** - Physical sales requiring inventory
-2. **`inventoryVarieties`** - Physical inventory received (T2G)
-3. **`boothVarieties`** - Virtual booth credits (no physical transfer)
-4. **`shippedVarieties`** - Direct ship orders (no scout inventory)
+**Example Scenario:**
+- Troop booth sells 100 packages
+- Scout helps at booth for 1 hour
+- TCM credits scout with 1 package sale (virtual T2G transfer)
+- Scout never physically receives the package (sold directly from troop stock)
+
+### Why Separate Tracking Is Required
+
+The system maintains **four distinct variety tracking objects** per scout (stored in `scout.$varietyBreakdowns`) to accurately separate physical inventory from virtual credits:
+
+1. **`$varietyBreakdowns.fromSales`** - Physical sales requiring inventory
+2. **`inventory.varieties`** - Physical inventory received (T2G)
+3. **`$varietyBreakdowns.fromBooth`** - Virtual booth credits (no physical transfer)
+4. **`$varietyBreakdowns.fromDirectShip`** - Direct ship allocations (no scout inventory)
+
+**See:** [IMPLEMENTATION-NOTES.md - $ Prefix Convention](IMPLEMENTATION-NOTES.md#-prefix-convention) for complete field documentation
 
 ### Purpose of Each Bucket
 
-**1. `varieties` (Physical Sales)**
-- **Contains**: Regular orders requiring physical delivery
+**1. `$varietyBreakdowns.fromSales` (Physical Sales)**
+- **Contains**: GIRL_DELIVERY orders requiring physical delivery
 - **Includes**: "Cookies in Hand", "In Person Delivery", "Pick Up"
-- **Includes**: Cookie Share (even though virtual - counts as "sold")
-- **Excludes**: Shipped orders, virtual booth credits
+- **Excludes**: Shipped orders, virtual booth credits, Cookie Share
 - **Used For**: "Sold" column in scout reports
 - **Inventory Impact**: REDUCES net inventory (scout gave away packages)
 
-**2. `inventoryVarieties` (Physical Inventory Received)**
+**2. `inventory.varieties` (Physical Inventory Received)**
 - **Contains**: T2G transfers where scout physically received cookies
 - **Includes**: Only physical cookie types
 - **Excludes**: Cookie Share (virtual, shows as N/A)
@@ -269,87 +249,95 @@ The system maintains **four distinct variety tracking objects** per scout to acc
 - **Used For**: "Picked Up" column in scout reports
 - **Inventory Impact**: INCREASES net inventory (scout received packages)
 
-**3. `boothVarieties` (Virtual Booth Credits)**
+**3. `$varietyBreakdowns.fromBooth` (Virtual Booth Credits)**
 - **Contains**: T2G transfers with `virtualBooth === true` flag
 - **Includes**: All varieties (even Cookie Share if present)
+- **Source**: `scout.credited.booth.varieties` (copied during calculation)
 - **Example**: Troop booth sold 100 packages, scout gets 1 package credit
 - **Used For**: "Booth Sales" column in scout reports
 - **Inventory Impact**: NONE (no physical transfer, credit only)
 
-**4. `shippedVarieties` (Direct Ship Orders)**
-- **Contains**: Orders shipped directly from supplier to customer
-- **Includes**: All varieties in shipped orders
-- **Example**: Customer orders 10 Thin Mints, shipped from warehouse
-- **Used For**: "Direct Ship" column in scout reports
+**4. `$varietyBreakdowns.fromDirectShip` (Direct Ship Allocations)**
+- **Contains**: Site orders (TROOP_DIRECT_SHIP) allocated to scouts
+- **Includes**: All varieties in direct ship allocations
+- **Source**: `scout.credited.directShip.varieties` (copied during calculation)
+- **Example**: Troop site order shipped to customer, scout gets credit
+- **Used For**: "Credited" totals in scout reports
 - **Inventory Impact**: NONE (scout never handled packages)
 
 ### Code Implementation
 
+**Current Implementation** (uses $ prefix pattern):
+
 ```javascript
-// Initialize all tracking buckets
-const scoutSummary = {
+// Structure created in data-reconciler.js buildUnifiedDataset()
+const scout = {
   name: scoutName,
-  totalPackages: 0,
-  packages: 0,           // Physical sales only
-  inventory: 0,          // T2G physical only
-  boothCredits: 0,       // Virtual booth credits
-  revenue: 0,
-  varieties: {},         // Physical sales
-  inventoryVarieties: {}, // T2G physical
-  boothVarieties: {},    // Virtual booth
-  shippedVarieties: {}   // Direct ship
-};
 
-// Processing regular orders
-dcData.forEach(row => {
-  const orderType = row['Order Type'] || '';
-  const isShipped = orderType.includes('Shipped');
-  const isDonationOnly = orderType === 'Donation';
+  // Inventory (from T2G transfers, physical only)
+  inventory: {
+    total: 47,
+    varieties: {              // Physical inventory received
+      "Thin Mints": 15,
+      "Adventurefuls": 3
+    }
+  },
 
-  // Parse varieties
-  Object.entries(cookieVarieties).forEach(([variety, count]) => {
-    if (count > 0) {
-      if (isShipped && variety !== 'Cookie Share') {
-        // Direct ship → shippedVarieties
-        scout.shippedVarieties[variety] =
-          (scout.shippedVarieties[variety] || 0) + count;
-      } else if (!isDonationOnly) {
-        // Regular physical sale → varieties
-        scout.varieties[variety] =
-          (scout.varieties[variety] || 0) + count;
+  // Allocations (booth and direct ship credits)
+  credited: {
+    booth: {
+      packages: 12,
+      varieties: {            // Source for $varietyBreakdowns.fromBooth
+        "Thin Mints": 4,
+        "Caramel deLites": 3
+      }
+    },
+    directShip: {
+      packages: 6,
+      varieties: {            // Source for $varietyBreakdowns.fromDirectShip
+        "Lemonades": 2
       }
     }
-  });
-});
+  },
 
-// Processing T2G transfers
-reconciler.transfers.forEach(transfer => {
-  if (transfer.type === 'T2G' || transfer.type.startsWith('T2G')) {
-    const isVirtualBooth = transfer.virtualBooth || false;
-    const cookieShareCount = transfer.varieties?.['Cookie Share'] || 0;
+  // $ Prefix calculated fields (computed in calculateScoutTotals)
+  $varietyBreakdowns: {
+    fromSales: {              // GIRL_DELIVERY orders, physical only
+      "Thin Mints": 10,
+      "Caramel deLites": 5
+    },
+    fromShipped: {            // GIRL_DIRECT_SHIP orders
+      "Adventurefuls": 3
+    },
+    fromBooth: {},            // Copy of credited.booth.varieties
+    fromDirectShip: {}        // Copy of credited.directShip.varieties
+  }
+};
 
-    if (!isVirtualBooth) {
-      // Physical T2G transfer → inventoryVarieties
-      const physicalPackages = (transfer.packages || 0) - cookieShareCount;
-      scout.inventory += physicalPackages;
-
-      Object.entries(transfer.varieties || {}).forEach(([variety, count]) => {
-        if (variety !== 'Cookie Share') {
-          scout.inventoryVarieties[variety] =
-            (scout.inventoryVarieties[variety] || 0) + count;
-        }
-      });
-    } else {
-      // Virtual booth credit → boothVarieties
-      scout.boothCredits += transfer.packages;
-
-      Object.entries(transfer.varieties || {}).forEach(([variety, count]) => {
-        scout.boothVarieties[variety] =
-          (scout.boothVarieties[variety] || 0) + count;
-      });
-    }
+// Processing in calculateScoutTotals() - Phase 5
+scout.orders.forEach(order => {
+  if (order.type === 'GIRL_DELIVERY') {
+    // Track varieties from physical sales
+    Object.entries(order.varieties).forEach(([variety, count]) => {
+      if (variety !== 'Cookie Share') {
+        scout.$varietyBreakdowns.fromSales[variety] =
+          (scout.$varietyBreakdowns.fromSales[variety] || 0) + count;
+      }
+    });
+  } else if (order.type === 'GIRL_DIRECT_SHIP') {
+    // Track varieties from shipped orders
+    Object.entries(order.varieties).forEach(([variety, count]) => {
+      if (variety !== 'Cookie Share') {
+        scout.$varietyBreakdowns.fromShipped[variety] =
+          (scout.$varietyBreakdowns.fromShipped[variety] || 0) + count;
+      }
+    });
   }
 });
+
+// Copy credited varieties to $ prefix breakdown fields
+scout.$varietyBreakdowns.fromBooth = { ...scout.credited.booth.varieties };
+scout.$varietyBreakdowns.fromDirectShip = { ...scout.credited.directShip.varieties };
 ```
 
 ### Display in Reports
@@ -437,12 +425,14 @@ Cookie Share         |   9  |    N/A    |   0   |   0    |    N/A
 **Field**: `virtual_booth: true` in Smart Cookie API
 **Meaning**: Scout gets credit for booth sale but didn't physically receive packages
 **Example**: Troop booth sold 24 packages, scout gets 1 package credit
-**Tracking**: Must go into `boothVarieties`, NOT `inventoryVarieties`
+**Tracking**: Must go into `scout.credited.booth` and `scout.$varietyBreakdowns.fromBooth`, NOT physical inventory
 **Impact**: If added to physical inventory, creates incorrect net inventory (+1 inflation)
 
 ---
 
 ## Cookie Share (Donations) Edge Cases
+
+**See also:** [CRITICAL-BUSINESS-RULES.md - Cookie Share](CRITICAL-BUSINESS-RULES.md#cookie-share-virtual-donations) for complete business logic and manual entry requirements.
 
 ### Cookie Share is ALWAYS Virtual
 **Never Physical Inventory**:
@@ -476,8 +466,8 @@ Cookie Share         |   9  |    N/A    |   0   |   0    |    N/A
 
 1. **totalPackages** (Total Sold): ✅ Included
 2. **packages** (Sales/Need Inventory): ❌ Excluded
-3. **varieties** (Physical Sales): ❌ Excluded
-4. **shippedVarieties** (Direct Ship): ✅ Tracked separately
+3. **$varietyBreakdowns.fromSales** (Physical Sales): ❌ Excluded
+4. **$varietyBreakdowns.fromShipped** (Direct Ship): ✅ Tracked separately
 5. **revenue**: ✅ Included (scout gets credit)
 
 **Example**:
@@ -490,12 +480,12 @@ Cookie Share         |   9  |    N/A    |   0   |   0    |    N/A
 
 ### Why Separate Tracking Matters
 **Problem Without Separation**:
-- Direct ship goes into `varieties`
+- Direct ship goes into physical sales tracking
 - Scout sold 10 but picked up 0
 - Net inventory: 0 - 10 = **-10** ❌ Shows as deficit!
 
 **Solution**:
-- Direct ship goes into `shippedVarieties`
+- Direct ship goes into `scout.$varietyBreakdowns.fromShipped`
 - Scout sold 0 physical, picked up 0
 - Net inventory: 0 - 0 = **0** ✅ Correct!
 - Direct ship column shows 10 separately
@@ -587,23 +577,15 @@ const includedInIO = row['IncludedInIO'] === true;   // ❌ Always false
 
 ### T2G Transfer Physical Calculation
 **Raw Transfer Package Count** may include virtual items
-**Must Exclude**:
-```javascript
-const isVirtualBooth = transfer.virtualBooth || false;
-const cookieShareCount = transfer.varieties?.['Cookie Share'] || 0;
-
-if (!isVirtualBooth) {
-  const physicalPackages = (transfer.packages || 0) - cookieShareCount;
-  scout.inventory += physicalPackages;  // Only physical
-}
-```
+**Must Exclude:**
+When calculating physical inventory from T2G transfers, exclude virtual booth transfers entirely (check `virtualBooth` flag) and subtract any Cookie Share packages from the total. Only the remaining physical packages should be added to scout inventory.
 
 ### Per-Variety Exclusions
-**When Tracking inventoryVarieties**:
+**When Tracking Physical Inventory** (`scout.inventory.varieties`):
 - Exclude `Cookie Share` variety (virtual)
 - Exclude entire transfer if `virtualBooth === true`
 
-**When Tracking boothVarieties**:
+**When Tracking Booth Credits** (`scout.credited.booth.varieties`):
 - Only process if `virtualBooth === true`
 - Include ALL varieties (even Cookie Share if present)
 
@@ -628,33 +610,7 @@ Actual (buggy): 1000 - 800 = 200  ❌ Wrong!
 - Site orders delivered directly weren't being subtracted
 
 **Solution:**
-```javascript
-// Track site orders separately
-let siteOrdersPhysical = 0;
-
-digitalCookieData.forEach(row => {
-  const lastName = row['Girl Last Name'] || '';
-  const isSiteOrder = lastName === 'Site';
-
-  if (isSiteOrder) {
-    const totalPkgs = parseInt(row['Total Packages (Includes Donate & Gift)']) || 0;
-    const donations = parseInt(row['Donation']) || 0;
-    const physicalPackages = totalPkgs - donations;
-
-    const orderType = row['Order Type'] || '';
-    const isShipped = orderType.includes('Shipped');
-    const isDonationOnly = orderType === 'Donation';
-
-    // Only count physical packages delivered from troop stock
-    if (!isShipped && !isDonationOnly) {
-      siteOrdersPhysical += physicalPackages;
-    }
-  }
-});
-
-// CRITICAL: Subtract site orders from troop inventory
-netInventory = totalOrdered - totalAllocated - siteOrdersPhysical;
-```
+Track site orders separately by identifying orders where the girl's last name equals "Site". For these orders, calculate physical packages (excluding donations) and filter for non-shipped, non-donation-only orders that use troop stock. These physical site order packages must be subtracted from net troop inventory along with T2G allocations: `netInventory = totalOrdered - totalAllocated - siteOrdersPhysical`.
 
 **Rule:** Site orders are booth sales from troop stock and MUST be subtracted from net troop inventory.
 
@@ -707,17 +663,19 @@ const match = dcOrderNum === scOrderNum.replace(/^D/, '');
 ## Variety Tracking Edge Cases
 
 ### Multiple Variety Tracking Objects
-**Per Scout, Code Tracks**:
-- `varieties`: Physical sales (regular orders)
-- `inventoryVarieties`: Physical inventory received (T2G transfers)
-- `boothVarieties`: Virtual booth credits (T2G with virtualBooth=true)
-- `shippedVarieties`: Direct ship orders (shipped orders)
+**Per Scout, Code Tracks** (using $ prefix for calculated fields):
+- `scout.$varietyBreakdowns.fromSales`: Physical sales (GIRL_DELIVERY orders)
+- `scout.inventory.varieties`: Physical inventory received (T2G transfers)
+- `scout.$varietyBreakdowns.fromBooth`: Virtual booth credits (T2G with virtualBooth=true)
+- `scout.$varietyBreakdowns.fromShipped`: Direct ship orders (GIRL_DIRECT_SHIP orders)
+
+**See:** [IMPLEMENTATION-NOTES.md - $ Prefix Convention](IMPLEMENTATION-NOTES.md#-prefix-convention) for complete field documentation
 
 **Cookie Share Placement**:
-- ✅ Goes into `varieties` (shows in Sold column)
-- ❌ Does NOT go into `inventoryVarieties` (shows N/A in Picked Up)
-- ❌ Does NOT go into `boothVarieties` (unless booth sale with donation)
-- ❌ Does NOT go into `shippedVarieties` (tracked in varieties even if shipped with donation)
+- ✅ Counts toward `scout.totals.donations` (shows in donations column)
+- ❌ Does NOT go into `inventory.varieties` (shows N/A in Picked Up)
+- ❌ Does NOT go into `$varietyBreakdowns.fromSales` (excluded from physical sales)
+- ❌ Does NOT go into `$varietyBreakdowns.fromShipped` (excluded from direct ship varieties)
 
 ### Variety Display Order
 **MUST Use Consistent Order** across all reports:

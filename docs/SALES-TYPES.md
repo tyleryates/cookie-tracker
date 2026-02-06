@@ -29,16 +29,10 @@ All cookie sales fall into 6 distinct types based on:
 - Column: **Shipped**
 - Tooltip: N/A (self-explanatory)
 
-**Code Logic:**
-```javascript
-const isSiteOrder = lastName === 'Site';
-const isShipped = orderType.includes('Shipped') || orderType.includes('shipped');
+**Classification Logic:**
+Orders are classified as GIRL_DIRECT_SHIP when the girl's last name is not "Site" AND the order type contains "Shipped" (case-insensitive). These orders are tracked in `scout.$varietyBreakdowns.fromShipped` and do not require physical inventory from the scout since packages are shipped directly from the supplier to the customer.
 
-if (!isSiteOrder && isShipped) {
-  scout.shippedPackages += physicalPackages;
-  scout.shippedVarieties[type] += count;
-}
-```
+**See:** [RECONCILIATION.md - Phase 2: Add DC Orders](RECONCILIATION.md#phase-2-add-dc-orders) for complete classification implementation
 
 **Example:**
 - Millie Yates orders 10 packages, shipped to customer
@@ -60,13 +54,8 @@ if (!isSiteOrder && isShipped) {
 - Requires physical inventory
 - Tooltip: N/A (self-explanatory)
 
-**Code Logic:**
-```javascript
-if (!isSiteOrder && !isShipped && !isDonationOnly) {
-  scout.packages += physicalPackages;
-  scout.varieties[type] += count;
-}
-```
+**Classification Logic:**
+Orders are classified as GIRL_DELIVERY when the girl's last name is not "Site", the order type does not contain "Shipped", and it's not a donation-only order. Physical packages are added to the scout's sales totals and inventory requirements.
 
 **Example:**
 - Charlie Yates sells 15 packages door-to-door
@@ -202,14 +191,8 @@ if (siteGirlDelivery > 0) {
 - Requires physical inventory
 - Tooltip: N/A (self-explanatory)
 
-**Code Logic:**
-```javascript
-// Same as Type 2 (Girl's Digital Cookie - Girl Delivery)
-if (!isSiteOrder && !isShipped && !isDonationOnly) {
-  scout.packages += physicalPackages;
-  scout.varieties[type] += count;
-}
-```
+**Classification Logic:**
+Uses the same logic as Type 2 (Girl's Digital Cookie - Girl Delivery). Orders with "Cookies in Hand" or "In Person Delivery" order types are classified as GIRL_DELIVERY and require physical inventory.
 
 **Example:**
 - Lucy Torres sells 8 packages at customer's door
@@ -238,16 +221,8 @@ if (!isSiteOrder && !isShipped && !isDonationOnly) {
 - Site Row → Show UNALLOCATED packages only
 - Site Row → Warning if unallocated > 0 (action required)
 
-**Code Logic:**
-```javascript
-// PLACEHOLDER - Implement when data available
-// Expected to be similar to virtualBooth transfers
-if (transfer.type === 'T2G' && transfer.booth === true) {
-  scout.creditedPackages += transfer.packages;
-  scout.creditedVarieties[variety] += count;
-  // Source: 'Booth Sales'
-}
-```
+**Classification Logic:**
+Not yet implemented. Expected to work similarly to Type 4 (virtual booth transfers) but for physical booth locations. When implemented, will look for T2G transfers with a booth-specific flag and add credited packages to scouts without physical inventory impact.
 
 **Example (hypothetical):**
 - Troop has 50 packages from physical booth
@@ -272,19 +247,10 @@ if (transfer.type === 'T2G' && transfer.booth === true) {
 - Tracked in varieties as "Cookie Share"
 - Special reconciliation report
 
-**Code Logic:**
-```javascript
-const donations = parseInt(row['Donation']) || 0;
-if (donations > 0) {
-  scout.donations += donations;
-  scout.varieties['Cookie Share'] += donations;
-}
+**Classification Logic:**
+Cookie Share donations are identified by checking if the "Donation" field has a value greater than 0. These packages are added to the scout's donation totals and tracked under the "Cookie Share" variety. Cookie Share is virtual (requires no physical inventory) and has special reconciliation requirements detailed in the Virtual Cookie Share report.
 
-// Virtual Cookie Share reconciliation
-// See VIRTUAL-COOKIE-SHARE.md for details
-```
-
-**See:** `VIRTUAL-COOKIE-SHARE.md` for complete reconciliation logic
+**See:** [CRITICAL-BUSINESS-RULES.md - Cookie Share](CRITICAL-BUSINESS-RULES.md#cookie-share-virtual-donations) for complete reconciliation logic
 
 ---
 

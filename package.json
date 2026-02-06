@@ -1,6 +1,6 @@
 {
   "name": "cookie-tracker",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Girl Scout Cookie Inventory and Order Tracker",
   "main": "main.js",
   "scripts": {
@@ -9,7 +9,13 @@
     "build:win": "electron-builder --win",
     "build:all": "electron-builder --mac --win"
   },
-  "keywords": ["girl-scouts", "cookies", "inventory", "electron", "desktop-app"],
+  "keywords": [
+    "girl-scouts",
+    "cookies",
+    "inventory",
+    "electron",
+    "desktop-app"
+  ],
   "author": "Tyler Yates",
   "license": "MIT",
   "type": "commonjs",
@@ -30,22 +36,35 @@
   "build": {
     "appId": "com.gscookies.tracker",
     "productName": "Cookie Tracker",
+    "publish": {
+      "provider": "github",
+      "owner": "tyleryates",
+      "repo": "cookie-tracker",
+      "releaseType": "release"
+    },
     "directories": {
       "output": "dist"
     },
     "files": [
       "main.js",
       "renderer.js",
+      "renderer/**/*",
       "index.html",
       "styles.css",
       "data-reconciler.js",
+      "data-processing/**/*",
       "cookie-constants.js",
+      "constants.js",
+      "logger.js",
       "credentials-manager.js",
       "scraper-utils.js",
       "scrapers/**/*",
       "node_modules/**/*"
     ],
-    "electronLanguages": ["en", "en-US"],
+    "electronLanguages": [
+      "en",
+      "en-US"
+    ],
     "mac": {
       "category": "public.app-category.productivity",
       "icon": "build/icon.icns",

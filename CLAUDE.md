@@ -2,6 +2,18 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🚫 CRITICAL: NEVER Auto-Commit or Auto-Publish
+
+**BLOCKING REQUIREMENT - Always require explicit user approval:**
+
+- ❌ NEVER create git commits without explicit user request
+- ❌ NEVER publish/release versions without explicit user approval
+- ❌ NEVER run `git commit`, `git push`, `npm run build`, or `electron-builder` commands proactively
+- ✅ User must explicitly ask "commit this" or "publish version X.Y.Z" before taking action
+- ✅ If user asks to "release" or "publish", confirm version number and changes before proceeding
+
+**Why:** User wants full control over git history and release timing.
+
 ## Project Overview
 
 Girl Scout Cookie Tracker - An Electron desktop app that syncs and reconciles cookie sales data from two independent systems:

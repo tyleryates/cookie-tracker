@@ -4,6 +4,7 @@ const fs = require('fs');
 const CredentialsManager = require('./credentials-manager');
 const ScraperOrchestrator = require('./scrapers');
 const { autoUpdater } = require('electron-updater');
+const Logger = require('./logger');
 
 let mainWindow;
 
@@ -16,6 +17,27 @@ const userDataPath = app.getPath('userData');
 const dataDir = path.join(userDataPath, 'data');
 
 const credentialsManager = new CredentialsManager(dataDir);
+
+// Standardized IPC error handler wrapper
+function handleIpcError(handler) {
+  return async (...args) => {
+    try {
+      const result = await handler(...args);
+      // If handler returns explicit success/error format, use it
+      if (result && typeof result === 'object' && 'success' in result) {
+        return result;
+      }
+      // Otherwise wrap successful result
+      return { success: true, data: result };
+    } catch (error) {
+      Logger.error('IPC Handler Error:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  };
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -33,36 +55,24 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
-// Auto-update configuration
-autoUpdater.autoDownload = false; // Don't auto-download, ask user first
+// Auto-update configuration (notification-only, no auto-install)
+autoUpdater.autoDownload = false; // Don't auto-download
 
 autoUpdater.on('update-available', (info) => {
+  Logger.debug('Update available:', info.version);
   mainWindow.webContents.send('update-available', info);
 });
 
-autoUpdater.on('update-downloaded', () => {
-  mainWindow.webContents.send('update-downloaded');
-});
-
 autoUpdater.on('error', (err) => {
-  console.error('Update error:', err);
-});
-
-// IPC handlers for update control
-ipcMain.handle('download-update', async () => {
-  await autoUpdater.downloadUpdate();
-});
-
-ipcMain.handle('install-update', () => {
-  autoUpdater.quitAndInstall();
+  Logger.error('Update check error:', err);
 });
 
 app.whenReady().then(() => {
   createWindow();
 
-  // Check for updates (only in production)
+  // Check for updates on startup only (only in production)
   if (!app.isPackaged) {
-    console.log('Skipping update check in development');
+    Logger.debug('Skipping update check in development');
   } else {
     setTimeout(() => {
       autoUpdater.checkForUpdates();
@@ -83,7 +93,7 @@ app.on('activate', () => {
 });
 
 // Handle scan and import from 'in' directory
-ipcMain.handle('scan-in-directory', async () => {
+ipcMain.handle('scan-in-directory', handleIpcError(async () => {
   const inDir = path.join(dataDir, 'in');
 
   // Create directory if it doesn't exist
@@ -131,36 +141,64 @@ ipcMain.handle('scan-in-directory', async () => {
     success: true,
     files: fileData
   };
+}));
+
+// Handle save file (for unified dataset caching)
+ipcMain.handle('save-file', async (event, { filename, content, type }) => {
+  try {
+    const inDir = path.join(dataDir, 'in');
+
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(inDir)) {
+      fs.mkdirSync(inDir, { recursive: true });
+    }
+
+    // Sanitize filename to prevent path traversal
+    const sanitizedFilename = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    // Validate filename
+    if (!sanitizedFilename || sanitizedFilename.startsWith('.')) {
+      throw new Error('Invalid filename provided');
+    }
+
+    const filePath = path.join(inDir, sanitizedFilename);
+
+    // Verify the resolved path is within the intended directory
+    const resolvedPath = path.resolve(filePath);
+    const resolvedDir = path.resolve(inDir);
+    // Check works on both Unix (/) and Windows (\) path separators
+    if (!resolvedPath.startsWith(resolvedDir + path.sep) && resolvedPath !== resolvedDir) {
+      throw new Error('Path traversal attempt detected');
+    }
+
+    fs.writeFileSync(filePath, content, 'utf8');
+
+    return {
+      success: true,
+      path: filePath
+    };
+  } catch (error) {
+    Logger.error('Save file error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
 });
 
 // Handle load credentials
-ipcMain.handle('load-credentials', async () => {
-  try {
-    const credentials = credentialsManager.loadCredentials();
-    return {
-      success: true,
-      credentials: credentials
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-});
+ipcMain.handle('load-credentials', handleIpcError(async () => {
+  const credentials = credentialsManager.loadCredentials();
+  return {
+    success: true,
+    credentials: credentials
+  };
+}));
 
 // Handle save credentials
-ipcMain.handle('save-credentials', async (event, credentials) => {
-  try {
-    const result = credentialsManager.saveCredentials(credentials);
-    return result;
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-});
+ipcMain.handle('save-credentials', handleIpcError(async (event, credentials) => {
+  return credentialsManager.saveCredentials(credentials);
+}));
 
 // Handle scrape websites
 ipcMain.handle('scrape-websites', async (event) => {
@@ -185,13 +223,16 @@ ipcMain.handle('scrape-websites', async (event) => {
       event.sender.send('scrape-progress', progress);
     });
 
+    // Small delay to ensure renderer's progress listener is fully registered
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     // Run scraping
     const results = await scraper.scrapeAll(credentials);
 
     return results;
 
   } catch (error) {
-    console.error('Scrape websites error:', error);
+    Logger.error('Scrape websites error:', error);
     return {
       success: false,
       error: error.message

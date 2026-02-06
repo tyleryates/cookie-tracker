@@ -4,6 +4,8 @@ const { CookieJar } = require('tough-cookie');
 const fs = require('fs');
 const path = require('path');
 const { getTimestamp } = require('../scraper-utils');
+const { requestWithRetry, rateLimit } = require('./request-utils');
+const Logger = require('../logger');
 
 /**
  * Smart Cookie API Scraper - API-based scraping
@@ -75,9 +77,12 @@ class SmartCookieApiScraper {
    * Login to Smart Cookies
    * POSTs credentials to /webapi/api/account/login
    * Captures AuthCookie and XSRF-TOKEN from response cookies
+   * @param {boolean} silent - If true, skip progress updates (for re-login during retry)
    */
-  async login(username, password) {
-    this.sendProgress('Smart Cookie API: Logging in...', 20);
+  async login(username, password, silent = false) {
+    if (!silent) {
+      this.sendProgress('Smart Cookie API: Logging in...', 20);
+    }
 
     try {
       // Note: The postData in the recording shows unquoted property names
@@ -116,7 +121,9 @@ class SmartCookieApiScraper {
         console.warn('Warning: /me endpoint failed:', err.message);
       }
 
-      this.sendProgress('Smart Cookie API: Login successful', 30);
+      if (!silent) {
+        this.sendProgress('Smart Cookie API: Login successful', 30);
+      }
       return true;
     } catch (error) {
       if (error.response) {
@@ -217,7 +224,7 @@ class SmartCookieApiScraper {
    * Shows how troop direct ship orders are allocated to individual scouts
    */
   async fetchDirectShipDivider() {
-    this.sendProgress('Smart Cookie API: Fetching direct ship allocations...', 60);
+    this.sendProgress('Smart Cookie API: Fetching direct ship allocations...', 72);
 
     if (!this.xsrfToken) {
       throw new Error('XSRF token not available. Must login first.');
@@ -279,7 +286,7 @@ class SmartCookieApiScraper {
    * Finds all COOKIE_SHARE transfers and fetches their per-scout breakdowns
    */
   async fetchAllVirtualCookieShares(ordersData) {
-    this.sendProgress('Smart Cookie API: Fetching virtual cookie share details...', 65);
+    this.sendProgress('Smart Cookie API: Fetching virtual cookie share details...', 75);
 
     const virtualCookieShares = [];
 
@@ -340,24 +347,49 @@ class SmartCookieApiScraper {
   /**
    * Main scraping method
    * Orchestrates the login, fetch, and save operations
+   * Uses automatic session detection - tries fetching first, only logs in if session expired
    */
   async scrape(credentials) {
+    // Validate input
+    if (!credentials || !credentials.username || !credentials.password) {
+      return {
+        success: false,
+        source: 'Smart Cookie',
+        error: 'Username and password are required'
+      };
+    }
+
     try {
       this.sendProgress('Smart Cookie API: Starting...', 10);
 
-      // Step 1: Login and get auth cookies
+      // Store credentials for potential re-login
+      this.credentials = credentials;
+
+      // Smart Cookie requires login first to get XSRF token
       await this.login(credentials.username, credentials.password);
 
-      // Step 2: Fetch orders data
-      const ordersData = await this.fetchOrders();
+      // Step 1: Fetch orders with automatic retry if session expires
+      const ordersData = await requestWithRetry(
+        () => this.fetchOrders(),
+        () => this.login(credentials.username, credentials.password, true),
+        { logPrefix: 'Smart Cookie: Fetch Orders', rateLimit: false }
+      );
 
-      // Step 3: Fetch direct ship divider allocations
-      const directShipDivider = await this.fetchDirectShipDivider();
+      // Step 2: Fetch direct ship divider allocations (with rate limiting)
+      const directShipDivider = await requestWithRetry(
+        () => this.fetchDirectShipDivider(),
+        () => this.login(credentials.username, credentials.password, true),
+        { logPrefix: 'Smart Cookie: Fetch Direct Ship' }
+      );
 
-      // Step 4: Fetch virtual cookie share allocations
-      const virtualCookieShares = await this.fetchAllVirtualCookieShares(ordersData);
+      // Step 3: Fetch virtual cookie share allocations (with rate limiting)
+      const virtualCookieShares = await requestWithRetry(
+        () => this.fetchAllVirtualCookieShares(ordersData),
+        () => this.login(credentials.username, credentials.password, true),
+        { logPrefix: 'Smart Cookie: Fetch Cookie Shares' }
+      );
 
-      // Step 5: Save to file
+      // Step 4: Save to file
       const filePath = await this.saveOrdersData(ordersData, directShipDivider, virtualCookieShares);
 
       this.sendProgress('Smart Cookie API: Complete', 100);

@@ -214,122 +214,275 @@ mergeOrder(existingOrder, newOrder, newSource) {
 }
 ```
 
-## Scout Aggregation
+## Unified Dataset Generation
 
-After all imports, calculate per-scout totals:
+### `buildUnifiedDataset()` - Main Entry Point
 
+The primary method for generating pre-calculated report data. Called once after all imports complete, returns a complete dataset with all totals pre-calculated.
+
+**Purpose:** Eliminates redundant calculations across multiple reports by pre-computing all derived values.
+
+**Returns:** Unified dataset object with scouts Map, troop totals, transfer breakdowns, variety aggregates, and Cookie Share tracking.
+
+**Structure:**
 ```javascript
-calculateScoutTotals() {
-  this.scouts.clear();
-
-  // Process T2G transfers (picked up inventory)
-  this.transfers
-    .filter(t => t.type === 'T2G')
-    .forEach(t => {
-      const scout = this.getOrCreateScout(t.to);
-      scout.pickedUp += t.packages;
-    });
-
-  // Process DC orders (sold packages)
-  this.orders.forEach(order => {
-    if (order.sources.includes('DC')) {
-      const scout = this.getOrCreateScout(order.scout);
-      scout.soldDC += order.packages;
-      scout.revenueDC += order.amount;
-      scout.ordersDC++;
-    }
-  });
-
-  // Process SC orders (sold packages)
-  this.orders.forEach(order => {
-    if (order.sources.includes('SC-Report') || order.sources.includes('SC-API')) {
-      const scout = this.getOrCreateScout(order.scout);
-      scout.soldSC += order.packages;
-    }
-  });
-
-  // Calculate remaining inventory
-  this.scouts.forEach(scout => {
-    scout.remaining = scout.pickedUp - scout.soldDC;
-  });
+{
+  scouts: Map,                 // Complete scout dataset (see below)
+  siteOrders: Object,          // Site order allocations
+  troopTotals: Object,         // Troop-level aggregates
+  transferBreakdowns: Object,  // Pre-classified transfer lists
+  varieties: Object,           // Variety totals and inventory
+  cookieShare: Object,         // Cookie Share tracking
+  metadata: Object             // Import metadata
 }
 ```
 
-## Virtual Booth Handling
-
-Virtual booth sales are T2G transfers where scouts receive sales credit without physical package transfer. This is a critical distinction for accurate inventory tracking.
-
-### What Are Virtual Booth Sales?
-
-**Definition**: Troop booth sales are allocated to individual scouts as "credits" for selling at a troop booth. Scouts never physically received these packages - the troop managed the inventory.
-
-**Identification**: In Smart Cookie API data, virtual booth transfers have `virtualBooth: true` flag.
-
-**Data Source**:
-- The `virtualBooth: true` flag comes from Smart Cookie API JSON response
-- Only available in API data (not available in CSV exports)
-- Example: `{"virtual_booth": true, "transfer_type": "T2G", "to": "Scout Name", ...}`
-- This is why API-based sync is superior to manual CSV import
-
-**Example**: Troop holds booth sale, sells 100 packages. TCM allocates 1-5 packages to each scout who helped at the booth as recognition/credit.
-
-### Why Exclude from Physical Inventory?
-
-Including virtual booth sales in physical inventory calculations would cause:
-- **Inflated inventory counts**: Shows scout received packages they never had
-- **Negative balances**: Scout appears to have sold more than they received
-- **Incorrect net inventory**: Physical inventory tracking becomes meaningless
-
-### Implementation
-
+**Usage:**
 ```javascript
-reconciler.transfers.forEach(transfer => {
-  if (transfer.type === 'T2G') {
-    const isVirtualBooth = transfer.virtualBooth || false;
-    const cookieShareCount = transfer.varieties?.['Cookie Share'] || 0;
+const reconciler = new DataReconciler();
+reconciler.importDigitalCookie(dcData);
+reconciler.importSmartCookieAPI(scApiData);
 
-    if (!isVirtualBooth) {
-      // Physical transfer - count toward inventory
-      const physicalPackages = (transfer.packages || 0) - cookieShareCount;
-      scout.inventory += physicalPackages;
+// Generate unified dataset with all $ prefix fields calculated
+const unified = reconciler.buildUnifiedDataset();
 
-      // Track physical inventory by variety (exclude Cookie Share)
-      Object.entries(transfer.varieties || {}).forEach(([variety, count]) => {
-        if (variety !== 'Cookie Share') {
-          scout.inventoryVarieties[variety] =
-            (scout.inventoryVarieties[variety] || 0) + count;
-        }
-      });
-    } else {
-      // Virtual booth credit - track separately
-      scout.boothCredits += transfer.packages;
-
-      // Track booth varieties separately (not physical inventory)
-      Object.entries(transfer.varieties || {}).forEach(([variety, count]) => {
-        scout.boothVarieties[variety] =
-          (scout.boothVarieties[variety] || 0) + count;
-      });
-    }
-  }
-});
+// Access pre-calculated data in reports
+const scouts = unified.scouts;  // Map of complete scout data
+const totals = unified.troopTotals;  // Troop-level totals
 ```
 
-### Tracking Buckets
+### Unified Dataset Structure
 
-The system maintains **four separate variety tracking objects** per scout:
+#### Scout Object Structure
 
-1. **`varieties`**: Physical sales (regular orders requiring inventory)
-2. **`inventoryVarieties`**: Physical inventory received (T2G transfers)
-3. **`boothVarieties`**: Virtual booth credits (T2G with `virtualBooth: true`)
-4. **`shippedVarieties`**: Direct ship orders (no physical inventory needed)
+Each scout in `unified.scouts` Map contains:
 
-### Display
+```javascript
+{
+  // Identity
+  name: "Scout Name",
+  firstName: "Scout",
+  lastName: "Name",
+  girlId: 12345,           // Smart Cookie girl ID
+  isSiteOrder: false,      // true if lastName === "Site"
 
-- **Picked Up column**: Shows only physical inventory (excludes booth credits)
-- **Booth Sales column**: Shows virtual booth credits separately
-- **Net Inventory**: Calculated as `pickedUp - sold` (both physical only)
+  // Orders (classified by type)
+  orders: [
+    {
+      orderNumber: "229584475",
+      date: "2026-01-28",
+      type: "GIRL_DELIVERY",     // Classified: GIRL_DELIVERY, GIRL_DIRECT_SHIP, etc.
+      orderType: "Cookies In Hand", // Original DC order type
+      packages: 18,
+      physicalPackages: 16,      // Excludes donations
+      donations: 2,              // Cookie Share
+      varieties: { "Thin Mints": 4, ... },
+      amount: 110.00,
+      status: "Completed",
+      paymentStatus: "CAPTURED",
+      needsInventory: true,      // false for shipped/donation-only orders
+      source: "DC"
+    }
+  ],
 
-This separation ensures physical inventory tracking remains accurate while still giving scouts credit for booth participation.
+  // Inventory (from T2G transfers)
+  inventory: {
+    total: 47,                   // Physical packages only
+    varieties: {
+      "Thin Mints": 15,
+      "Adventurefuls": 3
+    }
+  },
+
+  // Allocations (booth and direct ship credits)
+  credited: {
+    booth: {
+      packages: 12,              // Virtual booth credit
+      varieties: { "Thin Mints": 4, ... }
+    },
+    directShip: {
+      packages: 6,               // Direct ship credit
+      varieties: { "Lemonades": 2, ... }
+    }
+  },
+
+  // Calculated totals ($ = calculated/derived fields)
+  totals: {
+    orders: 16,                  // Number of orders
+    sales: 110,                  // GIRL_DELIVERY physical packages
+    shipped: 8,                  // GIRL_DIRECT_SHIP packages
+    credited: 18,                // booth + directShip
+    donations: 23,               // Cookie Share total
+    totalSold: 159,              // sales + shipped + donated + credited
+    inventory: -63,              // Net inventory (inventory.total - sales)
+    revenue: 663.90,             // Total revenue
+
+    $breakdown: {                // $ = calculated
+      direct: 141,               // sales + shipped + donations
+      credited: 18               // booth + directShip allocations
+    }
+  },
+
+  // $ Prefix Calculated Fields
+  $varietyBreakdowns: {          // $ = calculated/derived
+    fromSales: {},               // GIRL_DELIVERY varieties
+    fromShipped: {},             // GIRL_DIRECT_SHIP varieties
+    fromBooth: {},               // Booth credit varieties
+    fromDirectShip: {}           // Direct ship credit varieties
+  },
+
+  $issues: {                     // $ = calculated
+    negativeVarieties: ["Thin Mints: -3"],
+    hasNegativeInventory: true
+  },
+
+  $cookieShare: {                // $ = calculated
+    dcTotal: 23,                 // Total Cookie Share from DC orders
+    dcAutoSync: 15,              // Auto-syncs (Shipped/Donation + CAPTURED)
+    dcManualEntry: 8             // Needs manual entry (CASH or In Person)
+  }
+}
+```
+
+#### Troop Totals Structure
+
+```javascript
+troopTotals: {
+  orders: 125,                   // Total DC orders
+  sold: 769,                     // Packages sold (T2G + D + DIRECT_SHIP + COOKIE_SHARE)
+  revenue: 4614.00,              // Total revenue
+  inventory: 127,                // Net troop inventory
+  donations: 45,                 // Cookie Share total
+  ordered: 950,                  // C2T pickups (incoming inventory)
+  allocated: 698,                // T2G physical packages
+  siteOrdersPhysical: 125,       // Booth sales from troop stock
+
+  scouts: {
+    total: 23,
+    withBoothCredit: 5,
+    withDirectShipCredit: 3,
+    withNegativeInventory: 2,
+    withCookieShare: 8
+  }
+}
+```
+
+#### Transfer Breakdowns Structure
+
+```javascript
+transferBreakdowns: {
+  c2t: [...],                    // All C2T transfers
+  t2g: [...],                    // All T2G transfers
+  sold: [...],                   // All sold transfers (T2G + D + DIRECT_SHIP + COOKIE_SHARE)
+
+  totals: {
+    c2t: 950,                    // Total C2T packages
+    t2gPhysical: 698,            // T2G physical (excludes virtual booth + Cookie Share)
+    sold: 769                    // Total sold packages
+  }
+}
+```
+
+#### Varieties Structure
+
+```javascript
+varieties: {
+  byCookie: {
+    "Thin Mints": 250,
+    "Caramel deLites": 180,
+    "Cookie Share": 45
+  },
+  inventory: {                   // Net troop inventory by variety
+    "Thin Mints": 35,
+    "Caramel deLites": -5        // Negative = oversold
+  },
+  totalPhysical: 724,            // Excludes Cookie Share
+  totalAll: 769                  // Includes Cookie Share
+}
+```
+
+### Five-Phase Scout Processing Pipeline
+
+The `buildScoutDataset()` method processes scouts in five sequential phases:
+
+#### Phase 1: Initialize Scouts
+**Method:** `initializeScouts(scoutDataset, rawDCData)`
+
+Creates scout objects from all data sources (DC and SC) with empty structures.
+
+**Actions:**
+- Extract scout names from Digital Cookie orders
+- Create scout entries from Smart Cookie data
+- Initialize all data structures (orders[], inventory, credited, totals)
+- Merge girlId from Smart Cookie if available
+
+#### Phase 2: Add DC Orders
+**Method:** `addDCOrders(scoutDataset, rawDCData)`
+
+Classify and add all Digital Cookie orders to scouts.
+
+**Actions:**
+- Parse order details (packages, varieties, amount)
+- Classify order type (GIRL_DELIVERY, GIRL_DIRECT_SHIP, etc.)
+- Calculate physical packages (total - donations)
+- Determine if order needs inventory
+- Add order to scout's orders array
+
+**See:** [SALES-TYPES.md](SALES-TYPES.md) for order type classification logic
+
+#### Phase 3: Add Inventory
+**Method:** `addInventory(scoutDataset)`
+
+Process T2G transfers to track physical inventory received by scouts.
+
+**Actions:**
+- Filter for T2G transfers only
+- Exclude virtual booth credits (handled separately)
+- Exclude Cookie Share (virtual, never physical)
+- Add physical packages to scout.inventory.total
+- Add variety breakdown to scout.inventory.varieties
+
+#### Phase 4: Add Allocations
+**Method:** `addAllocations(scoutDataset)`
+
+Add booth and direct ship allocations (credit without physical transfer).
+
+**Actions:**
+- Process virtual booth credits (T2G with virtualBooth: true)
+- Process direct ship allocations (from site orders)
+- Add to scout.credited.booth or scout.credited.directShip
+- Track variety breakdown for each allocation type
+
+#### Phase 5: Calculate Totals
+**Method:** `calculateScoutTotals(scoutDataset)`
+
+Calculate all derived totals and $ prefix fields.
+
+**Actions:**
+- Sum packages by order type (sales, shipped, donations)
+- Build $varietyBreakdowns (fromSales, fromShipped, fromBooth, fromDirectShip)
+- Calculate totalSold (sales + shipped + donated + credited)
+- Calculate net inventory (inventory.total - sales)
+- Detect negative inventory by variety ($issues)
+- Calculate Cookie Share breakdown ($cookieShare)
+- Calculate breakdown (direct vs credited)
+
+## Virtual Booth Handling
+
+Virtual booth sales are T2G transfers where scouts receive sales credit without physical package transfer.
+
+**See [EDGE-CASES.md - Virtual Booth Tracking Buckets](EDGE-CASES.md#virtual-booth-tracking-buckets) for comprehensive explanation including:**
+- What virtual booth sales are and why they exist
+- Why they must be excluded from physical inventory
+- Complete implementation code examples
+- Four separate variety tracking objects
+- Display patterns in reports
+
+**Quick Summary:**
+- `virtualBooth: true` flag in Smart Cookie API indicates booth credit
+- Scout gets credit for sales but never physically received packages
+- Must track in `scout.credited.booth` and `scout.$varietyBreakdowns.fromBooth`, not physical inventory
+- Prevents negative inventory and incorrect calculations
 
 ## Persistence
 
@@ -455,6 +608,8 @@ try {
 
 ## Usage Example
 
+**Current API (Recommended):**
+
 ```javascript
 const reconciler = new DataReconciler();
 
@@ -464,13 +619,28 @@ reconciler.importSmartCookieReport(scReportData);
 reconciler.importSmartCookieTransfer(scTransferData);
 reconciler.importSmartCookieAPI(scApiJson);
 
-// Calculate aggregates
-reconciler.calculateScoutTotals();
+// Build unified dataset (calculates all $ prefix fields)
+const unified = reconciler.buildUnifiedDataset();
 
-// Save
+// Access pre-calculated data
+const scouts = unified.scouts;              // Map of complete scout data
+const troopTotals = unified.troopTotals;    // Troop-level aggregates
+const varieties = unified.varieties;        // Variety totals
+const cookieShare = unified.cookieShare;    // Cookie Share tracking
+
+// Save reconciled data
 reconciler.save();
-
-// Access data
-const allOrders = Array.from(reconciler.orders.values());
-const scoutTotals = Array.from(reconciler.scouts.values());
 ```
+
+**Legacy API (Internal Use Only):**
+
+```javascript
+// Direct access to raw data structures (not recommended for reports)
+const allOrders = Array.from(reconciler.orders.values());
+const rawTransfers = reconciler.transfers;
+
+// Low-level scout data (without $ prefix calculations)
+const rawScouts = Array.from(reconciler.scouts.values());
+```
+
+**Note:** Reports should use the unified dataset from `buildUnifiedDataset()`, not raw data structures, to ensure all calculated fields are available.

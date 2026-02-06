@@ -19,6 +19,8 @@ Complete reference for all data sources and formats in the Girl Scout Cookie Tra
 
 **File**: `SC-YYYY-MM-DD-HH-MM-SS.json` (from network interception)
 
+**Note:** API field names are available as constants in `constants.js` under `SC_API_COLUMNS`. See that file for the complete list.
+
 ### Data Structure
 
 Smart Cookie API returns JSON from `/orders/search` endpoint with nested structure:
@@ -73,6 +75,24 @@ Smart Cookie API returns JSON from `/orders/search` endpoint with nested structu
 const type = order.transfer_type || order.type || order.orderType || '';
 ```
 
+**C2T Transfer Type Suffix Variants** ⚠️:
+- Smart Cookie API returns C2T transfers with suffix variations:
+  - `"C2T"` - Council to Troop (generic)
+  - `"C2T(P)"` - Council to Troop (Pickup) - most common
+  - May have other suffixes in future
+- **MUST use `startsWith('C2T')` pattern** for matching, not exact equality:
+```javascript
+// ✓ CORRECT - handles all C2T variants
+if (transfer.type.startsWith('C2T')) {
+  // This is incoming inventory, not sold
+}
+
+// ✗ WRONG - misses C2T(P) variant
+if (transfer.type === 'C2T') {
+  // Will miss C2T(P) transfers!
+}
+```
+
 **Cookie ID Mapping** ⚠️:
 - API uses numeric IDs, NOT cookie names
 - **CRITICAL**: Must map IDs to names using verified mapping
@@ -91,6 +111,15 @@ const COOKIE_ID_MAP = {
   56: 'Exploremores'
 };
 ```
+
+**How to Verify Cookie ID Mapping:**
+If cookie IDs change between seasons or totals don't match:
+1. Export a CSV report from Smart Cookie showing variety totals
+2. Compare variety quantities in CSV to API data
+3. Match numeric IDs to cookie names by comparing quantities
+4. Update `COOKIE_ID_MAP` in `cookie-constants.js` if needed
+
+**Note:** This mapping is hardcoded in `cookie-constants.js` for simplicity and performance. IDs are stable within a season but may change between years.
 
 **Virtual Booth Flag** ⚠️:
 - `virtual_booth`: Boolean `true` or `false`
@@ -239,11 +268,19 @@ importSmartCookieAPI(apiData) {
 **File**: `OrderDataTroop_*_YYYY-MM-DD_HH.MM.SS.SSS.xlsx`
 
 ### Expected Columns
-- `Girl First Name`, `Girl Last Name`, `Order Number`
-- `Order Date (Central Time)`, `Order Type`, `Order Status`, `Payment Status`, `Ship Status`
-- Cookie varieties: `Adventurefuls`, `Exploremores`, `Lemonades`, `Trefoils`, `Thin Mints`, `Peanut Butter Patties`, `Caramel deLites`, `Peanut Butter Sandwich`, `Caramel Chocolate Chip`
-- `Total Packages (Includes Donate & Gift)`, `Refunded Packages`, `Donation`
-- `Current Sale Amount`, `Current Subtotal`, `Current S & H`
+
+**Note:** All column names are available as constants in `constants.js` under `DC_COLUMNS`.
+
+**Key Fields:** Girl names, order number, order date/type/status, payment/ship status, cookie varieties, package totals, refunds, donations, and sale amounts.
+
+**Usage:**
+```javascript
+const { DC_COLUMNS } = require('./constants');
+const firstName = row[DC_COLUMNS.GIRL_FIRST_NAME];
+const orderNum = row[DC_COLUMNS.ORDER_NUMBER];
+```
+
+**See:** `constants.js` → `DC_COLUMNS` for complete field list.
 
 ### Critical Edge Cases
 
@@ -395,12 +432,19 @@ GFC = Caramel Chocolate Chip (Girl Scout Fudge Covered)
 **File**: `ReportExport.xlsx`
 
 ### Expected Columns
-- `GirlID`, `GirlName`, `OrderID`, `RefNumber`
-- `GSUSAID`, `GradeLevel`
-- `TroopID`, `TroopDesc`, `ServiceUnitID`, `ServiceUnitDesc`, `CouncilID`, `CouncilDesc`
-- `OrderDate`, `OrderTypeDesc`, `IncludedInIO`, `CShareVirtual`
-- Cookie columns: `C1` through `C11` (and sometimes `C13`)
-- `Total`, `ParamTitle`
+
+**Note:** All column names are available as constants in `constants.js` under `SC_REPORT_COLUMNS`.
+
+**Key Fields:** Girl/order IDs, GSUSA ID, grade level, troop/service unit/council info, order date/type, Cookie Share flag, cookie variety columns (C1-C11), totals, and parameters.
+
+**Usage:**
+```javascript
+const { SC_REPORT_COLUMNS } = require('./constants');
+const girlName = row[SC_REPORT_COLUMNS.GIRL_NAME];
+const orderId = row[SC_REPORT_COLUMNS.ORDER_ID];
+```
+
+**See:** `constants.js` → `SC_REPORT_COLUMNS` for complete field list.
 
 ### Critical Edge Cases
 

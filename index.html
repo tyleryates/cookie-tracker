@@ -18,10 +18,11 @@
       <section class="import-section">
         <h2>Data Sync & Status</h2>
         <div class="button-group">
-          <button id="refreshFromWebBtn" class="btn btn-primary">🔄 Sync from Websites</button>
+          <button id="refreshFromWebBtn" class="btn btn-primary">🔄 Sync Now</button>
+          <button id="viewUnifiedDataBtn" class="btn btn-secondary" disabled style="background: #9C27B0; color: white;">💾 Download Data</button>
           <button id="configureLoginsBtn" class="btn btn-secondary">⚙️ Configure Logins</button>
         </div>
-        <p id="setupHint" class="table-hint" style="margin-top: 10px; display: none;">💡 First time? Click "Configure Logins" to set up credentials, then use "Sync from Websites" to download data</p>
+        <p id="setupHint" class="table-hint" style="margin-top: 10px; display: none;">💡 First time? Click "Configure Logins" to set up credentials, then use "Sync Now" to download data</p>
 
         <!-- Smart Cookie Progress & Status (PRIMARY SOURCE OF TRUTH) -->
         <div class="sync-card" style="border-color: #4CAF50; border-width: 3px;">
@@ -36,17 +37,6 @@
             <div id="scProgressText" class="progress-text"></div>
           </div>
           <p id="scLastSync" class="sync-last">Never synced</p>
-          <p style="font-size: 0.85em; color: #666; margin-top: 5px;">Source of truth for billing, inventory, and financial tracking</p>
-
-          <!-- Collapsible Order Data -->
-          <div style="margin-top: 15px;">
-            <button id="toggleScDataBtn" class="btn btn-secondary btn-small" style="width: 100%;">
-              <span id="scDataIcon">▶</span> View Data
-            </button>
-            <div id="scDataContainer" class="table-container" style="display: none; margin-top: 10px;">
-              <p class="placeholder">No data loaded</p>
-            </div>
-          </div>
         </div>
 
         <!-- Digital Cookie Progress & Status (SUPPLEMENTAL) -->
@@ -62,17 +52,6 @@
             <div id="dcProgressText" class="progress-text"></div>
           </div>
           <p id="dcLastSync" class="sync-last">Never synced</p>
-          <p style="font-size: 0.85em; color: #666; margin-top: 5px;">Provides order details and customer information</p>
-
-          <!-- Collapsible Order Data -->
-          <div style="margin-top: 15px;">
-            <button id="toggleDcDataBtn" class="btn btn-secondary btn-small" style="width: 100%;">
-              <span id="dcDataIcon">▶</span> View Data
-            </button>
-            <div id="dcDataContainer" class="table-container" style="display: none; margin-top: 10px;">
-              <p class="placeholder">No data loaded</p>
-            </div>
-          </div>
         </div>
 
         <div id="importStatus" class="status-message"></div>

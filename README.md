@@ -28,7 +28,7 @@ make dev       # or: npm start
 2. Click **"Sync from Websites"** to download data
 3. Explore the five available reports
 
-**Note:** Credentials are encrypted and stored securely in your OS keychain (macOS Keychain or Windows Credential Manager). In development mode (`npm start`), if encryption is unavailable, plaintext storage is used as a fallback.
+**Note:** Credentials are encrypted and stored securely in your OS keychain (macOS Keychain or Windows Credential Manager). If encryption is unavailable, the app will display an error and require OS keychain access.
 
 ### Configuration
 
@@ -62,18 +62,21 @@ make build-all    # or: npm run build:all
 
 ### 📘 For Developers
 
+**📑 [Complete Documentation Index](docs/INDEX.md)** - Full guide to all documentation
+
 **START HERE when resuming development:**
 
 - **[CRITICAL-BUSINESS-RULES.md](docs/CRITICAL-BUSINESS-RULES.md)** ⭐ - Essential business logic, edge cases, and implementation decisions
-- **[SYSTEM-OVERVIEW.md](docs/SYSTEM-OVERVIEW.md)** - Architecture, data flow, and technical overview
-- **[DATA-FORMATS.md](docs/DATA-FORMATS.md)** - Smart Cookie API and data structure reference
-- **[EDGE-CASES.md](docs/EDGE-CASES.md)** - Known oddities and gotchas
-- **[CLAUDE.md](CLAUDE.md)** - Claude Code development guide
+- **[DATA-SOURCES-PRIORITY.md](docs/DATA-SOURCES-PRIORITY.md)** 🥇 - Smart Cookie vs Digital Cookie hierarchy, conflict resolution
+- **[IMPLEMENTATION-NOTES.md](docs/IMPLEMENTATION-NOTES.md)** 🔧 - Code patterns, constants, performance optimizations, and common utilities
+- **[DATA-FORMATS.md](docs/DATA-FORMATS.md)** 📊 - Smart Cookie API and data structure reference
+- **[EDGE-CASES.md](docs/EDGE-CASES.md)** ⚠️ - Known oddities and gotchas
+- **[RECONCILIATION.md](docs/RECONCILIATION.md)** 🔄 - Data reconciliation implementation
 
 ### 📗 For Understanding the Domain
 
-- **[PROGRAM-KNOWLEDGE.md](docs/PROGRAM-KNOWLEDGE.md)** - Girl Scout Cookie Program operational knowledge
-- **[RECONCILIATION.md](docs/RECONCILIATION.md)** - How to reconcile Digital Cookie vs Smart Cookie
+- **[PROGRAM-KNOWLEDGE.md](docs/PROGRAM-KNOWLEDGE.md)** 🍪 - Girl Scout Cookie Program operational knowledge
+- **[SALES-TYPES.md](docs/SALES-TYPES.md)** 🛒 - Order type classification
 
 ## Architecture
 
@@ -97,7 +100,8 @@ cookie-tracker/
 │   ├── smart-cookie.js        # SC API scraper
 │   └── index.js               # Orchestrator
 ├── credentials-manager.js     # Encrypted credential storage
-├── cookie-constants.js        # Cookie varieties and mappings
+├── constants.js               # App-wide constants (packages, pricing, column names)
+├── cookie-constants.js        # Cookie varieties and ID mappings
 └── docs/                      # Comprehensive documentation
 ```
 
@@ -146,7 +150,8 @@ When numbers differ, Smart Cookie is correct.
 
 ### Common Gotchas
 
-- **Don't count "D" transfers** as sold (they're just sync records)
+- **DO count "D" transfers** as sold (Smart Cookie counts these - they're not duplicates of T2G)
+- **C2T transfers are NOT sold** (incoming inventory, not sales)
 - **Cookie Share is virtual** (exclude from physical inventory)
 - **Site orders reduce troop inventory** (booth sales from troop stock)
 - **1 case = 12 packages** (API returns packages in `total_cases` field)
@@ -172,7 +177,7 @@ escapeHtml(str)                   // XSS prevention
 
 - **cookie-constants.js** - Cookie ID mappings (verify if API IDs change)
 - **data-reconciler.js** - Order matching and deduplication logic
-- **renderer.js** - All UI and report generation (~1700 lines)
+- **renderer.js** - Data loading and report coordination
 - **credentials-manager.js** - Electron safeStorage integration
 
 ### Testing Your Changes
@@ -189,8 +194,8 @@ See [Testing Checklist](docs/CRITICAL-BUSINESS-RULES.md#testing-checklist) for c
 ## Troubleshooting
 
 ### "Packages Sold" doesn't match Smart Cookie
-- Check if "D" transfers are being counted (they shouldn't be)
-- Verify only T2G transfers counted as "sold"
+- Check if "D" transfers are being counted (they should be - Smart Cookie counts these as sold)
+- Verify T2G, D, DIRECT_SHIP, and COOKIE_SHARE transfers are counted as "sold"
 - See: [When Packages Are "Sold"](docs/CRITICAL-BUSINESS-RULES.md#when-packages-are-sold)
 
 ### Troop inventory is incorrect
@@ -245,4 +250,3 @@ This is a volunteer-developed tool. For:
 ---
 
 **Version:** 1.0.0
-**Last Updated:** 2026-02-04

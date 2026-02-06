@@ -64,6 +64,7 @@ class ScraperOrchestrator {
 
   /**
    * Scrape only Digital Cookie
+   * Note: Currently unused - reserved for future selective sync feature
    */
   async scrapeDigitalCookie(credentials) {
     this.digitalCookieScraper = new DigitalCookieScraper(this.dataDir, this.progressCallback);
@@ -72,6 +73,7 @@ class ScraperOrchestrator {
 
   /**
    * Scrape only Smart Cookie
+   * Note: Currently unused - reserved for future selective sync feature
    */
   async scrapeSmartCookie(credentials) {
     this.smartCookieScraper = new SmartCookieScraper(this.dataDir, this.progressCallback);

@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const { safeStorage } = require('electron');
+const { DEFAULT_COUNCIL_ID } = require('./constants');
+const Logger = require('./logger');
 
 class CredentialsManager {
   constructor(dataDir = null) {
@@ -15,24 +17,15 @@ class CredentialsManager {
    */
   loadCredentials() {
     try {
-      if (!fs.existsSync(this.credentialsPath)) {
-        return {
-          digitalCookie: { username: '', password: '', role: '', councilId: '623' },
-          smartCookie: { username: '', password: '' }
-        };
+      // Check if encryption is available first
+      if (!safeStorage.isEncryptionAvailable()) {
+        throw new Error('Credential encryption is unavailable. Cannot safely load credentials. Please ensure your operating system keychain is accessible.');
       }
 
-      // Check if encryption is available (might not be in dev mode)
-      if (!safeStorage.isEncryptionAvailable()) {
-        console.warn('Encryption not available, falling back to plaintext');
-        // Try to read as plaintext for backward compatibility
-        const oldPath = this.credentialsPath.replace('.enc', '.json');
-        if (fs.existsSync(oldPath)) {
-          const data = fs.readFileSync(oldPath, 'utf8');
-          return JSON.parse(data);
-        }
+      // Return empty credentials if encrypted file doesn't exist
+      if (!fs.existsSync(this.credentialsPath)) {
         return {
-          digitalCookie: { username: '', password: '', role: '', councilId: '623' },
+          digitalCookie: { username: '', password: '', role: '', councilId: DEFAULT_COUNCIL_ID },
           smartCookie: { username: '', password: '' }
         };
       }
@@ -50,15 +43,15 @@ class CredentialsManager {
           credentials.digitalCookie.role = '';
         }
         if (!credentials.digitalCookie.hasOwnProperty('councilId')) {
-          credentials.digitalCookie.councilId = '623'; // Default
+          credentials.digitalCookie.councilId = DEFAULT_COUNCIL_ID; // Default
         }
       }
 
       return credentials;
     } catch (error) {
-      console.error('Error loading credentials:', error);
+      Logger.error('Error loading credentials:', error);
       return {
-        digitalCookie: { username: '', password: '', role: '', councilId: '623' },
+        digitalCookie: { username: '', password: '', role: '', councilId: DEFAULT_COUNCIL_ID },
         smartCookie: { username: '', password: '' }
       };
     }
@@ -88,14 +81,7 @@ class CredentialsManager {
 
       // Check if encryption is available
       if (!safeStorage.isEncryptionAvailable()) {
-        console.warn('Encryption not available, saving as plaintext');
-        const oldPath = this.credentialsPath.replace('.enc', '.json');
-        fs.writeFileSync(oldPath, JSON.stringify(credentials, null, 2));
-        return {
-          success: true,
-          path: oldPath,
-          encrypted: false
-        };
+        throw new Error('Credential encryption is unavailable. Cannot safely store credentials. Please ensure your operating system keychain is accessible.');
       }
 
       // Convert credentials to JSON string
@@ -111,7 +97,7 @@ class CredentialsManager {
       const oldPath = this.credentialsPath.replace('.enc', '.json');
       if (fs.existsSync(oldPath)) {
         fs.unlinkSync(oldPath);
-        console.log('Migrated from plaintext to encrypted credentials');
+        Logger.info('Migrated from plaintext to encrypted credentials');
       }
 
       return {
@@ -120,7 +106,7 @@ class CredentialsManager {
         encrypted: true
       };
     } catch (error) {
-      console.error('Error saving credentials:', error);
+      Logger.error('Error saving credentials:', error);
       return {
         success: false,
         error: error.message

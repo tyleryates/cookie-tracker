@@ -5,6 +5,9 @@ const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
 const { getTimestamp } = require('../scraper-utils');
+const { DEFAULT_COUNCIL_ID, HTTP_STATUS } = require('../constants');
+const { requestWithRetry } = require('./request-utils');
+const Logger = require('../logger');
 
 /**
  * Digital Cookie Scraper - API-based scraping
@@ -110,17 +113,24 @@ class DigitalCookieScraper {
 
   /**
    * Login to Digital Cookie
+   * @param {boolean} silent - If true, skip progress updates (for re-login during retry)
    */
-  async login(username, password, roleName) {
-    this.sendProgress('Digital Cookie: Getting CSRF token...', 10);
+  async login(username, password, roleName, silent = false) {
+    if (!silent) {
+      this.sendProgress('Digital Cookie: Getting CSRF token...', 10);
+    }
 
     // Get CSRF token
     const loginPageResponse = await this.client.get('/login');
     const csrfToken = this.extractCSRFToken(loginPageResponse.data);
 
-    this.sendProgress('Digital Cookie: Logging in...', 20);
+    if (!silent) {
+      this.sendProgress('Digital Cookie: Logging in...', 20);
+    }
 
     // Submit login
+    // SECURITY WARNING: This request contains plaintext credentials
+    // Never log this request body or enable axios request interceptors that log POST data
     const params = new URLSearchParams({
       j_username: username,
       j_password: password,
@@ -133,11 +143,13 @@ class DigitalCookieScraper {
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
 
-    if (loginResponse.status !== 200 && loginResponse.status !== 302) {
+    if (loginResponse.status !== HTTP_STATUS.OK && loginResponse.status !== HTTP_STATUS.FOUND) {
       throw new Error(`Login failed with status ${loginResponse.status}`);
     }
 
-    this.sendProgress('Digital Cookie: Selecting role...', 25);
+    if (!silent) {
+      this.sendProgress('Digital Cookie: Selecting role...', 25);
+    }
 
     // Get and select role
     const rolePageResponse = await this.client.get('/select-role');
@@ -145,11 +157,13 @@ class DigitalCookieScraper {
 
     const roleResponse = await this.client.get(`/select-role?id=${roleId}`);
 
-    if (roleResponse.status !== 200 && roleResponse.status !== 302) {
+    if (roleResponse.status !== HTTP_STATUS.OK && roleResponse.status !== HTTP_STATUS.FOUND) {
       throw new Error(`Role selection failed with status ${roleResponse.status}`);
     }
 
-    this.sendProgress('Digital Cookie: Login successful', 30);
+    if (!silent) {
+      this.sendProgress('Digital Cookie: Login successful', 30);
+    }
 
     // Store the selected role name for use in downloadExport
     this.selectedRoleName = selectedRoleName;
@@ -159,7 +173,7 @@ class DigitalCookieScraper {
   /**
    * Download export file
    */
-  async downloadExport(councilId = '623') {
+  async downloadExport(councilId = DEFAULT_COUNCIL_ID) {
     this.sendProgress('Digital Cookie: Preparing export...', 40);
 
     // Use the role name that was selected during login
@@ -216,15 +230,30 @@ class DigitalCookieScraper {
    * Main scraping method
    */
   async scrape(credentials) {
-    try {
-      await this.login(
-        credentials.username,
-        credentials.password,
-        credentials.role || '' // Empty string = auto-select first Troop role
-      );
+    // Validate input
+    if (!credentials || !credentials.username || !credentials.password) {
+      return {
+        success: false,
+        source: 'Digital Cookie',
+        error: 'Username and password are required'
+      };
+    }
 
-      const councilId = credentials.councilId || '623';
-      const filePath = await this.downloadExport(councilId);
+    try {
+      // Store credentials for potential re-login
+      this.credentials = credentials;
+
+      const councilId = credentials.councilId || DEFAULT_COUNCIL_ID;
+
+      // Digital Cookie requires login first to set selectedRoleName
+      await this.login(credentials.username, credentials.password, credentials.role || '');
+
+      // Download export with automatic retry if session expires
+      const filePath = await requestWithRetry(
+        () => this.downloadExport(councilId),
+        () => this.login(credentials.username, credentials.password, credentials.role || '', true),
+        { logPrefix: 'Digital Cookie: Download Export', rateLimit: false }
+      );
 
       return {
         success: true,
@@ -232,6 +261,7 @@ class DigitalCookieScraper {
         filePath: filePath
       };
     } catch (error) {
+      Logger.error('Digital Cookie scrape failed:', error);
       return {
         success: false,
         source: 'Digital Cookie',
