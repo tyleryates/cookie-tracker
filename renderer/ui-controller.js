@@ -158,7 +158,7 @@ async function handleRefreshFromWeb(
 
 // Helper function to update source sync status and timestamp
 function updateSourceStatus(statusEl, lastSyncEl, filename, prefix, extension, updateTimestamps) {
-  statusEl.textContent = '✓ Synced';
+  statusEl.textContent = '✓';
   statusEl.className = 'sync-status synced';
 
   if (updateTimestamps) {
@@ -166,26 +166,30 @@ function updateSourceStatus(statusEl, lastSyncEl, filename, prefix, extension, u
     const timestampStr = filename.replace(prefix, '').replace(extension, '');
     // Convert from YYYY-MM-DD-HH-MM-SS to YYYY-MM-DDTHH:MM:SS
     const isoTimestamp = timestampStr.replace(/-(\d{2})-(\d{2})-(\d{2})$/, 'T$1:$2:$3');
-    lastSyncEl.textContent = `Last synced: ${DateFormatter.toFriendly(isoTimestamp)}`;
+    lastSyncEl.textContent = DateFormatter.toFriendly(isoTimestamp);
+    lastSyncEl.style.color = '#666';
   }
 }
 
 // Helper function to update sync status for a data source
 function updateSyncStatus(source, result, statusEl, lastSyncEl, timestamp, errors) {
   if (result && result.success) {
-    statusEl.textContent = '✓ Synced';
+    statusEl.textContent = '✓';
     statusEl.className = 'sync-status synced';
-    lastSyncEl.textContent = `Last synced: ${DateFormatter.toFriendly(timestamp)}`;
+    lastSyncEl.textContent = DateFormatter.toFriendly(timestamp);
+    lastSyncEl.style.color = '#666';
     return { success: true, message: `${source} downloaded` };
   } else if (result && !result.success) {
-    statusEl.textContent = '✗ Failed';
+    statusEl.textContent = '✗';
     statusEl.className = 'sync-status error';
-    lastSyncEl.textContent = 'Sync failed';
+    lastSyncEl.textContent = 'Failed';
+    lastSyncEl.style.color = '#EF4444';
     if (result.error) errors.push(`${source}: ${result.error}`);
     return { success: false };
   }
   return null;
 }
+
 
 // Progress bar helpers
 function initializeProgressBar(progressEl, fillEl, textEl, initialText = 'Starting...') {
@@ -203,10 +207,10 @@ function updateProgressBarAndStatus(fillEl, textEl, statusEl, progress, statusPr
   textEl.textContent = progress.status.replace(statusPrefix, '').replace('Smart Cookie: ', '');
 
   if (progress.progress >= 100) {
-    statusEl.textContent = '✓ Synced';
+    statusEl.textContent = '✓';
     statusEl.className = 'sync-status synced';
-  } else {
-    statusEl.textContent = 'Syncing...';
+  } else if (progress.progress > 0) {
+    statusEl.textContent = '...';
     statusEl.className = 'sync-status syncing';
   }
 }
@@ -229,8 +233,10 @@ function updateScrapeProgress(progress, dcProgressFill, dcProgressText, scProgre
 
 function showStatus(importStatus, message, type) {
   importStatus.textContent = message;
-  importStatus.className = `status-message ${type}`;
+  importStatus.className = `sync-status-message ${type}`;
+  importStatus.style.display = 'block';
 
+  // Auto-hide success messages after 5 seconds
   if (type === 'success') {
     setTimeout(() => {
       importStatus.style.display = 'none';

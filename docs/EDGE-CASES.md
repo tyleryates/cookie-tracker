@@ -15,18 +15,12 @@ This document captures critical edge cases and behaviors discovered in the codeb
 - **MUST use `transfer_type` field** - using `type` breaks all inventory tracking
 - Transfer types have suffixes (e.g., `C2T(P)`) - use `startsWith('C2T')` pattern
 
-### Reconciler Duplicate Accumulation Bug
+### Reconciler Must Be Reset Between Loads
 
 **The Problem:**
-The DataReconciler accumulates data in memory. If you load multiple Smart Cookie files without resetting, duplicates multiply.
+The DataReconciler accumulates data in memory. Loading multiple Smart Cookie files without resetting causes duplicate accumulation.
 
-**Historical Bug:**
-1. Reconciler never reset between data loads
-2. Multiple dated files (SC-2026-02-03.json, SC-2026-02-04.json) all imported
-3. Each import added to existing data
-4. Result: Duplicate orders, inflated totals
-
-**Solution:**
+**Correct Implementation:**
 ```javascript
 // CRITICAL: Reset reconciler before loading new data
 reconciler = new DataReconciler();
@@ -131,16 +125,14 @@ const needsManualEntry = !isAutoSync && donations > 0;
 - Always requires manual Virtual Cookie Share entry
 - TCM must create Virtual Cookie Share order in Smart Cookie
 
-### Critical Bug That Was Fixed
-**Previous Logic**: Only checked `Order Type` field
-**Problem**: "Donation" orders with CASH payment were incorrectly marked as auto-sync
-**Correct Logic**: Must check BOTH `Order Type` AND `Payment Status`
+### Complete Auto-Sync Determination Logic
+
+**Critical**: Must check BOTH `Order Type` AND `Payment Status` to determine sync behavior.
+
 ```javascript
 const isCreditCard = paymentStatus === 'CAPTURED';
 const isAutoSync = (orderType.includes('Shipped') || orderType === 'Donation') && isCreditCard;
 ```
-
-### Complete Auto-Sync Determination Logic
 
 **Full Implementation** showing all order type and payment status combinations:
 
@@ -591,25 +583,18 @@ When calculating physical inventory from T2G transfers, exclude virtual booth tr
 
 ### Site Orders Reduce Troop Inventory (CRITICAL)
 
-**The Problem:**
-"Site" orders (troop booth sales from Digital Cookie) are fulfilled from troop stock but weren't being subtracted from troop inventory.
+**Site Order Inventory Impact:**
+"Site" orders (troop booth sales from Digital Cookie) are fulfilled from troop stock and must be subtracted from troop inventory.
 
-**Historical Bug:**
+**Example Calculation:**
 ```
 Troop picks up 1000 packages (C2T)
 Scouts pick up 800 packages (T2G)
 Site orders deliver 50 packages to customers
-Expected inventory: 1000 - 800 - 50 = 150
-Actual (buggy): 1000 - 800 = 200  ❌ Wrong!
+Net inventory: 1000 - 800 - 50 = 150 ✅
 ```
 
-**Root Cause:**
-- Site orders come from Digital Cookie (online booth sales)
-- When fulfilled from troop stock, they reduce physical inventory
-- But troop inventory calculation only subtracted T2G transfers
-- Site orders delivered directly weren't being subtracted
-
-**Solution:**
+**Implementation:**
 Track site orders separately by identifying orders where the girl's last name equals "Site". For these orders, calculate physical packages (excluding donations) and filter for non-shipped, non-donation-only orders that use troop stock. These physical site order packages must be subtracted from net troop inventory along with T2G allocations: `netInventory = totalOrdered - totalAllocated - siteOrdersPhysical`.
 
 **Rule:** Site orders are booth sales from troop stock and MUST be subtracted from net troop inventory.
@@ -826,8 +811,6 @@ const tooltipText = ` title="${escapedList}"`;
 - Using `&#10;` shows literal text instead of line breaks
 - Always use `\n` for newlines in title attributes
 - Always escape quotes with `&quot;` to prevent broken HTML
-
-**Historical Bug:** Early versions used `&#10;` which didn't work, causing tooltips to be unreadable single lines with literal entity codes shown.
 
 ---
 

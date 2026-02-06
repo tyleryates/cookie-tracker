@@ -51,7 +51,7 @@ New to the project? Start here:
 - **[EDGE-CASES.md](EDGE-CASES.md)** ⚠️
   - Surprising behaviors
   - API quirks and oddities
-  - Historical bugs (fixed)
+  - Important implementation details
   - Virtual booth tracking
   - String boolean gotchas
 

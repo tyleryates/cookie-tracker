@@ -31,7 +31,8 @@ const {
   showStatus: showStatusUI,
   checkLoginStatus,
   setupReportObserver,
-  setupEventListeners
+  setupEventListeners,
+  handleRefreshFromWeb
 } = require('./renderer/ui-controller.js');
 
 // Global data
@@ -93,7 +94,106 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   await loadDataFromDisk(false);
   await checkLoginStatus();
+
+  // Initialize auto-sync toggle and start if enabled
+  initializeAutoSyncToggle();
 });
+
+// ============================================================================
+// AUTO-SYNC FUNCTIONALITY
+// ============================================================================
+
+const AUTO_SYNC_STORAGE_KEY = 'autoSyncEnabled';
+const AUTO_SYNC_INTERVAL_MS = 3600000; // 1 hour
+
+let autoSyncInterval = null;
+let autoSyncEnabled = true; // Default to enabled
+
+function initializeAutoSyncToggle() {
+  const toggle = document.getElementById('autoSyncToggle');
+
+  // Load saved preference from localStorage (defaults to true)
+  const savedPreference = localStorage.getItem(AUTO_SYNC_STORAGE_KEY);
+  autoSyncEnabled = savedPreference === null ? true : savedPreference === 'true';
+
+  // Set toggle to match saved preference
+  toggle.checked = autoSyncEnabled;
+
+  // Start auto-sync if enabled
+  if (autoSyncEnabled) {
+    startAutoSync();
+  }
+
+  // Listen for toggle changes
+  toggle.addEventListener('change', (e) => {
+    autoSyncEnabled = e.target.checked;
+
+    // Save preference to localStorage
+    localStorage.setItem(AUTO_SYNC_STORAGE_KEY, autoSyncEnabled.toString());
+
+    // Start or stop auto-sync based on toggle
+    if (autoSyncEnabled) {
+      startAutoSync();
+      showStatus('Auto-sync enabled (syncs every hour)', 'success');
+    } else {
+      stopAutoSync();
+      showStatus('Auto-sync disabled', 'success');
+    }
+  });
+}
+
+function startAutoSync() {
+  // Clear any existing interval
+  if (autoSyncInterval) {
+    clearInterval(autoSyncInterval);
+  }
+
+  // Auto-sync every hour
+  autoSyncInterval = setInterval(async () => {
+    // Double-check that auto-sync is still enabled
+    if (!autoSyncEnabled) {
+      stopAutoSync();
+      return;
+    }
+
+    console.log('Auto-sync: Starting hourly sync...');
+    try {
+      await handleRefreshFromWeb(
+        refreshFromWebBtn,
+        dcProgress, dcProgressFill, dcProgressText,
+        scProgress, scProgressFill, scProgressText,
+        dcStatus, scStatus, dcLastSync, scLastSync,
+        showStatus,
+        (source, result, statusEl, lastSyncEl, timestamp, errors) => {
+          // Use the updateSyncStatus function from ui-controller
+          const { updateSyncStatus } = require('./renderer/ui-controller.js');
+          return updateSyncStatus(source, result, statusEl, lastSyncEl, timestamp, errors);
+        },
+        loadDataFromDisk
+      );
+      console.log('Auto-sync: Completed successfully');
+    } catch (error) {
+      console.error('Auto-sync error:', error);
+    }
+  }, AUTO_SYNC_INTERVAL_MS);
+
+  console.log('Auto-sync: Started (syncs every hour)');
+}
+
+function stopAutoSync() {
+  if (autoSyncInterval) {
+    clearInterval(autoSyncInterval);
+    autoSyncInterval = null;
+    console.log('Auto-sync: Stopped');
+  }
+}
+
+// Stop auto-sync on window unload
+window.addEventListener('beforeunload', stopAutoSync);
+
+// ============================================================================
+// EVENT LISTENER SETUP
+// ============================================================================
 
 // Setup event listeners and observers
 setupEventListeners(

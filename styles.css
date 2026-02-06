@@ -195,15 +195,7 @@ h2 {
 }
 
 /* Status Messages */
-.status-message {
-  margin-top: 16px;
-  padding: 14px 18px;
-  border-radius: 10px;
-  display: none;
-  font-weight: 500;
-  animation: slideIn 0.3s ease;
-}
-
+/* Animations */
 @keyframes slideIn {
   from {
     opacity: 0;
@@ -213,20 +205,6 @@ h2 {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-.status-message.success {
-  background: var(--success-light);
-  color: var(--success);
-  border: 2px solid var(--success);
-  display: block;
-}
-
-.status-message.error {
-  background: var(--error-light);
-  color: var(--error);
-  border: 2px solid var(--error);
-  display: block;
 }
 
 /* Sync Cards */
@@ -244,18 +222,105 @@ h2 {
   box-shadow: var(--shadow-md);
 }
 
-.sync-header {
+.sync-status-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--gray-200);
 }
 
-.sync-header h3 {
-  font-size: 1.15em;
+.sync-status-row:last-of-type {
+  margin-bottom: 20px;
+}
+
+.sync-source-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sync-source-label strong {
+  font-size: 1.05em;
   color: var(--gray-900);
-  margin: 0;
   font-weight: 600;
+}
+
+.source-badge {
+  font-size: 0.7em;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: var(--gray-200);
+  color: var(--gray-700);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.source-badge.primary {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+.sync-source-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sync-timestamp {
+  font-size: 0.9em;
+  color: var(--gray-600);
+}
+
+.sync-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.sync-controls .btn {
+  margin: 0;
+}
+
+/* Status Messages Inside Sync Box */
+.sync-status-message {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  font-weight: 500;
+  display: none;
+  animation: slideIn 0.3s ease;
+}
+
+.sync-status-message.success {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid var(--success);
+  display: block;
+}
+
+.sync-status-message.error {
+  background: var(--error-light);
+  color: var(--error);
+  border: 1px solid var(--error);
+  display: block;
+}
+
+.sync-status-message.warning {
+  background: var(--warning-light);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  display: block;
+}
+
+.sync-status-message.info {
+  background: var(--gray-100);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+  display: block;
 }
 
 .sync-status {
@@ -270,6 +335,11 @@ h2 {
 .sync-status.synced {
   background: var(--success-light);
   color: var(--success);
+}
+
+.sync-status.not-synced {
+  background: var(--error-light);
+  color: var(--error);
 }
 
 .sync-status.syncing {
@@ -295,13 +365,70 @@ h2 {
   margin-bottom: 0;
 }
 
+/* Toggle Switch */
+.toggle-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-switch input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  background: var(--gray-300);
+  border-radius: 24px;
+  transition: background 0.3s ease;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input[type="checkbox"]:checked + .toggle-slider {
+  background: var(--primary);
+}
+
+.toggle-switch input[type="checkbox"]:checked + .toggle-slider::after {
+  transform: translateX(20px);
+}
+
+.toggle-switch:hover .toggle-slider {
+  box-shadow: 0 0 0 4px rgba(0, 174, 88, 0.1);
+}
+
+.toggle-label {
+  font-size: 0.9em;
+  color: var(--gray-700);
+  font-weight: 500;
+}
+
 /* Progress Bars */
 .scrape-progress {
-  margin-top: 20px;
-  padding: 20px;
+  margin: 12px 0 16px 0;
+  padding: 16px;
   background: var(--gray-50);
-  border-radius: 12px;
-  border: 2px solid var(--gray-200);
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
 }
 
 .progress-bar {

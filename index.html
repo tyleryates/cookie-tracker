@@ -17,44 +17,69 @@
     <main>
       <section class="import-section">
         <h2>Data Sync & Status</h2>
-        <div class="button-group">
-          <button id="refreshFromWebBtn" class="btn btn-primary">🔄 Sync Now</button>
-          <button id="viewUnifiedDataBtn" class="btn btn-secondary" disabled style="background: #9C27B0; color: white;">💾 Download Data</button>
-          <button id="configureLoginsBtn" class="btn btn-secondary">⚙️ Configure Logins</button>
-        </div>
-        <p id="setupHint" class="table-hint" style="margin-top: 10px; display: none;">💡 First time? Click "Configure Logins" to set up credentials, then use "Sync Now" to download data</p>
 
-        <!-- Smart Cookie Progress & Status (PRIMARY SOURCE OF TRUTH) -->
+        <!-- Sync Status - Status First Design -->
         <div class="sync-card" style="border-color: #4CAF50; border-width: 3px;">
-          <div class="sync-header">
-            <h3>Smart Cookie <span style="font-size: 0.7em; color: #4CAF50; font-weight: 600;">PRIMARY</span></h3>
-            <span id="scStatus" class="sync-status">Not Synced</span>
+          <!-- Smart Cookie Status -->
+          <div class="sync-status-row">
+            <div class="sync-source-label">
+              <strong>Smart Cookie</strong>
+              <span class="source-badge">Sales & inventory</span>
+            </div>
+            <div class="sync-source-status">
+              <span id="scStatus" class="sync-status not-synced">✗</span>
+              <span id="scLastSync" class="sync-timestamp">Never synced</span>
+            </div>
           </div>
+
+          <!-- Smart Cookie Progress -->
           <div id="scProgress" class="scrape-progress" style="display: none;">
             <div class="progress-bar">
               <div id="scProgressFill" class="progress-fill"></div>
             </div>
             <div id="scProgressText" class="progress-text"></div>
           </div>
-          <p id="scLastSync" class="sync-last">Never synced</p>
-        </div>
 
-        <!-- Digital Cookie Progress & Status (SUPPLEMENTAL) -->
-        <div class="sync-card">
-          <div class="sync-header">
-            <h3>Digital Cookie <span style="font-size: 0.7em; color: #666;">SUPPLEMENTAL</span></h3>
-            <span id="dcStatus" class="sync-status">Not Synced</span>
+          <!-- Digital Cookie Status -->
+          <div class="sync-status-row">
+            <div class="sync-source-label">
+              <strong>Digital Cookie</strong>
+              <span class="source-badge">Orders & customers</span>
+            </div>
+            <div class="sync-source-status">
+              <span id="dcStatus" class="sync-status not-synced">✗</span>
+              <span id="dcLastSync" class="sync-timestamp">Never synced</span>
+            </div>
           </div>
+
+          <!-- Digital Cookie Progress -->
           <div id="dcProgress" class="scrape-progress" style="display: none;">
             <div class="progress-bar">
               <div id="dcProgressFill" class="progress-fill"></div>
             </div>
             <div id="dcProgressText" class="progress-text"></div>
           </div>
-          <p id="dcLastSync" class="sync-last">Never synced</p>
+
+          <!-- Sync Controls -->
+          <div class="sync-controls">
+            <button id="refreshFromWebBtn" class="btn btn-secondary active">Sync Now</button>
+            <label class="toggle-switch" title="Enable automatic hourly sync">
+              <input type="checkbox" id="autoSyncToggle" checked>
+              <span class="toggle-slider"></span>
+              <span class="toggle-label">Auto-sync hourly</span>
+            </label>
+          </div>
+
+          <!-- Status Messages -->
+          <div id="importStatus" class="sync-status-message"></div>
         </div>
 
-        <div id="importStatus" class="status-message"></div>
+        <p id="setupHint" class="table-hint" style="margin-top: 10px; display: none;">💡 First time? Click "Configure Logins" to set up credentials, then use "Sync Now" to download data</p>
+
+        <div class="button-group" style="margin-top: 20px;">
+          <button id="configureLoginsBtn" class="btn btn-secondary">⚙️ Configure Logins</button>
+          <button id="viewUnifiedDataBtn" class="btn btn-secondary" disabled>💾 Download Data</button>
+        </div>
       </section>
 
       <section class="reports-section">
