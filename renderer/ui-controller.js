@@ -166,9 +166,38 @@ function updateSourceStatus(statusEl, lastSyncEl, filename, prefix, extension, u
     const timestampStr = filename.replace(prefix, '').replace(extension, '');
     // Convert from YYYY-MM-DD-HH-MM-SS to YYYY-MM-DDTHH:MM:SS
     const isoTimestamp = timestampStr.replace(/-(\d{2})-(\d{2})-(\d{2})$/, 'T$1:$2:$3');
-    lastSyncEl.textContent = DateFormatter.toFriendly(isoTimestamp);
+    setupTimestampHover(lastSyncEl, isoTimestamp);
     lastSyncEl.style.color = '#666';
   }
+}
+
+// Helper function to setup timestamp hover behavior (swap between relative and full timestamp)
+function setupTimestampHover(element, timestamp) {
+  const friendlyTime = DateFormatter.toFriendly(timestamp);
+  const fullTime = DateFormatter.toFullTimestamp(timestamp);
+
+  // Set initial text to friendly time
+  element.textContent = friendlyTime;
+
+  // Store both values as data attributes
+  element.dataset.friendlyTime = friendlyTime;
+  element.dataset.fullTime = fullTime;
+
+  // Remove any existing listeners to avoid duplicates
+  element.onmouseenter = null;
+  element.onmouseleave = null;
+
+  // Add hover behavior
+  element.onmouseenter = function() {
+    this.textContent = this.dataset.fullTime;
+  };
+
+  element.onmouseleave = function() {
+    this.textContent = this.dataset.friendlyTime;
+  };
+
+  // Add pointer cursor to indicate interactivity
+  element.style.cursor = 'pointer';
 }
 
 // Helper function to update sync status for a data source
@@ -176,7 +205,7 @@ function updateSyncStatus(source, result, statusEl, lastSyncEl, timestamp, error
   if (result && result.success) {
     statusEl.textContent = '✓';
     statusEl.className = 'sync-status synced';
-    lastSyncEl.textContent = DateFormatter.toFriendly(timestamp);
+    setupTimestampHover(lastSyncEl, timestamp);
     lastSyncEl.style.color = '#666';
     return { success: true, message: `${source} downloaded` };
   } else if (result && !result.success) {

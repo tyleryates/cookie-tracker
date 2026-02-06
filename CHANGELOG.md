@@ -7,9 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - TBD
+## [1.2.0] - 2026-02-06
 
-### Initial Release
+### Added
+- **Auto-sync toggle** - Hourly automatic sync (enabled by default) with persistent settings
+- **Modern UI redesign** - Apple-inspired clean minimal design with flat aesthetics
+- **Interactive timestamps** - Hover over sync times to see full timestamp
+- **Cookie pattern header** - Fun cookie emoji pattern in dark green gradient header
+- **Status-first layout** - Reorganized sync UI to prioritize status information
+
+### Changed
+- Updated color scheme with darker green (#16A34A) for better visual weight
+- Redesigned sync status cards with improved hierarchy
+- Moved sync controls inside status card for better organization
+- Replaced "Primary/Supplemental" badges with descriptive text ("Sales & inventory", "Orders & customers")
+- Streamlined button styling for consistency
+
+### Initial Release Features
 
 Electron desktop application for Girl Scout troops to sync and reconcile cookie sales data from Digital Cookie and Smart Cookie platforms.
 

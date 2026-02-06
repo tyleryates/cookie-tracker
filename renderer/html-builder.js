@@ -52,6 +52,21 @@ const DateFormatter = {
     return date.toISOString().replace(/[:.]/g, '-').split('.')[0];
   },
 
+  // Format full timestamp for hover (e.g., "Feb 5, 2026, 3:45 PM")
+  toFullTimestamp(date) {
+    if (!date) return 'Never synced';
+
+    const then = new Date(date);
+    return then.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  },
+
   // Format friendly relative timestamp with time-of-day
   toFriendly(date) {
     if (!date) return 'Never';
