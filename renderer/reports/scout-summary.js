@@ -62,8 +62,13 @@ function buildCreditedCell(isSiteRow, totalCredited, siteOrders, creditedBoothPa
   }
 
   // If this is the Site row (troop-level orders), add context to tooltip about site orders
-  if (isSiteRow && siteOrders && siteOrders.length > 0) {
-    sources.push(`\nNote: Troop booth sales and direct ship orders are allocated to scouts in Smart Cookie. See site orders in scout details.`);
+  if (isSiteRow && siteOrders) {
+    const hasSiteOrders =
+      (siteOrders.directShip?.orders?.length || 0) > 0 ||
+      (siteOrders.girlDelivery?.orders?.length || 0) > 0;
+    if (hasSiteOrders) {
+      sources.push(`\nNote: Troop booth sales and direct ship orders are allocated to scouts in Smart Cookie. See site orders in scout details.`);
+    }
   }
 
   const tooltipText = sources.join('\n');
@@ -372,10 +377,5 @@ function generateSummaryReport(reconciler) {
 }
 
 module.exports = {
-  generateSummaryReport,
-  buildScoutDetailBreakdown,
-  buildCookieBreakdownTable,
-  buildOrdersTable,
-  buildInventoryCell,
-  buildCreditedCell
+  generateSummaryReport
 };

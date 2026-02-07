@@ -91,7 +91,7 @@ npm run build           # Build for current platform
 - Aggregates per-scout summaries
 - Processes data in-memory for report generation
 
-**scrapers/index.js** - Orchestrator for both scrapers (currently DC disabled for testing)
+**scrapers/index.js** - Orchestrator for both scrapers (DC and SC run in parallel)
 
 **scrapers/digital-cookie.js** - API client for Digital Cookie
 - CSRF token extraction → form POST login → role selection → report download

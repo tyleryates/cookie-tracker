@@ -45,31 +45,15 @@
 
 **Verification:**
 - Smart Cookie dashboard: 769 packages sold
-- Breakdown: T2G (651) + D (31) + DIRECT_SHIP (66) + COOKIE_SHARE (21) = 769 ✓
+- Breakdown: T2G (651) + D (31) + DIRECT_SHIP (66) + COOKIE_SHARE (21) = 769
 
-**Solution:**
-```javascript
-// ✓ CORRECT - Count T2G
-if (transfer.type === 'T2G') {
-  totalSold += transfer.packages || 0;
-}
-
-// ✓ CORRECT - Also count D, DIRECT_SHIP, COOKIE_SHARE
-// But exclude C2T (incoming) and PLANNED (future)
-else if (transfer.type && transfer.packages > 0) {
-  const isCtoT = transfer.type === 'C2T' || transfer.type === 'C2T(P)' || transfer.type.startsWith('C2T');
-  const isPlanned = transfer.type === 'PLANNED';
-  if (!isCtoT && !isPlanned) {
-    totalSold += transfer.packages || 0;
-  }
-}
-```
+**Counting rule:** When computing total sold, include T2G transfers. For all other transfer types, also count their packages unless the type is C2T (any variant, including C2T(P) or anything starting with C2T) or PLANNED. Both of those categories are excluded from the sold total.
 
 ### Smart Cookie Dashboard Verification
 
 Smart Cookie's "Packages Sold" metric counts T2G + D + DIRECT_SHIP + COOKIE_SHARE transfers. Our app must match this exactly.
 
-**Test:** Sum all varieties shown in Smart Cookie dashboard → Should equal our "Packages Sold" number
+**Test:** Sum all varieties shown in Smart Cookie dashboard. The result should equal our "Packages Sold" number.
 
 **See also:**
 - [DATA-FORMATS.md - Transfer Type Field](DATA-FORMATS.md#critical-type-vs-transfer_type-field) - API structure details
@@ -111,7 +95,7 @@ Smart Cookie's "Packages Sold" metric counts T2G + D + DIRECT_SHIP + COOKIE_SHAR
 - Virtual booth sales allocated via Smart Booth Divider
 
 **Data Characteristics:**
-- Negative package quantities in API (use Math.abs())
+- Negative package quantities in API (use Math.abs() for display)
 - May include `virtualBooth: true` flag (booth credits, no physical transfer)
 - May include Cookie Share (virtual, exclude from physical inventory)
 - Includes variety breakdown
@@ -161,15 +145,7 @@ Cookie Share = Virtual donation where customer pays for cookies that are donated
 
 ### Inventory Impact
 
-**CRITICAL:** Cookie Share is VIRTUAL - exclude from physical inventory calculations
-
-```javascript
-// Exclude Cookie Share from physical inventory
-const physicalPackages = totalPackages - cookieShareCount;
-
-// But DO count in "Packages Sold" total
-totalSold += transfer.packages || 0; // Includes Cookie Share
-```
+**CRITICAL:** Cookie Share is VIRTUAL - exclude from physical inventory calculations. When computing physical packages, subtract the Cookie Share count from total packages. However, Cookie Share packages are still included in the "Packages Sold" total.
 
 ### Manual Entry Requirements
 
@@ -207,18 +183,7 @@ Not all Cookie Share orders auto-sync to Smart Cookie. Requires manual entry if:
 
 **Site orders are booth sales fulfilled from troop stock and MUST reduce troop inventory.**
 
-```javascript
-// Track physical packages from Site orders
-if (isSiteOrder) {
-  const physicalPackages = packages - donations;
-  if (!isShipped && !isDonationOnly) {
-    siteOrdersPhysical += physicalPackages;
-  }
-}
-
-// Subtract from troop inventory
-totalInventory -= siteOrdersPhysical;
-```
+For each site order, compute the physical package count by subtracting donations from total packages. If the order is not shipped and is not donation-only, add that count to the running site orders physical total. Then subtract the cumulative site orders physical total from troop inventory.
 
 ### Why This Matters
 
@@ -293,23 +258,10 @@ Physical Packages Needing Inventory: 10 - 2 = 8
 **Why This Matters:**
 If an order has 10 total packages but includes 2 Cookie Share donations, the scout only needs to deliver 8 physical packages. The 2 Cookie Share packages are virtual (donated to military/charity) and never physically handled.
 
-**Implementation:**
-```javascript
-// Total includes both physical and virtual
-const totalPackages = parseInt(row['Total Packages (Includes Donate & Gift)']) || 0;
-const donations = parseInt(row['Donation']) || 0;
-
-// Only physical packages need inventory
-const physicalPackages = totalPackages - donations;
-
-// Use physicalPackages for inventory tracking
-if (!isShipped && !isDonationOnly) {
-  scoutSummary[name].packages += physicalPackages;  // NOT totalPackages!
-}
-```
+**Implementation rule:** When tracking inventory, parse the total packages and donation count from each order row. Subtract donations from total to get physical packages. Use that physical count (not total) when accumulating a scout's package count. Only do this for non-shipped, non-donation-only orders.
 
 **Bug If Wrong:**
-Using `totalPackages` instead of `physicalPackages` will inflate inventory needs and cause negative inventory calculations.
+Using total packages instead of physical packages will inflate inventory needs and cause negative inventory calculations.
 
 ---
 
@@ -322,12 +274,12 @@ Using `totalPackages` instead of `physicalPackages` will inflate inventory needs
 ### Smart Cookie Data
 
 **In API (`total_cases` field):**
-- Contains total PACKAGES (not cases)
-- Divide by 12 to get cases: `Math.round(total_cases / 12)`
+- Contains total PACKAGES (not cases), despite the field name
+- Divide by 12 to get actual cases
 
 **In Reports:**
 - Display both cases and packages
-- Cases column shows: `Math.round(packages / 12)`
+- Cases column shows packages divided by 12 (rounded)
 - Tooltips show variety breakdown in cases
 
 ### Cookie Cupboard Orders
@@ -347,20 +299,18 @@ Troops order from council in CASES, but inventory is tracked in PACKAGES interna
 
 Smart Cookie API uses numeric IDs instead of names. **This mapping is hardcoded and verified.**
 
-```javascript
-const COOKIE_ID_MAP = {
-  1: 'Caramel deLites',
-  2: 'Peanut Butter Patties',
-  3: 'Trefoils',
-  4: 'Thin Mints',
-  5: 'Peanut Butter Sandwich',
-  34: 'Lemonades',
-  37: 'Cookie Share',
-  48: 'Adventurefuls',
-  52: 'Caramel Chocolate Chip',
-  56: 'Exploremores'
-};
-```
+| ID | Cookie Name |
+|----|-------------|
+| 1 | Caramel deLites |
+| 2 | Peanut Butter Patties |
+| 3 | Trefoils |
+| 4 | Thin Mints |
+| 5 | Peanut Butter Sandwich |
+| 34 | Lemonades |
+| 37 | Cookie Share |
+| 48 | Adventurefuls |
+| 52 | Caramel Chocolate Chip |
+| 56 | Exploremores |
 
 **Verification Method:** Export CSV from Smart Cookie, compare quantities to API data by ID.
 
@@ -381,7 +331,7 @@ Cookies always displayed in this order across ALL reports:
 9. Caramel Chocolate Chip
 10. Cookie Share
 
-**Implementation:** Use `sortVarietiesByOrder()` helper function
+Use `sortVarietiesByOrder()` helper function to enforce this order.
 
 ---
 
@@ -429,15 +379,9 @@ Cookies always displayed in this order across ALL reports:
 
 ### Revenue Sources
 
-**Total Revenue comes from Smart Cookie:**
-```javascript
-// Sum all T2G transfer amounts
-totalRevenue += transfer.amount || 0;
-```
+Total revenue comes from Smart Cookie by summing the `amount` field of all T2G transfers. Do NOT calculate revenue by multiplying pricing by packages. Use the actual transaction amounts from Smart Cookie.
 
-**Do NOT calculate revenue from pricing × packages.** Use actual transaction amounts from Smart Cookie.
-
-**Why:** Discounts, refunds, adjustments are already reflected in Smart Cookie amounts.
+**Why:** Discounts, refunds, and adjustments are already reflected in Smart Cookie amounts.
 
 ---
 
@@ -445,15 +389,7 @@ totalRevenue += transfer.amount || 0;
 
 ### Horizontal Stats Layout
 
-All summary stats use consistent horizontal grid layout:
-
-```javascript
-// Helper function for DRY stats display
-createHorizontalStats([
-  { label: 'Metric Name', value: 123, description: 'Context', color: '#2196F3' },
-  // ... more stats
-]);
-```
+All summary stats use the `createHorizontalStats()` helper, which accepts an array of stat objects with label, value, description, and color properties.
 
 **Colors:**
 - Blue (#2196F3) - Totals, orders
@@ -463,29 +399,16 @@ createHorizontalStats([
 
 ### Tooltips (Tippy.js)
 
-**Configuration:**
-- 100ms delay before showing
-- No arrow (simple box)
-- Interactive (text selectable)
-- `white-space: pre` (no word wrapping)
-- Variety lists sorted by cookie order
+**Configuration:** 100ms delay, no arrow, interactive (text selectable), `white-space: pre` (no word wrapping), variety lists sorted by cookie display order.
 
-**Implementation:**
-```javascript
-// In HTML, add data-tooltip attribute
-<td class="tooltip-cell" data-tooltip="Thin Mints: 10\nCaramel deLites: 5">
-
-// JavaScript auto-initializes via MutationObserver
-```
+**How it works:** Elements with a `data-tooltip` attribute containing the tooltip text (newline-separated for multi-line) are auto-initialized by a MutationObserver in JavaScript.
 
 ### Date Formatting
 
 **Display format:** MM/DD/YYYY
 **Storage format:** YYYY-MM-DD or YYYY/MM/DD
 
-```javascript
-formatDate('2026/01/28') → '01/28/2026'
-```
+The `formatDate()` helper converts storage format to display format (e.g., "2026/01/28" becomes "01/28/2026").
 
 ### Report Naming
 
@@ -513,7 +436,7 @@ formatDate('2026/01/28') → '01/28/2026'
 ### 3. Site Orders Forgotten
 
 **Problem:** Troop inventory doesn't account for site orders fulfilled from stock
-**Solution:** Track `siteOrdersPhysical` and subtract from `totalInventory`
+**Solution:** Track site orders physical count and subtract from total inventory
 
 ### 4. Virtual Booth Credits
 
@@ -523,7 +446,7 @@ formatDate('2026/01/28') → '01/28/2026'
 ### 5. "With Donation" Orders
 
 **Problem:** Counting full package total when some are Cookie Share
-**Solution:** Subtract `donations` field from `totalPackages` to get `physicalPackages`
+**Solution:** Subtract donations from total packages to get physical packages
 
 ### 6. Variety Order Inconsistency
 
@@ -533,7 +456,7 @@ formatDate('2026/01/28') → '01/28/2026'
 ### 7. Cases Calculation
 
 **Problem:** Using `total_cases` as-is when it contains packages
-**Solution:** Divide by 12: `Math.round(total_cases / 12)`
+**Solution:** Divide by 12 and round to get actual cases
 
 ### 8. Smart Cookie Status
 
@@ -555,26 +478,26 @@ formatDate('2026/01/28') → '01/28/2026'
 ## Quick Decision Reference
 
 **When should I count this toward "Packages Sold"?**
-- T2G transfer → YES ✓
-- D transfer → YES ✓ (initially thought NO, but Smart Cookie counts these)
-- DIRECT_SHIP transfer → YES ✓
-- COOKIE_SHARE transfer → YES ✓
-- C2T transfer → NO ✗ (that's inventory IN, not sold)
-- PLANNED transfer → NO ✗ (future orders, not completed)
+- T2G transfer → YES
+- D transfer → YES (initially thought NO, but Smart Cookie counts these)
+- DIRECT_SHIP transfer → YES
+- COOKIE_SHARE transfer → YES
+- C2T transfer → NO (that's inventory IN, not sold)
+- PLANNED transfer → NO (future orders, not completed)
 
 **Does this reduce troop inventory?**
-- T2G transfer (physical) → YES ✓
-- Site order (not shipped) → YES ✓
-- Cookie Share → NO ✗
-- Virtual booth credit → NO ✗
-- Shipped order → NO ✗ (fulfilled by supplier)
+- T2G transfer (physical) → YES
+- Site order (not shipped) → YES
+- Cookie Share → NO
+- Virtual booth credit → NO
+- Shipped order → NO (fulfilled by supplier)
 
 **Does this require physical inventory?**
-- "In Person Delivery" → YES ✓
-- "Cookies in Hand" → YES ✓
-- "Shipped" → NO ✗
-- "Donation" only → NO ✗
-- Cookie Share in "with Donation" → NO ✗
+- "In Person Delivery" → YES
+- "Cookies in Hand" → YES
+- "Shipped" → NO
+- "Donation" only → NO
+- Cookie Share in "with Donation" → NO
 
 **Should this appear in which report section?**
 - Site orders → Booth Sales column
@@ -594,7 +517,7 @@ When making changes, verify:
 - [ ] Site orders showing under Booth Sales, not Sales
 - [ ] Tooltips show varieties in correct order
 - [ ] No double-counting of D transfers
-- [ ] Cases = Packages ÷ 12 (rounded)
+- [ ] Cases = Packages / 12 (rounded)
 - [ ] Virtual booth credits excluded from physical inventory
 - [ ] Revenue matches Smart Cookie (not calculated from pricing)
 - [ ] All horizontal stats use createHorizontalStats() helper

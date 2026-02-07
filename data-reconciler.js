@@ -1,45 +1,16 @@
 // Data Reconciliation System
 // Standardizes and merges data from Digital Cookie and Smart Cookie
 
-const { PHYSICAL_COOKIE_TYPES, COOKIE_ID_MAP, COOKIE_COLUMN_MAP, COOKIE_ABBR_MAP } = require('./cookie-constants.js');
+const { DATA_SOURCES } = require('./constants');
 const {
-  PACKAGES_PER_CASE,
-  EXCEL_EPOCH,
-  MS_PER_DAY,
-  ORDER_TYPES,
-  DC_COLUMNS,
-  SC_REPORT_COLUMNS,
-  SC_API_COLUMNS
-} = require('./constants');
-const Logger = require('./logger');
-
-const {
-  parseVarietiesFromDC,
-  parseVarietiesFromSCReport,
-  parseVarietiesFromAPI,
-  parseVarietiesFromSCTransfer,
-  parseExcelDate,
   importDigitalCookie,
   importSmartCookieReport,
   importSmartCookieAPI,
-  importDirectShipDivider,
-  importVirtualCookieShares,
-  importSmartCookie,
-  updateScoutData
+  importSmartCookie
 } = require('./data-processing/data-importers.js');
-
 const {
   buildUnifiedDataset
 } = require('./data-processing/data-calculators.js');
-
-// Data source identifiers
-const DATA_SOURCES = {
-  DIGITAL_COOKIE: 'DC',
-  SMART_COOKIE: 'SC',
-  SMART_COOKIE_REPORT: 'SC-Report',
-  SMART_COOKIE_API: 'SC-API',
-  DIRECT_SHIP_DIVIDER: 'DirectShipDivider'
-};
 
 /**
  * DataReconciler - Merges and standardizes data from multiple sources
@@ -59,7 +30,8 @@ class DataReconciler {
     this.metadata = {
       lastImportDC: null,
       lastImportSC: null,
-      sources: []
+      sources: [],
+      warnings: []
     };
   }
 
@@ -89,7 +61,7 @@ class DataReconciler {
         council: data.council || null,
         district: data.district || null
       },
-      sources: [source], // ['DC', 'SC', 'SC-Report', 'SC-API']
+      sources: [source], // Uses DATA_SOURCES values from constants.js
       metadata: {
         dc: null,
         sc: null,
@@ -161,27 +133,6 @@ class DataReconciler {
     return keyMap[source] || source.toLowerCase();
   }
 
-  // Delegation wrappers for variety parsing
-  parseVarietiesFromDC(row) {
-    return parseVarietiesFromDC(row);
-  }
-
-  parseVarietiesFromSCReport(row) {
-    return parseVarietiesFromSCReport(row);
-  }
-
-  parseVarietiesFromAPI(cookiesArray) {
-    return parseVarietiesFromAPI(cookiesArray);
-  }
-
-  parseVarietiesFromSCTransfer(row) {
-    return parseVarietiesFromSCTransfer(row);
-  }
-
-  parseExcelDate(excelDate) {
-    return parseExcelDate(excelDate);
-  }
-
   // Delegation wrappers for import methods
   importDigitalCookie(dcData) {
     return importDigitalCookie(this, dcData);
@@ -195,20 +146,8 @@ class DataReconciler {
     return importSmartCookieAPI(this, apiData);
   }
 
-  importDirectShipDivider(dividerData) {
-    return importDirectShipDivider(this, dividerData);
-  }
-
-  importVirtualCookieShares(virtualCookieShares) {
-    return importVirtualCookieShares(this, virtualCookieShares);
-  }
-
   importSmartCookie(scData) {
     return importSmartCookie(this, scData);
-  }
-
-  updateScoutData(scoutName, updates, metadata) {
-    return updateScoutData(this, scoutName, updates, metadata);
   }
 
   // Delegation wrapper for unified dataset builder
@@ -217,55 +156,6 @@ class DataReconciler {
     return this.unified;
   }
 
-  // Get reconciled data
-  getData() {
-    return {
-      orders: Array.from(this.orders.values()),
-      transfers: this.transfers,
-      scouts: Array.from(this.scouts.values()),
-      metadata: this.metadata
-    };
-  }
-
-  // Get summary statistics
-  getSummary() {
-    const orders = Array.from(this.orders.values());
-    const hasDC = o => o.sources.includes('DC');
-    const hasSC = o => o.sources.includes('SC');
-    const hasSCReport = o => o.sources.includes('SC-Report');
-    const hasSCAPI = o => o.sources.includes('SC-API');
-
-    return {
-      totalOrders: orders.length,
-      ordersInBoth: orders.filter(o => hasDC(o) && (hasSC(o) || hasSCReport(o) || hasSCAPI(o))).length,
-      ordersOnlyDC: orders.filter(o => hasDC(o) && !hasSC(o) && !hasSCReport(o) && !hasSCAPI(o)).length,
-      ordersOnlySC: orders.filter(o => !hasDC(o) && (hasSC(o) || hasSCReport(o) || hasSCAPI(o))).length,
-      ordersWithMetadata: orders.filter(o => o.scoutId || o.gsusaId).length,
-      totalTransfers: this.transfers.length,
-      totalScouts: this.scouts.size,
-      totalPackages: orders.reduce((sum, o) => sum + o.packages, 0),
-      totalRevenue: orders.reduce((sum, o) => sum + o.amount, 0),
-      sources: {
-        dc: orders.filter(hasDC).length,
-        sc: orders.filter(hasSC).length,
-        scReport: orders.filter(hasSCReport).length,
-        scApi: orders.filter(hasSCAPI).length
-      }
-    };
-  }
-
-  // Load from saved data
-  loadFromJSON(data) {
-    this.orders = new Map(data.orders.map(o => [o.orderNumber, o]));
-    this.transfers = data.transfers || [];
-    this.scouts = new Map(data.scouts.map(s => [s.name, s]));
-    this.metadata = data.metadata || this.metadata;
-  }
-
-  // Export to JSON
-  toJSON() {
-    return JSON.stringify(this.getData(), null, 2);
-  }
 }
 
 // Export for use in renderer

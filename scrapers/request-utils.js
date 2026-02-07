@@ -154,11 +154,5 @@ async function requestWithRetry(requestFn, reloginFn, options = {}) {
 }
 
 module.exports = {
-  RATE_LIMIT,
-  sleep,
-  rateLimit,
-  getBackoffDelay,
-  isSessionExpired,
-  isRateLimited,
   requestWithRetry
 };

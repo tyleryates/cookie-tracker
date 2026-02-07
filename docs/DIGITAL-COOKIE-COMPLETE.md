@@ -64,23 +64,15 @@ GET /ajaxCall/downloadFile/TROOP_ORDER_REPORT/OrderDataTroop_623_3990_02-01-2026
 
 ## Configuration
 
-In `credentials.json`:
+Use **Configure Logins** in the app. Credentials are stored in an encrypted file:
 
-```json
-{
-  "digitalCookie": {
-    "username": "email@example.com",
-    "password": "your-password",
-    "role": "Troop 1234 of Service Unit 567",
-    "councilId": "623"
-  }
-}
-```
+**Storage:**
+- `credentials.enc` (encrypted via Electron `safeStorage`)
 
 **Fields:**
 - `username` - Email address
 - `password` - Account password
-- `role` - Exact role name from dropdown (must match exactly)
+- `role` - Exact role name from dropdown (optional; auto-selects first Troop role)
 - `councilId` - Council ID (defaults to 623 if not specified)
 
 ## ID Extraction
@@ -99,7 +91,7 @@ npm start
 # 1. Configure credentials (include councilId if not 623)
 # 2. Click "Sync from Websites"
 # 3. Watch progress bar
-# 4. File downloads to /data/in/DC-2026-02-01.xlsx
+# 4. File downloads to /data/in/DC-YYYY-MM-DD-HH-MM-SS.xlsx
 ```
 
 ## Error Handling
@@ -127,4 +119,4 @@ Progress updates sent throughout:
 - Automatic ID extraction
 - Robust error handling
 
-**Next: Smart Cookie Integration**
+**See also: Smart Cookie API implementation in `scrapers/smart-cookie.js`**

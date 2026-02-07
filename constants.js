@@ -7,18 +7,16 @@
 
 const PACKAGES_PER_CASE = 12;
 
-// Cookie Pricing (per package)
-const COOKIE_PRICING = {
-  'Thin Mints': 6,
-  'Caramel deLites': 6,
-  'Peanut Butter Patties': 6,
-  'Peanut Butter Sandwich': 6,
-  'Trefoils': 6,
-  'Adventurefuls': 6,
-  'Lemonades': 6,
-  'Exploremores': 6,
-  'Caramel Chocolate Chip': 7,  // Special pricing!
-  'Cookie Share': 6
+
+// ============================================================================
+// DATA SOURCE IDENTIFIERS
+// ============================================================================
+
+const DATA_SOURCES = {
+  DIGITAL_COOKIE: 'DC',
+  SMART_COOKIE: 'SC',
+  SMART_COOKIE_REPORT: 'SC-Report',
+  SMART_COOKIE_API: 'SC-API'
 };
 
 // ============================================================================
@@ -90,9 +88,7 @@ const SC_API_COLUMNS = {
 
 const DISPLAY_STRINGS = {
   TROOP_GIRL_DELIVERED: 'Troop Girl Delivered',
-  TROOP_DIRECT_SHIP: 'Troop Direct Ship',
-  TROOP_DIRECT_SHIP_DIVIDER: 'Troop Direct Ship Orders Divider',
-  SMART_VIRTUAL_BOOTH_DIVIDER: 'Smart Virtual Booth Divider'
+  TROOP_DIRECT_SHIP: 'Troop Direct Ship'
 };
 
 // ============================================================================
@@ -132,11 +128,8 @@ const UI_TIMING = {
 // ============================================================================
 
 module.exports = {
-  // Inventory & Pricing
   PACKAGES_PER_CASE,
-  COOKIE_PRICING,
-
-  // Order Types
+  DATA_SOURCES,
   ORDER_TYPES,
 
   // Data Source Column Names

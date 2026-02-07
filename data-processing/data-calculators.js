@@ -1,27 +1,13 @@
 // Data Calculation Functions
-// All calculation and building functions extracted from DataReconciler
-// These are pure functions that accept reconciler state as parameters
 
-const { PHYSICAL_COOKIE_TYPES, COOKIE_ID_MAP, COOKIE_COLUMN_MAP, COOKIE_ABBR_MAP } = require('../cookie-constants.js');
+const { PHYSICAL_COOKIE_TYPES } = require('../cookie-constants.js');
 const {
-  PACKAGES_PER_CASE,
-  EXCEL_EPOCH,
-  MS_PER_DAY,
+  DATA_SOURCES,
   ORDER_TYPES,
-  DC_COLUMNS,
-  SC_REPORT_COLUMNS,
-  SC_API_COLUMNS
+  DC_COLUMNS
 } = require('../constants');
 const { isC2TTransfer } = require('./utils');
-
-// Data source identifiers
-const DATA_SOURCES = {
-  DIGITAL_COOKIE: 'DC',
-  SMART_COOKIE: 'SC',
-  SMART_COOKIE_REPORT: 'SC-Report',
-  SMART_COOKIE_API: 'SC-API',
-  DIRECT_SHIP_DIVIDER: 'DirectShipDivider'
-};
+const Logger = require('../logger');
 
 // ============================================================================
 // UNIFIED DATASET BUILDER
@@ -37,8 +23,9 @@ const DATA_SOURCES = {
  * @returns {Object} Unified dataset with scouts Map, siteOrders, troopTotals, and varieties
  */
 function buildUnifiedDataset(reconciler) {
+  const warnings = reconciler.metadata.warnings || [];
   // Build scout and site order datasets first
-  const scouts = buildScoutDataset(reconciler);
+  const scouts = buildScoutDataset(reconciler, warnings);
   const siteOrders = buildSiteOrdersDataset(reconciler);
 
   // Build troop-level aggregates
@@ -49,7 +36,7 @@ function buildUnifiedDataset(reconciler) {
     transferBreakdowns: buildTransferBreakdowns(reconciler),
     varieties: buildVarieties(reconciler, scouts),
     cookieShare: buildCookieShareTracking(reconciler),
-    metadata: buildUnifiedMetadata(reconciler)
+    metadata: buildUnifiedMetadata(reconciler, warnings)
   };
 
   return unified;
@@ -60,7 +47,7 @@ function buildUnifiedDataset(reconciler) {
  * @param {Object} reconciler - DataReconciler instance
  * @returns {Map} Scout dataset with all calculated fields
  */
-function buildScoutDataset(reconciler) {
+function buildScoutDataset(reconciler, warnings) {
   const scoutDataset = new Map();
   const rawDCData = reconciler.metadata.rawDCData || [];
 
@@ -68,7 +55,7 @@ function buildScoutDataset(reconciler) {
   initializeScouts(reconciler, scoutDataset, rawDCData);
 
   // Phase 2: Add and classify orders from Digital Cookie
-  addDCOrders(scoutDataset, rawDCData);
+  addDCOrders(scoutDataset, rawDCData, warnings);
 
   // Phase 3: Add inventory from Smart Cookie T2G transfers
   addInventory(reconciler, scoutDataset);
@@ -201,7 +188,7 @@ function classifyOrderType(isSiteOrder, isShipped, isDonationOnly) {
  * @param {Map} scoutDataset - Scout dataset to populate
  * @param {Array} rawDCData - Raw Digital Cookie data
  */
-function addDCOrders(scoutDataset, rawDCData) {
+function addDCOrders(scoutDataset, rawDCData, warnings = []) {
   rawDCData.forEach(row => {
     const firstName = row[DC_COLUMNS.GIRL_FIRST_NAME] || '';
     const lastName = row[DC_COLUMNS.GIRL_LAST_NAME] || '';
@@ -234,6 +221,27 @@ function addDCOrders(scoutDataset, rawDCData) {
     const isSiteOrder = lastName === 'Site';
     const isShipped = orderType.includes('Shipped') || orderType.includes('shipped');
     const isDonationOnly = orderType === 'Donation';
+
+    const lcOrderType = orderType.toLowerCase();
+    const knownOrderType =
+      isDonationOnly ||
+      isShipped ||
+      lcOrderType.includes('cookies in hand') ||
+      lcOrderType.includes('in-person delivery') ||
+      lcOrderType.includes('in person delivery') ||
+      lcOrderType.includes('pick up');
+
+    if (!knownOrderType) {
+      const warning = {
+        type: 'UNKNOWN_ORDER_TYPE',
+        orderNumber: row[DC_COLUMNS.ORDER_NUMBER],
+        orderType: orderType,
+        scout: name
+      };
+      warnings.push(warning);
+      Logger.warn(`Unknown Digital Cookie order type "${orderType}" (order ${row[DC_COLUMNS.ORDER_NUMBER]})`);
+    }
+
     const classifiedType = classifyOrderType(isSiteOrder, isShipped, isDonationOnly);
 
     // Create order object
@@ -514,7 +522,6 @@ function calculateScoutTotals(scoutDataset) {
  * @returns {Object} Site orders summary with allocations
  */
 function buildSiteOrdersDataset(reconciler) {
-  const siteOrders = [];
   const rawDCData = reconciler.metadata.rawDCData || [];
 
   // Find site orders from DC
@@ -829,11 +836,6 @@ function buildVarieties(reconciler, scouts) {
       Object.entries(order.varieties).forEach(([variety, count]) => {
         byCookie[variety] = (byCookie[variety] || 0) + count;
       });
-
-      // Add donations (Cookie Share)
-      if (order.donations > 0) {
-        byCookie['Cookie Share'] = (byCookie['Cookie Share'] || 0) + order.donations;
-      }
     });
   });
 
@@ -921,12 +923,13 @@ function buildCookieShareTracking(reconciler) {
   reconciler.transfers.forEach(transfer => {
     // Look for Cookie Share in transfer varieties
     if (transfer.varieties?.['Cookie Share']) {
-      scTotal += transfer.varieties['Cookie Share'];
+      scTotal += Math.abs(transfer.varieties['Cookie Share']);
     }
 
     // Track COOKIE_SHARE transfer type (manual adjustments)
-    if (transfer.type?.includes('COOKIE_SHARE')) {
-      scManualEntries += transfer.packages || 0;
+    // Exclude DC-synced COOKIE_SHARE(D) transfers (order number starts with 'D')
+    if (transfer.type?.includes('COOKIE_SHARE') && !String(transfer.orderNumber || '').startsWith('D')) {
+      scManualEntries += Math.abs(transfer.packages || 0);
     }
   });
 
@@ -949,35 +952,23 @@ function buildCookieShareTracking(reconciler) {
  * @param {Object} reconciler - DataReconciler instance
  * @returns {Object} Unified metadata
  */
-function buildUnifiedMetadata(reconciler) {
+function buildUnifiedMetadata(reconciler, warnings = []) {
+  const healthChecks = {
+    warningsCount: warnings.length,
+    unknownOrderTypes: warnings.filter(w => w.type === 'UNKNOWN_ORDER_TYPE').length
+  };
+
   return {
     ...reconciler.metadata,
     unifiedBuildTime: new Date().toISOString(),
     scoutCount: reconciler.unified?.scouts?.size || 0,
     orderCount: Array.from(reconciler.unified?.scouts?.values() || [])
-      .reduce((sum, s) => sum + s.orders.length, 0)
+      .reduce((sum, s) => sum + s.orders.length, 0),
+    warnings,
+    healthChecks
   };
 }
 
-// Export all functions
 module.exports = {
-  buildUnifiedDataset,
-  buildScoutDataset,
-  initializeScouts,
-  classifyOrderType,
-  addDCOrders,
-  addInventory,
-  addAllocations,
-  calculateScoutTotals,
-  calculateVarietyTotals,
-  detectNegativeInventory,
-  calculateCookieShareBreakdown,
-  buildSiteOrdersDataset,
-  buildTroopTotals,
-  calculateScoutCounts,
-  calculatePackageTotals,
-  buildTransferBreakdowns,
-  buildVarieties,
-  buildCookieShareTracking,
-  buildUnifiedMetadata
+  buildUnifiedDataset
 };

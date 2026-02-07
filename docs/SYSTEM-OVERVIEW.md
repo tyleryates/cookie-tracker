@@ -51,7 +51,7 @@ This Electron desktop application automates the reconciliation of Digital Cookie
 
 **Web Scraping Capabilities:**
 - **Digital Cookie**: Automated login → role selection → order export download
-- **Smart Cookie**: Automated login → network interception → JSON capture
+- **Smart Cookie**: Automated login → API calls → JSON capture
 - **Progress Tracking**: Real-time status updates and progress bars
 - **Error Handling**: Credential validation, timeout detection, retry logic
 
@@ -94,12 +94,18 @@ This Electron desktop application automates the reconciliation of Digital Cookie
 
 ### Data Sources Supported
 
+**Current app behavior (v1.2.0):** The app auto-loads the latest matching files in `/data/in`:
+- `DC-*.xlsx` (Digital Cookie)
+- `SC-*.json` (Smart Cookie API)
+- `*ReportExport*.xlsx` (Smart Cookie Report)
+- `*CookieOrders*.xlsx` (Smart Cookie Transfers, only if SC API data is not present)
+
 | Source | Import Method | Format |
 |--------|---------------|--------|
 | Digital Cookie Orders | Automated web scrape | Excel (.xlsx) |
-| Smart Cookie Transfers | Manual file import | Excel (.xlsx) |
-| Smart Cookie Reports | Manual file import | Excel (.xlsx) |
-| Smart Cookie API | Automated network intercept | JSON |
+| Smart Cookie API | Automated API fetch | JSON |
+| Smart Cookie Report | Manual file drop (auto-loaded) | Excel (.xlsx) |
+| Smart Cookie Transfers | Manual file drop (auto-loaded when no SC API) | Excel (.xlsx) |
 
 ### UI Components
 
@@ -122,7 +128,7 @@ This Electron desktop application automates the reconciliation of Digital Cookie
 - Digital Cookie credentials with optional role selection
 - Smart Cookie credentials
 - Auto-select first troop role if not specified
-- Plain text local storage warning
+- Credentials encrypted via Electron safeStorage (OS keychain)
 
 ### Key Features
 
@@ -162,8 +168,7 @@ This Electron desktop application automates the reconciliation of Digital Cookie
 - Encrypted using Electron safeStorage API
 - Stored in OS-native keychain (macOS Keychain, Windows Credential Manager)
 - Configured via UI "Configure Logins" dialog
-- Never stored in plaintext in production
-- Development fallback: Uses plaintext `credentials.json` if encryption unavailable
+- Never stored in plaintext (no plaintext fallback)
 
 **Data Structure:**
 ```json
@@ -374,12 +379,7 @@ From "Reconciling Digital Cookie and Smart Cookies Reporting Troop":
 - No prefix
 - Use `OrderID` or `RefNumber` column
 
-**Matching Logic:**
-```
-DC Order 229584475
-  = SC Transfer D229584475 (remove D prefix)
-  = SC Report 229584475 (direct match)
-```
+**Matching Logic:** A DC order number like `229584475` matches an SC Transfer order by removing the `D` prefix (so `D229584475` becomes `229584475`), and matches an SC Report order directly since the Report uses the same format with no prefix.
 
 ### 2. "Site" Order Handling
 
@@ -474,7 +474,7 @@ DC Order 229584475
 - Positive = inventory IN (C2T, returns)
 - Negative = inventory OUT (deliveries, sales)
 
-**Display rule:** Always use `Math.abs()` for user-facing numbers
+**Display rule:** Always use absolute values for user-facing numbers.
 
 ### 10. Status Field Confusion
 
@@ -541,12 +541,8 @@ DC Order 229584475
 ## Best Practices for Reconciliation
 
 ### 1. Import Order Matters
-```
-Recommended sequence:
-1. Digital Cookie (OrderData export) - Master order list
-2. Smart Cookie Report (ReportExport) - Enriches with metadata
-3. Smart Cookie Transfers (CookieOrders) - Adds inventory context
-```
+
+The recommended import sequence is: first, Digital Cookie (OrderData export) as the master order list; second, Smart Cookie Report (ReportExport) to enrich with metadata; and third, Smart Cookie Transfers (CookieOrders) to add inventory context.
 
 ### 2. Scout Name Normalization
 - Trim whitespace
@@ -554,40 +550,17 @@ Recommended sequence:
 - Handle "Unknown" gracefully
 - Match fuzzy when needed
 
-### 3. "Site" Order Handling
-```javascript
-// For girl-level reports
-const girlOrders = orders.filter(o =>
-  !o.scout.includes('Site') &&
-  o.scout !== 'Unknown'
-);
+### 3. Site Order Handling
 
-// For troop totals
-const allOrders = orders; // Include everything
-```
+For girl-level reports, exclude any orders where the scout name contains "Site" or is "Unknown". For troop totals, include all orders (including Site orders) to capture complete troop sales.
 
 ### 4. Order Matching Strategy
-```javascript
-// DC ↔ SC Report: Direct match
-dcOrder.orderNumber === scReport.OrderID
 
-// DC ↔ SC Transfer: Remove prefix
-dcOrder.orderNumber === scTransfer.ORDER_NUM.replace(/^D/, '')
-
-// Only COOKIE_SHARE(D) types have D prefix in SC
-```
+When matching DC orders to SC Report orders, compare the order numbers directly since both use the same numeric format. When matching DC orders to SC Transfer orders, strip the leading "D" prefix from the SC Transfer order number before comparing. Note that only COOKIE_SHARE(D) transfer types carry the "D" prefix in Smart Cookie.
 
 ### 5. Revenue Calculation
-```javascript
-// Cookie revenue only
-const cookieRevenue = order.Current_Subtotal;
 
-// Total including shipping
-const totalRevenue = order.Current_Sale_Amount;
-
-// Shipping & handling
-const shipping = totalRevenue - cookieRevenue;
-```
+The cookie-only revenue comes from the order's subtotal field (before shipping). The total revenue including shipping comes from the sale amount field. The difference between the total and the subtotal gives you the shipping and handling amount.
 
 ---
 
@@ -686,25 +659,13 @@ const shipping = totalRevenue - cookieRevenue;
 
 ### Filter Recipes
 
-**Girl-Only Orders (exclude Site):**
-```
-lastName !== "Site" && lastName !== ""
-```
+**Girl-Only Orders (exclude Site):** Include orders where the last name is not "Site" and is not empty.
 
-**Troop Site Orders Only:**
-```
-lastName === "Site" && firstName.startsWith("Troop")
-```
+**Troop Site Orders Only:** Include orders where the last name is "Site" and the first name starts with "Troop".
 
-**Digital Cookie Orders in SC Transfers:**
-```
-TYPE.includes("COOKIE_SHARE") && ORDER_NUM.startsWith("D")
-```
+**Digital Cookie Orders in SC Transfers:** Include transfer records where the type contains "COOKIE_SHARE" and the order number starts with "D".
 
-**Completed Orders:**
-```
-status === "Completed" || status === "Delivered"
-```
+**Completed Orders:** Include orders where the status is either "Completed" or "Delivered".
 
 ---
 

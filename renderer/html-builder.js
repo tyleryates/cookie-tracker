@@ -1,8 +1,6 @@
 // HTML Builder Utilities
-// Extracted from renderer.js for better organization
 
 const { COOKIE_ORDER } = require('../cookie-constants.js');
-const { PACKAGES_PER_CASE, DISPLAY_STRINGS } = require('../constants');
 
 // Helper function to sort varieties by preferred order
 function sortVarietiesByOrder(entries) {
@@ -143,52 +141,6 @@ function createHorizontalStats(stats) {
   return html;
 }
 
-// Helper: Build inventory cell with negative inventory warning
-function buildInventoryCell(netInventory, negativeVarieties) {
-  if (negativeVarieties.length > 0) {
-    const tooltipText = `Warning: Negative inventory\n${negativeVarieties.join('\n')}`;
-    return `<span class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}" style="color: #f44336; font-weight: 600;">${netInventory} ⚠️</span>`;
-  }
-  return `${netInventory}`;
-}
-
-// Helper: Build credited cell with tooltips
-function buildCreditedCell(isSiteRow, totalCredited, siteOrders, creditedBoothPackages, creditedDirectShipPackages) {
-  if (isSiteRow) {
-    const unallocatedDirectShip = siteOrders.directShip.unallocated || 0;
-    const unallocatedGirlDelivery = siteOrders.girlDelivery.unallocated || 0;
-    const totalUnallocated = unallocatedDirectShip + unallocatedGirlDelivery;
-
-    if (totalUnallocated > 0) {
-      // Build tooltip with allocation instructions
-      const tooltipParts = [
-        'UNALLOCATED - Action Required',
-        `Direct Ship: ${unallocatedDirectShip}`,
-        `Girl Delivery: ${unallocatedGirlDelivery}`,
-        '',
-        'Allocate in Smart Cookie:'
-      ];
-
-      if (unallocatedDirectShip > 0) {
-        tooltipParts.push(`- ${DISPLAY_STRINGS.TROOP_DIRECT_SHIP_DIVIDER}`);
-      }
-      if (unallocatedGirlDelivery > 0) {
-        tooltipParts.push(`- ${DISPLAY_STRINGS.SMART_VIRTUAL_BOOTH_DIVIDER}`);
-      }
-
-      const tooltipText = tooltipParts.join('\n');
-      return `<span class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}" style="color: #f44336; font-weight: 600;">${totalUnallocated} ⚠️</span>`;
-    }
-  } else if (totalCredited > 0) {
-    const sources = [];
-    if (creditedBoothPackages > 0) sources.push(`${DISPLAY_STRINGS.TROOP_GIRL_DELIVERED}: ${creditedBoothPackages}`);
-    if (creditedDirectShipPackages > 0) sources.push(`${DISPLAY_STRINGS.TROOP_DIRECT_SHIP}: ${creditedDirectShipPackages}`);
-    if (sources.length > 0) {
-      return `<span class="tooltip-cell" data-tooltip="${escapeHtml(sources.join('\n'))}">${totalCredited}</span>`;
-    }
-  }
-  return `${totalCredited}`;
-}
 
 function escapeHtml(text) {
   const div = document.createElement('div');
@@ -221,23 +173,16 @@ function formatCurrency(value) {
   return `$${Math.round(value || 0)}`;
 }
 
-function formatNumber(value, defaultValue = 0) {
-  return value !== null && value !== undefined ? value : defaultValue;
-}
-
 module.exports = {
   sortVarietiesByOrder,
   getCompleteVarieties,
   DateFormatter,
   formatDate,
   createHorizontalStats,
-  buildInventoryCell,
-  buildCreditedCell,
   escapeHtml,
   startTable,
   createTableHeader,
   createTableRow,
   endTable,
-  formatCurrency,
-  formatNumber
+  formatCurrency
 };

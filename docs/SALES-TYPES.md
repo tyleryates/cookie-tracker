@@ -85,36 +85,8 @@ Orders are classified as GIRL_DELIVERY when the girl's last name is not "Site", 
 - Site Row → Show UNALLOCATED packages only
 - Site Row → Warning if unallocated > 0 (action required)
 
-**Code Logic:**
-```javascript
-// Data import (data-reconciler.js)
-importDirectShipDivider(dividerData) {
-  girls.forEach(girl => {
-    this.directShipAllocations.push({
-      girlId: girl.id,
-      packages: totalPackages,
-      varieties: varieties,
-      source: 'DirectShipDivider'
-    });
-  });
-}
-
-// Display (renderer.js)
-if (reconciler.directShipAllocations) {
-  directShipAllocations.forEach(allocation => {
-    const scoutName = girlIdToName.get(allocation.girlId);
-    scout.creditedPackages += allocation.packages;
-    scout.creditedVarieties[variety] += count;
-    // Source: 'Troop Direct Ship'
-  });
-}
-
-// Show unallocated in Site row
-const siteDirectShip = totalSiteDirectShip - totalAllocatedDirectShip;
-if (siteDirectShip > 0) {
-  // WARNING: X packages need allocation in Smart Cookie
-}
-```
+**How It Works:**
+Direct ship divider data is imported and stored as allocations keyed by girlId with package counts and variety breakdowns. During display, each allocation is matched to a scout by girlId, and credited packages/varieties are added to the scout's totals with source "Troop Direct Ship". The Site row shows only unallocated packages (total site direct ship minus total allocated), with a warning if any remain unallocated.
 
 **Example:**
 - Troop3990 Site has 20 packages direct ship order
@@ -149,22 +121,8 @@ if (siteDirectShip > 0) {
 - Site Row → Show UNALLOCATED packages only
 - Site Row → Warning if unallocated > 0 (action required)
 
-**Code Logic:**
-```javascript
-// Detection (data import from Smart Cookie API)
-if (transfer.type === 'T2G' && transfer.virtualBooth === true) {
-  // This is an allocated troop girl delivery order
-  scout.creditedPackages += transfer.packages;
-  scout.creditedVarieties[variety] += count;
-  // Source: 'Troop Girl Delivered'
-}
-
-// Show unallocated in Site row
-const siteGirlDelivery = totalSiteGirlDelivery - totalAllocatedBooth;
-if (siteGirlDelivery > 0) {
-  // WARNING: X packages need allocation in Smart Cookie
-}
-```
+**How It Works:**
+During Smart Cookie data import, T2G transfers with `virtualBooth: true` are identified as allocated troop girl delivery orders. Their packages and varieties are added to the scout's credited totals with source "Troop Girl Delivered". The Site row shows only unallocated packages (total site girl delivery minus total allocated via virtual booth), with a warning if any remain unallocated.
 
 **Example:**
 - Troop3990 Site has 2 packages girl delivery order
@@ -316,19 +274,10 @@ Smart Cookie Dividers
    - Booth/Credited sales don't impact scout's physical inventory
 
 4. **Total Sold Calculation:**
-   ```javascript
-   totalSold = totalPackages + totalCredited
-
-   where:
-   totalPackages = packages + shippedPackages + donations (scout's own)
-   totalCredited = boothCredits + creditedPackages (troop-allocated)
-   ```
+   `totalSold = totalPackages + totalCredited`, where `totalPackages` is the sum of sales packages, shipped packages, and donations (scout's own), and `totalCredited` is the sum of booth credits and credited packages (troop-allocated).
 
 5. **Total Sold Tooltip Breakdown:**
-   ```
-   Direct: [packages + shippedPackages + donations]
-   Credited: [boothCredits + creditedPackages]
-   ```
+   Shows two lines: "Direct" (sales + shipped + donations) and "Credited" (booth credits + credited packages).
 
 ---
 
@@ -372,9 +321,8 @@ When investigating order classification issues:
 
 ## Related Documentation
 
-- `VIRTUAL-COOKIE-SHARE.md` - Cookie Share reconciliation logic
 - `PROGRAM-KNOWLEDGE.md` - Overall program structure and data sources
-- `API-ENDPOINTS.md` - Smart Cookie API reference
+- `DATA-FORMATS.md` - Smart Cookie API and data structure reference
 
 ---
 

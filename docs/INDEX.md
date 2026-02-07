@@ -201,4 +201,4 @@ Background on how the Girl Scout Cookie Program works:
 
 ---
 
-*Documentation for Cookie Tracker v1.0.0*
+*Documentation for Cookie Tracker v1.2.0*

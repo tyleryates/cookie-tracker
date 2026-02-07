@@ -91,6 +91,8 @@ make release-minor    # Bump 1.0.0→1.1.0, commit, build, publish
 make release-major    # Bump 1.0.0→2.0.0, commit, build, publish
 ```
 
+**Policy Note:** Do not run release or publish commands without explicit approval (see `CLAUDE.md`). These commands commit and publish.
+
 This automatically:
 - Bumps the version
 - Commits the version change
@@ -180,11 +182,7 @@ If you don't want to use GitHub public releases:
 
 3. **Share link with users** (manual download)
 
-4. **Update package.json** to disable auto-update:
-   ```javascript
-   // In main.js, comment out this line:
-   // autoUpdater.checkForUpdates();
-   ```
+4. **Disable auto-update:** Comment out the `autoUpdater.checkForUpdates()` call in `main.js`.
 
 ---
 

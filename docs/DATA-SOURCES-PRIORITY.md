@@ -42,24 +42,10 @@ Digital Cookie provides:
 
 ### What to Do When Sources Conflict
 
-```
-IF Smart Cookie and Digital Cookie show different totals:
-  1. Check if DC orders are fully synced to SC
-     → Most DC orders take time to sync
-     → Only ~10-15% appear in SC immediately
-
-  2. Check if SC includes booth sales
-     → SC includes troop booth sales
-     → DC may not show these yet
-
-  3. Check transfer types counted
-     → SC counts: T2G, D, DIRECT_SHIP, COOKIE_SHARE
-     → DC only shows: online/app orders
-
-  4. When in doubt: Trust Smart Cookie
-     → It's the billing system
-     → Girl Scouts council uses SC numbers
-```
+1. **Check if DC orders are fully synced to SC** -- Most DC orders take time to sync; only ~10-15% appear in SC immediately.
+2. **Check if SC includes booth sales** -- SC includes troop booth sales that DC may not show yet.
+3. **Check transfer types counted** -- SC counts T2G, D, DIRECT_SHIP, and COOKIE_SHARE; DC only shows online/app orders.
+4. **When in doubt: Trust Smart Cookie** -- It's the billing system and Girl Scouts council uses SC numbers.
 
 ---
 
@@ -72,18 +58,7 @@ IF Smart Cookie and Digital Cookie show different totals:
 - Digital Cookie report: 650 packages
 
 **Diagnosis:**
-```
-Smart Cookie counts:
-  T2G transfers: 651 packages
-  D transfers: 31 packages
-  DIRECT_SHIP: 66 packages
-  COOKIE_SHARE: 21 packages
-  Total: 769 packages ✓
-
-Digital Cookie counts:
-  Online orders only: 650 packages
-  (Doesn't include booth sales or some transfers)
-```
+Smart Cookie counts T2G (651) + D (31) + DIRECT_SHIP (66) + COOKIE_SHARE (21) = 769 packages. Digital Cookie counts only online orders (650) and doesn't include booth sales or some transfers.
 
 **Resolution:** ✅ Trust Smart Cookie (769)
 
@@ -139,16 +114,7 @@ Digital Cookie counts:
 - Smart Cookie: $4614 total revenue
 
 **Diagnosis:**
-```
-Digital Cookie revenue:
-  Online orders only: $2850
-
-Smart Cookie revenue:
-  Online orders: $2850
-  Booth sales: $1200
-  Cash sales: $564
-  Total: $4614 ✓
-```
+Digital Cookie shows only online order revenue ($2850). Smart Cookie includes all channels: online ($2850) + booth ($1200) + cash ($564) = $4614.
 
 **Resolution:** ✅ Trust Smart Cookie (includes all channels)
 
@@ -213,25 +179,12 @@ When reconciling data:
 
 **How the Cookie Tracker handles this:**
 
-```javascript
-// Primary data source: Smart Cookie
-const totalSold = reconciler.unified.troopTotals.sold; // From SC
-
-// Supplemental data: Digital Cookie
-const customerInfo = order.metadata.dc; // From DC
-
-// Conflict resolution: Prefer SC for totals
-if (scTotal !== dcTotal) {
-  // Use SC total, note discrepancy
-  console.warn(`Discrepancy: SC=${scTotal}, DC=${dcTotal}`);
-  reportTotal = scTotal; // Trust Smart Cookie
-}
-```
+The app uses Smart Cookie totals (from `reconciler.unified.troopTotals`) as the primary numbers and Digital Cookie metadata for supplemental detail. When SC and DC totals differ, SC is trusted and the discrepancy is logged.
 
 **Report Display Pattern:**
 - Show SC numbers prominently
 - Show DC numbers as "(from Digital Cookie)" for context
-- Flag discrepancies with ⚠️ warning icon
+- Flag discrepancies with warning icon
 - Provide explanation tooltips
 
 ---

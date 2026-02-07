@@ -4,8 +4,8 @@ const { CookieJar } = require('tough-cookie');
 const fs = require('fs');
 const path = require('path');
 const { getTimestamp } = require('../scraper-utils');
-const { requestWithRetry, rateLimit } = require('./request-utils');
-const Logger = require('../logger');
+const { requestWithRetry } = require('./request-utils');
+const { HTTP_STATUS } = require('../constants');
 
 /**
  * Smart Cookie API Scraper - API-based scraping
@@ -99,7 +99,7 @@ class SmartCookieApiScraper {
         }
       });
 
-      if (response.status !== 200) {
+      if (response.status !== HTTP_STATUS.OK) {
         throw new Error(`Login failed with status ${response.status}`);
       }
 
@@ -197,7 +197,7 @@ class SmartCookieApiScraper {
         }
       });
 
-      if (response.status !== 200) {
+      if (response.status !== HTTP_STATUS.OK) {
         throw new Error(`Orders fetch failed with status ${response.status}`);
       }
 
@@ -238,7 +238,7 @@ class SmartCookieApiScraper {
         }
       });
 
-      if (response.status !== 200) {
+      if (response.status !== HTTP_STATUS.OK) {
         throw new Error(`Direct ship divider fetch failed with status ${response.status}`);
       }
 
@@ -268,7 +268,7 @@ class SmartCookieApiScraper {
         }
       });
 
-      if (response.status !== 200) {
+      if (response.status !== HTTP_STATUS.OK) {
         throw new Error(`Virtual cookie share fetch failed with status ${response.status}`);
       }
 

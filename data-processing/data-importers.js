@@ -1,27 +1,16 @@
 // Data Import and Parsing Functions
-// Extracted from DataReconciler for reuse and better modularity
-// These functions handle importing and parsing data from Digital Cookie and Smart Cookie sources
 
 const { PHYSICAL_COOKIE_TYPES, COOKIE_ID_MAP, COOKIE_COLUMN_MAP, COOKIE_ABBR_MAP } = require('../cookie-constants.js');
 const {
+  DATA_SOURCES,
   PACKAGES_PER_CASE,
   EXCEL_EPOCH,
   MS_PER_DAY,
-  ORDER_TYPES,
   DC_COLUMNS,
   SC_REPORT_COLUMNS,
   SC_API_COLUMNS
 } = require('../constants');
 const { isC2TTransfer } = require('./utils');
-
-// Data source identifiers
-const DATA_SOURCES = {
-  DIGITAL_COOKIE: 'DC',
-  SMART_COOKIE: 'SC',
-  SMART_COOKIE_REPORT: 'SC-Report',
-  SMART_COOKIE_API: 'SC-API',
-  DIRECT_SHIP_DIVIDER: 'DirectShipDivider'
-};
 
 // ============================================================================
 // PURE PARSING FUNCTIONS
@@ -56,12 +45,13 @@ function parseVarietiesFromSCReport(row) {
     const parts = String(value).split('/');
     const cases = parseInt(parts[0]) || 0;
     const packages = parseInt(parts[1]) || 0;
+    const total = (cases * PACKAGES_PER_CASE) + packages;
 
-    if (packages > 0) {
-      varieties[name] = packages;
+    if (total > 0) {
+      varieties[name] = total;
     }
     totalCases += Math.abs(cases);
-    totalPackages += Math.abs(packages);
+    totalPackages += Math.abs(total);
   });
 
   return { varieties, totalCases, totalPackages };
@@ -208,7 +198,7 @@ function importDigitalCookie(reconciler, dcData) {
     };
 
     // Merge or create order (DC is source of truth for order details)
-    reconciler.mergeOrCreateOrder(orderNum, orderData, 'DC', row);
+    reconciler.mergeOrCreateOrder(orderNum, orderData, DATA_SOURCES.DIGITAL_COOKIE, row);
 
     // Update scout data
     updateScoutData(reconciler, scout, {
@@ -220,7 +210,7 @@ function importDigitalCookie(reconciler, dcData) {
 
   reconciler.metadata.lastImportDC = new Date().toISOString();
   reconciler.metadata.sources.push({
-    type: 'DC',
+    type: DATA_SOURCES.DIGITAL_COOKIE,
     date: new Date().toISOString(),
     records: dcData.length
   });
@@ -242,7 +232,9 @@ function importSmartCookieReport(reconciler, reportData) {
 
     // Parse total (also in "cases/packages" format)
     const totalParts = String(row[SC_REPORT_COLUMNS.TOTAL] || '0/0').split('/');
-    const totalFromField = parseInt(totalParts[1]) || totalPackages;
+    const fieldCases = parseInt(totalParts[0]) || 0;
+    const fieldPkgs = parseInt(totalParts[1]) || 0;
+    const totalFromField = (fieldCases * PACKAGES_PER_CASE) + fieldPkgs || totalPackages;
 
     const orderData = {
       orderNumber: orderNum,
@@ -264,7 +256,7 @@ function importSmartCookieReport(reconciler, reportData) {
     };
 
     // Merge or create order with enrichment
-    reconciler.mergeOrCreateOrder(orderNum, orderData, 'SC-Report', row, (existing, newData) => {
+    reconciler.mergeOrCreateOrder(orderNum, orderData, DATA_SOURCES.SMART_COOKIE_REPORT, row, (existing, newData) => {
       existing.scoutId = newData.scoutId;
       existing.gsusaId = newData.gsusaId;
       existing.gradeLevel = newData.gradeLevel;
@@ -291,7 +283,7 @@ function importSmartCookieReport(reconciler, reportData) {
 
   reconciler.metadata.lastImportSCReport = new Date().toISOString();
   reconciler.metadata.sources.push({
-    type: 'SC-Report',
+    type: DATA_SOURCES.SMART_COOKIE_REPORT,
     date: new Date().toISOString(),
     records: reportData.length
   });
@@ -334,7 +326,7 @@ function importSmartCookieAPI(reconciler, apiData) {
       virtualBooth: order.virtual_booth || false,
       status: order.status || '',
       actions: order.actions || {},
-      source: 'SC-API'
+      source: DATA_SOURCES.SMART_COOKIE_API
     };
 
     // Create transfer record
@@ -354,7 +346,7 @@ function importSmartCookieAPI(reconciler, apiData) {
         amount: Math.abs(transferData.amount),
         status: 'In SC Only',
         varieties: varieties
-      }, 'SC-API', order);
+      }, DATA_SOURCES.SMART_COOKIE_API, order);
     }
 
     // Track scout pickups (T2G - Troop to Girl)
@@ -384,7 +376,7 @@ function importSmartCookieAPI(reconciler, apiData) {
 
   reconciler.metadata.lastImportSC = new Date().toISOString();
   reconciler.metadata.sources.push({
-    type: 'SC-API',
+    type: DATA_SOURCES.SMART_COOKIE_API,
     date: new Date().toISOString(),
     records: orders.length
   });
@@ -488,7 +480,7 @@ function importSmartCookie(reconciler, scData) {
       packages: parseInt(row[SC_API_COLUMNS.TOTAL]) || 0,
       varieties: varieties,
       amount: parseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT]) || 0,
-      source: 'SC'
+      source: DATA_SOURCES.SMART_COOKIE
     };
 
     // Create transfer record
@@ -508,7 +500,7 @@ function importSmartCookie(reconciler, scData) {
         amount: Math.abs(transferData.amount),
         status: 'In SC Only',
         varieties: varieties
-      }, 'SC', row);
+      }, DATA_SOURCES.SMART_COOKIE, row);
     }
 
     // Extract troop number from C2T transfers (Council to Troop)
@@ -534,7 +526,7 @@ function importSmartCookie(reconciler, scData) {
 
   reconciler.metadata.lastImportSC = new Date().toISOString();
   reconciler.metadata.sources.push({
-    type: 'SC',
+    type: DATA_SOURCES.SMART_COOKIE,
     date: new Date().toISOString(),
     records: scData.length
   });
@@ -545,22 +537,8 @@ function importSmartCookie(reconciler, scData) {
 // ============================================================================
 
 module.exports = {
-  // Data sources
-  DATA_SOURCES,
-
-  // Pure parsing functions
-  parseVarietiesFromDC,
-  parseVarietiesFromSCReport,
-  parseVarietiesFromAPI,
-  parseVarietiesFromSCTransfer,
-  parseExcelDate,
-
-  // Import functions
-  updateScoutData,
   importDigitalCookie,
   importSmartCookieReport,
   importSmartCookieAPI,
-  importDirectShipDivider,
-  importVirtualCookieShares,
   importSmartCookie
 };

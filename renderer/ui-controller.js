@@ -10,8 +10,7 @@ const { UI_TIMING } = require('../constants.js');
 
 // UI Constants
 const TIMEOUTS = {
-  STATUS_MESSAGE_HIDE: 5000,  // Hide success message after 5 seconds
-  INIT_TOOLTIPS_DELAY: 100    // Delay before initializing tooltips
+  STATUS_MESSAGE_HIDE: 5000  // Hide success message after 5 seconds
 };
 
 // Global observer for cleanup
@@ -368,17 +367,66 @@ function cleanup() {
 // EVENT SETUP
 // ============================================================================
 
-function setupEventListeners(
-  configureLoginsBtn, refreshFromWebBtn,
-  troopSummaryBtn, inventoryReportBtn, summaryReportBtn, varietyReportBtn, donationAlertBtn, viewUnifiedDataBtn,
-  loginModal, closeModal, cancelModal, saveCredentials,
-  dcUsername, dcPassword, dcRole, scUsername, scPassword,
-  dcProgress, dcProgressFill, dcProgressText,
-  scProgress, scProgressFill, scProgressText,
-  dcStatusEl, scStatusEl, dcLastSync, scLastSync,
-  importStatus, reportContainer,
-  generateReport, exportUnifiedDataset, loadDataFromDisk, checkLoginStatusFn
-) {
+function setupEventListeners(config) {
+  const {
+    buttons,
+    modal,
+    fields,
+    progress,
+    status,
+    reportContainer,
+    actions
+  } = config;
+
+  const {
+    configureLoginsBtn,
+    refreshFromWebBtn,
+    troopSummaryBtn,
+    inventoryReportBtn,
+    summaryReportBtn,
+    varietyReportBtn,
+    donationAlertBtn,
+    viewUnifiedDataBtn
+  } = buttons;
+
+  const {
+    loginModal,
+    closeModal,
+    cancelModal,
+    saveCredentials
+  } = modal;
+
+  const {
+    dcUsername,
+    dcPassword,
+    dcRole,
+    scUsername,
+    scPassword
+  } = fields;
+
+  const {
+    dcProgress,
+    dcProgressFill,
+    dcProgressText,
+    scProgress,
+    scProgressFill,
+    scProgressText
+  } = progress;
+
+  const {
+    dcStatus: dcStatusEl,
+    scStatus: scStatusEl,
+    dcLastSync,
+    scLastSync,
+    importStatus
+  } = status;
+
+  const {
+    generateReport,
+    exportUnifiedDataset,
+    loadDataFromDisk,
+    checkLoginStatus: checkLoginStatusFn
+  } = actions;
   // Button event listeners
   if (configureLoginsBtn) {
     configureLoginsBtn.addEventListener('click', () => {
@@ -484,20 +532,11 @@ function setupEventListeners(
 // ============================================================================
 
 module.exports = {
-  openLoginModal,
-  closeLoginModal,
-  handleSaveCredentials,
   handleRefreshFromWeb,
   updateSourceStatus,
   updateSyncStatus,
-  initializeProgressBar,
-  hideProgressBar,
-  updateProgressBarAndStatus,
-  updateScrapeProgress,
   showStatus,
   checkLoginStatus,
-  initializeTooltips,
   setupReportObserver,
-  cleanup,
   setupEventListeners
 };

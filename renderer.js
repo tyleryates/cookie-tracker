@@ -1,22 +1,8 @@
 const { ipcRenderer } = require('electron');
 const XLSX = require('xlsx');
 const DataReconciler = require('./data-reconciler.js');
-const { COOKIE_ORDER, PHYSICAL_COOKIE_TYPES } = require('./cookie-constants.js');
-const { PACKAGES_PER_CASE, ORDER_TYPES, DISPLAY_STRINGS } = require('./constants');
-const {
-  sortVarietiesByOrder,
-  getCompleteVarieties,
-  DateFormatter,
-  formatDate,
-  createHorizontalStats,
-  escapeHtml,
-  startTable,
-  createTableHeader,
-  createTableRow,
-  endTable,
-  formatCurrency,
-  formatNumber
-} = require('./renderer/html-builder.js');
+const { DateFormatter } = require('./renderer/html-builder.js');
+const { DC_COLUMNS } = require('./constants');
 
 // Report generators
 const { generateTroopSummaryReport } = require('./renderer/reports/troop-summary.js');
@@ -35,9 +21,6 @@ const {
   handleRefreshFromWeb
 } = require('./renderer/ui-controller.js');
 
-// Global data
-let digitalCookieData = [];
-let smartCookieData = null;
 let reconciler = new DataReconciler();
 
 // DOM elements
@@ -196,17 +179,53 @@ window.addEventListener('beforeunload', stopAutoSync);
 // ============================================================================
 
 // Setup event listeners and observers
-setupEventListeners(
-  configureLoginsBtn, refreshFromWebBtn,
-  troopSummaryBtn, inventoryReportBtn, summaryReportBtn, varietyReportBtn, donationAlertBtn, viewUnifiedDataBtn,
-  loginModal, closeModal, cancelModal, saveCredentials,
-  dcUsername, dcPassword, dcRole, scUsername, scPassword,
-  dcProgress, dcProgressFill, dcProgressText,
-  scProgress, scProgressFill, scProgressText,
-  dcStatus, scStatus, dcLastSync, scLastSync,
-  importStatus, reportContainer,
-  generateReport, exportUnifiedDataset, loadDataFromDisk, checkLoginStatus
-);
+setupEventListeners({
+  buttons: {
+    configureLoginsBtn,
+    refreshFromWebBtn,
+    troopSummaryBtn,
+    inventoryReportBtn,
+    summaryReportBtn,
+    varietyReportBtn,
+    donationAlertBtn,
+    viewUnifiedDataBtn
+  },
+  modal: {
+    loginModal,
+    closeModal,
+    cancelModal,
+    saveCredentials
+  },
+  fields: {
+    dcUsername,
+    dcPassword,
+    dcRole,
+    scUsername,
+    scPassword
+  },
+  progress: {
+    dcProgress,
+    dcProgressFill,
+    dcProgressText,
+    scProgress,
+    scProgressFill,
+    scProgressText
+  },
+  status: {
+    dcStatus,
+    scStatus,
+    dcLastSync,
+    scLastSync,
+    importStatus
+  },
+  reportContainer,
+  actions: {
+    generateReport,
+    exportUnifiedDataset,
+    loadDataFromDisk,
+    checkLoginStatus
+  }
+});
 setupReportObserver(reportContainer);
 
 // ============================================================================
@@ -241,12 +260,19 @@ async function loadDataFromDisk(showMessages = true, updateTimestamps = true) {
     // Find most recent files of each type
     const scFiles = result.files.filter(f => f.extension === '.json' && f.name.startsWith('SC-'));
     const dcFiles = result.files.filter(f => f.extension === '.xlsx' && f.name.startsWith('DC-'));
+    const scReportFiles = result.files.filter(f => f.extension === '.xlsx' && f.name.includes('ReportExport'));
+    const scTransferFiles = result.files.filter(f => f.extension === '.xlsx' && f.name.includes('CookieOrders'));
 
     scFiles.sort((a, b) => b.name.localeCompare(a.name));
     dcFiles.sort((a, b) => b.name.localeCompare(a.name));
+    scReportFiles.sort((a, b) => b.name.localeCompare(a.name));
+    scTransferFiles.sort((a, b) => b.name.localeCompare(a.name));
 
     let loadedSC = false;
     let loadedDC = false;
+    let loadedSCReport = false;
+    let loadedSCTransfer = false;
+    const loadIssues = [];
 
     // Load most recent Smart Cookie file
     if (scFiles.length > 0) {
@@ -255,11 +281,12 @@ async function loadDataFromDisk(showMessages = true, updateTimestamps = true) {
 
       if (isSmartCookieAPIFormat(jsonData)) {
         reconciler.importSmartCookieAPI(jsonData);
-        smartCookieData = jsonData;
         loadedSC = true;
 
         // Update sync status
         updateSourceStatus(scStatus, scLastSync, file.name, 'SC-', '.json', updateTimestamps);
+      } else {
+        loadIssues.push(`Smart Cookie JSON not recognized: ${file.name}`);
       }
     }
 
@@ -270,18 +297,54 @@ async function loadDataFromDisk(showMessages = true, updateTimestamps = true) {
 
       if (isDigitalCookieFormat(parsedData)) {
         reconciler.importDigitalCookie(parsedData);
-        digitalCookieData = parsedData;
         loadedDC = true;
 
         // Update sync status
         updateSourceStatus(dcStatus, dcLastSync, file.name, 'DC-', '.xlsx', updateTimestamps);
+      } else {
+        loadIssues.push(`Digital Cookie XLSX not recognized: ${file.name}`);
       }
     }
 
+    // Load most recent Smart Cookie Report (ReportExport.xlsx)
+    if (scReportFiles.length > 0) {
+      const file = scReportFiles[0];
+      const parsedData = parseExcel(file.data);
+      if (parsedData && parsedData.length > 0) {
+        reconciler.importSmartCookieReport(parsedData);
+        loadedSCReport = true;
+      } else {
+        loadIssues.push(`Smart Cookie Report empty/unreadable: ${file.name}`);
+      }
+    }
+
+    // Load most recent Smart Cookie Transfers (CookieOrders.xlsx) only if no SC API data
+    if (!loadedSC && scTransferFiles.length > 0) {
+      const file = scTransferFiles[0];
+      const parsedData = parseExcel(file.data);
+      if (parsedData && parsedData.length > 0) {
+        reconciler.importSmartCookie(parsedData);
+        loadedSCTransfer = true;
+      } else {
+        loadIssues.push(`Smart Cookie Transfer empty/unreadable: ${file.name}`);
+      }
+    } else if (loadedSC && scTransferFiles.length > 0) {
+      const warning = {
+        type: 'SC_TRANSFER_SKIPPED',
+        reason: 'SC API data present',
+        file: scTransferFiles[0].name
+      };
+      reconciler.metadata.warnings.push(warning);
+      console.warn('Skipping CookieOrders.xlsx import because SC API data is present.');
+    }
+
     // Build unified dataset after all imports complete
-    if (loadedSC || loadedDC) {
+    if (loadedSC || loadedDC || loadedSCReport || loadedSCTransfer) {
       console.log('Building unified dataset...');
       reconciler.buildUnifiedDataset();
+      if (reconciler.unified?.metadata?.healthChecks?.warningsCount > 0) {
+        console.warn('Health check warnings:', reconciler.unified.metadata.warnings);
+      }
       console.log('✓ Unified dataset ready:', {
         scouts: reconciler.unified.scouts.size,
         siteOrders: reconciler.unified.siteOrders
@@ -297,6 +360,15 @@ async function loadDataFromDisk(showMessages = true, updateTimestamps = true) {
       return true;
     }
 
+    if (loadIssues.length > 0 && showMessages) {
+      showStatus(`No reports loaded. ${loadIssues.join(' | ')}`, 'warning');
+      renderHealthBanner({
+        level: 'warning',
+        title: 'No Reports Loaded',
+        message: 'Files were found but could not be parsed. See details below.',
+        details: loadIssues.map(msg => ({ type: 'LOAD_ISSUE', message: msg }))
+      });
+    }
     return false;
 
   } catch (error) {
@@ -311,13 +383,38 @@ async function loadDataFromDisk(showMessages = true, updateTimestamps = true) {
 function parseExcel(buffer) {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
   const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+  fixWorksheetRange(firstSheet);
   return XLSX.utils.sheet_to_json(firstSheet, { raw: false });
+}
+
+function fixWorksheetRange(worksheet) {
+  if (!worksheet) return;
+  const keys = Object.keys(worksheet).filter(k => !k.startsWith('!'));
+  if (keys.length === 0) return;
+
+  let maxRow = 0;
+  let maxCol = 0;
+
+  keys.forEach(key => {
+    const match = key.match(/^([A-Z]+)(\d+)$/);
+    if (!match) return;
+    const [, colLetters, rowStr] = match;
+    const row = parseInt(rowStr, 10);
+    const col = XLSX.utils.decode_col(colLetters);
+    if (row > maxRow) maxRow = row;
+    if (col > maxCol) maxCol = col;
+  });
+
+  if (maxRow > 0) {
+    const range = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxRow - 1, c: maxCol } });
+    worksheet['!ref'] = range;
+  }
 }
 
 function isDigitalCookieFormat(data) {
   if (!data || data.length === 0) return false;
   const headers = Object.keys(data[0]);
-  return headers.includes('Girl First Name') && headers.includes('Order Number');
+  return headers.includes(DC_COLUMNS.GIRL_FIRST_NAME) && headers.includes(DC_COLUMNS.ORDER_NUMBER);
 }
 
 function isSmartCookieAPIFormat(data) {
@@ -340,6 +437,17 @@ const REPORT_CONFIG = {
 function generateReport(type) {
   if (!reportContainer) return;
 
+  const unknownTypes = reconciler.unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
+  if (unknownTypes > 0) {
+    renderHealthBanner({
+      level: 'error',
+      title: 'Blocked: Unknown Order Types Detected',
+      message: `Found ${unknownTypes} unknown Digital Cookie order type(s). Update classification rules before viewing reports.`,
+      details: reconciler.unified?.metadata?.warnings || []
+    });
+    return;
+  }
+
   // Remove active class from all buttons
   Object.values(REPORT_CONFIG).forEach(config => {
     const btn = config.button();
@@ -357,6 +465,25 @@ function generateReport(type) {
 }
 
 function enableReportButtons() {
+  const unknownTypes = reconciler.unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
+  if (unknownTypes > 0) {
+    // Hard fail: block reports if unknown order types are present
+    if (troopSummaryBtn) troopSummaryBtn.disabled = true;
+    if (inventoryReportBtn) inventoryReportBtn.disabled = true;
+    if (viewUnifiedDataBtn) viewUnifiedDataBtn.disabled = false;
+    if (summaryReportBtn) summaryReportBtn.disabled = true;
+    if (varietyReportBtn) varietyReportBtn.disabled = true;
+    if (donationAlertBtn) donationAlertBtn.disabled = true;
+
+    renderHealthBanner({
+      level: 'error',
+      title: 'Blocked: Unknown Order Types Detected',
+      message: `Found ${unknownTypes} unknown Digital Cookie order type(s). Update classification rules before viewing reports.`,
+      details: reconciler.unified?.metadata?.warnings || []
+    });
+    return;
+  }
+
   if (troopSummaryBtn) troopSummaryBtn.disabled = false;
   if (inventoryReportBtn) inventoryReportBtn.disabled = false;
   if (viewUnifiedDataBtn) viewUnifiedDataBtn.disabled = false;
@@ -407,6 +534,32 @@ function exportUnifiedDataset() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ============================================================================
+// HEALTH CHECK UI
+// ============================================================================
+
+function renderHealthBanner({ level, title, message, details = [] }) {
+  if (!reportContainer) return;
+  const bannerStyle = level === 'error'
+    ? 'background:#FFEBEE;border-left:4px solid #C62828;color:#B71C1C;'
+    : 'background:#FFF8E1;border-left:4px solid #F57F17;color:#E65100;';
+
+  const detailList = details.length
+    ? `<pre style="margin:10px 0 0;white-space:pre-wrap;">${JSON.stringify(details.slice(0, 20), null, 2)}</pre>
+       ${details.length > 20 ? `<p style="margin:8px 0 0;">…and ${details.length - 20} more</p>` : ''}`
+    : '';
+
+  reportContainer.innerHTML = `
+    <div class="report-visual">
+      <div style="padding:15px;border-radius:8px;${bannerStyle}">
+        <strong>${title}</strong>
+        <p style="margin:8px 0 0;">${message}</p>
+        ${detailList}
+      </div>
+    </div>
+  `;
 }
 
 function serializeUnifiedDataset() {

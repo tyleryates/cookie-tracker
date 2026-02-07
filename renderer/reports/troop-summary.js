@@ -1,7 +1,4 @@
-const {
-  createHorizontalStats,
-  escapeHtml
-} = require('../html-builder.js');
+const { createHorizontalStats } = require('../html-builder.js');
 
 function generateTroopSummaryReport(reconciler) {
   // Use pre-processed unified dataset
