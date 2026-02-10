@@ -2,7 +2,22 @@
 // Pure utility functions used across calculator modules
 
 import { COOKIE_TYPE } from '../../cookie-constants';
-import type { Scout, Varieties } from '../../types';
+import type { Scout, ScoutCredited, Varieties } from '../../types';
+
+/**
+ * Calculate total credited packages (all 6 fields) for a scout.
+ * Single source of truth for the credited total.
+ */
+export function totalCredited(credited: ScoutCredited): number {
+  return (
+    credited.virtualBooth.packages +
+    credited.virtualBooth.donations +
+    credited.directShip.packages +
+    credited.directShip.donations +
+    credited.boothSales.packages +
+    credited.boothSales.donations
+  );
+}
 
 /**
  * Add varieties from source to target object

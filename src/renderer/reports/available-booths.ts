@@ -164,8 +164,7 @@ function generateAvailableBoothsReport(reconciler: IDataReconciler, config: Avai
     return removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots).length > 0;
   });
 
-  html +=
-    '<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">';
+  html += '<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">';
   html +=
     '<button id="refreshBoothAvailability" style="padding: 4px 12px; font-size: 0.82em; border: 1px solid #90CAF9; background: #e3f2fd; color: #1565C0; border-radius: 6px; cursor: pointer; font-weight: 500;">Refresh Availability</button>';
   html += '</div>';

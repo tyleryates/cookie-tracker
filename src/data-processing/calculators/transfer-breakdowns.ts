@@ -1,7 +1,7 @@
 // Transfer Breakdowns
 // Pre-classifies transfers into categories (C2T, T2G, sold) with totals
 
-import { SALE_CATEGORIES, T2G_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
+import { SALE_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import Logger from '../../logger';
 import type { IDataReconciler, Transfer, TransferBreakdowns, Warning } from '../../types';
 import { isKnownTransferType } from '../utils';
@@ -37,20 +37,18 @@ export function buildTransferBreakdowns(reconciler: IDataReconciler, warnings: W
     // Classify into lists using central category groups
     if (transfer.category === TRANSFER_CATEGORY.COUNCIL_TO_TROOP) {
       c2t.push(transfer);
-      c2tTotal += packages;
+      c2tTotal += transfer.physicalPackages || 0;
     } else if (transfer.category === TRANSFER_CATEGORY.GIRL_RETURN) {
       g2t.push(transfer);
       g2tTotal += transfer.physicalPackages || 0;
     }
-    if (T2G_CATEGORIES.has(transfer.category)) {
+    if (transfer.category === TRANSFER_CATEGORY.GIRL_PICKUP) {
       t2g.push(transfer);
-      if (transfer.category === TRANSFER_CATEGORY.GIRL_PICKUP) {
-        t2gPhysicalTotal += transfer.physicalPackages || 0;
-      }
+      t2gPhysicalTotal += transfer.physicalPackages || 0;
     }
     if (SALE_CATEGORIES.has(transfer.category)) {
       sold.push(transfer);
-      soldTotal += packages;
+      soldTotal += transfer.physicalPackages || 0;
     }
   });
 

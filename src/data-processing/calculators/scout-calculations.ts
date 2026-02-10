@@ -10,7 +10,7 @@ import {
   TROOP_PROCEEDS_PER_PACKAGE
 } from '../../cookie-constants';
 import type { CookieType, Order, Scout, Varieties } from '../../types';
-import { calculateSalesByVariety } from './helpers';
+import { calculateSalesByVariety, totalCredited } from './helpers';
 
 /** Check single variety for negative inventory */
 function checkVarietyInventory(
@@ -69,11 +69,7 @@ function calculateOrderTotals(scout: Scout): void {
 
 /** Calculate credited totals from allocations */
 function calculateCreditedTotals(scout: Scout): void {
-  scout.totals.credited =
-    scout.credited.virtualBooth.packages +
-    scout.credited.directShip.packages +
-    scout.credited.boothSales.packages +
-    scout.credited.boothSales.donations;
+  scout.totals.credited = totalCredited(scout.credited);
 
   scout.totals.$creditedRevenue =
     calculateRevenue(scout.credited.virtualBooth.varieties) +
@@ -156,25 +152,29 @@ function calculateFinancialTracking(scout: Scout): void {
     cashCollected: allCashCollected,
     electronicPayments: inventoryElectronic,
     inventoryValue: inventoryValue,
+    unsoldValue: unsoldValue,
     cashOwed: cashOwed
   };
 }
 
 /** Calculate inventory display and detect issues */
 function calculateInventoryDisplay(scout: Scout): void {
-  // Net inventory total
-  scout.totals.inventory = scout.inventory.total - scout.totals.sales;
-
   // Sales by variety (for net inventory calculation)
   const salesByVariety = calculateSalesByVariety(scout);
 
   // Net inventory by variety
   scout.totals.$inventoryDisplay = {};
+  let inventoryTotal = 0;
   PHYSICAL_COOKIE_TYPES.forEach((variety) => {
     const inventoryCount = scout.inventory.varieties[variety] || 0;
     const salesCount = salesByVariety[variety] || 0;
-    scout.totals.$inventoryDisplay[variety] = inventoryCount - salesCount;
+    const net = inventoryCount - salesCount;
+    scout.totals.$inventoryDisplay[variety] = net;
+    // Can't have negative boxes on hand — clamp per variety so one oversold
+    // variety doesn't drag down the total (girl just needs more inventory)
+    inventoryTotal += Math.max(0, net);
   });
+  scout.totals.inventory = inventoryTotal;
 
   // Detect negative inventory issues
   detectNegativeInventory(scout, salesByVariety);

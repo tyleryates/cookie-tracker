@@ -303,7 +303,12 @@ function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: b
   // Smart Cookie Report (Excel)
   let scReport = false;
   if (scReportFile) {
-    const r = loadExcelFile(scReportFile, (data) => data?.length > 0, (data) => rec.importSmartCookieReport(data), 'Smart Cookie Report empty/unreadable');
+    const r = loadExcelFile(
+      scReportFile,
+      (data) => data?.length > 0,
+      (data) => rec.importSmartCookieReport(data),
+      'Smart Cookie Report empty/unreadable'
+    );
     scReport = r.loaded;
     if (r.issue) issues.push(r.issue);
   }
@@ -311,7 +316,12 @@ function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: b
   // Smart Cookie Transfers (Excel) — skipped if API data present
   let scTransfer = false;
   if (!sc && scTransferFile) {
-    const r = loadExcelFile(scTransferFile, (data) => data?.length > 0, (data) => rec.importSmartCookie(data), 'Smart Cookie Transfer empty/unreadable');
+    const r = loadExcelFile(
+      scTransferFile,
+      (data) => data?.length > 0,
+      (data) => rec.importSmartCookie(data),
+      'Smart Cookie Transfer empty/unreadable'
+    );
     scTransfer = r.loaded;
     if (r.issue) issues.push(r.issue);
   } else if (sc && scTransferFile) {
@@ -416,7 +426,14 @@ const REPORT_CONFIG = {
   variety: { button: () => dom.buttons.varietyReportBtn, generator: () => generateVarietyReport(reconciler) },
   'donation-alert': { button: () => dom.buttons.donationAlertBtn, generator: () => generateDonationAlertReport(reconciler) },
   booth: { button: () => dom.buttons.boothReportBtn, generator: () => generateBoothReport(reconciler) },
-  'available-booths': { button: () => dom.buttons.availableBoothsBtn, generator: () => generateAvailableBoothsReport(reconciler, { filters: appConfig?.boothDayFilters || [], ignoredTimeSlots: appConfig?.ignoredTimeSlots || [] }) }
+  'available-booths': {
+    button: () => dom.buttons.availableBoothsBtn,
+    generator: () =>
+      generateAvailableBoothsReport(reconciler, {
+        filters: appConfig?.boothDayFilters || [],
+        ignoredTimeSlots: appConfig?.ignoredTimeSlots || []
+      })
+  }
 };
 
 async function handleRefreshBoothAvailability(): Promise<void> {
@@ -546,7 +563,7 @@ function getScoutWarningLabel(): string {
     reconciler.unified?.siteOrders?.directShip?.hasWarning ||
     reconciler.unified?.siteOrders?.girlDelivery?.hasWarning ||
     reconciler.unified?.siteOrders?.boothSale?.hasWarning;
-  return (hasNegativeInventory || hasUnallocated) ? '⚠️ Scouts' : 'Scouts';
+  return hasNegativeInventory || hasUnallocated ? '⚠️ Scouts' : 'Scouts';
 }
 
 function getDonationWarningLabel(): string {
@@ -566,8 +583,12 @@ function enableReportButtons(): void {
 
   // All report buttons (viewUnifiedDataBtn always enabled even when blocked)
   const reportButtons = [
-    dom.buttons.troopSummaryBtn, dom.buttons.inventoryReportBtn, dom.buttons.summaryReportBtn,
-    dom.buttons.varietyReportBtn, dom.buttons.donationAlertBtn, dom.buttons.boothReportBtn,
+    dom.buttons.troopSummaryBtn,
+    dom.buttons.inventoryReportBtn,
+    dom.buttons.summaryReportBtn,
+    dom.buttons.varietyReportBtn,
+    dom.buttons.donationAlertBtn,
+    dom.buttons.boothReportBtn,
     dom.buttons.availableBoothsBtn
   ];
 

@@ -424,7 +424,10 @@ function setupModalHandlers(
     }
   };
 
-  if (loginModal) loginModal.addEventListener('click', (e: Event) => { if (e.target === loginModal) closeModalFn(); });
+  if (loginModal)
+    loginModal.addEventListener('click', (e: Event) => {
+      if (e.target === loginModal) closeModalFn();
+    });
   if (closeModal) closeModal.addEventListener('click', closeModalFn);
   if (cancelModal) cancelModal.addEventListener('click', closeModalFn);
   if (saveCredentials) saveCredentials.addEventListener('click', saveCredentialsFn);
@@ -471,10 +474,19 @@ function setupEventListeners(config: Record<string, any>): void {
   // Sync
   const refreshOpts: RefreshFromWebOptions = {
     refreshFromWebBtn: buttons.refreshFromWebBtn,
-    dcProgress, dcProgressFill, dcProgressText,
-    scProgress, scProgressFill, scProgressText,
-    dcStatusEl, scStatusEl, dcLastSync, scLastSync,
-    showStatus: statusMsg, updateSyncStatus, loadDataFromDisk
+    dcProgress,
+    dcProgressFill,
+    dcProgressText,
+    scProgress,
+    scProgressFill,
+    scProgressText,
+    dcStatusEl,
+    scStatusEl,
+    dcLastSync,
+    scLastSync,
+    showStatus: statusMsg,
+    updateSyncStatus,
+    loadDataFromDisk
   };
   if (buttons.refreshFromWebBtn) buttons.refreshFromWebBtn.addEventListener('click', () => handleRefreshFromWeb(refreshOpts));
 

@@ -165,13 +165,7 @@ function mergeDCOrderFromSC(
 }
 
 /** Track scout inventory changes from an API transfer (T2G pickup, G2T return, Cookie Share) */
-function trackScoutFromAPITransfer(
-  reconciler: IDataReconciler,
-  type: string,
-  to: string,
-  from: string,
-  packages: number
-): void {
+function trackScoutFromAPITransfer(reconciler: IDataReconciler, type: string, to: string, from: string, packages: number): void {
   if (type === TRANSFER_TYPE.T2G && to !== from) {
     updateScoutData(reconciler, to, { pickedUp: Math.abs(packages) });
   }

@@ -458,9 +458,7 @@ class SmartCookieApiScraper {
     const allBooths = await this.apiPost('/webapi/api/booths/search', { troop_id: this.troopId }, 'Booth locations fetch');
 
     // Filter to configured booth IDs (passed from app config)
-    const filtered = boothIds.length > 0
-      ? (allBooths || []).filter((b: any) => boothIds.includes(b.id || b.booth_id))
-      : allBooths || [];
+    const filtered = boothIds.length > 0 ? (allBooths || []).filter((b: any) => boothIds.includes(b.id || b.booth_id)) : allBooths || [];
 
     // Fetch dates and time slots for each booth during sync
     for (const booth of filtered) {

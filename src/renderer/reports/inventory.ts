@@ -46,10 +46,15 @@ function generateInventoryReport(reconciler: IDataReconciler): string {
   const netInventory = troopTotals.inventory;
   const inventoryVarieties = varieties.inventory;
 
+  // Troop sold = booth + virtual booth physical packages (sold from troop stock, not via girl pickup)
+  // Independently computed from SC transfer data so mismatches reveal data errors
+  const troopSold = troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G;
+
   // Overall inventory stats
   const stats = [
     { label: 'Total Received', value: totalOrdered, description: 'C2T and T2T pickups', color: '#2196F3' },
-    { label: 'Allocated to Scouts (T2G)', value: totalAllocated, description: 'Physical packages only', color: '#4CAF50' }
+    { label: 'Allocated to Scouts (T2G)', value: totalAllocated, description: 'Physical packages only', color: '#4CAF50' },
+    { label: 'Troop Sold', value: troopSold, description: 'Booth & troop delivery', color: '#00897B' }
   ];
   if (totalReturned > 0) {
     stats.push({ label: 'Returns (G2T)', value: totalReturned, description: 'Returned from scouts', color: '#FF9800' });

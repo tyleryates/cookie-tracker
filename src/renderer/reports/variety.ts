@@ -22,25 +22,21 @@ function generateVarietyReport(reconciler: IDataReconciler): string {
   const totalPackages = varieties.totalAll;
 
   let html = '<div class="report-visual"><h3>Cookie Popularity Report</h3>';
-  html += `<p style="margin-bottom: 15px;">Total: ${totalPackages} packages (${totalPhysicalPackages} physical cookies + ${varietyStats[COOKIE_TYPE.COOKIE_SHARE]} Cookie Share)</p>`;
+  html += `<p style="margin-bottom: 15px;">Total: ${totalPhysicalPackages} packages sold</p>`;
   html += startTable('table-normal');
   html += createTableHeader(['Variety', 'Packages', '% of Physical Sales']);
 
-  sortVarietiesByOrder(Object.entries(getCompleteVarieties(varietyStats))).forEach(([variety, count]) => {
-    // Calculate percentage based on physical cookies only (exclude Cookie Share from denominator)
-    const percent =
-      variety === COOKIE_TYPE.COOKIE_SHARE
-        ? '—' // Don't show percentage for Cookie Share
-        : totalPhysicalPackages > 0
-          ? `${((count / totalPhysicalPackages) * 100).toFixed(1)}%`
-          : '0%';
+  sortVarietiesByOrder(Object.entries(getCompleteVarieties(varietyStats)))
+    .filter(([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE)
+    .forEach(([variety, count]) => {
+      const percent = totalPhysicalPackages > 0 ? `${((count / totalPhysicalPackages) * 100).toFixed(1)}%` : '0%';
 
-    html += createTableRow([
-      `<td><strong>${escapeHtml(getCookieDisplayName(variety))}</strong></td>`,
-      `<td>${count}</td>`,
-      `<td>${percent}</td>`
-    ]);
-  });
+      html += createTableRow([
+        `<td><strong>${escapeHtml(getCookieDisplayName(variety))}</strong></td>`,
+        `<td>${count}</td>`,
+        `<td>${percent}</td>`
+      ]);
+    });
 
   html += `${endTable()}</div>`;
   return html;

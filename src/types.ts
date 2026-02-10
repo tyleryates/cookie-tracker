@@ -163,6 +163,7 @@ export interface ScoutTotals {
     cashCollected: number;
     electronicPayments: number;
     inventoryValue: number;
+    unsoldValue: number;
     cashOwed: number;
   };
   $inventoryDisplay: Varieties;
@@ -176,6 +177,7 @@ export interface ScoutInventory {
 export interface ScoutCredited {
   virtualBooth: {
     packages: number;
+    donations: number;
     varieties: Varieties;
     allocations: Array<{
       orderNumber?: string;
@@ -479,15 +481,16 @@ export interface TroopTotals {
   proceedsDeduction: number;
   proceedsExemptPackages: number;
   inventory: number;
-  packagesSoldFromStock: number;
   donations: number;
   ordered: number;
   allocated: number;
   siteOrdersPhysical: number;
   directShip: number;
   boothDividerT2G: number;
+  virtualBoothT2G: number;
   girlDelivery: number;
   girlInventory: number;
+  pendingPickup: number;
   scouts: ScoutCounts;
 }
 
@@ -571,8 +574,8 @@ export interface DayFilter {
 
 export interface IgnoredTimeSlot {
   boothId: number;
-  date: string;             // YYYY-MM-DD
-  startTime: string;        // "16:00" or "4:00 PM"
+  date: string; // YYYY-MM-DD
+  startTime: string; // "16:00" or "4:00 PM"
 }
 
 export interface AppConfig {

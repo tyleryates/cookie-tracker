@@ -63,6 +63,7 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
     credited: {
       virtualBooth: {
         packages: 0,
+        donations: 0,
         varieties: {},
         allocations: []
       },
@@ -98,6 +99,7 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
         cashCollected: 0,
         electronicPayments: 0,
         inventoryValue: 0,
+        unsoldValue: 0,
         cashOwed: 0
       },
       $inventoryDisplay: {} // Net inventory by variety

@@ -1,6 +1,8 @@
-import { calculateRevenue } from '../../cookie-constants';
-import type { BoothReservationImported, IDataReconciler } from '../../types';
-import { createHorizontalStats, escapeHtml } from '../html-builder';
+import type { IDataReconciler } from '../../types';
+import { createHorizontalStats } from '../html-builder';
+
+const sectionHeader = (text: string) =>
+  `<h4 style="margin: 18px 0 4px 0; font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 0.5px;">${text}</h4>`;
 
 function generateTroopSummaryReport(reconciler: IDataReconciler): string {
   // Use pre-processed unified dataset
@@ -12,40 +14,33 @@ function generateTroopSummaryReport(reconciler: IDataReconciler): string {
 
   let html = '<div class="report-visual"><h3>Troop Summary</h3>';
 
-  // Sales channel breakdown
-  const boothSalesPackages = troopTotals.boothDividerT2G;
-  const girlDeliveryPackages = troopTotals.girlDelivery;
-  const directShipPackages = troopTotals.directShip;
-  const donationPackages = troopTotals.donations;
-  const totalSold = boothSalesPackages + girlDeliveryPackages + directShipPackages + donationPackages;
+  // Sales channel breakdown (physical packages, consistent with inventory row)
+  const totalSold = troopTotals.boothDividerT2G + troopTotals.girlDelivery + troopTotals.directShip + troopTotals.donations;
 
-  const channelStats = [
-    { label: 'Booth Sales', value: boothSalesPackages, description: 'Via booth divider', color: '#7B1FA2' },
-    { label: 'Girl Delivery', value: girlDeliveryPackages, description: 'Sold from hand', color: '#2196F3' },
-    { label: 'Direct Ship', value: directShipPackages, description: 'Shipped orders', color: '#0288D1' },
-    { label: 'Donations', value: donationPackages, description: 'Cookie Share', color: '#7B1FA2' },
-    { label: 'Total Sold', value: totalSold, description: 'To customers', color: '#4CAF50' }
-  ];
-
-  html += createHorizontalStats(channelStats);
-
-  // Operational stats: received, sold (from stock), inventory, cash owed
-  // packagesSoldFromStock is pre-computed from component totals in troop-totals.ts
-  const packagesSold = troopTotals.packagesSoldFromStock;
-  const varieties = reconciler.unified.varieties;
-  const inventoryValue = Math.round(calculateRevenue(varieties.inventory));
-  const salesRevenue = Math.round(troopTotals.revenue);
-  const cashOwed = salesRevenue + inventoryValue;
-  const cashTooltip = `Sales: $${salesRevenue}\nInventory: $${inventoryValue}`;
-  const cashOwedHtml = `<span class="tooltip-cell" data-tooltip="${escapeHtml(cashTooltip)}">$${cashOwed}</span>`;
-
+  html += sectionHeader('Sales by Channel');
   html += createHorizontalStats([
-    { label: 'Total Received', value: troopTotals.ordered, description: 'Packages from council', color: '#ff9800' },
-    { label: 'Packages Sold', value: packagesSold, description: 'From troop stock', color: '#4CAF50' },
-    { label: 'Troop Inventory', value: troopTotals.inventory, description: 'Troop on hand', color: '#9C27B0' },
-    { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'Girls on hand', color: '#9C27B0' },
-    { label: 'Cash Owed', value: cashOwedHtml, description: 'Troop owes council', color: '#C62828' }
+    { label: 'Booth Sales', value: troopTotals.boothDividerT2G, description: 'Via booth divider', color: '#7B1FA2' },
+    { label: 'Girl Delivery', value: troopTotals.girlDelivery, description: 'In-person & online delivery', color: '#2196F3' },
+    { label: 'Direct Ship', value: troopTotals.directShip, description: 'Shipped orders', color: '#0288D1' },
+    { label: 'Donations', value: troopTotals.donations, description: 'Cookie Share', color: '#7B1FA2' },
+    { label: 'Total Sold', value: totalSold, description: 'To customers', color: '#4CAF50' }
   ]);
+
+  // Physical inventory: where are the packages from council?
+  // Sold from Stock = physical packages sold to customers from troop inventory (booth + girl delivery)
+  const soldFromStock = troopTotals.boothDividerT2G + troopTotals.girlDelivery;
+
+  html += sectionHeader('Inventory');
+  const inventoryStats = [
+    { label: 'Total Received', value: troopTotals.ordered, description: 'C2T and T2T pickups', color: '#ff9800' },
+    { label: 'Sold from Stock', value: soldFromStock, description: 'Physical pkgs sold', color: '#4CAF50' },
+    { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls, unsold', color: '#9C27B0' },
+    { label: 'Troop Inventory', value: troopTotals.inventory, description: 'Troop on hand', color: '#9C27B0' }
+  ];
+  if (troopTotals.pendingPickup > 0) {
+    inventoryStats.push({ label: 'Pending Pickup', value: troopTotals.pendingPickup, description: 'Sold, awaiting T2G', color: '#FF9800' });
+  }
+  html += createHorizontalStats(inventoryStats);
 
   // Financial stats
   const financialStats: { label: string; value: string; description: string; color: string }[] = [
@@ -65,19 +60,8 @@ function generateTroopSummaryReport(reconciler: IDataReconciler): string {
     description: 'After first-50 deduction',
     color: '#4CAF50'
   });
+  html += sectionHeader('Finances');
   html += createHorizontalStats(financialStats);
-
-  // Add booth reservation stats if available (exclude Virtual Delivery booths)
-  const allBoothReservations = reconciler.unified.boothReservations || [];
-  const boothReservations = allBoothReservations.filter(
-    (r: BoothReservationImported) => !(r.booth.reservationType || '').toLowerCase().includes('virtual')
-  );
-  if (boothReservations.length > 0) {
-    const distributedCount = boothReservations.filter((r: BoothReservationImported) => r.booth.isDistributed).length;
-    html += createHorizontalStats([
-      { label: 'Booths', value: boothReservations.length, description: `${distributedCount} distributed`, color: '#00796B' }
-    ]);
-  }
 
   // Add info about related reports
   html += `

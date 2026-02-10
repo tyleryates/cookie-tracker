@@ -16,16 +16,22 @@ interface ScoutDonationRow {
 /** Build the colored status banner showing reconciliation state */
 function buildStatusBanner(adjustmentNeeded: number): string {
   if (adjustmentNeeded === 0) {
-    return '<div style="padding: 12px; background: #C8E6C9; border-radius: 8px; margin: 15px 0; border-left: 4px solid #2E7D32;">'
-      + '<p style="margin: 0; color: #2E7D32; font-weight: 600;">Reconciled \u2014 no manual entries needed in Smart Cookie.</p></div>';
+    return (
+      '<div style="padding: 12px; background: #C8E6C9; border-radius: 8px; margin: 15px 0; border-left: 4px solid #2E7D32;">' +
+      '<p style="margin: 0; color: #2E7D32; font-weight: 600;">Reconciled \u2014 no manual entries needed in Smart Cookie.</p></div>'
+    );
   }
   if (adjustmentNeeded > 0) {
-    return '<div style="padding: 12px; background: #FFE0B2; border-radius: 8px; margin: 15px 0; border-left: 4px solid #F57F17;">'
-      + `<p style="margin: 0; color: #E65100; font-weight: 600;">Add <strong>${adjustmentNeeded}</strong> Cookie Share package${adjustmentNeeded !== 1 ? 's' : ''} in Smart Cookie (Orders \u2192 Virtual Cookie Share).</p></div>`;
+    return (
+      '<div style="padding: 12px; background: #FFE0B2; border-radius: 8px; margin: 15px 0; border-left: 4px solid #F57F17;">' +
+      `<p style="margin: 0; color: #E65100; font-weight: 600;">Add <strong>${adjustmentNeeded}</strong> Cookie Share package${adjustmentNeeded !== 1 ? 's' : ''} in Smart Cookie (Orders \u2192 Virtual Cookie Share).</p></div>`
+    );
   }
   const count = Math.abs(adjustmentNeeded);
-  return '<div style="padding: 12px; background: #FFCDD2; border-radius: 8px; margin: 15px 0; border-left: 4px solid #C62828;">'
-    + `<p style="margin: 0; color: #C62828; font-weight: 600;">Remove <strong>${count}</strong> Cookie Share package${count !== 1 ? 's' : ''} from Smart Cookie.</p></div>`;
+  return (
+    '<div style="padding: 12px; background: #FFCDD2; border-radius: 8px; margin: 15px 0; border-left: 4px solid #C62828;">' +
+    `<p style="margin: 0; color: #C62828; font-weight: 600;">Remove <strong>${count}</strong> Cookie Share package${count !== 1 ? 's' : ''} from Smart Cookie.</p></div>`
+  );
 }
 
 /** Calculate per-scout Cookie Share breakdown from orders */
@@ -46,10 +52,7 @@ function computeScoutDonations(scout: Scout): { dcTotal: number; dcAutoSync: num
 }
 
 /** Build per-scout donation rows for the reconciliation table */
-function buildScoutDonationRows(
-  scouts: Map<string, Scout>,
-  virtualCSAllocations: Map<number, number> | null
-): ScoutDonationRow[] {
+function buildScoutDonationRows(scouts: Map<string, Scout>, virtualCSAllocations: Map<number, number> | null): ScoutDonationRow[] {
   const rows: ScoutDonationRow[] = [];
   scouts.forEach((scout: Scout, scoutName: string) => {
     if (scout.isSiteOrder) return;
@@ -65,7 +68,16 @@ function buildScoutDonationRows(
       manualEntered = virtualCSAllocations.get(scout.girlId);
     }
 
-    rows.push({ name: scoutName, dcAutoSync, manualNeeded, dcTotal, manualEntered, boothCS, totalCS, adjustment: manualNeeded - manualEntered });
+    rows.push({
+      name: scoutName,
+      dcAutoSync,
+      manualNeeded,
+      dcTotal,
+      manualEntered,
+      boothCS,
+      totalCS,
+      adjustment: manualNeeded - manualEntered
+    });
   });
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -73,10 +85,16 @@ function buildScoutDonationRows(
 /** Render the adjustment cell with color coding */
 function buildAdjustmentCell(adjustment: number): { cell: string; rowClass: string } {
   if (adjustment > 0) {
-    return { cell: `<td style="color: #ff9800; font-weight: 600;"><strong>+${adjustment}</strong></td>`, rowClass: 'style="background: #fff3cd;"' };
+    return {
+      cell: `<td style="color: #ff9800; font-weight: 600;"><strong>+${adjustment}</strong></td>`,
+      rowClass: 'style="background: #fff3cd;"'
+    };
   }
   if (adjustment < 0) {
-    return { cell: `<td style="color: #f44336; font-weight: 600;"><strong>${adjustment}</strong></td>`, rowClass: 'style="background: #ffcdd2;"' };
+    return {
+      cell: `<td style="color: #f44336; font-weight: 600;"><strong>${adjustment}</strong></td>`,
+      rowClass: 'style="background: #ffcdd2;"'
+    };
   }
   return { cell: '<td style="color: #4CAF50; font-weight: 600;">\u2014</td>', rowClass: '' };
 }

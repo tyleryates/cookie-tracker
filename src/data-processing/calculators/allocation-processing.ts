@@ -15,7 +15,8 @@ function processVirtualBoothAllocations(reconciler: IDataReconciler, scoutDatase
     const scout = scoutDataset.get(transfer.to);
     if (!scout) return;
 
-    scout.credited.virtualBooth.packages += transfer.packages || 0;
+    scout.credited.virtualBooth.packages += transfer.physicalPackages || 0;
+    scout.credited.virtualBooth.donations += transfer.varieties?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
     addVarietiesToTarget(scout.credited.virtualBooth.varieties, transfer.varieties);
 
     // Preserve individual allocation record for traceability
@@ -23,7 +24,7 @@ function processVirtualBoothAllocations(reconciler: IDataReconciler, scoutDatase
       orderNumber: transfer.orderNumber,
       date: transfer.date,
       from: transfer.from,
-      packages: transfer.packages || 0,
+      packages: transfer.physicalPackages || 0,
       varieties: { ...transfer.varieties },
       amount: transfer.amount || 0
     });
@@ -42,12 +43,15 @@ function processDirectShipAllocations(
     const scout = findScoutByGirlId(allocation.girlId, scoutDataset, girlIdToName);
     if (!scout) return;
 
-    scout.credited.directShip.packages += allocation.packages || 0;
+    const physicalPkgs = sumPhysicalPackages(allocation.varieties);
+    const donationCount = allocation.trackedCookieShare || allocation.varieties?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
+    scout.credited.directShip.packages += physicalPkgs;
+    scout.credited.directShip.donations += donationCount;
     addVarietiesToTarget(scout.credited.directShip.varieties, allocation.varieties);
 
     // Preserve individual allocation record
     scout.credited.directShip.allocations.push({
-      packages: allocation.packages || 0,
+      packages: physicalPkgs,
       varieties: { ...allocation.varieties },
       source: 'DirectShipDivider'
     });

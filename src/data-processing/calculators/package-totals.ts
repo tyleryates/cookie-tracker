@@ -15,7 +15,6 @@ function calculatePackageTotals(transfers: Transfer[], rawDCData: Record<string,
   let totalVirtualBoothT2G = 0; // Virtual booth T2G (site orders allocated to scouts)
   let totalBoothDividerT2G = 0; // Booth divider T2G (booth sales allocated to scouts)
   let totalDirectShipDividerT2G = 0; // Direct ship divider T2G (troop direct ship allocated to scouts)
-  let totalDonations = 0; // Cookie Share (virtual donations)
   let totalDirectShip = 0; // Direct ship orders (shipped from supplier, not troop inventory)
   let totalG2T = 0; // Girl to Troop returns (inventory back to troop)
 
@@ -44,19 +43,14 @@ function calculatePackageTotals(transfers: Transfer[], rawDCData: Record<string,
         totalDirectShipDividerT2G += transfer.physicalPackages || 0;
         break;
       case TRANSFER_CATEGORY.DIRECT_SHIP:
-        totalDirectShip += packages;
+        totalDirectShip += transfer.physicalPackages || 0;
         break;
     }
 
     // Common: all sale categories contribute to sold and revenue
     if (SALE_CATEGORIES.has(transfer.category)) {
-      totalSold += packages;
+      totalSold += transfer.physicalPackages || 0;
       totalRevenue += amount;
-    }
-
-    // Count Cookie Share donations
-    if (transfer.varieties?.[COOKIE_TYPE.COOKIE_SHARE]) {
-      totalDonations += transfer.varieties[COOKIE_TYPE.COOKIE_SHARE];
     }
   });
 
@@ -71,7 +65,7 @@ function calculatePackageTotals(transfers: Transfer[], rawDCData: Record<string,
     virtualBoothT2G: totalVirtualBoothT2G,
     boothDividerT2G: totalBoothDividerT2G,
     directShipDividerT2G: totalDirectShipDividerT2G,
-    donations: totalDonations,
+    donations: 0, // Computed from scout orders in troop-totals.ts (SC transfers incomplete)
     directShip: totalDirectShip,
     siteOrdersPhysical: siteOrdersPhysical,
     g2t: totalG2T

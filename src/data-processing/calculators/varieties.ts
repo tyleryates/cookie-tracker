@@ -30,6 +30,7 @@ export function buildVarieties(reconciler: IDataReconciler): VarietiesResult {
     if (!transfer.packages || transfer.packages <= 0) return;
 
     Object.entries(transfer.varieties).forEach(([variety, count]) => {
+      if (variety === COOKIE_TYPE.COOKIE_SHARE) return;
       if (typeof count === 'number' && count > 0) {
         byCookie[variety as keyof Varieties] = (byCookie[variety as keyof Varieties] || 0) + count;
       }
