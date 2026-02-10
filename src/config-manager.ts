@@ -23,6 +23,7 @@ class ConfigManager {
     const defaults = this.getDefaults();
     try {
       if (!fs.existsSync(this.configPath)) {
+        this.saveConfig(defaults);
         return defaults;
       }
       const raw = fs.readFileSync(this.configPath, 'utf8');
