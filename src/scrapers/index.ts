@@ -34,7 +34,7 @@ class ScraperOrchestrator {
   }
 
   /** Scrape both Digital Cookie and Smart Cookie in parallel */
-  async scrapeAll(credentials: Credentials): Promise<Record<string, any>> {
+  async scrapeAll(credentials: Credentials, boothIds: number[] = []): Promise<Record<string, any>> {
     const results = {
       digitalCookie: null,
       smartCookie: null,
@@ -49,7 +49,7 @@ class ScraperOrchestrator {
       // Run both scrapers in parallel for maximum speed
       const [digitalCookieResult, smartCookieResult] = await Promise.all([
         this.digitalCookieScraper.scrape(credentials.digitalCookie),
-        this.smartCookieScraper.scrape(credentials.smartCookie)
+        this.smartCookieScraper.scrape(credentials.smartCookie, boothIds)
       ]);
 
       results.digitalCookie = digitalCookieResult;

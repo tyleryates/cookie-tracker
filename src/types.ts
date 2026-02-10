@@ -555,6 +555,34 @@ export interface UnifiedDataset {
 }
 
 // ============================================================================
+// APP CONFIG TYPES
+// ============================================================================
+
+export interface DayFilter {
+  /** 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat */
+  day: number;
+  /** If set, only show time slots starting within this range (24h, e.g. "16:00") */
+  timeAfter?: string;
+  timeBefore?: string;
+  /** If set, exclude time slots starting within this range (24h) */
+  excludeAfter?: string;
+  excludeBefore?: string;
+}
+
+export interface IgnoredTimeSlot {
+  boothId: number;
+  date: string;             // YYYY-MM-DD
+  startTime: string;        // "16:00" or "4:00 PM"
+}
+
+export interface AppConfig {
+  autoSyncEnabled: boolean;
+  boothIds: number[];
+  boothDayFilters: DayFilter[];
+  ignoredTimeSlots: IgnoredTimeSlot[];
+}
+
+// ============================================================================
 // DATA FILE INFO (for file listing in renderer)
 // ============================================================================
 

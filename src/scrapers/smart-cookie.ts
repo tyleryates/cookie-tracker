@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import axios from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
-import { BOOTH_IDS, HTTP_STATUS, SPECIAL_IDENTIFIERS } from '../constants';
+import { HTTP_STATUS, SPECIAL_IDENTIFIERS } from '../constants';
 import { normalizeCookieName } from '../cookie-constants';
 import Logger from '../logger';
 import { getTimestamp } from '../scraper-utils';
@@ -449,7 +449,7 @@ class SmartCookieApiScraper {
    * Fetch available booth locations for the troop
    * Returns list of stores where booths can be reserved
    */
-  async fetchBoothLocations(): Promise<any[]> {
+  async fetchBoothLocations(boothIds: number[] = []): Promise<any[]> {
     if (!this.troopId) {
       Logger.warn('Warning: No troopId available, skipping booth locations fetch');
       return [];
@@ -457,8 +457,10 @@ class SmartCookieApiScraper {
 
     const allBooths = await this.apiPost('/webapi/api/booths/search', { troop_id: this.troopId }, 'Booth locations fetch');
 
-    // Filter to configured booth IDs (see BOOTH_IDS in constants.ts)
-    const filtered = (allBooths || []).filter((b: any) => BOOTH_IDS.includes(b.id || b.booth_id));
+    // Filter to configured booth IDs (passed from app config)
+    const filtered = boothIds.length > 0
+      ? (allBooths || []).filter((b: any) => boothIds.includes(b.id || b.booth_id))
+      : allBooths || [];
 
     // Fetch dates and time slots for each booth during sync
     for (const booth of filtered) {
@@ -610,7 +612,7 @@ class SmartCookieApiScraper {
    * Orchestrates the login, fetch, and save operations
    * Uses automatic session detection - tries fetching first, only logs in if session expired
    */
-  async scrape(credentials: { username: string; password: string }): Promise<Record<string, any>> {
+  async scrape(credentials: { username: string; password: string }, boothIds: number[] = []): Promise<Record<string, any>> {
     // Validate input
     if (!credentials || !credentials.username || !credentials.password) {
       return {
@@ -661,7 +663,7 @@ class SmartCookieApiScraper {
 
       // Step 5: Fetch booth locations (non-fatal)
       this.sendProgress('Smart Cookie API: Fetching booth locations...', 58);
-      const boothLocations = await this.fetchOptional(() => this.fetchBoothLocations(), 'Fetch Booth Locations', []);
+      const boothLocations = await this.fetchOptional(() => this.fetchBoothLocations(boothIds), 'Fetch Booth Locations', []);
 
       // Step 6: Fetch booth reservations (non-fatal)
       this.sendProgress('Smart Cookie API: Fetching reservations...', 60);

@@ -6,7 +6,7 @@ import { normalizeBoothLocation } from './data-processing/data-importers';
 import DataReconciler from './data-reconciler';
 import Logger from './logger';
 import { DateFormatter } from './renderer/html-builder';
-import { generateAvailableBoothsReport } from './renderer/reports/available-booths';
+import { countAvailableSlots, generateAvailableBoothsReport } from './renderer/reports/available-booths';
 import { generateBoothReport } from './renderer/reports/booth';
 import { generateDonationAlertReport } from './renderer/reports/donation-alert';
 import { generateInventoryReport } from './renderer/reports/inventory';
@@ -23,9 +23,10 @@ import {
   updateSourceStatus,
   updateSyncStatus
 } from './renderer/ui-controller';
-import type { BoothReservationImported, DataFileInfo } from './types';
+import type { AppConfig, BoothReservationImported, DataFileInfo } from './types';
 
 let reconciler = new DataReconciler();
+let appConfig: AppConfig | null = null;
 
 const dom = {
   buttons: {
@@ -86,17 +87,31 @@ window.addEventListener('DOMContentLoaded', async () => {
     Logger.error('Failed to load version:', err);
   }
 
+  appConfig = await loadAppConfig();
   await loadDataFromDisk(false);
   await checkLoginStatus();
 
   initializeAutoSyncToggle();
 });
 
+async function loadAppConfig(): Promise<AppConfig> {
+  try {
+    const result = await ipcRenderer.invoke('load-config');
+    // IPC wraps in { success, data } — unwrap if needed
+    if (result && typeof result === 'object' && 'success' in result) {
+      return result.data;
+    }
+    return result;
+  } catch (err) {
+    Logger.error('Failed to load config:', err);
+    return { autoSyncEnabled: true, boothIds: [], boothDayFilters: [], ignoredTimeSlots: [] };
+  }
+}
+
 // ============================================================================
 // AUTO-SYNC FUNCTIONALITY
 // ============================================================================
 
-const AUTO_SYNC_STORAGE_KEY = 'autoSyncEnabled';
 const AUTO_SYNC_INTERVAL_MS = 3600000; // 1 hour
 
 let autoSyncInterval: ReturnType<typeof setInterval> | null = null;
@@ -105,8 +120,7 @@ let autoSyncEnabled = true; // Default to enabled
 function initializeAutoSyncToggle(): void {
   const toggle = document.getElementById('autoSyncToggle') as HTMLInputElement;
 
-  const savedPreference = localStorage.getItem(AUTO_SYNC_STORAGE_KEY);
-  autoSyncEnabled = savedPreference === null ? true : savedPreference === 'true';
+  autoSyncEnabled = appConfig?.autoSyncEnabled ?? true;
 
   if (toggle) toggle.checked = autoSyncEnabled;
 
@@ -117,7 +131,7 @@ function initializeAutoSyncToggle(): void {
   toggle.addEventListener('change', (e: Event) => {
     autoSyncEnabled = (e.target as HTMLInputElement).checked;
 
-    localStorage.setItem(AUTO_SYNC_STORAGE_KEY, autoSyncEnabled.toString());
+    ipcRenderer.invoke('update-config', { autoSyncEnabled });
 
     if (autoSyncEnabled) {
       startAutoSync();
@@ -402,7 +416,7 @@ const REPORT_CONFIG = {
   variety: { button: () => dom.buttons.varietyReportBtn, generator: () => generateVarietyReport(reconciler) },
   'donation-alert': { button: () => dom.buttons.donationAlertBtn, generator: () => generateDonationAlertReport(reconciler) },
   booth: { button: () => dom.buttons.boothReportBtn, generator: () => generateBoothReport(reconciler) },
-  'available-booths': { button: () => dom.buttons.availableBoothsBtn, generator: () => generateAvailableBoothsReport(reconciler) }
+  'available-booths': { button: () => dom.buttons.availableBoothsBtn, generator: () => generateAvailableBoothsReport(reconciler, { filters: appConfig?.boothDayFilters || [], ignoredTimeSlots: appConfig?.ignoredTimeSlots || [] }) }
 };
 
 async function handleRefreshBoothAvailability(): Promise<void> {
@@ -477,12 +491,35 @@ function generateReport(type: string): void {
     if (btn) btn.classList.add('active');
     dom.reportContainer.classList.add('show');
 
-    // Wire up booth availability refresh button if present
+    // Wire up booth availability refresh button and ignore buttons if present
     if (type === 'available-booths') {
       const refreshBtn = document.getElementById('refreshBoothAvailability');
       if (refreshBtn) {
         refreshBtn.addEventListener('click', handleRefreshBoothAvailability);
       }
+
+      // Wire ignore (×) buttons on time slot chips
+      dom.reportContainer.querySelectorAll('.booth-slot-ignore').forEach((btn) => {
+        btn.addEventListener('click', async (e: Event) => {
+          e.stopPropagation();
+          const target = e.currentTarget as HTMLElement;
+          const boothId = Number(target.dataset.boothId);
+          const date = target.dataset.date || '';
+          const startTime = target.dataset.startTime || '';
+          if (!boothId || !date || !startTime) return;
+
+          const ignored = appConfig?.ignoredTimeSlots || [];
+          ignored.push({ boothId, date, startTime });
+          if (appConfig) appConfig.ignoredTimeSlots = ignored;
+          await ipcRenderer.invoke('update-config', { ignoredTimeSlots: ignored });
+
+          // Re-render the report with updated ignore list
+          generateReport('available-booths');
+
+          // Update warning badge on the button
+          if (dom.buttons.availableBoothsBtn) dom.buttons.availableBoothsBtn.textContent = getAvailableBoothsWarningLabel();
+        });
+      });
     }
   }
 }
@@ -516,6 +553,14 @@ function getDonationWarningLabel(): string {
   return reconciler.unified?.cookieShare?.reconciled ? 'Donations' : '⚠️ Donations';
 }
 
+function getAvailableBoothsWarningLabel(): string {
+  const boothLocations = reconciler.unified?.boothLocations || [];
+  const filters = appConfig?.boothDayFilters || [];
+  const ignored = appConfig?.ignoredTimeSlots || [];
+  const count = countAvailableSlots(boothLocations, filters, ignored);
+  return count > 0 ? '⚠️ Available Booths' : 'Available Booths';
+}
+
 function enableReportButtons(): void {
   const unknownTypes = reconciler.unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
 
@@ -546,6 +591,7 @@ function enableReportButtons(): void {
   if (dom.buttons.summaryReportBtn) dom.buttons.summaryReportBtn.textContent = getScoutWarningLabel();
   if (dom.buttons.donationAlertBtn) dom.buttons.donationAlertBtn.textContent = getDonationWarningLabel();
   if (dom.buttons.boothReportBtn) dom.buttons.boothReportBtn.textContent = getBoothWarningLabel(reconciler);
+  if (dom.buttons.availableBoothsBtn) dom.buttons.availableBoothsBtn.textContent = getAvailableBoothsWarningLabel();
 
   generateReport('troop');
 }

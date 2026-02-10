@@ -262,10 +262,3 @@ export const UI_TIMING = {
   TOOLTIP_DELAY_HIDE: 0 // Milliseconds before hiding tooltip
 } as const;
 
-// ============================================================================
-// BOOTH AVAILABILITY CONFIG
-// TODO: Make user-configurable via settings UI
-// ============================================================================
-
-/** Booth IDs to fetch availability for (used by scraper + report display) */
-export const BOOTH_IDS = [4187, 4217, 4286, 9337, 9338, 8099, 21593];

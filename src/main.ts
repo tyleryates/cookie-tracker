@@ -2,11 +2,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
+import ConfigManager from './config-manager';
 import CredentialsManager from './credentials-manager';
 import Logger from './logger';
 import ScraperOrchestrator from './scrapers';
 import SmartCookieScraper from './scrapers/smart-cookie';
-import type { Credentials } from './types';
+import type { AppConfig, Credentials } from './types';
 
 let mainWindow: BrowserWindow | null = null;
 let lastScraper: ScraperOrchestrator | null = null;
@@ -20,6 +21,7 @@ const userDataPath = app.getPath('userData');
 const dataDir = path.join(userDataPath, 'data');
 
 const credentialsManager = new CredentialsManager(dataDir);
+const configManager = new ConfigManager(dataDir);
 
 // Standardized IPC error handler wrapper
 function handleIpcError(handler: (...args: any[]) => Promise<any>): (...args: any[]) => Promise<any> {
@@ -282,6 +284,30 @@ ipcMain.handle(
   })
 );
 
+// Handle config operations
+ipcMain.handle(
+  'load-config',
+  handleIpcError(async () => {
+    return configManager.loadConfig();
+  })
+);
+
+ipcMain.handle(
+  'save-config',
+  handleIpcError(async (_event: any, config: AppConfig) => {
+    configManager.saveConfig(config);
+    return { success: true };
+  })
+);
+
+ipcMain.handle(
+  'update-config',
+  handleIpcError(async (_event: any, partial: Partial<AppConfig>) => {
+    const updated = configManager.updateConfig(partial);
+    return updated;
+  })
+);
+
 // Handle scrape websites
 ipcMain.handle('scrape-websites', async (event) => {
   try {
@@ -305,8 +331,9 @@ ipcMain.handle('scrape-websites', async (event) => {
     // Small delay to ensure renderer's progress listener is fully registered
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Run scraping
-    const results = await scraper.scrapeAll(credentials);
+    // Run scraping (pass configured booth IDs)
+    const config = configManager.loadConfig();
+    const results = await scraper.scrapeAll(credentials, config.boothIds);
 
     // Persist scraper for on-demand booth API calls
     if (results.success) {
@@ -341,7 +368,8 @@ ipcMain.handle(
       await scraper.login(credentials.smartCookie.username, credentials.smartCookie.password);
     }
 
-    const boothLocations = await scraper.fetchBoothLocations();
+    const config = configManager.loadConfig();
+    const boothLocations = await scraper.fetchBoothLocations(config.boothIds);
     return { success: true, data: boothLocations };
   })
 );
