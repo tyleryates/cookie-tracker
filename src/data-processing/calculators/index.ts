@@ -57,7 +57,7 @@ export function buildUnifiedDataset(reconciler: IDataReconciler): UnifiedDataset
   const transferBreakdowns = buildTransferBreakdowns(reconciler, warnings);
 
   // Build varieties
-  const varieties = buildVarieties(reconciler);
+  const varieties = buildVarieties(reconciler, scouts);
 
   // Build Cookie Share tracking
   const cookieShareTracking = buildCookieShareTracking(reconciler);

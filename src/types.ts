@@ -478,6 +478,7 @@ export interface TroopTotals {
   sold: number;
   revenue: number;
   troopProceeds: number;
+  proceedsRate: number;
   proceedsDeduction: number;
   proceedsExemptPackages: number;
   inventory: number;

@@ -192,8 +192,15 @@ export const COOKIE_PRICES = {
 } as { [K in CookieType]: number };
 
 // Troop proceeds per package (what the troop gets to keep)
-// Based on Smart Cookie InitialMultiplier - same rate for all varieties including GF
-export const TROOP_PROCEEDS_PER_PACKAGE = 0.9;
+// Rate depends on Per Girl Average (PGA = packages credited / active girls)
+export const TROOP_PROCEEDS_PER_PACKAGE = 0.9; // Default, used for per-scout estimates before PGA is known
+
+/** Get troop proceeds rate based on Per Girl Average */
+export function getTroopProceedsRate(pga: number): number {
+  if (pga >= 350) return 0.95;
+  if (pga >= 200) return 0.90;
+  return 0.85;
+}
 
 // First N packages per girl are exempt from troop proceeds
 // Only applies to girls who have sold at least 1 package

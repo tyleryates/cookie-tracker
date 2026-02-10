@@ -20,10 +20,10 @@ function generateTroopSummaryReport(reconciler: IDataReconciler): string {
   html += sectionHeader('Sales by Channel');
   html += createHorizontalStats([
     { label: 'Booth Sales', value: troopTotals.boothDividerT2G, description: 'Via booth divider', color: '#7B1FA2' },
-    { label: 'Girl Delivery', value: troopTotals.girlDelivery, description: 'In-person & online delivery', color: '#2196F3' },
-    { label: 'Direct Ship', value: troopTotals.directShip, description: 'Shipped orders', color: '#0288D1' },
-    { label: 'Donations', value: troopTotals.donations, description: 'Cookie Share', color: '#7B1FA2' },
-    { label: 'Total Sold', value: totalSold, description: 'To customers', color: '#4CAF50' }
+    { label: 'Girl Delivery', value: troopTotals.girlDelivery, description: 'In-person & online delivery', color: '#1976D2' },
+    { label: 'Direct Ship', value: troopTotals.directShip, description: 'Shipped orders', color: '#00838F' },
+    { label: 'Donations', value: troopTotals.donations, description: 'Cookie Share', color: '#E91E63' },
+    { label: 'Total Sold', value: totalSold, description: 'To customers', color: '#2E7D32' }
   ]);
 
   // Physical inventory: where are the packages from council?
@@ -32,25 +32,29 @@ function generateTroopSummaryReport(reconciler: IDataReconciler): string {
 
   html += sectionHeader('Inventory');
   const inventoryStats = [
-    { label: 'Total Received', value: troopTotals.ordered, description: 'C2T and T2T pickups', color: '#ff9800' },
-    { label: 'Sold from Stock', value: soldFromStock, description: 'Physical pkgs sold', color: '#4CAF50' },
-    { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls, unsold', color: '#9C27B0' },
-    { label: 'Troop Inventory', value: troopTotals.inventory, description: 'Troop on hand', color: '#9C27B0' }
+    { label: 'Total Received', value: troopTotals.ordered, description: 'C2T and T2T pickups', color: '#1565C0' },
+    { label: 'Sold from Stock', value: soldFromStock, description: 'Physical pkgs sold', color: '#2E7D32' },
+    { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls, unsold', color: '#F57F17' },
+    { label: 'Troop Inventory', value: troopTotals.inventory, description: 'Troop on hand', color: '#E65100' }
   ];
   if (troopTotals.pendingPickup > 0) {
-    inventoryStats.push({ label: 'Pending Pickup', value: troopTotals.pendingPickup, description: 'Sold, awaiting T2G', color: '#FF9800' });
+    inventoryStats.push({ label: 'Pending Pickup', value: troopTotals.pendingPickup, description: 'Sold, awaiting T2G', color: '#BF360C' });
   }
   html += createHorizontalStats(inventoryStats);
 
   // Financial stats
+  const packagesCredited = troopTotals.ordered + troopTotals.directShip + troopTotals.donations;
+  const grossProceeds = troopTotals.troopProceeds + troopTotals.proceedsDeduction;
   const financialStats: { label: string; value: string; description: string; color: string }[] = [
-    { label: 'Total Revenue', value: `$${Math.round(troopTotals.revenue)}`, description: 'Retail price (to GSUSA)', color: '#ff9800' }
+    { label: 'Packages Credited', value: `${packagesCredited}`, description: 'Received + direct ship + donations', color: '#1565C0' },
+    { label: 'Per Girl Average', value: `$${troopTotals.scouts.active > 0 ? Math.round(packagesCredited / troopTotals.scouts.active) : 0}`, description: `${troopTotals.scouts.active} girls participating`, color: '#6A1B9A' },
+    { label: 'Gross Proceeds', value: `$${Math.round(grossProceeds)}`, description: `$${troopTotals.proceedsRate.toFixed(2)}/pkg owed to troop`, color: '#EF6C00' }
   ];
   if (troopTotals.proceedsDeduction > 0) {
     financialStats.push({
       label: 'First-50 Deduction',
       value: `-$${Math.round(troopTotals.proceedsDeduction)}`,
-      description: `${troopTotals.proceedsExemptPackages} pkg × $0.90`,
+      description: `${troopTotals.proceedsExemptPackages} pkg × $${troopTotals.proceedsRate.toFixed(2)}`,
       color: '#f44336'
     });
   }
@@ -58,7 +62,7 @@ function generateTroopSummaryReport(reconciler: IDataReconciler): string {
     label: 'Troop Proceeds',
     value: `$${Math.round(troopTotals.troopProceeds)}`,
     description: 'After first-50 deduction',
-    color: '#4CAF50'
+    color: '#2E7D32'
   });
   html += sectionHeader('Finances');
   html += createHorizontalStats(financialStats);

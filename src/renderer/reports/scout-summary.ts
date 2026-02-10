@@ -17,7 +17,7 @@ import {
 function buildInventoryCell(netInventory: number, negativeVarieties: any[] | undefined, actualNet: number): string {
   if (negativeVarieties && negativeVarieties.length > 0) {
     const varietyList = negativeVarieties
-      .map((v: { variety: string; count: number }) => `${getCookieDisplayName(v.variety)}: ${v.count}`)
+      .map((v: { variety: string; shortfall: number }) => `${getCookieDisplayName(v.variety)}: -${v.shortfall}`)
       .join('\n');
     const display = netInventory > 0 ? `+${netInventory}` : actualNet;
     return `<span class="tooltip-cell" data-tooltip="${escapeHtml(varietyList)}" style="color: #f44336; font-weight: 600;">${display} ⚠️</span>`;

@@ -2,7 +2,7 @@
 // Calculates troop-level aggregate totals and inventory
 
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
-import { PROCEEDS_EXEMPT_PACKAGES, TROOP_PROCEEDS_PER_PACKAGE } from '../../cookie-constants';
+import { PROCEEDS_EXEMPT_PACKAGES, getTroopProceedsRate } from '../../cookie-constants';
 import type { IDataReconciler, Scout, SiteOrdersDataset, TroopTotals } from '../../types';
 import { calculatePackageTotals } from './package-totals';
 import { calculateScoutCounts } from './scout-calculations';
@@ -69,17 +69,23 @@ export function buildTroopTotals(reconciler: IDataReconciler, scouts: Map<string
   // Total donations = DC non-site (individual girl orders) + credited allocations (site orders distributed to scouts)
   const donations = countDCDonations(rawDCData) + scoutAgg.creditedDonations;
 
-  // Troop proceeds: $0.90/pkg for all packages troop is responsible for, minus per-girl exemptions
-  const grossProceeds = (packageTotals.ordered + donations + scoutAgg.directShip) * TROOP_PROCEEDS_PER_PACKAGE;
-  const troopProceeds = grossProceeds - scoutAgg.proceedsDeduction;
+  // Troop proceeds: rate depends on Per Girl Average (PGA)
+  const packagesCredited = packageTotals.ordered + donations + scoutAgg.directShip;
+  const pga = scoutCounts.active > 0 ? Math.round(packagesCredited / scoutCounts.active) : 0;
+  const proceedsRate = getTroopProceedsRate(pga);
+  const grossProceeds = packagesCredited * proceedsRate;
+  const exemptPackages = scoutCounts.active * PROCEEDS_EXEMPT_PACKAGES;
+  const proceedsDeduction = exemptPackages * proceedsRate;
+  const troopProceeds = grossProceeds - proceedsDeduction;
 
   return {
     orders: rawDCData.length,
     sold: packageTotals.sold,
     revenue: packageTotals.revenue,
     troopProceeds,
-    proceedsDeduction: scoutAgg.proceedsDeduction,
-    proceedsExemptPackages: scoutAgg.exemptPackages,
+    proceedsRate,
+    proceedsDeduction,
+    proceedsExemptPackages: exemptPackages,
     inventory: totalInventory,
     donations,
     ordered: packageTotals.ordered,

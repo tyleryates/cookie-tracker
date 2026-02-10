@@ -1,4 +1,4 @@
-import { COOKIE_TYPE } from '../../cookie-constants';
+import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
 import type { BoothReservationImported, IDataReconciler, Scout } from '../../types';
 import {
   buildVarietyTooltipAttr,
@@ -119,7 +119,7 @@ function generateBoothReport(reconciler: IDataReconciler): string {
     {
       label: 'Booth Donations',
       value: totalBoothDonations,
-      description: COOKIE_TYPE.COOKIE_SHARE,
+      description: getCookieDisplayName(COOKIE_TYPE.COOKIE_SHARE),
       color: totalBoothDonations > 0 ? '#7B1FA2' : '#999'
     }
   ];

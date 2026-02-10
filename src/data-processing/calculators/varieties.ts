@@ -1,15 +1,25 @@
 // Varieties Calculations
 // Aggregates cookie variety counts and calculates troop inventory by variety
 
-import { SALE_CATEGORIES, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
+import { ORDER_TYPE, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
-import type { IDataReconciler, Transfer, Varieties, VarietiesResult } from '../../types';
+import type { IDataReconciler, Scout, Transfer, Varieties, VarietiesResult } from '../../types';
+
+/** Add physical varieties (excluding Cookie Share) to accumulator */
+function addVarieties(source: Varieties, target: Varieties): void {
+  Object.entries(source).forEach(([variety, count]) => {
+    if (variety === COOKIE_TYPE.COOKIE_SHARE) return;
+    if (typeof count === 'number' && count > 0) {
+      target[variety as keyof Varieties] = (target[variety as keyof Varieties] || 0) + count;
+    }
+  });
+}
 
 /**
- * Build aggregate variety counts across all transfers
+ * Build aggregate variety counts from actual customer sales
  *
  * Calculates:
- * 1. Total packages sold by variety (byCookie) - from SC transfers (source of truth)
+ * 1. Total packages sold by variety (byCookie) - from scout orders + credited allocations
  * 2. Net troop inventory by variety (inventory) - from SC transfers
  *
  * INVENTORY CALCULATION (variety-level):
@@ -18,23 +28,24 @@ import type { IDataReconciler, Transfer, Varieties, VarietiesResult } from '../.
  * - Subtract ALL T2G varieties (physical + virtual booth + booth divider)
  * - Cookie Share excluded (virtual, never in physical inventory)
  */
-export function buildVarieties(reconciler: IDataReconciler): VarietiesResult {
+export function buildVarieties(reconciler: IDataReconciler, scouts: Map<string, Scout>): VarietiesResult {
   const byCookie: Varieties = {};
   const inventory: Varieties = {};
 
-  // Aggregate varieties from SC transfers that count as sold.
-  // Only actual sale categories are counted. DC_ORDER_RECORD and COOKIE_SHARE_RECORD
-  // are sync records — counting them would double-count with the T2G allocation.
-  reconciler.transfers.forEach((transfer: Transfer) => {
-    if (!SALE_CATEGORIES.has(transfer.category)) return;
-    if (!transfer.packages || transfer.packages <= 0) return;
-
-    Object.entries(transfer.varieties).forEach(([variety, count]) => {
-      if (variety === COOKIE_TYPE.COOKIE_SHARE) return;
-      if (typeof count === 'number' && count > 0) {
-        byCookie[variety as keyof Varieties] = (byCookie[variety as keyof Varieties] || 0) + count;
+  // Aggregate varieties from actual customer sales (scout orders + credited allocations)
+  scouts.forEach((scout) => {
+    // Girl delivery + direct ship orders
+    scout.orders.forEach((order) => {
+      if (order.needsInventory || order.orderType === ORDER_TYPE.DIRECT_SHIP) {
+        addVarieties(order.varieties, byCookie);
       }
     });
+    // Credited allocations (booth sales, virtual booth, direct ship)
+    if (!scout.isSiteOrder) {
+      addVarieties(scout.credited.boothSales.varieties, byCookie);
+      addVarieties(scout.credited.virtualBooth.varieties, byCookie);
+      addVarieties(scout.credited.directShip.varieties, byCookie);
+    }
   });
 
   // Calculate net troop inventory by variety (SC transfer data)
