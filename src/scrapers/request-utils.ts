@@ -72,6 +72,47 @@ function isRateLimited(error: any): boolean {
 }
 
 /**
+ * Handle a failed request attempt: re-authenticate, backoff, or throw.
+ * Throws if unrecoverable; returns normally if the caller should retry.
+ */
+async function handleRequestError(
+  error: any,
+  attempt: number,
+  maxRetries: number,
+  reloginFn: (() => Promise<boolean>) | null,
+  logPrefix: string
+): Promise<void> {
+  const isLastAttempt = attempt === maxRetries - 1;
+
+  if (isSessionExpired(error) && !isLastAttempt && reloginFn) {
+    Logger.warn(`${logPrefix}: Session expired (${error.response?.status || 'auth error'})`);
+    Logger.info(`${logPrefix}: Attempting re-authentication...`);
+    try {
+      await reloginFn();
+      Logger.info(`${logPrefix}: Re-authentication successful, retrying request`);
+      return;
+    } catch (loginError) {
+      throw new Error(`Session expired and re-authentication failed: ${loginError.message}`);
+    }
+  }
+
+  if (isRateLimited(error) && !isLastAttempt) {
+    Logger.warn(`${logPrefix}: Rate limited (429)`);
+    const backoffDelay = getBackoffDelay(attempt) * 2;
+    Logger.info(`${logPrefix}: Backing off for ${backoffDelay}ms`);
+    await sleep(backoffDelay);
+    return;
+  }
+
+  if (isLastAttempt) {
+    Logger.error(`${logPrefix}: Failed after ${maxRetries} attempts:`, error);
+    throw error;
+  }
+
+  Logger.warn(`${logPrefix}: Request failed (attempt ${attempt + 1}/${maxRetries}):`, error.message);
+}
+
+/**
  * Execute request with automatic retry on session expiry
  */
 async function requestWithRetry(
@@ -84,64 +125,19 @@ async function requestWithRetry(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      // Add rate limiting delay before request (except first attempt)
       if (attempt > 0) {
         const delay = getBackoffDelay(attempt - 1);
         Logger.debug(`${logPrefix}: Retrying after ${delay}ms (attempt ${attempt + 1}/${maxRetries})`);
         await sleep(delay);
       } else if (options.rateLimit !== false) {
-        // Apply standard rate limit on first attempt
         await rateLimit();
       }
 
-      // Execute the request
       const result = await requestFn();
-
-      // Success - return result
-      if (attempt > 0) {
-        Logger.info(`${logPrefix}: Retry successful on attempt ${attempt + 1}`);
-      }
+      if (attempt > 0) Logger.info(`${logPrefix}: Retry successful on attempt ${attempt + 1}`);
       return result;
     } catch (error) {
-      const isLastAttempt = attempt === maxRetries - 1;
-
-      // Check if session expired
-      if (isSessionExpired(error)) {
-        Logger.warn(`${logPrefix}: Session expired (${error.response?.status || 'auth error'})`);
-
-        if (!isLastAttempt && reloginFn) {
-          Logger.info(`${logPrefix}: Attempting re-authentication...`);
-          try {
-            await reloginFn();
-            Logger.info(`${logPrefix}: Re-authentication successful, retrying request`);
-            continue; // Retry after re-login
-          } catch (loginError) {
-            Logger.error(`${logPrefix}: Re-authentication failed:`, loginError);
-            throw new Error(`Session expired and re-authentication failed: ${loginError.message}`);
-          }
-        }
-      }
-
-      // Check if rate limited
-      if (isRateLimited(error)) {
-        Logger.warn(`${logPrefix}: Rate limited (429)`);
-
-        if (!isLastAttempt) {
-          const backoffDelay = getBackoffDelay(attempt) * 2; // Extra delay for rate limiting
-          Logger.info(`${logPrefix}: Backing off for ${backoffDelay}ms`);
-          await sleep(backoffDelay);
-          continue; // Retry after backoff
-        }
-      }
-
-      // If last attempt or unrecoverable error, throw
-      if (isLastAttempt) {
-        Logger.error(`${logPrefix}: Failed after ${maxRetries} attempts:`, error);
-        throw error;
-      }
-
-      // For other errors, retry with exponential backoff
-      Logger.warn(`${logPrefix}: Request failed (attempt ${attempt + 1}/${maxRetries}):`, error.message);
+      await handleRequestError(error, attempt, maxRetries, reloginFn, logPrefix);
     }
   }
 

@@ -5,7 +5,7 @@ import { DATA_SOURCES, TRANSFER_CATEGORY, type TransferCategory } from './consta
 import { COOKIE_TYPE } from './cookie-constants';
 import { buildUnifiedDataset } from './data-processing/data-calculators';
 import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './data-processing/data-importers';
-import { isIncomingInventory } from './data-processing/utils';
+import { isIncomingInventory, sumPhysicalPackages } from './data-processing/utils';
 import Logger from './logger';
 import type {
   BoothLocation,
@@ -143,9 +143,7 @@ class DataReconciler implements IDataReconciler {
     );
 
     // Physical packages = sum of non-Cookie-Share varieties (positive sum, not subtraction)
-    const physicalPackages = Object.entries(data.varieties || {})
-      .filter(([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE)
-      .reduce((sum, [, count]) => sum + (typeof count === 'number' ? count : 0), 0);
+    const physicalPackages = sumPhysicalPackages(data.varieties);
 
     // Physical varieties (excluding Cookie Share)
     const physicalVarieties: Varieties = {};

@@ -88,6 +88,20 @@ export interface Order {
 // ============================================================================
 
 /**
+ * Transfer data structure (Smart Cookie records from /orders/search API)
+ *
+ * Stored in reconciler.transfers[]. Includes both actual inventory transfers
+ * (C2T, T2G, G2T) and order/sales records (D, COOKIE_SHARE, DIRECT_SHIP) that
+ * the SC API returns through the same endpoint. The `category` field distinguishes
+ * these — see TRANSFER_CATEGORY and its category groups in constants.ts.
+ *
+ * Separate from reconciler.orders (Order type), which holds customer-facing sale
+ * data enriched from DC + SC Report with payment info, ship status, etc.
+ * Some records exist in both collections (e.g., D-prefixed SC records also
+ * create/enrich an Order).
+ */
+
+/**
  * Actions available on a Smart Cookie transfer
  */
 export interface TransferActions {

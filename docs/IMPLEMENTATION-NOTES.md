@@ -1,6 +1,6 @@
 # Implementation Notes
 
-Technical implementation details and patterns for the Cookie Tracker application (v1.3.0).
+Technical implementation details and patterns for the Cookie Tracker application.
 
 ---
 
@@ -27,12 +27,27 @@ src/
 │       ├── scout-summary.ts     # Scout-level detail
 │       ├── donation-alert.ts    # Cookie Share reconciliation
 │       ├── booth.ts             # Booth reservations & allocations
+│       ├── available-booths.ts  # Upcoming booth availability
 │       ├── inventory.ts         # Inventory tracking
 │       └── variety.ts           # Cookie popularity breakdown
 ├── data-processing/
-│   ├── utils.ts                 # Shared utility functions
+│   ├── utils.ts                 # Shared helpers (sumPhysicalPackages, isC2TTransfer, etc.)
 │   ├── data-importers.ts        # Import & parsing functions
-│   └── data-calculators.ts      # Calculation & aggregation
+│   ├── data-calculators.ts      # Orchestrator: calls calculators/ in order
+│   └── calculators/             # Individual calculation modules
+│       ├── index.ts             # Re-exports buildScoutDataset, buildUnifiedDataset
+│       ├── scout-initialization.ts  # Phase 1: Create scout objects from all sources
+│       ├── order-processing.ts      # Phase 2: Classify & add DC orders to scouts
+│       ├── allocation-processing.ts # Phase 3-4: T2G inventory + divider allocations
+│       ├── scout-calculations.ts    # Phase 5: Compute totals & derived fields
+│       ├── helpers.ts               # Shared: variety merging, scout lookup
+│       ├── package-totals.ts        # Transfer-level totals by category
+│       ├── troop-totals.ts          # Troop-level aggregates
+│       ├── varieties.ts             # Per-variety sold/inventory totals
+│       ├── transfer-breakdowns.ts   # Classified transfer lists (c2t, t2g, sold)
+│       ├── cookie-share-tracking.ts # DC vs SC Cookie Share reconciliation
+│       ├── site-orders.ts           # Site order allocation tracking
+│       └── metadata.ts             # Health checks & warnings
 └── scrapers/
     ├── index.ts                 # Scraper orchestration
     ├── digital-cookie.ts        # Digital Cookie API client
@@ -43,14 +58,15 @@ src/
 ### Module Boundaries
 
 - **renderer.ts** coordinates data loading and report generation; **ui-controller.ts** handles UI interactions; **html-builder.ts** provides HTML utilities; **reports/** contains focused report generators.
-- **data-reconciler.ts** orchestrates data flow; **data-importers.ts** handles parsing; **data-calculators.ts** handles aggregation; **utils.ts** provides shared helpers.
+- **data-reconciler.ts** manages state and transfer creation (including `classifyTransferCategory()`); **data-importers.ts** handles parsing; **data-calculators.ts** orchestrates the calculator modules; **calculators/** contains individual computation modules for each aspect of the unified dataset.
 - Modules have clear boundaries with no circular dependencies.
 
 ### Extensibility
 
-- New reports: add a file to `renderer/reports/`
+- New reports: add a file to `renderer/reports/`, wire up in `renderer.ts`
 - New data sources: add an importer to `data-processing/data-importers.ts`
-- New calculations: add a function to `data-processing/data-calculators.ts`
+- New calculations: add a module to `data-processing/calculators/`, call from `data-calculators.ts`
+- New transfer categories: add to `TRANSFER_CATEGORY` in `constants.ts`, update relevant group sets, update `classifyTransferCategory()` in `data-reconciler.ts`
 
 ---
 
@@ -64,7 +80,8 @@ All string constants are defined in `constants.ts` using `as const` objects. Typ
 
 Defined in `types.ts`:
 - **Order** — Normalized order from any source, with metadata preserving raw data per source
-- **Transfer** — SC transfer record with explicit `category` field (from `TRANSFER_CATEGORY`)
+- **Transfer** — SC transfer record with explicit `category` field (from `TRANSFER_CATEGORY`). Stored in `reconciler.transfers[]`. Note: this collection holds both actual inventory transfers (C2T, T2G, G2T) and order/sales records (D, COOKIE_SHARE, DIRECT_SHIP) because the SC API returns all record types through the same `/orders/search` endpoint. The `category` field distinguishes them.
+- **TransferInput** — Input type for `createTransfer()`. Extends `Partial<Transfer>` with raw API classification flags (`virtualBooth`, `boothDivider`, `directShipDivider`) that are used by `classifyTransferCategory()` to determine the transfer's category but are NOT stored on the final Transfer object.
 - **Scout** — Per-scout aggregate with orders, inventory, credited allocations, totals, and $ fields
 - **OrderMetadata** — Four source-specific raw data slots (`dc`, `sc`, `scReport`, `scApi`)
 - **TransferActions** — SC transfer action flags (`submittable`, `approvable`, `saveable`)
@@ -89,7 +106,8 @@ Pre-calculated and derived fields use a `$` prefix to distinguish them from raw 
 All "magic numbers" and string literals are centralized in `constants.ts`:
 
 - `PACKAGES_PER_CASE` (12), `DEFAULT_COUNCIL_ID` ('623'), Excel epoch/ms-per-day for date conversion
-- `OWNER`, `ORDER_TYPE`, `PAYMENT_METHOD`, `TRANSFER_TYPE`, `ALLOCATION_METHOD` — Classification dimensions
+- `OWNER`, `ORDER_TYPE`, `PAYMENT_METHOD`, `TRANSFER_TYPE`, `TRANSFER_CATEGORY`, `ALLOCATION_METHOD` — Classification dimensions
+- `SALE_CATEGORIES`, `T2G_CATEGORIES`, `TROOP_INVENTORY_IN_CATEGORIES`, `SCOUT_PHYSICAL_CATEGORIES` — Central category group sets (see below)
 - `DC_COLUMNS`, `SC_REPORT_COLUMNS`, `SC_API_COLUMNS` — Field name constants for imported data
 - `DISPLAY_STRINGS` — UI tooltip/label strings keyed by allocation method
 - `HTTP_STATUS`, `UI_TIMING` — HTTP codes and animation durations
@@ -117,6 +135,10 @@ All orders from all sources are normalized into a common shape with fields for o
 ### Transfer Object
 
 SC transfer records stored separately from orders. Key fields: type (from `transfer_type`), category (from `TRANSFER_CATEGORY`), order number, from/to, packages (absolute value), physicalPackages (sum of non-Cookie-Share varieties), physicalVarieties, and amount. The `category` field is assigned at creation time by `classifyTransferCategory()` based on the raw type string and API flags — reports dispatch on category instead of boolean flags.
+
+### Troop Totals — `packagesSoldFromStock`
+
+`troopTotals.packagesSoldFromStock` is computed directly from component T2G totals: `allocated + virtualBoothT2G + boothDividerT2G - g2t`. This avoids the anti-pattern of computing a displayed value from other derived values (e.g., `ordered - inventory`). The G2T subtraction is acceptable because returns are a fundamentally different flow, not an edge case being stripped.
 
 ### Scout Aggregate
 
@@ -160,7 +182,7 @@ Orders are deduplicated by order number (normalized: strip prefixes, convert to 
 
 `buildUnifiedDataset()` returns:
 - **scouts** — Complete scout data with all calculated fields
-- **troopTotals** — Troop-level aggregates (sold, revenue, inventory, proceeds)
+- **troopTotals** — Troop-level aggregates (sold, revenue, inventory, proceeds, `packagesSoldFromStock`)
 - **transferBreakdowns** — Pre-classified transfer lists (c2t, t2g, sold)
 - **varieties** — Per-variety totals and inventory
 - **cookieShare** — DC vs SC Cookie Share tracking
@@ -226,17 +248,38 @@ HTML generation uses the array join pattern for concatenation. Variety breakdown
 
 ## Common Patterns
 
+### Transfer Classification (`classifyTransferCategory`)
+
+Every transfer is assigned exactly one `TRANSFER_CATEGORY` at creation time in `data-reconciler.ts`. The function `classifyTransferCategory(type, virtualBooth, boothDivider, directShipDivider)` maps the raw SC API `transfer_type` string plus boolean flags to a category. The boolean flags come from the raw API data (via `TransferInput`) but are NOT stored on the final `Transfer` — only the resolved `category` is kept.
+
+Reports dispatch on `transfer.category` (switch/if) or use the central category group sets (see below) instead of re-deriving from raw fields.
+
+### Category Group Sets
+
+Central `ReadonlySet<TransferCategory>` constants in `constants.ts` that group related categories. Use these instead of repeating category lists across reports — when a new category is added, update the relevant set once.
+
+| Set | Categories | Purpose |
+|-----|-----------|---------|
+| `SALE_CATEGORIES` | GIRL_PICKUP, VIRTUAL_BOOTH_ALLOCATION, BOOTH_SALES_ALLOCATION, DIRECT_SHIP_ALLOCATION, DIRECT_SHIP | Transfers that count as "sold" (contribute to total sold / revenue) |
+| `T2G_CATEGORIES` | GIRL_PICKUP, VIRTUAL_BOOTH_ALLOCATION, BOOTH_SALES_ALLOCATION, DIRECT_SHIP_ALLOCATION | All T2G sub-types (troop inventory out to scout) |
+| `TROOP_INVENTORY_IN_CATEGORIES` | COUNCIL_TO_TROOP, GIRL_RETURN | Transfers that add to troop stock |
+| `SCOUT_PHYSICAL_CATEGORIES` | GIRL_PICKUP, GIRL_RETURN | Transfers where physical cookies change hands at scout level |
+
 ### Transfer Type Matching
 
 C2T types have suffix variants. Always use `isC2TTransfer()` from `utils.ts` or startsWith check. Never exact equality.
 
 ### Sold Package Counting
 
-Include all transfer types except C2T and PLANNED. T2G is the primary sales mechanism. D, DIRECT_SHIP, COOKIE_SHARE are additional sold types.
+Use `SALE_CATEGORIES.has(transfer.category)` to check if a transfer counts as sold. This includes T2G physical + virtual + booth + direct ship allocations, plus standalone direct ship orders. Excludes: C2T (incoming inventory), G2T (returns), D/COOKIE_SHARE records (sync records, not sales), and PLANNED (future orders).
+
+### Physical Package Counting
+
+Use `sumPhysicalPackages(varieties)` from `data-processing/utils.ts` to count non-Cookie-Share packages. This replaces the old subtraction pattern (`packages - cookieShare`) with a positive sum of all non-virtual varieties.
 
 ### Physical Inventory
 
-Use `transfer.category` (from `TRANSFER_CATEGORY`) for dispatch. Physical inventory is affected by `GIRL_PICKUP` (adds to scout) and `GIRL_RETURN` (subtracts from scout). Other T2G categories (VIRTUAL_BOOTH_ALLOCATION, BOOTH_SALES_ALLOCATION, DIRECT_SHIP_ALLOCATION) are credits, not physical movements.
+Use `transfer.category` (from `TRANSFER_CATEGORY`) for dispatch. Physical inventory is affected by `GIRL_PICKUP` (adds to scout) and `GIRL_RETURN` (subtracts from scout). Use `SCOUT_PHYSICAL_CATEGORIES.has()` for this check. Other T2G categories (VIRTUAL_BOOTH_ALLOCATION, BOOTH_SALES_ALLOCATION, DIRECT_SHIP_ALLOCATION) are credits, not physical movements.
 
 ### Auto-Sync Detection
 

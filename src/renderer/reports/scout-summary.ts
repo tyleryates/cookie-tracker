@@ -57,68 +57,63 @@ function getStatusStyle(status: string | undefined): { style: string; text: stri
   return { style: '', text };
 }
 
-// Build credited cell with tooltip
+// Build tooltip lines for a single allocation source
+function buildVirtualBoothTooltipLines(credited: ScoutCredited): string[] {
+  const pkg = credited.virtualBooth.packages || 0;
+  if (pkg === 0) return [];
+  const lines = [`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${pkg}`];
+  credited.virtualBooth.allocations.forEach((a) => {
+    const order = a.orderNumber ? `#${a.orderNumber}` : 'Unknown';
+    const date = a.date ? ` (${a.date})` : '';
+    lines.push(`  ${order}${date}: ${a.packages} pkg`);
+  });
+  return lines;
+}
+
+function buildDirectShipTooltipLines(credited: ScoutCredited): string[] {
+  const pkg = credited.directShip.packages || 0;
+  if (pkg === 0) return [];
+  const lines = [`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${pkg}`];
+  const n = credited.directShip.allocations.length;
+  if (n > 0) lines.push(`  (${n} allocation${n === 1 ? '' : 's'} from SC divider)`);
+  return lines;
+}
+
+function buildBoothSalesTooltipLines(credited: ScoutCredited): string[] {
+  const pkg = credited.boothSales.packages || 0;
+  const don = credited.boothSales.donations || 0;
+  if (pkg + don === 0) return [];
+  const lines = [`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${pkg + don}`];
+  credited.boothSales.allocations.forEach((a) => {
+    const store = a.storeName || 'Booth';
+    const date = a.date ? ` (${a.date})` : '';
+    const parts = [`${a.packages} pkg`];
+    if (a.donations > 0) parts.push(`${a.donations} Donations`);
+    lines.push(`  ${store}${date}: ${parts.join(', ')}`);
+  });
+  return lines;
+}
+
 function buildCreditedCell(isSiteRow: boolean, credited: ScoutCredited, siteOrders: SiteOrdersDataset): string {
-  const creditedVirtualBoothPackages = credited.virtualBooth.packages || 0;
-  const creditedDirectShipPackages = credited.directShip.packages || 0;
-  const creditedBoothSalesPackages = credited.boothSales.packages || 0;
-  const creditedBoothSalesDonations = credited.boothSales.donations || 0;
   const totalCredited =
-    creditedVirtualBoothPackages + creditedDirectShipPackages + creditedBoothSalesPackages + creditedBoothSalesDonations;
+    (credited.virtualBooth.packages || 0) + (credited.directShip.packages || 0) +
+    (credited.boothSales.packages || 0) + (credited.boothSales.donations || 0);
+  if (totalCredited === 0) return '—';
 
-  if (totalCredited === 0) {
-    return '—';
-  }
+  const sources = [
+    ...buildVirtualBoothTooltipLines(credited),
+    ...buildDirectShipTooltipLines(credited),
+    ...buildBoothSalesTooltipLines(credited)
+  ];
 
-  // Build tooltip breakdown
-  const sources: string[] = [];
-  if (creditedVirtualBoothPackages > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${creditedVirtualBoothPackages}`);
-    // Show individual virtual booth allocations with order numbers
-    if (credited.virtualBooth.allocations.length > 0) {
-      credited.virtualBooth.allocations.forEach((a) => {
-        const orderPart = a.orderNumber ? `#${a.orderNumber}` : 'Unknown';
-        const datePart = a.date ? ` (${a.date})` : '';
-        sources.push(`  ${orderPart}${datePart}: ${a.packages} pkg`);
-      });
-    }
-  }
-  if (creditedDirectShipPackages > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${creditedDirectShipPackages}`);
-    // Direct ship allocations lack per-order detail from API
-    if (credited.directShip.allocations.length > 0) {
-      sources.push(
-        `  (${credited.directShip.allocations.length} allocation${credited.directShip.allocations.length === 1 ? '' : 's'} from SC divider)`
-      );
-    }
-  }
-  const totalBoothCredited = creditedBoothSalesPackages + creditedBoothSalesDonations;
-  if (totalBoothCredited > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${totalBoothCredited}`);
-    // Show per-booth allocations
-    if (credited.boothSales.allocations.length > 0) {
-      credited.boothSales.allocations.forEach((a) => {
-        const storePart = a.storeName || 'Booth';
-        const datePart = a.date ? ` (${a.date})` : '';
-        const parts = [`${a.packages} pkg`];
-        if (a.donations > 0) parts.push(`${a.donations} Donations`);
-        sources.push(`  ${storePart}${datePart}: ${parts.join(', ')}`);
-      });
-    }
-  }
-
-  // If this is the Site row (troop-level orders), add context to tooltip about site orders
   if (isSiteRow && siteOrders) {
     const hasSiteOrders = (siteOrders.directShip?.orders?.length || 0) > 0 || (siteOrders.girlDelivery?.orders?.length || 0) > 0;
     if (hasSiteOrders) {
-      sources.push(
-        `\nNote: Troop booth sales and direct ship orders are allocated to scouts in Smart Cookie. See site orders in scout details.`
-      );
+      sources.push(`\nNote: Troop booth sales and direct ship orders are allocated to scouts in Smart Cookie. See site orders in scout details.`);
     }
   }
 
-  const tooltipText = sources.join('\n');
-  return `<span class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}">${totalCredited}</span>`;
+  return `<span class="tooltip-cell" data-tooltip="${escapeHtml(sources.join('\n'))}">${totalCredited}</span>`;
 }
 
 // Calculate variety breakdowns from scout orders (simple inline calculation)
@@ -158,6 +153,30 @@ function calculateVarietyBreakdowns(scout: Scout): {
   return { salesVarieties, shippedVarieties, totalDonations };
 }
 
+function formatNetInventory(net: number, isCookieShare: boolean): { html: string; className: string } {
+  const naSpan = '<span style="color: #999;">N/A</span>';
+  if (isCookieShare) return { html: naSpan, className: '' };
+  if (net < 0) return { html: `<span style="color: #f44336; font-weight: 600;">${net} ⚠️</span>`, className: '' };
+  if (net > 0) return { html: `+${net}`, className: 'success-text' };
+  return { html: '—', className: '' };
+}
+
+function formatCreditedVariety(variety: string, credited: ScoutCredited): string {
+  const vb = credited.virtualBooth.varieties[variety] || 0;
+  const ds = credited.directShip.varieties[variety] || 0;
+  const bs = credited.boothSales.varieties[variety] || 0;
+  const total = vb + ds + bs;
+  if (total === 0) return '—';
+
+  const sources = [];
+  if (vb > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vb}`);
+  if (ds > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${ds}`);
+  if (bs > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bs}`);
+  return sources.length > 0
+    ? `<span class="tooltip-cell" data-tooltip="${escapeHtml(sources.join('\n'))}">${total}</span>`
+    : `${total}`;
+}
+
 function buildVarietyRow(
   variety: string,
   inventory: Scout['inventory'],
@@ -167,47 +186,17 @@ function buildVarietyRow(
 ): string {
   const pickedUp = inventory.varieties[variety] || 0;
   const sold = salesVarieties[variety] || 0;
-  const creditedVirtualBooth = credited.virtualBooth.varieties[variety] || 0;
-  const creditedDirectShip = credited.directShip.varieties[variety] || 0;
-  const creditedBoothSales = credited.boothSales.varieties[variety] || 0;
-  const creditedTotal = creditedVirtualBooth + creditedDirectShip + creditedBoothSales;
   const shipped = shippedVarieties[variety] || 0;
-  const net = pickedUp - sold;
   const isCookieShare = variety === COOKIE_TYPE.COOKIE_SHARE;
-  const naSpan = '<span style="color: #999;">N/A</span>';
+  const { html: netHtml, className: netClass } = formatNetInventory(pickedUp - sold, isCookieShare);
 
-  let netDisplay: string;
-  let netClass = '';
-  if (isCookieShare) {
-    netDisplay = naSpan;
-  } else if (net < 0) {
-    netDisplay = `<span style="color: #f44336; font-weight: 600;">${net} ⚠️</span>`;
-  } else if (net > 0) {
-    netClass = 'success-text';
-    netDisplay = `+${net}`;
-  } else {
-    netDisplay = '—';
-  }
-
-  let creditedDisplay: string | number = creditedTotal > 0 ? creditedTotal : '—';
-  if (creditedTotal > 0) {
-    const sources = [];
-    if (creditedVirtualBooth > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${creditedVirtualBooth}`);
-    if (creditedDirectShip > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${creditedDirectShip}`);
-    if (creditedBoothSales > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${creditedBoothSales}`);
-    if (sources.length > 0) {
-      creditedDisplay = `<span class="tooltip-cell" data-tooltip="${escapeHtml(sources.join('\n'))}">${creditedTotal}</span>`;
-    }
-  }
-
-  let html = `<tr>`;
-  html += `<td><strong>${escapeHtml(getCookieDisplayName(variety))}</strong></td>`;
-  html += `<td class="${isCookieShare ? '' : netClass}">${isCookieShare ? naSpan : netDisplay}</td>`;
-  html += `<td>${sold}</td>`;
-  html += `<td>${shipped > 0 ? shipped : '—'}</td>`;
-  html += `<td>${creditedDisplay}</td>`;
-  html += `</tr>`;
-  return html;
+  return `<tr>`
+    + `<td><strong>${escapeHtml(getCookieDisplayName(variety))}</strong></td>`
+    + `<td class="${netClass}">${netHtml}</td>`
+    + `<td>${sold}</td>`
+    + `<td>${shipped > 0 ? shipped : '—'}</td>`
+    + `<td>${formatCreditedVariety(variety, credited)}</td>`
+    + `</tr>`;
 }
 
 // Build cookie breakdown table showing varieties, sales, inventory, and credited amounts
@@ -249,88 +238,68 @@ function buildCookieBreakdownTable(scout: Scout): string {
   return html;
 }
 
-// Build allocation details table showing individual allocation records
+function buildVirtualBoothAllocationsHtml(credited: ScoutCredited): string {
+  const allocations = credited.virtualBooth.allocations || [];
+  if (allocations.length === 0) return '';
+
+  let html = `<div style="margin-top: 12px;">`;
+  html += `<h6 style="margin: 0 0 8px 0; color: #666;">${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]} (${credited.virtualBooth.packages} pkg)</h6>`;
+  html += startTable('table-compact');
+  html += createTableHeader(['Order #', 'Date', 'From', 'Packages', 'Amount']);
+  allocations.forEach((a) => {
+    html += `<tr><td>${escapeHtml(String(a.orderNumber || '-'))}</td><td>${escapeHtml(formatDate(a.date))}</td>`
+      + `<td>${escapeHtml(String(a.from || '-'))}</td><td class="tooltip-cell"${buildVarietyTooltipAttr(a.varieties)}>${a.packages}</td>`
+      + `<td>$${Math.round(a.amount || 0)}</td></tr>`;
+  });
+  return html + endTable() + '</div>';
+}
+
+function buildDirectShipAllocationsHtml(credited: ScoutCredited): string {
+  const allocations = credited.directShip.allocations || [];
+  if (allocations.length === 0) return '';
+
+  let html = `<div style="margin-top: 12px;">`;
+  html += `<h6 style="margin: 0 0 8px 0; color: #666;">${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]} (${credited.directShip.packages} pkg)</h6>`;
+  html += startTable('table-compact');
+  html += createTableHeader(['Source', 'Packages']);
+  allocations.forEach((a) => {
+    html += `<tr><td>SC Direct Ship Divider</td><td class="tooltip-cell"${buildVarietyTooltipAttr(a.varieties)}>${a.packages}</td></tr>`;
+  });
+  html += endTable();
+  html += `<p style="font-size: 0.85em; color: #999; margin-top: 4px;">Note: The Smart Cookie Direct Ship Divider API does not provide per-order breakdowns.</p>`;
+  return html + '</div>';
+}
+
+function buildBoothSalesAllocationsHtml(credited: ScoutCredited): string {
+  const allocations = credited.boothSales.allocations || [];
+  if (allocations.length === 0) return '';
+
+  const pkg = credited.boothSales.packages || 0;
+  const don = credited.boothSales.donations || 0;
+  const label = don > 0 ? `${pkg} pkg, ${don} Donations` : `${pkg + don} pkg`;
+
+  let html = `<div style="margin-top: 12px;">`;
+  html += `<h6 style="margin: 0 0 8px 0; color: #666;">${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]} (${label})</h6>`;
+  html += startTable('table-compact');
+  html += createTableHeader(['Store', 'Date', 'Time', 'Packages', 'Donations']);
+  allocations.forEach((a) => {
+    const time = a.startTime && a.endTime ? `${a.startTime} - ${a.endTime}` : a.startTime || '-';
+    html += `<tr><td>${escapeHtml(String(a.storeName || '-'))}</td><td>${escapeHtml(formatDate(a.date))}</td>`
+      + `<td>${escapeHtml(time)}</td><td class="tooltip-cell"${buildVarietyTooltipAttr(a.varieties)}>${a.packages}</td>`
+      + `<td>${a.donations || '\u2014'}</td></tr>`;
+  });
+  return html + endTable() + '</div>';
+}
+
 function buildAllocationDetailsTable(credited: ScoutCredited): string {
-  const virtualBoothAllocations = credited.virtualBooth.allocations || [];
-  const directShipAllocations = credited.directShip.allocations || [];
-  const boothSalesAllocations = credited.boothSales.allocations || [];
+  const sections = [
+    buildVirtualBoothAllocationsHtml(credited),
+    buildDirectShipAllocationsHtml(credited),
+    buildBoothSalesAllocationsHtml(credited)
+  ].filter(Boolean);
 
-  if (virtualBoothAllocations.length === 0 && directShipAllocations.length === 0 && boothSalesAllocations.length === 0) {
-    return '';
-  }
-
-  let html = '<div style="margin-top: 24px;">';
-  html += '<h5>Allocation Details</h5>';
-
-  // Virtual Booth allocations (have order-level traceability)
-  if (virtualBoothAllocations.length > 0) {
-    html += `<div style="margin-top: 12px;">`;
-    html += `<h6 style="margin: 0 0 8px 0; color: #666;">${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]} (${credited.virtualBooth.packages} pkg)</h6>`;
-    html += startTable('table-compact');
-    html += createTableHeader(['Order #', 'Date', 'From', 'Packages', 'Amount']);
-
-    virtualBoothAllocations.forEach((a) => {
-      html += '<tr>';
-      html += `<td>${escapeHtml(String(a.orderNumber || '-'))}</td>`;
-      html += `<td>${escapeHtml(formatDate(a.date))}</td>`;
-      html += `<td>${escapeHtml(String(a.from || '-'))}</td>`;
-      html += `<td class="tooltip-cell"${buildVarietyTooltipAttr(a.varieties)}>${a.packages}</td>`;
-      html += `<td>$${Math.round(a.amount || 0)}</td>`;
-      html += '</tr>';
-    });
-
-    html += endTable();
-    html += '</div>';
-  }
-
-  // Direct Ship allocations (aggregate only — no order-level detail from API)
-  if (directShipAllocations.length > 0) {
-    html += `<div style="margin-top: 12px;">`;
-    html += `<h6 style="margin: 0 0 8px 0; color: #666;">${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]} (${credited.directShip.packages} pkg)</h6>`;
-    html += startTable('table-compact');
-    html += createTableHeader(['Source', 'Packages']);
-
-    directShipAllocations.forEach((a) => {
-      html += '<tr>';
-      html += `<td>SC Direct Ship Divider</td>`;
-      html += `<td class="tooltip-cell"${buildVarietyTooltipAttr(a.varieties)}>${a.packages}</td>`;
-      html += '</tr>';
-    });
-
-    html += endTable();
-    html += `<p style="font-size: 0.85em; color: #999; margin-top: 4px;">Note: The Smart Cookie Direct Ship Divider API does not provide per-order breakdowns.</p>`;
-    html += '</div>';
-  }
-
-  // Booth Sales allocations (per-reservation detail from Smart Booth Divider API)
-  if (boothSalesAllocations.length > 0) {
-    const boothTotal = (credited.boothSales.packages || 0) + (credited.boothSales.donations || 0);
-    const boothLabel =
-      credited.boothSales.donations > 0
-        ? `${credited.boothSales.packages} pkg, ${credited.boothSales.donations} Donations`
-        : `${boothTotal} pkg`;
-    html += `<div style="margin-top: 12px;">`;
-    html += `<h6 style="margin: 0 0 8px 0; color: #666;">${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]} (${boothLabel})</h6>`;
-    html += startTable('table-compact');
-    html += createTableHeader(['Store', 'Date', 'Time', 'Packages', 'Donations']);
-
-    boothSalesAllocations.forEach((a) => {
-      const timeDisplay = a.startTime && a.endTime ? `${a.startTime} - ${a.endTime}` : a.startTime || '-';
-      html += '<tr>';
-      html += `<td>${escapeHtml(String(a.storeName || '-'))}</td>`;
-      html += `<td>${escapeHtml(formatDate(a.date))}</td>`;
-      html += `<td>${escapeHtml(timeDisplay)}</td>`;
-      html += `<td class="tooltip-cell"${buildVarietyTooltipAttr(a.varieties)}>${a.packages}</td>`;
-      html += `<td>${a.donations || '\u2014'}</td>`;
-      html += '</tr>';
-    });
-
-    html += endTable();
-    html += '</div>';
-  }
-
-  html += '</div>';
-  return html;
+  if (sections.length === 0) return '';
+  return `<div style="margin-top: 24px;"><h5>Allocation Details</h5>${sections.join('')}</div>`;
 }
 
 // Build orders table showing individual order details
@@ -344,15 +313,8 @@ function buildOrdersTable(scout: Scout): string {
   scout.orders.forEach((order: Order) => {
     const tooltipAttr = buildVarietyTooltipAttr(order.varieties);
 
-    // Format payment status for display
-    const paymentDisplay =
-      order.paymentStatus === 'CAPTURED'
-        ? 'Credit Card'
-        : order.paymentStatus === 'AUTHORIZED'
-          ? 'Credit Card'
-          : order.paymentStatus === 'CASH'
-            ? 'Cash'
-            : order.paymentStatus || '-';
+    const PAYMENT_LABELS: Record<string, string> = { CAPTURED: 'Credit Card', AUTHORIZED: 'Credit Card', CASH: 'Cash' };
+    const paymentDisplay = PAYMENT_LABELS[order.paymentStatus] || order.paymentStatus || '-';
 
     const { style: statusStyle, text: statusText } = getStatusStyle(order.status);
 
@@ -437,93 +399,78 @@ function getOrderStatusStyle(scout: Scout): { color: string; icon: string; toolt
   return { color: '', icon: '', tooltip: '' };
 }
 
-function buildScoutRow(name: string, scout: Scout, idx: number, isSiteRow: boolean, siteOrders: SiteOrdersDataset): string {
-  const totals = scout.totals;
-  const _inventory = scout.inventory;
-  const credited = scout.credited;
+function buildDeliveredCell(sales: number, isSiteRow: boolean, scout: Scout, siteOrders: SiteOrdersDataset): string {
+  if (!isSiteRow || !(scout as any).$hasUnallocatedSiteOrders || !siteOrders) {
+    return `<td>${sales}</td>`;
+  }
+  const dsUnalloc = siteOrders.directShip.unallocated || 0;
+  const gdUnalloc = siteOrders.girlDelivery.unallocated || 0;
+  const bsUnalloc = siteOrders.boothSale.unallocated || 0;
+  const parts = [];
+  if (bsUnalloc > 0) parts.push(`Booth Sales: ${bsUnalloc}`);
+  if (gdUnalloc > 0) parts.push(`Troop Girl Delivered: ${gdUnalloc}`);
+  if (dsUnalloc > 0) parts.push(`Troop Direct Ship: ${dsUnalloc}`);
+  parts.push('\nAllocate in Smart Cookie');
+  return `<td><span class="tooltip-cell" data-tooltip="${escapeHtml(parts.join('\n'))}" style="color: #ff9800; font-weight: 600;">${sales} ⚠️</span></td>`;
+}
 
+function buildProceedsCell(isSiteRow: boolean, totals: Scout['totals']): string {
+  if (isSiteRow) return '<td>-</td>';
+  const proceeds = Math.round(totals.$troopProceeds || 0);
+  const deduction = Math.round(totals.$proceedsDeduction || 0);
+  const style = proceeds > 0 ? 'color: #4CAF50; font-weight: 600;' : '';
+  if (deduction > 0) {
+    const tooltip = `First ${PROCEEDS_EXEMPT_PACKAGES} pkg exempt: -$${deduction}\nGross: $${Math.round((totals.totalSold || 0) * 0.9)}`;
+    return `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltip)}" style="${style}">$${proceeds}</td>`;
+  }
+  return `<td style="${style}">${proceeds > 0 ? `$${proceeds}` : '$0'}</td>`;
+}
+
+function buildCashOwedCell(isSiteRow: boolean, totals: Scout['totals']): string {
+  if (isSiteRow) return '<td>-</td>';
+  const financials = totals.$financials;
+  const cashOwed = Math.round(financials?.cashOwed || 0);
+  const style = cashOwed > 0 ? 'color: #C62828; font-weight: 600;' : 'color: #4CAF50;';
+  const inventoryValue = Math.round(financials?.inventoryValue || 0);
+  const electronic = Math.round(financials?.electronicPayments || 0);
+  const salesCash = Math.round(financials?.cashCollected || 0);
+  const unsold = Math.max(0, cashOwed - salesCash);
+  const tooltipParts = [`Pickup value: $${inventoryValue}`];
+  if (electronic > 0) tooltipParts.push(`Digital payments: -$${electronic}`);
+  if (salesCash > 0) tooltipParts.push(`Sales cash: $${salesCash}`);
+  if (unsold > 0) tooltipParts.push(`Unsold inventory: $${unsold}`);
+  return `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltipParts.join('\n'))}" style="${style}">${cashOwed > 0 ? `$${cashOwed}` : '$0'}</td>`;
+}
+
+function buildScoutRow(name: string, scout: Scout, idx: number, isSiteRow: boolean, siteOrders: SiteOrdersDataset): string {
+  const { totals, credited } = scout;
   const sales = totals.sales || 0;
 
   const netInventory = Object.values(totals.$inventoryDisplay || {}).reduce((sum, count) => sum + Math.max(0, count || 0), 0);
-  const actualNetInventory = totals.inventory || 0;
-  const negativeVarieties = scout.$issues?.negativeInventory || [];
-  const inventoryCell = buildInventoryCell(netInventory, negativeVarieties, actualNetInventory);
+  const inventoryCell = buildInventoryCell(netInventory, scout.$issues?.negativeInventory, totals.inventory || 0);
 
   const totalCredited =
-    (credited.virtualBooth.packages || 0) +
-    (credited.directShip.packages || 0) +
-    (credited.boothSales.packages || 0) +
-    (credited.boothSales.donations || 0);
+    (credited.virtualBooth.packages || 0) + (credited.directShip.packages || 0) +
+    (credited.boothSales.packages || 0) + (credited.boothSales.donations || 0);
   const creditedCell = buildCreditedCell(isSiteRow, credited, siteOrders);
-
   const { color: orderColor, icon: orderIcon, tooltip: orderTooltip } = getOrderStatusStyle(scout);
+
+  const totalSold = totals.totalSold || 0;
+  const directSales = sales + (totals.shipped || 0) + (totals.donations || 0);
+  const soldTooltip = [`Direct: ${directSales}`, `Credited: ${totalCredited}`].join('\n');
 
   let html = `<tr class="scout-row" data-scout-index="${idx}">`;
   html += `<td><span class="expand-icon" style="margin-right: 8px;">▶</span><strong>${escapeHtml(name)}</strong></td>`;
   html += `<td class="${orderTooltip ? 'tooltip-cell' : ''}"${orderTooltip}><span style="${orderColor}">${scout.orders.length}${orderIcon}</span></td>`;
   html += `<td>${inventoryCell}</td>`;
-
-  // Delivered cell - show warning for unallocated site orders
-  if (isSiteRow && (scout as any).$hasUnallocatedSiteOrders && siteOrders) {
-    const dsUnalloc = siteOrders.directShip.unallocated || 0;
-    const gdUnalloc = siteOrders.girlDelivery.unallocated || 0;
-    const bsUnalloc = siteOrders.boothSale.unallocated || 0;
-    const parts = [];
-    if (bsUnalloc > 0) parts.push(`Booth Sales: ${bsUnalloc}`);
-    if (gdUnalloc > 0) parts.push(`Troop Girl Delivered: ${gdUnalloc}`);
-    if (dsUnalloc > 0) parts.push(`Troop Direct Ship: ${dsUnalloc}`);
-    parts.push('\nAllocate in Smart Cookie');
-    const tooltip = parts.join('\n');
-    html += `<td><span class="tooltip-cell" data-tooltip="${escapeHtml(tooltip)}" style="color: #ff9800; font-weight: 600;">${sales} ⚠️</span></td>`;
-  } else {
-    html += `<td>${sales}</td>`;
-  }
-
+  html += buildDeliveredCell(sales, isSiteRow, scout, siteOrders);
   html += `<td>${totals.shipped || 0}</td>`;
   html += `<td>${totals.donations || 0}</td>`;
   html += `<td>${creditedCell}</td>`;
-
-  // Build tooltip for Total Sold breakdown (Direct vs Credited)
-  const totalSold = totals.totalSold || 0;
-  const directSales = sales + (totals.shipped || 0) + (totals.donations || 0);
-  const tooltipBreakdown = [`Direct: ${directSales}`, `Credited: ${totalCredited}`].join('\n');
-  html += `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltipBreakdown)}">${totalSold}</td>`;
-
-  // Proceeds (with deduction tooltip)
-  if (isSiteRow) {
-    html += '<td>-</td>';
-  } else {
-    const proceeds = Math.round(totals.$troopProceeds || 0);
-    const deduction = Math.round(totals.$proceedsDeduction || 0);
-    const proceedsStyle = proceeds > 0 ? 'color: #4CAF50; font-weight: 600;' : '';
-    if (deduction > 0) {
-      const tooltipText = `First ${PROCEEDS_EXEMPT_PACKAGES} pkg exempt: -$${deduction}\nGross: $${Math.round(totalSold * 0.9)}`;
-      html += `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}" style="${proceedsStyle}">$${proceeds}</td>`;
-    } else {
-      html += `<td style="${proceedsStyle}">${proceeds > 0 ? `$${proceeds}` : '$0'}</td>`;
-    }
-  }
-
-  // Cash Owed
-  const financials = totals.$financials;
-  const cashOwed = Math.round(financials?.cashOwed || 0);
-  const cashStyle = cashOwed > 0 ? 'color: #C62828; font-weight: 600;' : 'color: #4CAF50;';
-  if (isSiteRow) {
-    html += '<td>-</td>';
-  } else {
-    const inventoryValue = Math.round(financials?.inventoryValue || 0);
-    const electronic = Math.round(financials?.electronicPayments || 0);
-    const salesCash = Math.round(financials?.cashCollected || 0);
-    const unsold = Math.max(0, cashOwed - salesCash);
-    const tooltipParts = [`Pickup value: $${inventoryValue}`];
-    if (electronic > 0) tooltipParts.push(`Digital payments: -$${electronic}`);
-    if (salesCash > 0) tooltipParts.push(`Sales cash: $${salesCash}`);
-    if (unsold > 0) tooltipParts.push(`Unsold inventory: $${unsold}`);
-    const tooltipText = tooltipParts.join('\n');
-    html += `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltipText)}" style="${cashStyle}">${cashOwed > 0 ? `$${cashOwed}` : '$0'}</td>`;
-  }
+  html += `<td class="tooltip-cell" data-tooltip="${escapeHtml(soldTooltip)}">${totalSold}</td>`;
+  html += buildProceedsCell(isSiteRow, totals);
+  html += buildCashOwedCell(isSiteRow, totals);
   html += '</tr>';
-
   return html;
 }
 
@@ -546,9 +493,9 @@ function generateSummaryReport(reconciler: IDataReconciler): string {
 
   const SCOUT_SUMMARY_COLUMN_COUNT = 10;
 
-  let html = '<div class="report-visual"><h3>Scout Summary Report</h3>';
+  let html = '<div class="report-visual"><h3>Scout Summary</h3>';
   html +=
-    '<p class="table-hint">💡 Click on any scout to see detailed breakdown. <strong>Delivered</strong> = packages for in-person delivery. <strong>Inventory</strong> = net on hand. <strong>Credited</strong> = troop booth sales + direct ship allocated to scout. <strong>Shipped</strong> = scout\'s own direct ship orders. <strong>Proceeds</strong> = $0.90/pkg after first 50 exempt. <strong>Cash Owed</strong> = pickup value minus electronic DC payments.</p>';
+    '<p class="table-hint">💡 Click on any scout to see detailed breakdown. <strong>Delivered</strong> = packages for in-person delivery. <strong>Inventory</strong> = net on hand. <strong>Credited</strong> = troop booth sales + direct ship allocated to scout. <strong>Shipped</strong> = scout\'s own direct ship orders. <strong>Proceeds</strong> = $0.90/pkg after first 50 exempt. <strong>Cash Due</strong> = pickup value minus electronic DC payments.</p>';
   html += startTable('table-normal scout-table');
   html += createTableHeader([
     'Scout',
@@ -560,7 +507,7 @@ function generateSummaryReport(reconciler: IDataReconciler): string {
     'Credited',
     'Total Sold',
     'Proceeds',
-    'Cash Owed'
+    'Cash Due'
   ]);
 
   sortedScouts.forEach(([name, scout]: [string, Scout], idx: number) => {

@@ -237,22 +237,33 @@ When a booth divider distributes cookies, SC creates separate records: T2G trans
 
 ## Smart Cookie Transfer Types
 
-| Transfer Type | Direction | Meaning | Counted as "Sold"? |
-|--------------|-----------|---------|-------------------|
-| **C2T** / **C2T(P)** | IN (+) | Troop picks up from council | No (just received) |
-| **T2G** | OUT (−) | Scout picks up from troop | **Yes** |
-| **D** | — | DC order synced to SC | **Yes** |
-| **DIRECT_SHIP** | — | Shipped from supplier | **Yes** |
-| **COOKIE_SHARE** | OUT (−) | Virtual donation | **Yes** |
-| **PLANNED** | — | Future/uncommitted order | No (not yet approved) |
+The SC API returns all record types through `/orders/search`. Each transfer is assigned a `TRANSFER_CATEGORY` at creation time (see `classifyTransferCategory()` in `data-reconciler.ts`). Reports dispatch on `category`, not raw `transfer_type`.
+
+| Transfer Type | Category | Direction | Meaning | Counted as "Sold"? |
+|--------------|----------|-----------|---------|-------------------|
+| **C2T** / **C2T(P)** / **T2T** | `COUNCIL_TO_TROOP` | IN (+) | Troop picks up from council | No (inventory in) |
+| **T2G** (physical pickup) | `GIRL_PICKUP` | OUT (−) | Scout picks up from troop | **Yes** |
+| **T2G** (virtual booth) | `VIRTUAL_BOOTH_ALLOCATION` | OUT (−) | Troop delivery credited to scout | **Yes** |
+| **T2G** (booth divider) | `BOOTH_SALES_ALLOCATION` | OUT (−) | Booth sale credited to scout | **Yes** |
+| **T2G** (direct ship divider) | `DIRECT_SHIP_ALLOCATION` | OUT (−) | Troop direct ship credited to scout | **Yes** |
+| **G2T** | `GIRL_RETURN` | IN (+) | Scout returns to troop | No (inventory return) |
+| **D** | `DC_ORDER_RECORD` | — | DC order synced to SC | No (sync record only) |
+| **COOKIE_SHARE** / **COOKIE_SHARE_D** | `COOKIE_SHARE_RECORD` | OUT (−) | Manual or DC-synced donation | No (sync record only) |
+| **COOKIE_SHARE** (from booth divider) | `BOOTH_COOKIE_SHARE` | OUT (−) | Booth divider Cookie Share | No (automatic, not manual) |
+| **DIRECT_SHIP** | `DIRECT_SHIP` | — | Shipped from supplier | **Yes** |
+| **PLANNED** | `PLANNED` | — | Future/uncommitted order | No (not yet approved) |
 
 ### What Counts as "Sold"
 
-**Packages Sold = T2G + D + DIRECT_SHIP + COOKIE_SHARE**
+Use `SALE_CATEGORIES.has(transfer.category)` — includes: `GIRL_PICKUP`, `VIRTUAL_BOOTH_ALLOCATION`, `BOOTH_SALES_ALLOCATION`, `DIRECT_SHIP_ALLOCATION`, `DIRECT_SHIP`.
 
-Excludes: C2T (incoming inventory) and PLANNED (future orders).
+Excludes: `COUNCIL_TO_TROOP` (inventory in), `GIRL_RETURN` (returns), `DC_ORDER_RECORD` (sync record — counting it would double-count with the T2G allocation), `COOKIE_SHARE_RECORD` / `BOOTH_COOKIE_SHARE` (sync/allocation records), `PLANNED` (future).
 
-**Verification:** Compare the sum of these transfer types against the Smart Cookie Dashboard "Packages Sold" number. They should match.
+**Verification:** Compare the sum of SALE_CATEGORIES transfers against the Smart Cookie Dashboard "Packages Sold" number. They should match.
+
+### BOOTH_COOKIE_SHARE vs COOKIE_SHARE_RECORD
+
+When a booth sells Cookie Share packages and the TCM distributes via Smart Booth Divider, SC creates COOKIE_SHARE entries with a `smart_divider_id`. These are categorized as `BOOTH_COOKIE_SHARE` — they are automatic and should NOT be counted as manual entries needing reconciliation. Manual Virtual Cookie Share entries (no `smart_divider_id`) are categorized as `COOKIE_SHARE_RECORD`. The Virtual Cookie Share reconciliation report uses this distinction to determine what the TCM needs to manually adjust.
 
 ### Important: Negative Quantities
 
@@ -272,14 +283,14 @@ C2T transfers have suffixes: `"C2T"`, `"C2T(P)"`, potentially others. Always mat
 
 ### Physical Items (Affect Scout Net Inventory)
 
-- T2G transfers (regular, non-virtual-booth, non-booth-divider)
+- T2G transfers with category `GIRL_PICKUP` (physical pickup from troop)
 - GIRL DELIVERY orders (in-person delivery)
 - GIRL IN_HAND orders (cookies in hand / door-to-door)
 
 ### Virtual Items (NO Physical Inventory Impact)
 
 - **Cookie Share** — Virtual donations (scout never handles)
-- **Virtual Booth Credits** — T2G with `virtualBooth: true` flag (credit only, no physical transfer)
+- **Virtual Booth Credits** — T2G with category `VIRTUAL_BOOTH_ALLOCATION` (credit only, no physical transfer)
 - **Direct Ship** — Shipped from supplier (scout never handles)
 - **Booth Sales Allocations** — Credit for booth participation (from Smart Booth Divider)
 
@@ -288,7 +299,7 @@ C2T transfers have suffixes: `"C2T"`, `"C2T(P)"`, potentially others. Always mat
 Net Troop Inventory = C2T Total − T2G Physical Total − Site Orders Physical
 
 - **C2T Total** — All packages picked up from council
-- **T2G Physical Total** — Physical T2G only (excludes virtual booth, booth divider, Cookie Share)
+- **T2G Physical Total** — `GIRL_PICKUP` category only (excludes virtual booth, booth divider, Cookie Share)
 - **Site Orders Physical** — Troop site delivery orders fulfilled from stock (excludes shipped, donation-only)
 
 ### Scout Inventory Calculation
@@ -356,11 +367,11 @@ Site orders fulfilled from troop stock MUST reduce troop inventory:
 
 TCMs use three divider types to allocate troop orders to individual scouts:
 
-**1. Smart Virtual Booth Divider** — Allocates online troop site delivery sales. Creates T2G transfers with `virtualBooth: true`. Credits scouts without physical transfer.
+**1. Smart Virtual Booth Divider** — Allocates online troop site delivery sales. Creates T2G transfers with category `VIRTUAL_BOOTH_ALLOCATION`. Credits scouts without physical transfer.
 
 **2. Smart Direct Ship Divider** — Allocates troop direct ship orders. Stores separate allocation records. Credits scouts (supplier handles fulfillment).
 
-**3. Smart Booth Divider** — Allocates physical booth sales per-reservation. Creates T2G transfers with `boothDivider: true` plus booth details. Credits scouts per-booth-session.
+**3. Smart Booth Divider** — Allocates physical booth sales per-reservation. Creates T2G transfers with category `BOOTH_SALES_ALLOCATION` plus booth details. Credits scouts per-booth-session.
 
 ### Allocation Traceability
 
@@ -472,11 +483,12 @@ All reports must use consistent ordering: Thin Mints, Caramel deLites, Peanut Bu
 
 ## Reports
 
-The app provides six reports:
+The app provides seven reports (button labels in parentheses):
 
-1. **Troop Summary** — Total packages sold, revenue, troop proceeds, inventory, booth stats
-2. **Scout Summary** — Per-scout sales, inventory, credited allocations, cash owed, variety breakdowns
-3. **Virtual Cookie Share** — Cookie Share reconciliation showing adjustments needed per scout
-4. **Booths** — Booth reservations, distribution status, per-scout allocations
-5. **Inventory** — C2T pickups, T2G allocations, per-variety troop and scout inventory
-6. **Cookie Popularity** — Sales breakdown by cookie variety with percentages
+1. **Troop Summary** (Troop) — Total packages sold, revenue, troop proceeds, inventory, booth stats
+2. **Scout Summary** (Scouts) — Per-scout sales, inventory, credited allocations, cash owed, variety breakdowns
+3. **Cookie Share Reconciliation** (Donations) — DC vs SC Cookie Share comparison, adjustments needed per scout
+4. **Booth Reservations & Sales** (Booths) — Booth reservations, distribution status, per-scout allocations
+5. **Available Booths** (Available Booths) — Upcoming booth locations with available time slots
+6. **Inventory Report** (Inventory) — C2T pickups, T2G allocations, per-variety troop and scout inventory
+7. **Cookie Popularity Report** (Cookies) — Sales breakdown by cookie variety with percentages

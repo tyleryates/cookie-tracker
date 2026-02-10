@@ -135,6 +135,74 @@ function registerScout(reconciler: IDataReconciler, girlId: any, girl: Record<st
   }
 }
 
+/** Merge a Digital Cookie order found in Smart Cookie data (D-prefixed order numbers) */
+function mergeDCOrderFromSC(
+  reconciler: IDataReconciler,
+  orderNum: string,
+  scout: string,
+  transferData: { date: string; packages: number; amount: number },
+  type: string,
+  varieties: Varieties,
+  source: string,
+  rawData: Record<string, any>
+): void {
+  const dcOrderNum = orderNum.substring(1);
+  reconciler.mergeOrCreateOrder(
+    dcOrderNum,
+    {
+      orderNumber: dcOrderNum,
+      scout,
+      date: transferData.date,
+      type,
+      packages: Math.abs(transferData.packages),
+      amount: Math.abs(transferData.amount),
+      status: 'In SC Only',
+      varieties
+    },
+    source,
+    rawData
+  );
+}
+
+/** Track scout inventory changes from an API transfer (T2G pickup, G2T return, Cookie Share) */
+function trackScoutFromAPITransfer(
+  reconciler: IDataReconciler,
+  type: string,
+  to: string,
+  from: string,
+  packages: number
+): void {
+  if (type === TRANSFER_TYPE.T2G && to !== from) {
+    updateScoutData(reconciler, to, { pickedUp: Math.abs(packages) });
+  }
+  if (type === TRANSFER_TYPE.G2T && to !== from) {
+    updateScoutData(reconciler, from, { pickedUp: -Math.abs(packages) });
+  }
+  if (type.includes('COOKIE_SHARE')) {
+    updateScoutData(reconciler, to, { soldSC: Math.abs(packages) });
+  }
+}
+
+/** Parse a girl's cookie allocation, deduplicating by key. Returns null if zero packages or duplicate. */
+function parseGirlAllocation(
+  girl: Record<string, any>,
+  dedupePrefix: string | number,
+  seen: Set<string>,
+  reconciler: IDataReconciler,
+  dynamicCookieIdMap: Record<number, CookieType> | null
+): { girlId: number; varieties: Varieties; totalPackages: number; trackedCookieShare: number } | null {
+  const girlId = girl.id;
+  const { varieties, totalPackages } = parseVarietiesFromAPI(girl.cookies, dynamicCookieIdMap);
+  if (totalPackages === 0) return null;
+
+  const dedupeKey = `${dedupePrefix}-${girlId}`;
+  if (seen.has(dedupeKey)) return null;
+  seen.add(dedupeKey);
+
+  registerScout(reconciler, girlId, girl);
+  return { girlId, varieties, totalPackages, trackedCookieShare: varieties[COOKIE_TYPE.COOKIE_SHARE] || 0 };
+}
+
 // ============================================================================
 // IMPORT FUNCTIONS
 // ============================================================================
@@ -376,48 +444,11 @@ function importSmartCookieAPI(reconciler: IDataReconciler, apiData: Record<strin
 
     reconciler.transfers.push(reconciler.createTransfer(transferData));
 
-    // Handle Digital Cookie orders in Smart Cookie (orderNumber starts with D)
     if (orderNum.startsWith('D')) {
-      const dcOrderNum = orderNum.substring(1); // Remove 'D' prefix
-
-      // Merge or create order from SC-API
-      reconciler.mergeOrCreateOrder(
-        dcOrderNum,
-        {
-          orderNumber: dcOrderNum,
-          scout: to,
-          date: transferData.date,
-          type: type,
-          packages: Math.abs(transferData.packages),
-          amount: Math.abs(transferData.amount),
-          status: 'In SC Only',
-          varieties: varieties
-        },
-        DATA_SOURCES.SMART_COOKIE_API,
-        order
-      );
+      mergeDCOrderFromSC(reconciler, orderNum, to, transferData, type, varieties, DATA_SOURCES.SMART_COOKIE_API, order);
     }
 
-    // Track scout pickups (T2G - Troop to Girl)
-    if (type === TRANSFER_TYPE.T2G && to !== from) {
-      updateScoutData(reconciler, to, {
-        pickedUp: Math.abs(transferData.packages)
-      });
-    }
-
-    // Track scout returns (G2T - Girl to Troop) — reduce scout's pickedUp
-    if (type === TRANSFER_TYPE.G2T && to !== from) {
-      updateScoutData(reconciler, from, {
-        pickedUp: -Math.abs(transferData.packages)
-      });
-    }
-
-    // Track Digital Cookie sales in SC (COOKIE_SHARE)
-    if (type.includes('COOKIE_SHARE')) {
-      updateScoutData(reconciler, to, {
-        soldSC: Math.abs(transferData.packages)
-      });
-    }
+    trackScoutFromAPITransfer(reconciler, type, to, from, transferData.packages);
   });
 
   importOptionalData(reconciler, apiData);
@@ -537,7 +568,7 @@ function importBoothDividers(
   reconciler.boothSalesAllocations = [];
 
   // Track seen (reservationId, girlId) pairs to prevent duplicates
-  const seen = new Set();
+  const seen = new Set<string>();
 
   boothDividers.forEach((entry) => {
     const divider = entry.divider || {};
@@ -548,22 +579,14 @@ function importBoothDividers(
     const timeslot = rawBooth.timeslot || entry.timeslot || {};
 
     girls.forEach((girl: Record<string, any>) => {
-      const girlId = girl.id;
-      const { varieties, totalPackages } = parseVarietiesFromAPI(girl.cookies, dynamicCookieIdMap);
-      if (totalPackages === 0) return;
-
-      // Deduplicate by (reservationId, girlId)
-      const dedupeKey = `${entry.reservationId}-${girlId}`;
-      if (seen.has(dedupeKey)) return;
-      seen.add(dedupeKey);
-
-      registerScout(reconciler, girlId, girl);
+      const alloc = parseGirlAllocation(girl, entry.reservationId, seen, reconciler, dynamicCookieIdMap);
+      if (!alloc) return;
 
       reconciler.boothSalesAllocations.push({
-        girlId: girlId,
-        packages: totalPackages,
-        varieties: varieties,
-        trackedCookieShare: varieties[COOKIE_TYPE.COOKIE_SHARE] || 0,
+        girlId: alloc.girlId,
+        packages: alloc.totalPackages,
+        varieties: alloc.varieties,
+        trackedCookieShare: alloc.trackedCookieShare,
         reservationId: entry.reservationId,
         booth: {
           boothId: booth.booth_id || booth.id,
@@ -593,30 +616,22 @@ function importDirectShipDividers(
   reconciler.directShipAllocations = reconciler.directShipAllocations || [];
 
   // Track seen (orderId, girlId) pairs to prevent duplicates
-  const seen = new Set();
+  const seen = new Set<string>();
 
   directShipDividers.forEach((entry) => {
     const divider = entry.divider || entry;
     const girls = divider.girls || [];
 
     girls.forEach((girl: Record<string, any>) => {
-      const girlId = girl.id;
-      const { varieties, totalPackages } = parseVarietiesFromAPI(girl.cookies, dynamicCookieIdMap);
-      if (totalPackages === 0) return;
-
-      // Deduplicate by (orderId, girlId)
       const orderId = entry.orderId || entry.id || '';
-      const dedupeKey = `${orderId}-${girlId}`;
-      if (seen.has(dedupeKey)) return;
-      seen.add(dedupeKey);
-
-      registerScout(reconciler, girlId, girl);
+      const alloc = parseGirlAllocation(girl, orderId, seen, reconciler, dynamicCookieIdMap);
+      if (!alloc) return;
 
       reconciler.directShipAllocations.push({
-        girlId: girlId,
-        packages: totalPackages,
-        varieties: varieties,
-        trackedCookieShare: varieties[COOKIE_TYPE.COOKIE_SHARE] || 0,
+        girlId: alloc.girlId,
+        packages: alloc.totalPackages,
+        varieties: alloc.varieties,
+        trackedCookieShare: alloc.trackedCookieShare,
         orderId: orderId,
         source: 'SmartDirectShipDivider'
       });
@@ -650,24 +665,7 @@ function importSmartCookie(reconciler: IDataReconciler, scData: Record<string, a
 
     // Handle Digital Cookie orders in Smart Cookie (COOKIE_SHARE with D prefix)
     if (type.includes('COOKIE_SHARE') && orderNum.startsWith('D')) {
-      const dcOrderNum = orderNum.substring(1); // Remove 'D' prefix
-
-      // Merge or create order from SC
-      reconciler.mergeOrCreateOrder(
-        dcOrderNum,
-        {
-          orderNumber: dcOrderNum,
-          scout: to,
-          date: transferData.date,
-          type: type,
-          packages: Math.abs(transferData.packages),
-          amount: Math.abs(transferData.amount),
-          status: 'In SC Only',
-          varieties: varieties
-        },
-        DATA_SOURCES.SMART_COOKIE,
-        row
-      );
+      mergeDCOrderFromSC(reconciler, orderNum, to, transferData, type, varieties, DATA_SOURCES.SMART_COOKIE, row);
     }
 
     // Extract troop number from C2T transfers (Council to Troop)

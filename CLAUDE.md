@@ -93,11 +93,14 @@ npm run build           # Build for current platform
 
 **src/renderer.ts** - UI logic, report generation, data display
 
-**src/data-reconciler.ts** - Data normalization and deduplication engine
-- Creates unified data model from disparate sources
+**src/data-reconciler.ts** - Data normalization, deduplication, and transfer creation
+- Creates transfers with explicit `TRANSFER_CATEGORY` via `classifyTransferCategory()`
 - Deduplicates orders by order number (handles DC "229584475" vs SC "D229584475")
-- Aggregates per-scout summaries
-- Processes data in-memory for report generation
+
+**src/data-processing/calculators/** - Unified dataset computation (13 modules)
+- Scout processing (5 phases): initialize → orders → inventory → allocations → totals
+- Troop-level: package totals, troop totals, varieties, transfer breakdowns
+- Reconciliation: cookie share tracking, site orders, metadata/health checks
 
 **src/scrapers/index.ts** - Orchestrator for both scrapers (DC and SC run in parallel)
 
@@ -115,15 +118,15 @@ npm run build           # Build for current platform
 ### Data Flow
 
 ```
-┌──────────────────┐                    ┌────────────────┐
-│ Digital Cookie   │──── Excel ────────▶│                │
-│ (API)            │                     │ Data           │
-└──────────────────┘                     │ Reconciler     │──▶ Unified Data Model
-                                         │                │
-┌──────────────────┐                     │ - Normalize    │    ├─ orders (Map)
-│ Smart Cookie     │──── JSON ──────────▶│ - Deduplicate  │    ├─ transfers (Array)
-│ (API)            │                     │ - Merge        │    ├─ scouts (Map)
-└──────────────────┘                     └────────────────┘    └─ metadata
+┌──────────────────┐                    ┌────────────────┐     ┌────────────────┐
+│ Digital Cookie   │──── Excel ────────▶│                │     │ Calculators    │
+│ (API)            │                     │ Reconciler     │────▶│ (13 modules)   │──▶ Unified Dataset
+└──────────────────┘                     │                │     │                │
+                                         │ - Normalize    │     │ - Scouts       │    ├─ scouts (Map)
+┌──────────────────┐                     │ - Deduplicate  │     │ - Troop totals │    ├─ troopTotals
+│ Smart Cookie     │──── JSON ──────────▶│ - Classify     │     │ - Varieties    │    ├─ varieties
+│ (API)            │                     │   transfers    │     │ - Cookie share │    ├─ cookieShare
+└──────────────────┘                     └────────────────┘     └────────────────┘    └─ metadata
 ```
 
 ### Data Storage
@@ -198,54 +201,26 @@ All OUT transactions have negative quantities in SC data - use `Math.abs()` for 
 
 ## Reconciliation Logic
 
-The `DataReconciler` class (`src/data-reconciler.ts`) implements the core reconciliation:
+The `DataReconciler` class (`src/data-reconciler.ts`) manages state and creates transfers (including `classifyTransferCategory()`). The `data-processing/calculators/` modules build the unified dataset in five phases:
 
-1. **Normalization**: Convert DC/SC data to standardized format
-2. **Order Deduplication**: Merge orders with matching order numbers
-   - DC order `229584475` matches SC transfer `D229584475` (strip prefix)
-   - SC report `229584475` matches DC order `229584475` (exact match)
-3. **Scout Aggregation**: Sum per-scout totals
-   - `pickedUp` from T2G transfers
-   - `soldDC` from DC orders
-   - `soldSC` from SC transfers
-   - `remaining` = picked up - sold
+1. **Import & Normalize** — `data-importers.ts` parses DC Excel, SC JSON/API, SC Report formats
+2. **Order Deduplication** — Merge orders by order number (DC `229584475` = SC `D229584475`)
+3. **Scout Processing** (five phases in `calculators/`):
+   - Initialize scouts → Add DC orders → Add T2G inventory → Add divider allocations → Calculate totals
+4. **Troop Aggregation** — Package totals, troop inventory, proceeds, variety breakdowns
+5. **Unified Dataset** — scouts, troopTotals, varieties, cookieShare, boothReservations, metadata
 
 ## Design Principles
 
 **CRITICAL:** Before making changes, read [`docs/DESIGN-PRINCIPLES.md`](docs/DESIGN-PRINCIPLES.md)
 
-### The Golden Rule: Model What Data IS, Not How Reports USE It
+Key principles (see that file for examples, decision tree, and code review checklist):
 
-❌ **Don't add report-specific aggregations to data model:**
-```javascript
-// ❌ BAD: Pre-aggregate for specific reports
-scout.$varietyBreakdowns = { ... };  // Only for scout-summary.js
-scout.$cookieShare = { ... };        // Only for donation-alert.js
-```
-
-✅ **Do classify fundamental properties:**
-```javascript
-// ✅ GOOD: Core concepts
-transfer.isPhysical = true;          // Fundamental: does this move inventory?
-order.needsInventory = true;         // Fundamental: needs fulfillment?
-scout.$issues = { hasNegative };     // Fundamental: data quality
-```
-
-✅ **Do calculate in reports:**
-```javascript
-// ✅ GOOD: Reports do simple loops
-function buildVarietyBreakdown(scout) {
-  const breakdown = {};
-  scout.orders.forEach(order => {
-    if (order.needsInventory) { /* ... */ }
-  });
-  return breakdown;
-}
-```
-
-**Why:** Data models stay clean, reports stay simple, changes stay local.
-
-See full principles, examples, and decision tree in [`docs/DESIGN-PRINCIPLES.md`](docs/DESIGN-PRINCIPLES.md).
+1. **Model what data IS, not how reports USE it** — Data models contain fundamental properties (`transfer.category`, `order.needsInventory`), not report-specific aggregations. Reports calculate their own breakdowns from clean data.
+2. **Classify once, use everywhere** — `classifyTransferCategory()` assigns a `TRANSFER_CATEGORY` at creation time. Reports dispatch on `transfer.category`, never re-derive from raw fields.
+3. **Reports calculate their own needs** — Simple loops over classified data, co-located with display code.
+4. **Classify granularly, report with simple sums** — `report.value = sum(items.where(category == X).field)`. No subtraction patterns, no remainder classification, no derived-from-derived.
+5. **Central category group sets** — `SALE_CATEGORIES`, `T2G_CATEGORIES`, etc. in `constants.ts`. Update once, all consumers pick up the change.
 
 ---
 
@@ -280,45 +255,15 @@ Smart Cookie uses direct API calls (no browser needed):
 ### Progress Callbacks
 Both scrapers accept a progress callback that reports status updates (0-100%) to the UI. Always send progress updates at key milestones.
 
-### Report Enhancement Pattern
+### Adding a New Report
 
-When adding new data tracking to reports, follow this consistent pattern:
+1. Create `src/renderer/reports/my-report.ts` with a `generateMyReport(reconciler)` function
+2. Add import and `REPORT_CONFIG` entry in `src/renderer.ts`
+3. Add button to `src/index.html`
+4. Wire click handler in `src/renderer/ui-controller.ts`
+5. Enable/disable in `enableReportButtons()` in `src/renderer.ts`
 
-1. **Add tracking variable** to summary objects (e.g., `donations: 0`)
-2. **Update data processing loops** to populate the field when processing orders
-3. **Add column to table headers** (update `colspan` if needed to match column count)
-4. **Display field in table rows** using appropriate formatting
-5. **Include in variety breakdowns** with correct pricing if applicable
-
-**Example: Adding Donation Tracking**
-```javascript
-// Step 1: Initialize tracking variable
-scoutSummary[name] = {
-  donations: 0,  // New field
-  varieties: {}
-};
-
-// Step 2: Populate during order processing
-const donations = parseInt(row['Donation']) || 0;
-if (donations > 0) {
-  scoutSummary[name].donations += donations;
-  scoutSummary[name].varieties['Cookie Share'] =
-    (scoutSummary[name].varieties['Cookie Share'] || 0) + donations;
-}
-
-// Step 3: Add header column (update colspan from 9 to 10)
-<th colspan="10">Details</th>
-
-// Step 4: Display in table
-<td>${scout.donations}</td>
-
-// Step 5: Include in pricing calculations
-if (variety === 'Cookie Share') {
-  revenue += count * 6;  // $6 per donation package
-}
-```
-
-**Why This Matters:** Following this pattern ensures new features are tracked consistently across all reports and don't break table layouts or calculations.
+Reports read from `reconciler.unified` (pre-computed data) and return HTML strings. Use `html-builder.ts` helpers for consistent tables and stat cards.
 
 ## Common Pitfalls
 

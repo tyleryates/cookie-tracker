@@ -1,7 +1,7 @@
 // Varieties Calculations
 // Aggregates cookie variety counts and calculates troop inventory by variety
 
-import { TRANSFER_CATEGORY } from '../../constants';
+import { SALE_CATEGORIES, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { IDataReconciler, Transfer, Varieties, VarietiesResult } from '../../types';
 
@@ -25,16 +25,8 @@ export function buildVarieties(reconciler: IDataReconciler): VarietiesResult {
   // Aggregate varieties from SC transfers that count as sold.
   // Only actual sale categories are counted. DC_ORDER_RECORD and COOKIE_SHARE_RECORD
   // are sync records — counting them would double-count with the T2G allocation.
-  const saleCategories: Set<string> = new Set([
-    TRANSFER_CATEGORY.GIRL_PICKUP,
-    TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
-    TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION,
-    TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION,
-    TRANSFER_CATEGORY.DIRECT_SHIP
-  ]);
-
   reconciler.transfers.forEach((transfer: Transfer) => {
-    if (!saleCategories.has(transfer.category)) return;
+    if (!SALE_CATEGORIES.has(transfer.category)) return;
     if (!transfer.packages || transfer.packages <= 0) return;
 
     Object.entries(transfer.varieties).forEach(([variety, count]) => {
@@ -45,31 +37,21 @@ export function buildVarieties(reconciler: IDataReconciler): VarietiesResult {
   });
 
   // Calculate net troop inventory by variety (SC transfer data)
+  // C2T/G2T add to troop stock, all T2G categories subtract from troop stock
   reconciler.transfers.forEach((transfer: Transfer) => {
-    switch (transfer.category) {
-      // C2T — Add to inventory (packages received from council)
-      case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
-      // G2T — Add back to inventory (packages returned from scout to troop)
-      case TRANSFER_CATEGORY.GIRL_RETURN:
-        Object.entries(transfer.physicalVarieties).forEach(([variety, count]) => {
-          if (typeof count === 'number') {
-            inventory[variety as keyof Varieties] = (inventory[variety as keyof Varieties] || 0) + count;
-          }
-        });
-        break;
-      // T2G categories — Subtract from inventory (packages that left troop stock)
-      case TRANSFER_CATEGORY.GIRL_PICKUP:
-      case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
-      case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
-      case TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION:
-        Object.entries(transfer.physicalVarieties).forEach(([variety, count]) => {
-          if (typeof count === 'number') {
-            inventory[variety as keyof Varieties] = (inventory[variety as keyof Varieties] || 0) - count;
-          }
-        });
-        break;
-      // DC_ORDER_RECORD, COOKIE_SHARE_RECORD, DIRECT_SHIP, PLANNED: no inventory impact
+    let sign = 0;
+    if (TROOP_INVENTORY_IN_CATEGORIES.has(transfer.category)) {
+      sign = 1; // Inventory in
+    } else if (T2G_CATEGORIES.has(transfer.category)) {
+      sign = -1; // Inventory out
     }
+    if (sign === 0) return;
+
+    Object.entries(transfer.physicalVarieties).forEach(([variety, count]) => {
+      if (typeof count === 'number') {
+        inventory[variety as keyof Varieties] = (inventory[variety as keyof Varieties] || 0) + sign * count;
+      }
+    });
   });
 
   // Calculate totals

@@ -1,9 +1,10 @@
 // Smart Cookie Allocation Processing
 // Handles virtual booth, direct ship, and booth sales allocations
 
-import { TRANSFER_CATEGORY } from '../../constants';
+import { SCOUT_PHYSICAL_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { BoothSalesAllocation, DirectShipAllocation, IDataReconciler, Scout, Transfer } from '../../types';
+import { sumPhysicalPackages } from '../utils';
 import { addVarietiesToTarget, buildGirlIdToNameMap, findScoutByGirlId } from './helpers';
 
 /** Process virtual booth T2G transfers (Troop girl delivery) */
@@ -66,10 +67,7 @@ function processBoothSalesAllocations(
     if (!scout) return;
 
     const cookieShareCount = allocation.trackedCookieShare || allocation.varieties?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
-    // Sum non-Cookie-Share varieties (positive sum instead of subtraction)
-    const physicalPackages = Object.entries(allocation.varieties || {})
-      .filter(([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE)
-      .reduce((sum, [, count]) => sum + (typeof count === 'number' ? count : 0), 0);
+    const physicalPackages = sumPhysicalPackages(allocation.varieties);
 
     scout.credited.boothSales.packages += physicalPackages;
     scout.credited.boothSales.donations += cookieShareCount;
@@ -93,25 +91,18 @@ function processBoothSalesAllocations(
 /** Add inventory from Smart Cookie physical transfers (T2G pickup adds, G2T subtracts) */
 function addInventory(reconciler: IDataReconciler, scoutDataset: Map<string, Scout>): void {
   reconciler.transfers.forEach((transfer: Transfer) => {
-    if (transfer.category === TRANSFER_CATEGORY.GIRL_PICKUP) {
-      // T2G physical: scout is picking up cookies — add to scout's inventory
-      const scout = scoutDataset.get(transfer.to);
-      if (!scout) return;
+    if (!SCOUT_PHYSICAL_CATEGORIES.has(transfer.category)) return;
 
-      scout.inventory.total += transfer.physicalPackages || 0;
-      Object.entries(transfer.physicalVarieties).forEach(([variety, count]) => {
-        scout.inventory.varieties[variety] = (scout.inventory.varieties[variety] || 0) + count;
-      });
-    } else if (transfer.category === TRANSFER_CATEGORY.GIRL_RETURN) {
-      // G2T: scout is returning cookies — subtract from scout's inventory
-      const scout = scoutDataset.get(transfer.from);
-      if (!scout) return;
+    // GIRL_PICKUP: scout picks up from troop (+), GIRL_RETURN: scout returns to troop (-)
+    const isPickup = transfer.category === TRANSFER_CATEGORY.GIRL_PICKUP;
+    const scout = scoutDataset.get(isPickup ? transfer.to : transfer.from);
+    if (!scout) return;
 
-      scout.inventory.total -= transfer.physicalPackages || 0;
-      Object.entries(transfer.physicalVarieties).forEach(([variety, count]) => {
-        scout.inventory.varieties[variety] = (scout.inventory.varieties[variety] || 0) - count;
-      });
-    }
+    const sign = isPickup ? 1 : -1;
+    scout.inventory.total += sign * (transfer.physicalPackages || 0);
+    Object.entries(transfer.physicalVarieties).forEach(([variety, count]) => {
+      scout.inventory.varieties[variety] = (scout.inventory.varieties[variety] || 0) + sign * count;
+    });
   });
 }
 

@@ -1,7 +1,7 @@
 // Transfer Breakdowns
 // Pre-classifies transfers into categories (C2T, T2G, sold) with totals
 
-import { TRANSFER_CATEGORY } from '../../constants';
+import { SALE_CATEGORIES, T2G_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import Logger from '../../logger';
 import type { IDataReconciler, Transfer, TransferBreakdowns, Warning } from '../../types';
 import { isKnownTransferType } from '../utils';
@@ -34,40 +34,23 @@ export function buildTransferBreakdowns(reconciler: IDataReconciler, warnings: W
       });
     }
 
-    switch (transfer.category) {
-      case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
-        c2t.push(transfer);
-        c2tTotal += packages;
-        break;
-
-      case TRANSFER_CATEGORY.GIRL_RETURN:
-        g2t.push(transfer);
-        g2tTotal += transfer.physicalPackages || 0;
-        break;
-
-      // T2G categories — all go into t2g list; sale categories also go into sold
-      case TRANSFER_CATEGORY.GIRL_PICKUP:
-        t2g.push(transfer);
+    // Classify into lists using central category groups
+    if (transfer.category === TRANSFER_CATEGORY.COUNCIL_TO_TROOP) {
+      c2t.push(transfer);
+      c2tTotal += packages;
+    } else if (transfer.category === TRANSFER_CATEGORY.GIRL_RETURN) {
+      g2t.push(transfer);
+      g2tTotal += transfer.physicalPackages || 0;
+    }
+    if (T2G_CATEGORIES.has(transfer.category)) {
+      t2g.push(transfer);
+      if (transfer.category === TRANSFER_CATEGORY.GIRL_PICKUP) {
         t2gPhysicalTotal += transfer.physicalPackages || 0;
-        sold.push(transfer);
-        soldTotal += packages;
-        break;
-
-      case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
-      case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
-      case TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION:
-        t2g.push(transfer);
-        sold.push(transfer);
-        soldTotal += packages;
-        break;
-
-      case TRANSFER_CATEGORY.DIRECT_SHIP:
-        sold.push(transfer);
-        soldTotal += packages;
-        break;
-
-      // DC_ORDER_RECORD, COOKIE_SHARE_RECORD: sync records, NOT counted as sold
-      // PLANNED: future orders, NOT counted as sold
+      }
+    }
+    if (SALE_CATEGORIES.has(transfer.category)) {
+      sold.push(transfer);
+      soldTotal += packages;
     }
   });
 

@@ -8,7 +8,7 @@ Desktop app for Girl Scout troops to sync and manage cookie sales from Digital C
 
 - ✅ **One-Click Sync** - Automatically download data from both platforms
 - 🔄 **Auto-Sync** - Syncs every hour automatically
-- 📊 **5 Reports** - Troop summary, scout performance, inventory, varieties, and donations
+- 📊 **7 Reports** - Troop, scouts, donations, booths, available booths, inventory, and cookies
 - 🔒 **Secure** - Credentials encrypted on your computer
 - 📦 **Inventory Tracking** - Track troop and scout inventory
 
@@ -39,11 +39,13 @@ That's it! The app will automatically sync every hour.
 
 ## Reports
 
-- **Troop Summary** - Total orders, packages sold, revenue, and inventory
-- **Scout Summary** - Individual scout performance and order details
-- **Inventory** - Troop inventory by cookie variety
-- **Cookie Varieties** - Sales breakdown by cookie type
-- **Virtual Cookie Share** - Donation tracking
+- **Troop** - Total orders, packages sold, revenue, proceeds, and inventory
+- **Scouts** - Individual scout sales, inventory, credited allocations, and cash owed
+- **Donations** - Cookie Share reconciliation between Digital Cookie and Smart Cookie
+- **Booths** - Booth reservations, distribution status, and per-scout allocations
+- **Available Booths** - Upcoming booth locations with available time slots
+- **Inventory** - Troop inventory by cookie variety, council pickups, and scout allocations
+- **Cookies** - Sales breakdown by cookie type with percentages
 
 ## Settings
 
@@ -75,6 +77,6 @@ All data stays on your computer. Nothing is sent anywhere except to the Girl Sco
 
 ---
 
-**Version:** 1.3.0
+**Version:** 1.2.0
 
 This is an unofficial volunteer tool not affiliated with Girl Scouts of the USA.

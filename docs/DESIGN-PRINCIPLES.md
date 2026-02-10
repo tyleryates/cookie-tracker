@@ -16,7 +16,7 @@ Ask: **"Is this a fundamental property of this data?"**
 
 ```javascript
 // ✅ GOOD: Fundamental properties
-transfer.isPhysical = true;           // Is this a physical inventory movement?
+transfer.category = TRANSFER_CATEGORY.GIRL_PICKUP; // What kind of transfer is this?
 order.owner = OWNER.GIRL;             // Whose sale is this?
 order.needsInventory = true;          // Does this require physical fulfillment?
 scout.$issues = { hasNegative: true }; // Are there data quality problems?
@@ -77,7 +77,7 @@ When considering adding a field to the data model:
 ```
 Is this a fundamental property of the data?
 ├─ YES → Add it
-│  └─ Examples: isPhysical, owner, orderType
+│  └─ Examples: category, owner, orderType
 │
 └─ NO → Is it a simple calculation used 3+ times?
    ├─ YES → Consider convenience field
@@ -93,7 +93,7 @@ Simple calculations used in many places can be pre-computed:
 
 ```javascript
 // 🟡 ACCEPTABLE: Used 15+ times, eliminates duplicate logic
-transfer.physicalPackages = packages - cookieShare;
+transfer.physicalPackages = sum(varieties excluding Cookie Share);
 transfer.physicalVarieties = { /* varieties without Cookie Share */ };
 ```
 
@@ -102,6 +102,7 @@ transfer.physicalVarieties = { /* varieties without Cookie Share */ };
 - Non-trivial calculation (not just field access)
 - Eliminates meaningful duplication
 - Represents a clear business concept (physical vs total)
+- Uses positive sums, not subtractions (see Principle #6)
 
 ---
 
@@ -111,29 +112,31 @@ transfer.physicalVarieties = { /* varieties without Cookie Share */ };
 
 ### ✅ Right: Classify at Creation
 
-```javascript
-// data-reconciler.js - createTransfer()
-createTransfer(data) {
-  const virtualBooth = data.virtualBooth || false;
-  const boothDivider = data.boothDivider || false;
-  const isT2G = data.type === 'T2G';
-
-  return {
-    // ... other fields
-
-    // Computed once at creation:
-    isPhysical: isT2G && !virtualBooth && !boothDivider
-  };
+```typescript
+// data-reconciler.ts - classifyTransferCategory()
+// Explicit category from raw type + API flags — no remainder logic
+function classifyTransferCategory(type, virtualBooth, boothDivider, directShipDivider) {
+  if (isIncomingInventory(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
+  if (type === 'G2T') return TRANSFER_CATEGORY.GIRL_RETURN;
+  if (type === 'T2G') {
+    if (virtualBooth) return TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION;
+    if (boothDivider) return TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION;
+    if (directShipDivider) return TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION;
+    return TRANSFER_CATEGORY.GIRL_PICKUP;
+  }
+  // ... etc
 }
+
+// createTransfer() stores the category; reports use it for dispatch
 ```
 
 ### ❌ Wrong: Re-Compute Everywhere
 
 ```javascript
-// ❌ BAD: Every function re-computes
+// ❌ BAD: Every function re-computes from raw fields
 function calculateInventory(transfer) {
   if (transfer.type === 'T2G' && !transfer.virtualBooth && !transfer.boothDivider) {
-    // ... physical T2G logic
+    // ... check repeated everywhere
   }
 }
 
@@ -228,7 +231,7 @@ scout.breakdown           // Ambiguous: breakdown of what?
 ### Naming Convention
 
 - **Regular fields:** `packages`, `varieties`, `amount`
-- **Computed fields:** `physicalPackages`, `isPhysical`, `needsInventory`
+- **Computed fields:** `physicalPackages`, `category`, `needsInventory`
 - **Derived aggregates:** `$issues`, `$orderRevenue`, `$creditedRevenue` ($ prefix)
 
 ---
@@ -280,11 +283,11 @@ function buildInventoryBreakdown(scout) {
 }
 ```
 
-### Example 2: Detecting Physical Transfers
+### Example 2: Dispatching on Transfer Type
 
 **Wrong Approach:**
 ```javascript
-// ❌ Re-compute in every function
+// ❌ Re-compute from raw fields in every function
 function processTransfer(transfer) {
   if (transfer.type === 'T2G' && !transfer.virtualBooth && !transfer.boothDivider) {
     // ... check repeated everywhere
@@ -293,18 +296,19 @@ function processTransfer(transfer) {
 ```
 
 **Right Approach:**
-```javascript
-// ✅ Compute once at creation (data-reconciler.js)
-createTransfer(data) {
-  return {
-    isPhysical: data.type === 'T2G' && !data.virtualBooth && !data.boothDivider
-  };
-}
+```typescript
+// ✅ Classify once at creation (data-reconciler.ts)
+// classifyTransferCategory() assigns an explicit TRANSFER_CATEGORY
 
-// Use everywhere
+// Use everywhere via switch
 function processTransfer(transfer) {
-  if (transfer.isPhysical) {
-    // ... simple check
+  switch (transfer.category) {
+    case TRANSFER_CATEGORY.GIRL_PICKUP:
+      // ... physical T2G logic
+      break;
+    case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
+      // ... virtual booth logic
+      break;
   }
 }
 ```
@@ -401,6 +405,35 @@ G2T subtraction is acceptable — returns are a fundamentally different flow (in
 
 ---
 
+## Central Category Group Sets
+
+When multiple reports need to check "is this transfer a sale?" or "is this a T2G sub-type?", define the category set once in `constants.ts` and import it everywhere. This prevents reports from maintaining their own category lists that drift out of sync.
+
+```typescript
+// ✅ GOOD: Central set, imported by all consumers
+// constants.ts
+export const SALE_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
+  TRANSFER_CATEGORY.GIRL_PICKUP,
+  TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
+  // ...
+]);
+
+// package-totals.ts, varieties.ts, transfer-breakdowns.ts, etc.
+if (SALE_CATEGORIES.has(transfer.category)) { ... }
+```
+
+```typescript
+// ❌ BAD: Each report defines its own list
+// package-totals.ts
+if (transfer.category === GIRL_PICKUP || transfer.category === VIRTUAL_BOOTH_ALLOCATION || ...) { ... }
+// varieties.ts — same list, maybe different, maybe not
+if (transfer.category === GIRL_PICKUP || transfer.category === VIRTUAL_BOOTH_ALLOCATION || ...) { ... }
+```
+
+When adding a new `TRANSFER_CATEGORY`, update the relevant group sets in `constants.ts` — all consumers pick up the change automatically.
+
+---
+
 ## Red Flags: Signs You're Breaking the Rules
 
 🚩 **Adding fields for one specific report**
@@ -443,6 +476,8 @@ If you answered "no" to most of these → **Don't add it. Calculate in reports i
 | Reports | Calculate own needs | Read pre-aggregations |
 | Naming | Clear, descriptive | Ambiguous |
 | Separation | Data in data layer | Display in data layer |
+| Category Groups | Central sets in constants.ts | Per-report category lists |
+| Granular Sums | `sum(classified.field)` | `totalA - totalB` |
 
 **Remember:** Clean data models are stable. They describe what data fundamentally **IS**, independent of how any particular report chooses to **USE** it.
 

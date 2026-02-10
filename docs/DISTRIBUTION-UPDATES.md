@@ -150,7 +150,7 @@ This automatically:
 
 ### How It Works:
 
-- `main.js` checks GitHub Releases on startup
+- `src/main.ts` (compiled to `dist/main.js`) checks GitHub Releases on startup
 - Compares installed version vs latest release
 - If newer version exists, prompts user
 - Downloads update in background
@@ -180,7 +180,7 @@ If you don't want to use GitHub public releases:
 
 3. **Share link with users** (manual download)
 
-4. **Disable auto-update:** Comment out the `autoUpdater.checkForUpdates()` call in `main.js`.
+4. **Disable auto-update:** Comment out the `autoUpdater.checkForUpdates()` call in `src/main.ts`.
 
 ---
 
@@ -300,6 +300,7 @@ Before publishing an update:
 - [ ] Update version in `package.json`
 - [ ] Test the new features/fixes
 - [ ] Update README.md if needed
+- [ ] Compile TypeScript: `npm run compile`
 - [ ] Commit changes to git
 - [ ] Build and test locally: `npm run build && open dist/*.dmg`
 - [ ] Verify app opens and works

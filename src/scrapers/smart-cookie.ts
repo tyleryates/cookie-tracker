@@ -462,36 +462,45 @@ class SmartCookieApiScraper {
 
     // Fetch dates and time slots for each booth during sync
     for (const booth of filtered) {
-      const boothId = booth.id || booth.booth_id;
-      try {
-        const datesData = await this.fetchBoothDates(boothId);
-        const dates = Array.isArray(datesData) ? datesData : datesData?.dates || [];
-
-        booth.availableDates = [];
-        for (const d of dates) {
-          const dateStr = typeof d === 'string' ? d : d.date || '';
-          if (!dateStr) continue;
-
-          let timeSlots = [];
-          try {
-            const timesData = await this.fetchBoothTimes(boothId, dateStr);
-            const slots = Array.isArray(timesData) ? timesData : timesData?.times || timesData?.slots || [];
-            timeSlots = slots.map((s: any) => ({
-              start_time: s.start_time || s.startTime || s.start || '',
-              end_time: s.end_time || s.endTime || s.end || ''
-            }));
-          } catch (err) {
-            Logger.warn(`Warning: Could not fetch times for booth ${boothId} on ${dateStr}:`, err.message);
-          }
-
-          booth.availableDates.push({ date: dateStr, timeSlots });
-        }
-      } catch (err) {
-        Logger.warn(`Warning: Could not fetch dates for booth ${boothId}:`, err.message);
-      }
+      booth.availableDates = await this.fetchBoothAvailability(booth.id || booth.booth_id);
     }
 
     return filtered;
+  }
+
+  /** Fetch available dates and time slots for a single booth */
+  async fetchBoothAvailability(boothId: number): Promise<{ date: string; timeSlots: any[] }[]> {
+    try {
+      const datesData = await this.fetchBoothDates(boothId);
+      const dates = Array.isArray(datesData) ? datesData : datesData?.dates || [];
+      const result: { date: string; timeSlots: any[] }[] = [];
+
+      for (const d of dates) {
+        const dateStr = typeof d === 'string' ? d : d.date || '';
+        if (!dateStr) continue;
+        result.push({ date: dateStr, timeSlots: await this.fetchBoothTimeSlots(boothId, dateStr) });
+      }
+
+      return result;
+    } catch (err) {
+      Logger.warn(`Warning: Could not fetch dates for booth ${boothId}:`, err.message);
+      return [];
+    }
+  }
+
+  /** Fetch and normalize time slots for a booth on a specific date */
+  async fetchBoothTimeSlots(boothId: number, date: string): Promise<any[]> {
+    try {
+      const timesData = await this.fetchBoothTimes(boothId, date);
+      const slots = Array.isArray(timesData) ? timesData : timesData?.times || timesData?.slots || [];
+      return slots.map((s: any) => ({
+        start_time: s.start_time || s.startTime || s.start || '',
+        end_time: s.end_time || s.endTime || s.end || ''
+      }));
+    } catch (err) {
+      Logger.warn(`Warning: Could not fetch times for booth ${boothId} on ${date}:`, err.message);
+      return [];
+    }
   }
 
   /**
@@ -581,6 +590,21 @@ class SmartCookieApiScraper {
     }
   }
 
+  /** Extract troopId from C2T (Council to Troop) transfers when /me didn't provide it */
+  extractTroopIdFromOrders(orders: Record<string, any>[]): string | null {
+    for (const order of orders) {
+      const type = order.transfer_type || order.type || '';
+      if ((type === 'C2T' || type.startsWith('C2T')) && order.to) {
+        const match = String(order.to).match(/\d+/);
+        if (match) {
+          Logger.debug(`Extracted troopId from C2T transfer: ${match[0]}`);
+          return match[0];
+        }
+      }
+    }
+    return null;
+  }
+
   /**
    * Main scraping method
    * Orchestrates the login, fetch, and save operations
@@ -613,21 +637,8 @@ class SmartCookieApiScraper {
       );
 
       // Fallback: extract troopId from orders data if /me didn't provide it
-      // Look for C2T (Council to Troop) transfers - the 'to' field contains troop identifier
       if (!this.troopId && ordersData?.orders) {
-        for (const order of ordersData.orders) {
-          const type = order.transfer_type || order.type || '';
-          // C2T transfers have the troop identifier in the 'to' field
-          if ((type === 'C2T' || type.startsWith('C2T')) && order.to) {
-            // Try to extract numeric troop ID from the 'to' string (e.g., "Troop 1234")
-            const match = String(order.to).match(/\d+/);
-            if (match) {
-              this.troopId = match[0];
-              Logger.debug(`Extracted troopId from C2T transfer: ${this.troopId}`);
-              break;
-            }
-          }
-        }
+        this.troopId = this.extractTroopIdFromOrders(ordersData.orders);
       }
 
       // Step 2: Fetch direct ship divider allocations (with rate limiting)

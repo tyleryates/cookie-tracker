@@ -369,38 +369,21 @@ function cleanup(): void {
 // EVENT SETUP
 // ============================================================================
 
-function setupEventListeners(config: Record<string, any>): void {
-  const { buttons, modal, fields, progress, status, reportContainer, actions } = config;
-
-  const {
-    configureLoginsBtn,
-    refreshFromWebBtn,
-    troopSummaryBtn,
-    inventoryReportBtn,
-    summaryReportBtn,
-    varietyReportBtn,
-    donationAlertBtn,
-    boothReportBtn,
-    recalculateBtn,
-    viewUnifiedDataBtn
-  } = buttons;
-
+/** Wire up login modal: open, close, save credentials */
+function setupModalHandlers(
+  modal: Record<string, any>,
+  fields: Record<string, any>,
+  statusMsg: (msg: string, type: string) => void,
+  checkLoginStatusFn: () => Promise<void>
+): void {
   const { loginModal, closeModal, cancelModal, saveCredentials } = modal;
-
   const { dcUsername, dcPassword, dcRole, scUsername, scPassword } = fields;
 
-  const { dcProgress, dcProgressFill, dcProgressText, scProgress, scProgressFill, scProgressText } = progress;
+  const closeModalFn = () => loginModal.classList.remove('show');
 
-  const { dcStatus: dcStatusEl, scStatus: scStatusEl, dcLastSync, scLastSync, importStatus } = status;
-
-  const { generateReport, exportUnifiedDataset, loadDataFromDisk, checkLoginStatus: checkLoginStatusFn } = actions;
-
-  const statusMsg = (msg: string, type: string) => showStatus(importStatus, msg, type);
-
-  const openModal = async () => {
+  const openModalFn = async () => {
     try {
       const result = await ipcRenderer.invoke('load-credentials');
-
       if (result.success && result.credentials) {
         dcUsername.value = result.credentials.digitalCookie.username || '';
         dcPassword.value = result.credentials.digitalCookie.password || '';
@@ -408,35 +391,22 @@ function setupEventListeners(config: Record<string, any>): void {
         scUsername.value = result.credentials.smartCookie.username || '';
         scPassword.value = result.credentials.smartCookie.password || '';
       }
-
-      loginModal.classList.add('show');
     } catch (error) {
       Logger.error('Error loading credentials:', error);
-      loginModal.classList.add('show');
     }
+    loginModal.classList.add('show');
   };
 
-  const closeModal_ = () => loginModal.classList.remove('show');
-
-  const saveCredentials_ = async () => {
+  const saveCredentialsFn = async () => {
     try {
       const credentials: Credentials = {
-        digitalCookie: {
-          username: dcUsername!.value.trim(),
-          password: dcPassword!.value.trim(),
-          role: dcRole!.value.trim()
-        },
-        smartCookie: {
-          username: scUsername!.value.trim(),
-          password: scPassword!.value.trim()
-        }
+        digitalCookie: { username: dcUsername!.value.trim(), password: dcPassword!.value.trim(), role: dcRole!.value.trim() },
+        smartCookie: { username: scUsername!.value.trim(), password: scPassword!.value.trim() }
       };
 
       const result = await ipcRenderer.invoke('save-credentials', credentials);
 
-      // Clear sensitive data from memory immediately after use
-      // Note: JavaScript strings are immutable, so this is best-effort only
-      // Actual security relies on Electron's safeStorage (OS keychain encryption)
+      // Best-effort memory clearing (JS strings are immutable; real security is OS keychain)
       credentials.digitalCookie.password = '';
       credentials.smartCookie.password = '';
       if (dcPassword) dcPassword.value = '';
@@ -444,9 +414,7 @@ function setupEventListeners(config: Record<string, any>): void {
 
       if (result.success) {
         statusMsg('Credentials saved successfully', 'success');
-        closeModal_();
-
-        // Update button prominence
+        closeModalFn();
         await checkLoginStatusFn();
       } else {
         statusMsg(`Error saving credentials: ${result.error}`, 'error');
@@ -456,103 +424,98 @@ function setupEventListeners(config: Record<string, any>): void {
     }
   };
 
-  const refreshOpts: RefreshFromWebOptions = {
-    refreshFromWebBtn,
-    dcProgress,
-    dcProgressFill,
-    dcProgressText,
-    scProgress,
-    scProgressFill,
-    scProgressText,
-    dcStatusEl,
-    scStatusEl,
-    dcLastSync,
-    scLastSync,
-    showStatus: statusMsg,
-    updateSyncStatus,
-    loadDataFromDisk
-  };
+  if (loginModal) loginModal.addEventListener('click', (e: Event) => { if (e.target === loginModal) closeModalFn(); });
+  if (closeModal) closeModal.addEventListener('click', closeModalFn);
+  if (cancelModal) cancelModal.addEventListener('click', closeModalFn);
+  if (saveCredentials) saveCredentials.addEventListener('click', saveCredentialsFn);
 
-  // Button event listeners
-  if (configureLoginsBtn) {
-    configureLoginsBtn.addEventListener('click', openModal);
-  }
+  // Expose openModal to the configure button
+  return openModalFn as any;
+}
 
-  if (refreshFromWebBtn) {
-    refreshFromWebBtn.addEventListener('click', () => handleRefreshFromWeb(refreshOpts));
-  }
+/** Wire up expandable row toggles via event delegation */
+function setupRowToggleDelegation(reportContainer: HTMLElement): void {
+  reportContainer.addEventListener('click', (e: MouseEvent) => {
+    const target = e.target as HTMLElement;
 
-  if (troopSummaryBtn) troopSummaryBtn.addEventListener('click', () => generateReport('troop'));
-  if (inventoryReportBtn) inventoryReportBtn.addEventListener('click', () => generateReport('inventory'));
-  if (summaryReportBtn) summaryReportBtn.addEventListener('click', () => generateReport('summary'));
-  if (varietyReportBtn) varietyReportBtn.addEventListener('click', () => generateReport('variety'));
-  if (donationAlertBtn) donationAlertBtn.addEventListener('click', () => generateReport('donation-alert'));
-  if (boothReportBtn) boothReportBtn.addEventListener('click', () => generateReport('booth'));
-  if (recalculateBtn) recalculateBtn.addEventListener('click', () => loadDataFromDisk());
-  if (viewUnifiedDataBtn) viewUnifiedDataBtn.addEventListener('click', () => exportUnifiedDataset());
+    const scoutRow = target.closest('.scout-row') as HTMLElement | null;
+    if (scoutRow) {
+      const detailRow = reportContainer.querySelector(
+        `.scout-detail[data-scout-index="${scoutRow.dataset.scoutIndex}"]`
+      ) as HTMLElement | null;
+      toggleDetailRow(detailRow, scoutRow.querySelector('.expand-icon'));
+    }
 
-  // Modal event listeners
-  if (closeModal) closeModal.addEventListener('click', closeModal_);
-  if (cancelModal) cancelModal.addEventListener('click', closeModal_);
-  if (saveCredentials) {
-    saveCredentials.addEventListener('click', saveCredentials_);
-  }
-
-  // Close modal when clicking outside
-  if (loginModal) {
-    loginModal.addEventListener('click', (e: Event) => {
-      if (e.target === loginModal) {
-        closeModal_();
+    const boothRow = target.closest('.booth-row') as HTMLElement | null;
+    if (boothRow) {
+      const detailRow = boothRow.nextElementSibling as HTMLElement | null;
+      if (detailRow?.classList.contains('detail-row')) {
+        toggleDetailRow(detailRow, boothRow.querySelector('.expand-icon'));
       }
-    });
-  }
+    }
+  });
+}
 
-  // Listen for scrape progress events
-  ipcRenderer.on('scrape-progress', (_event, progress: ScrapeProgress) => {
-    updateScrapeProgress(progress, dcProgressFill, dcProgressText, scProgressFill, scProgressText);
+function setupEventListeners(config: Record<string, any>): void {
+  const { buttons, modal, fields, progress, status, reportContainer, actions } = config;
+  const { dcProgress, dcProgressFill, dcProgressText, scProgress, scProgressFill, scProgressText } = progress;
+  const { dcStatus: dcStatusEl, scStatus: scStatusEl, dcLastSync, scLastSync, importStatus } = status;
+  const { generateReport, exportUnifiedDataset, loadDataFromDisk, checkLoginStatus: checkLoginStatusFn } = actions;
+
+  const statusMsg = (msg: string, type: string) => showStatus(importStatus, msg, type);
+
+  // Modal
+  const openModal = setupModalHandlers(modal, fields, statusMsg, checkLoginStatusFn);
+  if (buttons.configureLoginsBtn) buttons.configureLoginsBtn.addEventListener('click', openModal);
+
+  // Sync
+  const refreshOpts: RefreshFromWebOptions = {
+    refreshFromWebBtn: buttons.refreshFromWebBtn,
+    dcProgress, dcProgressFill, dcProgressText,
+    scProgress, scProgressFill, scProgressText,
+    dcStatusEl, scStatusEl, dcLastSync, scLastSync,
+    showStatus: statusMsg, updateSyncStatus, loadDataFromDisk
+  };
+  if (buttons.refreshFromWebBtn) buttons.refreshFromWebBtn.addEventListener('click', () => handleRefreshFromWeb(refreshOpts));
+
+  // Report buttons
+  const reportBindings: [HTMLElement | null, string][] = [
+    [buttons.troopSummaryBtn, 'troop'],
+    [buttons.inventoryReportBtn, 'inventory'],
+    [buttons.summaryReportBtn, 'summary'],
+    [buttons.varietyReportBtn, 'variety'],
+    [buttons.donationAlertBtn, 'donation-alert'],
+    [buttons.boothReportBtn, 'booth'],
+    [buttons.availableBoothsBtn, 'available-booths']
+  ];
+  reportBindings.forEach(([btn, type]) => {
+    if (btn) btn.addEventListener('click', () => generateReport(type));
   });
 
-  // Event delegation for scout row toggles (more efficient than individual listeners)
-  if (reportContainer) {
-    reportContainer.addEventListener('click', (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
+  // Action buttons
+  if (buttons.recalculateBtn) buttons.recalculateBtn.addEventListener('click', () => loadDataFromDisk());
+  if (buttons.viewUnifiedDataBtn) buttons.viewUnifiedDataBtn.addEventListener('click', () => exportUnifiedDataset());
 
-      // Handle scout row toggle
-      const scoutRow = target.closest('.scout-row') as HTMLElement | null;
-      if (scoutRow) {
-        const detailRow = reportContainer.querySelector(
-          `.scout-detail[data-scout-index="${scoutRow.dataset.scoutIndex}"]`
-        ) as HTMLElement | null;
-        toggleDetailRow(detailRow, scoutRow.querySelector('.expand-icon'));
-      }
+  // IPC listeners
+  ipcRenderer.on('scrape-progress', (_event, prog: ScrapeProgress) => {
+    updateScrapeProgress(prog, dcProgressFill, dcProgressText, scProgressFill, scProgressText);
+  });
 
-      // Handle booth row toggle
-      const boothRow = target.closest('.booth-row') as HTMLElement | null;
-      if (boothRow) {
-        const detailRow = boothRow.nextElementSibling as HTMLElement | null;
-        if (detailRow?.classList.contains('detail-row')) {
-          toggleDetailRow(detailRow, boothRow.querySelector('.expand-icon'));
-        }
-      }
-    });
-  }
-
-  // Auto-update notification handler (notification-only)
   ipcRenderer.on('update-available', (_event, info: { version: string }) => {
     const response = confirm(
       `🎉 New version ${info.version} is available!\n\n` +
         `You're currently on version ${require('../../package.json').version}\n\n` +
         'Click OK to download the latest version from GitHub.'
     );
-
     if (response) {
-      // Open releases page in default browser
       require('electron').shell.openExternal('https://github.com/tyleryates/cookie-tracker/releases/latest');
       showStatus(importStatus, 'Opening download page...', 'info');
     }
   });
 
-  // Clean up on window unload
+  // Row toggle delegation
+  if (reportContainer) setupRowToggleDelegation(reportContainer);
+
   window.addEventListener('beforeunload', cleanup);
 }
 

@@ -69,24 +69,60 @@ export const TRANSFER_TYPE = {
 
 export type TransferType = (typeof TRANSFER_TYPE)[keyof typeof TRANSFER_TYPE];
 
-// Explicit transfer category — replaces boolean dispatch (isPhysical, virtualBooth, etc.)
-// Every transfer gets exactly one category assigned at creation time.
-// Reports use category for dispatch instead of nested if/else on booleans.
+// Explicit transfer category — every transfer gets exactly one category at creation time.
+//
+// NOTE: The SC API returns ALL record types through /orders/search, so reconciler.transfers[]
+// contains both actual inventory transfers (C2T, T2G, G2T) AND order/sales records (D,
+// COOKIE_SHARE, DIRECT_SHIP) that aren't really "transfers." The category documents which is
+// which. See category groups below for how reports distinguish them.
 export const TRANSFER_CATEGORY = {
+  // Actual inventory transfers
   COUNCIL_TO_TROOP: 'COUNCIL_TO_TROOP', // C2T, C2T(P), T2T — inventory received
   GIRL_PICKUP: 'GIRL_PICKUP', // T2G physical pickup
   VIRTUAL_BOOTH_ALLOCATION: 'VIRTUAL_BOOTH_ALLOCATION', // T2G virtual booth
   BOOTH_SALES_ALLOCATION: 'BOOTH_SALES_ALLOCATION', // T2G booth divider
   DIRECT_SHIP_ALLOCATION: 'DIRECT_SHIP_ALLOCATION', // T2G direct ship divider
   GIRL_RETURN: 'GIRL_RETURN', // G2T
-  DC_ORDER_RECORD: 'DC_ORDER_RECORD', // D (sync record, not a sale)
+  // Order/sales records (not actual transfers — stored in transfers[] because SC API returns them there)
+  DC_ORDER_RECORD: 'DC_ORDER_RECORD', // D — DC order synced to SC (not a sale, just a sync record)
   COOKIE_SHARE_RECORD: 'COOKIE_SHARE_RECORD', // COOKIE_SHARE, COOKIE_SHARE_D (manual or DC-synced)
   BOOTH_COOKIE_SHARE: 'BOOTH_COOKIE_SHARE', // COOKIE_SHARE from booth divider (automatic)
-  DIRECT_SHIP: 'DIRECT_SHIP', // DIRECT_SHIP
-  PLANNED: 'PLANNED' // Future orders
+  DIRECT_SHIP: 'DIRECT_SHIP', // Shipped from supplier (order record, not inventory movement)
+  PLANNED: 'PLANNED' // Future/uncommitted order
 } as const;
 
 export type TransferCategory = (typeof TRANSFER_CATEGORY)[keyof typeof TRANSFER_CATEGORY];
+
+// Category groups — define once, use everywhere.
+// When adding a new TRANSFER_CATEGORY, update the relevant groups here.
+export const SALE_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
+  TRANSFER_CATEGORY.GIRL_PICKUP,
+  TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
+  TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION,
+  TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION,
+  TRANSFER_CATEGORY.DIRECT_SHIP
+]);
+
+export const T2G_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
+  TRANSFER_CATEGORY.GIRL_PICKUP,
+  TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
+  TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION,
+  TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION
+]);
+
+// Troop inventory out = T2G_CATEGORIES (packages leaving troop stock)
+// Troop inventory in: packages entering troop stock
+export const TROOP_INVENTORY_IN_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
+  TRANSFER_CATEGORY.COUNCIL_TO_TROOP,
+  TRANSFER_CATEGORY.GIRL_RETURN
+]);
+
+// Scout physical inventory: categories where physical cookies change hands at the scout level
+// GIRL_PICKUP adds to scout inventory, GIRL_RETURN subtracts
+export const SCOUT_PHYSICAL_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
+  TRANSFER_CATEGORY.GIRL_PICKUP,
+  TRANSFER_CATEGORY.GIRL_RETURN
+]);
 
 // How troop orders get credited to girls in SC
 export const ALLOCATION_METHOD = {

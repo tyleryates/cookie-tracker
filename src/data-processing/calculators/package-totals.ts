@@ -1,7 +1,7 @@
 // Package Totals Calculations
 // Calculates troop-wide package totals across all sources
 
-import { DC_COLUMNS, ORDER_TYPE, SPECIAL_IDENTIFIERS, TRANSFER_CATEGORY } from '../../constants';
+import { DC_COLUMNS, ORDER_TYPE, SALE_CATEGORIES, SPECIAL_IDENTIFIERS, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { PackageTotals, Transfer } from '../../types';
 import { classifyDCOrder } from './order-processing';
@@ -23,6 +23,7 @@ function calculatePackageTotals(transfers: Transfer[], rawDCData: Record<string,
     const packages = transfer.packages || 0;
     const amount = transfer.amount || 0;
 
+    // Per-category counters
     switch (transfer.category) {
       case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
         totalOrdered += transfer.physicalPackages || 0;
@@ -32,30 +33,25 @@ function calculatePackageTotals(transfers: Transfer[], rawDCData: Record<string,
         break;
       case TRANSFER_CATEGORY.GIRL_PICKUP:
         totalAllocated += transfer.physicalPackages || 0;
-        totalSold += packages;
-        totalRevenue += amount;
         break;
       case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
         totalVirtualBoothT2G += transfer.physicalPackages || 0;
-        totalSold += packages;
-        totalRevenue += amount;
         break;
       case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
         totalBoothDividerT2G += transfer.physicalPackages || 0;
-        totalSold += packages;
-        totalRevenue += amount;
         break;
       case TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION:
         totalDirectShipDividerT2G += transfer.physicalPackages || 0;
-        totalSold += packages;
-        totalRevenue += amount;
         break;
       case TRANSFER_CATEGORY.DIRECT_SHIP:
         totalDirectShip += packages;
-        totalSold += packages;
-        totalRevenue += amount;
         break;
-      // DC_ORDER_RECORD, COOKIE_SHARE_RECORD, PLANNED: not counted as sold
+    }
+
+    // Common: all sale categories contribute to sold and revenue
+    if (SALE_CATEGORIES.has(transfer.category)) {
+      totalSold += packages;
+      totalRevenue += amount;
     }
 
     // Count Cookie Share donations

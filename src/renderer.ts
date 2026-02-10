@@ -6,6 +6,7 @@ import { normalizeBoothLocation } from './data-processing/data-importers';
 import DataReconciler from './data-reconciler';
 import Logger from './logger';
 import { DateFormatter } from './renderer/html-builder';
+import { generateAvailableBoothsReport } from './renderer/reports/available-booths';
 import { generateBoothReport } from './renderer/reports/booth';
 import { generateDonationAlertReport } from './renderer/reports/donation-alert';
 import { generateInventoryReport } from './renderer/reports/inventory';
@@ -36,6 +37,7 @@ const dom = {
     varietyReportBtn: document.getElementById('varietyReportBtn'),
     donationAlertBtn: document.getElementById('donationAlertBtn'),
     boothReportBtn: document.getElementById('boothReportBtn'),
+    availableBoothsBtn: document.getElementById('availableBoothsBtn'),
     recalculateBtn: document.getElementById('recalculateBtn'),
     viewUnifiedDataBtn: document.getElementById('viewUnifiedDataBtn')
   },
@@ -229,9 +231,8 @@ function setButtonDisabled(btn: HTMLElement | null, disabled: boolean): void {
 type FileLoadResult = { loaded: boolean; issue?: string };
 
 function loadJsonFile(file: DataFileInfo, rec: DataReconciler): FileLoadResult {
-  const jsonData = file.data;
-  if (isSmartCookieAPIFormat(jsonData)) {
-    rec.importSmartCookieAPI(jsonData);
+  if (isSmartCookieAPIFormat(file.data)) {
+    rec.importSmartCookieAPI(file.data);
     return { loaded: true };
   }
   return { loaded: false, issue: `Smart Cookie JSON not recognized: ${file.name}` };
@@ -251,121 +252,99 @@ function loadExcelFile(
   return { loaded: false, issue: `${errorLabel}: ${file.name}` };
 }
 
+interface LoadedSources {
+  sc: boolean;
+  dc: boolean;
+  scReport: boolean;
+  scTransfer: boolean;
+  issues: string[];
+}
+
+/** Find and load all data source files, updating UI status indicators */
+function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: boolean): LoadedSources {
+  const issues: string[] = [];
+  const scFile = findLatestFile(files, 'SC-', '.json');
+  const dcFile = findLatestFile(files, 'DC-', '.xlsx');
+  const scReportFile = findLatestFile(files, '', '.xlsx', 'ReportExport');
+  const scTransferFile = findLatestFile(files, '', '.xlsx', 'CookieOrders');
+
+  // Smart Cookie API (JSON)
+  let sc = false;
+  if (scFile) {
+    const r = loadJsonFile(scFile, rec);
+    sc = r.loaded;
+    if (r.loaded) updateSourceStatus(dom.status.scStatus, dom.status.scLastSync, scFile.name, 'SC-', '.json', updateTs);
+    else if (r.issue) issues.push(r.issue);
+  }
+
+  // Digital Cookie (Excel)
+  let dc = false;
+  if (dcFile) {
+    const r = loadExcelFile(dcFile, isDigitalCookieFormat, (data) => rec.importDigitalCookie(data), 'Digital Cookie XLSX not recognized');
+    dc = r.loaded;
+    if (r.loaded) updateSourceStatus(dom.status.dcStatus, dom.status.dcLastSync, dcFile.name, 'DC-', '.xlsx', updateTs);
+    else if (r.issue) issues.push(r.issue);
+  }
+
+  // Smart Cookie Report (Excel)
+  let scReport = false;
+  if (scReportFile) {
+    const r = loadExcelFile(scReportFile, (data) => data?.length > 0, (data) => rec.importSmartCookieReport(data), 'Smart Cookie Report empty/unreadable');
+    scReport = r.loaded;
+    if (r.issue) issues.push(r.issue);
+  }
+
+  // Smart Cookie Transfers (Excel) — skipped if API data present
+  let scTransfer = false;
+  if (!sc && scTransferFile) {
+    const r = loadExcelFile(scTransferFile, (data) => data?.length > 0, (data) => rec.importSmartCookie(data), 'Smart Cookie Transfer empty/unreadable');
+    scTransfer = r.loaded;
+    if (r.issue) issues.push(r.issue);
+  } else if (sc && scTransferFile) {
+    rec.metadata.warnings.push({ type: 'SC_TRANSFER_SKIPPED', reason: 'SC API data present', file: scTransferFile.name });
+    Logger.warn('Skipping CookieOrders.xlsx import because SC API data is present.');
+  }
+
+  return { sc, dc, scReport, scTransfer, issues };
+}
+
 async function loadDataFromDisk(showMessages: boolean = true, updateTimestamps: boolean = true): Promise<boolean> {
   try {
-    if (showMessages) {
-      showStatus('Loading data...', 'success');
-    }
+    if (showMessages) showStatus('Loading data...', 'success');
 
     reconciler = new DataReconciler();
-
     const result = await ipcRenderer.invoke('scan-in-directory');
+    if (!result.success || !result.files?.length) return false;
 
-    if (!result.success || !result.files || result.files.length === 0) {
-      return false;
-    }
+    const loaded = loadSourceFiles(result.files, reconciler, updateTimestamps);
+    const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;
 
-    const files: DataFileInfo[] = result.files;
-    const scFile = findLatestFile(files, 'SC-', '.json');
-    const dcFile = findLatestFile(files, 'DC-', '.xlsx');
-    const scReportFile = findLatestFile(files, '', '.xlsx', 'ReportExport');
-    const scTransferFile = findLatestFile(files, '', '.xlsx', 'CookieOrders');
-
-    let loadedSC = false;
-    let loadedDC = false;
-    let loadedSCReport = false;
-    let loadedSCTransfer = false;
-    const loadIssues: string[] = [];
-
-    if (scFile) {
-      const r = loadJsonFile(scFile, reconciler);
-      loadedSC = r.loaded;
-      if (r.loaded) {
-        updateSourceStatus(dom.status.scStatus, dom.status.scLastSync, scFile.name, 'SC-', '.json', updateTimestamps);
-      } else if (r.issue) {
-        loadIssues.push(r.issue);
-      }
-    }
-
-    if (dcFile) {
-      const r = loadExcelFile(
-        dcFile,
-        isDigitalCookieFormat,
-        (data) => reconciler.importDigitalCookie(data),
-        'Digital Cookie XLSX not recognized'
-      );
-      loadedDC = r.loaded;
-      if (r.loaded) {
-        updateSourceStatus(dom.status.dcStatus, dom.status.dcLastSync, dcFile.name, 'DC-', '.xlsx', updateTimestamps);
-      } else if (r.issue) {
-        loadIssues.push(r.issue);
-      }
-    }
-
-    if (scReportFile) {
-      const r = loadExcelFile(
-        scReportFile,
-        (data) => data && data.length > 0,
-        (data) => reconciler.importSmartCookieReport(data),
-        'Smart Cookie Report empty/unreadable'
-      );
-      loadedSCReport = r.loaded;
-      if (r.issue) loadIssues.push(r.issue);
-    }
-
-    if (!loadedSC && scTransferFile) {
-      const r = loadExcelFile(
-        scTransferFile,
-        (data) => data && data.length > 0,
-        (data) => reconciler.importSmartCookie(data),
-        'Smart Cookie Transfer empty/unreadable'
-      );
-      loadedSCTransfer = r.loaded;
-      if (r.issue) loadIssues.push(r.issue);
-    } else if (loadedSC && scTransferFile) {
-      const warning = {
-        type: 'SC_TRANSFER_SKIPPED',
-        reason: 'SC API data present',
-        file: scTransferFile.name
-      };
-      reconciler.metadata.warnings.push(warning);
-      Logger.warn('Skipping CookieOrders.xlsx import because SC API data is present.');
-    }
-
-    if (loadedSC || loadedDC || loadedSCReport || loadedSCTransfer) {
+    if (anyLoaded) {
       Logger.debug('Building unified dataset...');
       reconciler.buildUnifiedDataset();
       if (reconciler.unified?.metadata?.healthChecks?.warningsCount > 0) {
         Logger.warn('Health check warnings:', reconciler.unified.metadata.warnings);
       }
-      Logger.info('Unified dataset ready:', {
-        scouts: reconciler.unified.scouts.size,
-        siteOrders: reconciler.unified.siteOrders
-      });
+      Logger.info('Unified dataset ready:', { scouts: reconciler.unified.scouts.size, siteOrders: reconciler.unified.siteOrders });
 
       await saveUnifiedDatasetToDisk();
-
       enableReportButtons();
-      if (showMessages) {
-        showStatus(`✅ Loaded ${result.files.length} file(s)`, 'success');
-      }
+      if (showMessages) showStatus(`✅ Loaded ${result.files.length} file(s)`, 'success');
       return true;
     }
 
-    if (loadIssues.length > 0 && showMessages) {
-      showStatus(`No reports loaded. ${loadIssues.join(' | ')}`, 'warning');
+    if (loaded.issues.length > 0 && showMessages) {
+      showStatus(`No reports loaded. ${loaded.issues.join(' | ')}`, 'warning');
       renderHealthBanner({
         level: 'warning',
         title: 'No Reports Loaded',
         message: 'Files were found but could not be parsed. See details below.',
-        details: loadIssues.map((msg) => ({ type: 'LOAD_ISSUE', message: msg }))
+        details: loaded.issues.map((msg) => ({ type: 'LOAD_ISSUE', message: msg }))
       });
     }
     return false;
   } catch (error) {
-    if (showMessages) {
-      showStatus(`Error loading files: ${error.message}`, 'error');
-    }
+    if (showMessages) showStatus(`Error loading files: ${error.message}`, 'error');
     Logger.error('Data load error:', error);
     return false;
   }
@@ -422,7 +401,8 @@ const REPORT_CONFIG = {
   summary: { button: () => dom.buttons.summaryReportBtn, generator: () => generateSummaryReport(reconciler) },
   variety: { button: () => dom.buttons.varietyReportBtn, generator: () => generateVarietyReport(reconciler) },
   'donation-alert': { button: () => dom.buttons.donationAlertBtn, generator: () => generateDonationAlertReport(reconciler) },
-  booth: { button: () => dom.buttons.boothReportBtn, generator: () => generateBoothReport(reconciler) }
+  booth: { button: () => dom.buttons.boothReportBtn, generator: () => generateBoothReport(reconciler) },
+  'available-booths': { button: () => dom.buttons.availableBoothsBtn, generator: () => generateAvailableBoothsReport(reconciler) }
 };
 
 async function handleRefreshBoothAvailability(): Promise<void> {
@@ -457,8 +437,8 @@ async function handleRefreshBoothAvailability(): Promise<void> {
       reconciler.unified.boothLocations = updated;
     }
 
-    // Re-render booth report
-    generateReport('booth');
+    // Re-render available booths report
+    generateReport('available-booths');
   } catch (error) {
     Logger.error('Booth availability refresh failed:', error);
     if (btn) {
@@ -498,7 +478,7 @@ function generateReport(type: string): void {
     dom.reportContainer.classList.add('show');
 
     // Wire up booth availability refresh button if present
-    if (type === 'booth') {
+    if (type === 'available-booths') {
       const refreshBtn = document.getElementById('refreshBoothAvailability');
       if (refreshBtn) {
         refreshBtn.addEventListener('click', handleRefreshBoothAvailability);
@@ -523,20 +503,32 @@ function getBoothWarningLabel(rec: DataReconciler): string {
   return pastNeedingDistribution > 0 ? '⚠️ Booths' : 'Booths';
 }
 
+function getScoutWarningLabel(): string {
+  const hasNegativeInventory = reconciler.unified?.troopTotals?.scouts?.withNegativeInventory > 0;
+  const hasUnallocated =
+    reconciler.unified?.siteOrders?.directShip?.hasWarning ||
+    reconciler.unified?.siteOrders?.girlDelivery?.hasWarning ||
+    reconciler.unified?.siteOrders?.boothSale?.hasWarning;
+  return (hasNegativeInventory || hasUnallocated) ? '⚠️ Scouts' : 'Scouts';
+}
+
+function getDonationWarningLabel(): string {
+  return reconciler.unified?.cookieShare?.reconciled ? 'Donations' : '⚠️ Donations';
+}
+
 function enableReportButtons(): void {
-  const { troopSummaryBtn, inventoryReportBtn, summaryReportBtn, varietyReportBtn, donationAlertBtn, boothReportBtn, viewUnifiedDataBtn } =
-    dom.buttons;
   const unknownTypes = reconciler.unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
 
-  if (unknownTypes > 0) {
-    setButtonDisabled(troopSummaryBtn, true);
-    setButtonDisabled(inventoryReportBtn, true);
-    setButtonDisabled(viewUnifiedDataBtn, false);
-    setButtonDisabled(summaryReportBtn, true);
-    setButtonDisabled(varietyReportBtn, true);
-    setButtonDisabled(donationAlertBtn, true);
-    setButtonDisabled(boothReportBtn, true);
+  // All report buttons (viewUnifiedDataBtn always enabled even when blocked)
+  const reportButtons = [
+    dom.buttons.troopSummaryBtn, dom.buttons.inventoryReportBtn, dom.buttons.summaryReportBtn,
+    dom.buttons.varietyReportBtn, dom.buttons.donationAlertBtn, dom.buttons.boothReportBtn,
+    dom.buttons.availableBoothsBtn
+  ];
 
+  if (unknownTypes > 0) {
+    reportButtons.forEach((btn) => setButtonDisabled(btn, true));
+    setButtonDisabled(dom.buttons.viewUnifiedDataBtn, false);
     renderHealthBanner({
       level: 'error',
       title: 'Blocked: Unknown Order Types Detected',
@@ -546,35 +538,14 @@ function enableReportButtons(): void {
     return;
   }
 
-  setButtonDisabled(troopSummaryBtn, false);
-  setButtonDisabled(inventoryReportBtn, false);
-  setButtonDisabled(viewUnifiedDataBtn, false);
+  // Enable all buttons
+  reportButtons.forEach((btn) => setButtonDisabled(btn, false));
+  setButtonDisabled(dom.buttons.viewUnifiedDataBtn, false);
 
-  if (summaryReportBtn) {
-    setButtonDisabled(summaryReportBtn, false);
-
-    const hasNegativeInventory = reconciler.unified?.troopTotals?.scouts?.withNegativeInventory > 0;
-    const hasUnallocatedSiteOrders =
-      reconciler.unified?.siteOrders?.directShip?.hasWarning ||
-      reconciler.unified?.siteOrders?.girlDelivery?.hasWarning ||
-      reconciler.unified?.siteOrders?.boothSale?.hasWarning;
-    const hasScoutWarning = hasNegativeInventory || hasUnallocatedSiteOrders;
-    summaryReportBtn.textContent = hasScoutWarning ? '⚠️ Scout Summary' : 'Scout Summary';
-  }
-
-  setButtonDisabled(varietyReportBtn, false);
-
-  if (donationAlertBtn) {
-    setButtonDisabled(donationAlertBtn, false);
-
-    const needsReconciliation = !reconciler.unified?.cookieShare?.reconciled;
-    donationAlertBtn.textContent = needsReconciliation ? '⚠️ Virtual Cookie Share' : 'Virtual Cookie Share';
-  }
-
-  if (boothReportBtn) {
-    setButtonDisabled(boothReportBtn, false);
-    boothReportBtn.textContent = getBoothWarningLabel(reconciler);
-  }
+  // Apply warning labels
+  if (dom.buttons.summaryReportBtn) dom.buttons.summaryReportBtn.textContent = getScoutWarningLabel();
+  if (dom.buttons.donationAlertBtn) dom.buttons.donationAlertBtn.textContent = getDonationWarningLabel();
+  if (dom.buttons.boothReportBtn) dom.buttons.boothReportBtn.textContent = getBoothWarningLabel(reconciler);
 
   generateReport('troop');
 }
