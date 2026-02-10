@@ -1,7 +1,5 @@
 # Distributing Updates to Cookie Tracker
 
-**Last Updated:** 2026-02-04
-
 This guide explains how to distribute updates to users who have the Cookie Tracker app installed.
 
 ---

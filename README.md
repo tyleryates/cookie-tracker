@@ -73,12 +73,8 @@ All data stays on your computer. Nothing is sent anywhere except to the Girl Sco
 **Still need help?**
 [Report an issue on GitHub](https://github.com/tyleryates/cookie-tracker/issues)
 
-## For Developers
-
-See **[DEVELOPMENT.md](DEVELOPMENT.md)** for technical documentation.
-
 ---
 
-**Version:** 1.2.0
+**Version:** 1.3.0
 
 This is an unofficial volunteer tool not affiliated with Girl Scouts of the USA.

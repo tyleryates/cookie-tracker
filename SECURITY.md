@@ -90,16 +90,6 @@ If you enable auto-updates via GitHub:
 
 ---
 
-## Audit History
-
-- **2026-02-04** - Initial security review before v1.0.0 release
-  - No critical vulnerabilities found in application code
-  - xlsx dependency vulnerability documented and risk accepted
-  - Sensitive console.log statements removed
-  - Hardcoded troop-specific data removed
-
----
-
 ## Responsible Disclosure
 
 We take security seriously. If you discover a security issue:
@@ -109,6 +99,3 @@ We take security seriously. If you discover a security issue:
 3. Allow reasonable time for a fix before public disclosure
 4. We will credit you in the security advisory (if desired)
 
----
-
-**Last Updated:** 2026-02-04

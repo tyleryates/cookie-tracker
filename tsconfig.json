@@ -1,0 +1,50 @@
+{
+  "compilerOptions": {
+    // Target ES2020 for modern Node.js features
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
+
+    // Output configuration
+    "rootDir": "src",
+    "outDir": "dist",
+
+    // Module resolution
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+
+    // Type checking - relaxed for initial migration
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strictFunctionTypes": false,
+    "strictPropertyInitialization": false,
+    "noImplicitThis": false,
+    "alwaysStrict": false,
+
+    // Additional checks - disabled for now
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+
+    // Other options
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,  // Allow JS files during migration
+    "checkJs": false  // Don't type-check JS files yet
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "release",
+    "docs",
+    "**/*.spec.ts",
+    "**/*.test.ts"
+  ]
+}
