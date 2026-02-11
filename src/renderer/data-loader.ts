@@ -1,10 +1,10 @@
 // Data Loader — thin IPC wrapper for the renderer.
 // All data processing happens in the main process via the data pipeline.
 
-import { ipcRenderer } from 'electron';
 import Logger from '../logger';
-import type { AppConfig, DataFileInfo, DatasetEntry, IpcResponse, LoadDataResult, UnifiedDataset } from '../types';
+import type { AppConfig, DataFileInfo, DatasetEntry, LoadDataResult, UnifiedDataset } from '../types';
 import { DateFormatter } from './format-utils';
+import { ipcInvoke, ipcInvokeRaw } from './ipc';
 
 export type { DatasetEntry };
 
@@ -16,7 +16,7 @@ export async function loadDataFromDisk(options?: {
   specificSc?: DataFileInfo | null;
   specificDc?: DataFileInfo | null;
 }): Promise<LoadDataResult | null> {
-  const result: IpcResponse<LoadDataResult | null> = await ipcRenderer.invoke('load-data', options);
+  const result = await ipcInvokeRaw('load-data', options);
 
   // Unwrap standardized IPC format { success, data }
   if (!result?.success) return null;
@@ -61,7 +61,7 @@ export async function saveUnifiedDatasetToDisk(unified: UnifiedDataset): Promise
     const timestamp = DateFormatter.toTimestamp();
     const filename = `unified-${timestamp}.json`;
 
-    const result = await ipcRenderer.invoke('save-file', {
+    const result = await ipcInvokeRaw('save-file', {
       filename: filename,
       content: jsonStr,
       type: 'unified'
@@ -94,11 +94,7 @@ export function exportUnifiedDataset(unified: UnifiedDataset): void {
 
 export async function loadAppConfig(): Promise<AppConfig> {
   try {
-    const result: IpcResponse<AppConfig> = await ipcRenderer.invoke('load-config');
-    if (result.success) {
-      return result.data;
-    }
-    throw new Error(result.error);
+    return await ipcInvoke('load-config');
   } catch (err) {
     Logger.error('Failed to load config:', err);
     return { autoSyncEnabled: true, boothIds: [], boothDayFilters: [], ignoredTimeSlots: [] };

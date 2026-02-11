@@ -459,6 +459,38 @@ export interface AppConfig {
 export type IpcResponse<T = unknown> = { success: true; data: T } | { success: false; error: string };
 
 // ============================================================================
+// IPC CONTRACT TYPES
+// ============================================================================
+
+export interface ScrapeResults {
+  digitalCookie?: { success: boolean; error?: string; filePath?: string };
+  smartCookie?: { success: boolean; error?: string; filePath?: string };
+  success: boolean;
+  error?: string;
+}
+
+export interface IpcChannelMap {
+  'load-data': {
+    request: { specificSc?: DataFileInfo | null; specificDc?: DataFileInfo | null } | undefined;
+    response: LoadDataResult | null;
+  };
+  'save-file': { request: { filename: string; content: string; type?: string }; response: { path: string } };
+  'load-credentials': { request: undefined; response: Credentials };
+  'save-credentials': { request: Credentials; response: undefined };
+  'load-config': { request: undefined; response: AppConfig };
+  'save-config': { request: AppConfig; response: undefined };
+  'update-config': { request: Partial<AppConfig>; response: AppConfig };
+  'scrape-websites': { request: undefined; response: ScrapeResults };
+  'cancel-sync': { request: undefined; response: undefined };
+  'refresh-booth-locations': { request: undefined; response: BoothLocation[] };
+}
+
+export interface IpcEventMap {
+  'scrape-progress': ScrapeProgress;
+  'update-available': { version: string };
+}
+
+// ============================================================================
 // DATA FILE INFO
 // ============================================================================
 

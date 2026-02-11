@@ -2,11 +2,11 @@
 // Handles troop booth sale orders and allocation tracking
 
 import { ALLOCATION_CHANNEL, ORDER_TYPE, OWNER, TRANSFER_CATEGORY } from '../../constants';
-import type { DataStore } from '../../data-store';
+import type { ReadonlyDataStore } from '../../data-store';
 import type { Order, Scout, SiteOrderCategory, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
 
 /** Build site orders dataset with allocation tracking */
-function buildSiteOrdersDataset(reconciler: DataStore, scoutDataset: Map<string, Scout>): SiteOrdersDataset {
+function buildSiteOrdersDataset(reconciler: ReadonlyDataStore, scoutDataset: Map<string, Scout>): SiteOrdersDataset {
   // Find site scout from pre-classified scout data
   let siteScout: Scout | null = null;
   for (const s of scoutDataset.values()) {
@@ -74,7 +74,7 @@ function buildCategory(orders: SiteOrderEntry[], allocated: number): SiteOrderCa
 }
 
 /** Calculate total allocated packages by type */
-function calculateAllocations(reconciler: DataStore): { directShip: number; virtualBooth: number; boothSales: number } {
+function calculateAllocations(reconciler: ReadonlyDataStore): { directShip: number; virtualBooth: number; boothSales: number } {
   let directShip = 0;
   let virtualBooth = 0;
   let boothSales = 0;

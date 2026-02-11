@@ -31,7 +31,7 @@ export interface AppState {
 // ACTIONS
 // ============================================================================
 
-type Action =
+export type Action =
   | { type: 'SET_STATUS'; msg: string; statusType: StatusMessage['type'] }
   | { type: 'CLEAR_STATUS' }
   | { type: 'SET_SETUP_HINT'; show: boolean }

@@ -2,11 +2,11 @@
 // Creates initial scout data structures from DC and SC data
 
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
-import type { DataStore } from '../../data-store';
+import type { ReadonlyDataStore } from '../../data-store';
 import type { RawScoutData, Scout } from '../../types';
 
 /** Initialize scouts from Digital Cookie and Smart Cookie data */
-function initializeScouts(reconciler: DataStore, rawDCData: Record<string, any>[]): Map<string, Scout> {
+function initializeScouts(reconciler: ReadonlyDataStore, rawDCData: Record<string, any>[]): Map<string, Scout> {
   const scoutDataset = new Map<string, Scout>();
 
   // From Digital Cookie orders

@@ -2,11 +2,11 @@
 // Tracks Cookie Share donations across DC and SC for reconciliation
 
 import { DC_COLUMNS, isDCAutoSync, SPECIAL_IDENTIFIERS, TRANSFER_CATEGORY } from '../../constants';
-import type { DataStore } from '../../data-store';
+import type { ReadonlyDataStore } from '../../data-store';
 import type { CookieShareTracking, Transfer } from '../../types';
 
 /** Build Cookie Share reconciliation tracking */
-export function buildCookieShareTracking(reconciler: DataStore): CookieShareTracking {
+export function buildCookieShareTracking(reconciler: ReadonlyDataStore): CookieShareTracking {
   const rawDCData = reconciler.metadata.rawDCData || [];
 
   let dcTotal = 0;

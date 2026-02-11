@@ -1,9 +1,9 @@
 // LoginModal — Controlled form for configuring DC and SC credentials
 
-import { ipcRenderer } from 'electron';
 import { useEffect, useState } from 'preact/hooks';
 import Logger from '../../logger';
 import type { Credentials } from '../../types';
+import { ipcInvoke, ipcInvokeRaw } from '../ipc';
 
 interface LoginModalProps {
   onClose: () => void;
@@ -69,14 +69,12 @@ export function LoginModal({ onClose, onSave, showStatus }: LoginModalProps) {
   useEffect(() => {
     (async () => {
       try {
-        const result = await ipcRenderer.invoke('load-credentials');
-        if (result.success && result.data) {
-          setDcUsername(result.data.digitalCookie.username || '');
-          setDcPassword(result.data.digitalCookie.password || '');
-          setDcRole(result.data.digitalCookie.role || '');
-          setScUsername(result.data.smartCookie.username || '');
-          setScPassword(result.data.smartCookie.password || '');
-        }
+        const creds = await ipcInvoke('load-credentials');
+        setDcUsername(creds.digitalCookie.username || '');
+        setDcPassword(creds.digitalCookie.password || '');
+        setDcRole(creds.digitalCookie.role || '');
+        setScUsername(creds.smartCookie.username || '');
+        setScPassword(creds.smartCookie.password || '');
       } catch (error) {
         Logger.error('Error loading credentials:', error);
       }
@@ -90,7 +88,7 @@ export function LoginModal({ onClose, onSave, showStatus }: LoginModalProps) {
         smartCookie: { username: scUsername.trim(), password: scPassword.trim() }
       };
 
-      const result = await ipcRenderer.invoke('save-credentials', credentials);
+      const result = await ipcInvokeRaw('save-credentials', credentials);
 
       // Best-effort memory clearing (JS strings are immutable; real security is OS keychain)
       credentials.digitalCookie.password = '';

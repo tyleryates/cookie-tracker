@@ -7,11 +7,12 @@ import { type Cookie, CookieJar } from 'tough-cookie';
 import { HTTP_STATUS, SPECIAL_IDENTIFIERS } from '../constants';
 import Logger from '../logger';
 import { requestWithRetry } from './request-utils';
+import type { SCMeResponse } from './sc-types';
 
 export class SmartCookieSession {
   xsrfToken: string | null = null;
   troopId: string | null = null;
-  meResponse: Record<string, unknown> | null = null;
+  meResponse: SCMeResponse | null = null;
   client: AxiosInstance;
   private cookieJar: CookieJar;
   private credentials: { username: string; password: string } | null = null;
@@ -78,7 +79,7 @@ export class SmartCookieSession {
 
     // Call /me endpoint to establish session and capture troopId
     try {
-      const meData = await this.apiGet('/webapi/api/me', '/me endpoint');
+      const meData = await this.apiGet<SCMeResponse>('/webapi/api/me', '/me endpoint');
       this.meResponse = meData || null;
 
       if (meData?.role?.troop_id) {
@@ -111,7 +112,7 @@ export class SmartCookieSession {
   }
 
   /** Authenticated GET request */
-  async apiGet(url: string, label: string): Promise<any> {
+  async apiGet<T = any>(url: string, label: string): Promise<T> {
     if (!this.xsrfToken) throw new Error('XSRF token not available. Must login first.');
     try {
       const response = await this.client.get(url, { headers: this.authHeaders });
@@ -123,7 +124,7 @@ export class SmartCookieSession {
   }
 
   /** Authenticated POST request */
-  async apiPost(url: string, body: Record<string, any>, label: string): Promise<any> {
+  async apiPost<T = any>(url: string, body: Record<string, any>, label: string): Promise<T> {
     if (!this.xsrfToken) throw new Error('XSRF token not available. Must login first.');
     try {
       const response = await this.client.post(url, body, {

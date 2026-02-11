@@ -7,7 +7,7 @@ import ExcelJS from 'exceljs';
 import { DC_COLUMNS } from './constants';
 import { buildUnifiedDataset } from './data-processing/calculators/index';
 import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './data-processing/importers';
-import { createDataStore, type DataStore } from './data-store';
+import { createDataStore, type DataStore, type ReadonlyDataStore } from './data-store';
 import Logger from './logger';
 import type { DataFileInfo, DatasetEntry, LoadDataResult, LoadedSources } from './types';
 
@@ -316,7 +316,8 @@ export async function loadData(
   if (!anyLoaded) return null;
 
   Logger.debug('Building unified dataset...');
-  const unified = buildUnifiedDataset(store);
+  const frozenStore: ReadonlyDataStore = store;
+  const unified = buildUnifiedDataset(frozenStore);
 
   if (unified.metadata?.healthChecks?.warningsCount > 0) {
     Logger.warn('Health check warnings:', unified.warnings);

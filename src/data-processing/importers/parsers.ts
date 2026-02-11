@@ -49,8 +49,8 @@ export function parseVarietiesFromSCReport(row: Record<string, any>): { varietie
 
 /** Parse cookie varieties from Smart Cookie API cookies array */
 export function parseVarietiesFromAPI(
-  cookiesArray: Array<{ id?: number; cookieId?: number; quantity: number }> | null,
-  dynamicCookieIdMap: Record<number, CookieType> | null = null
+  cookiesArray: Array<{ id?: number; cookieId?: number; quantity: number }> | null | undefined,
+  dynamicCookieIdMap: Record<number, CookieType> | null | undefined = null
 ): { varieties: Varieties; totalPackages: number } {
   const varieties: Record<string, number> = {};
   let totalPackages = 0;

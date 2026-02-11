@@ -4,6 +4,7 @@ import { TRANSFER_TYPE } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
+import type { SCDividerGirl } from '../../scrapers/sc-types';
 import type { CookieType, RawScoutData, Varieties } from '../../types';
 import { parseVarietiesFromAPI } from './parsers';
 
@@ -45,7 +46,7 @@ export function updateScoutData(reconciler: DataStore, scoutName: string, data: 
 }
 
 /** Register a scout by girlId, creating the scout entry if needed */
-export function registerScout(reconciler: DataStore, girlId: number, girl: Record<string, any>): void {
+export function registerScout(reconciler: DataStore, girlId: number, girl: SCDividerGirl): void {
   const scoutName = `${girl.first_name || ''} ${girl.last_name || ''}`.trim();
   if (!girlId || !scoutName) return;
 
@@ -102,7 +103,7 @@ export function mergeDCOrderFromSC(
 
 /** Parse a girl's cookie allocation, deduplicating by key. Returns null if zero packages or duplicate. */
 export function parseGirlAllocation(
-  girl: Record<string, any>,
+  girl: SCDividerGirl,
   dedupePrefix: string | number,
   seen: Set<string>,
   reconciler: DataStore,

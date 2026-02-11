@@ -8,18 +8,21 @@ import type { ProgressCallback } from '../types';
 import { BaseScraper, getTimestamp } from './base-scraper';
 import { requestWithRetry } from './request-utils';
 import { SmartCookieSession } from './sc-session';
+import type {
+  SaveOrdersParams,
+  SCBoothDividerResult,
+  SCBoothLocationRaw,
+  SCCookieMapEntry,
+  SCDirectShipDivider,
+  SCDividerGirl,
+  SCOrder,
+  SCOrdersResponse,
+  SCReservation,
+  SCReservationsResponse,
+  SCVirtualCookieShare
+} from './sc-types';
 
 const BOOTH_DIVIDER_CONCURRENCY = 3;
-
-interface SaveOrdersParams {
-  ordersData: any;
-  directShipDivider: any;
-  virtualCookieShares: any;
-  reservations: any;
-  boothDividers: any;
-  boothLocations: any;
-  cookieIdMap: any;
-}
 
 /**
  * Smart Cookie API Scraper
@@ -45,7 +48,7 @@ class SmartCookieScraper extends BaseScraper {
     }
   }
 
-  async fetchOrders(signal?: AbortSignal): Promise<any> {
+  async fetchOrders(signal?: AbortSignal): Promise<SCOrdersResponse> {
     this.checkAborted(signal);
     this.sendProgress('Fetching orders...', 25);
 
@@ -60,7 +63,7 @@ class SmartCookieScraper extends BaseScraper {
     };
 
     try {
-      const data = await this.session.apiPost('/webapi/api/orders/search', searchPayload, 'Orders search');
+      const data = await this.session.apiPost<SCOrdersResponse>('/webapi/api/orders/search', searchPayload, 'Orders search');
       this.sendProgress('Orders fetched', 35);
       return data;
     } catch (error: unknown) {
@@ -74,23 +77,23 @@ class SmartCookieScraper extends BaseScraper {
     }
   }
 
-  async fetchDirectShipDivider(signal?: AbortSignal): Promise<any> {
+  async fetchDirectShipDivider(signal?: AbortSignal): Promise<SCDirectShipDivider> {
     this.checkAborted(signal);
     this.sendProgress('Fetching direct ship allocations...', 40);
-    return this.session.apiGet('/webapi/api/troops/directship/smart-directship-divider', 'Direct ship divider fetch');
+    return this.session.apiGet<SCDirectShipDivider>('/webapi/api/troops/directship/smart-directship-divider', 'Direct ship divider fetch');
   }
 
-  async fetchVirtualCookieShare(orderId: string): Promise<Record<string, any>[]> {
-    return this.session.apiGet(`/webapi/api/cookie-shares/virtual/${orderId}`, 'Virtual cookie share fetch');
+  async fetchVirtualCookieShare(orderId: string): Promise<SCVirtualCookieShare> {
+    return this.session.apiGet<SCVirtualCookieShare>(`/webapi/api/cookie-shares/virtual/${orderId}`, 'Virtual cookie share fetch');
   }
 
-  async fetchAllVirtualCookieShares(ordersData: Record<string, any>, signal?: AbortSignal): Promise<Record<string, any>[]> {
+  async fetchAllVirtualCookieShares(ordersData: SCOrdersResponse, signal?: AbortSignal): Promise<SCVirtualCookieShare[]> {
     this.checkAborted(signal);
     this.sendProgress('Fetching virtual cookie share details...', 45);
 
-    const virtualCookieShares: Record<string, any>[] = [];
+    const virtualCookieShares: SCVirtualCookieShare[] = [];
 
-    const cookieShareOrders = (ordersData.orders || []).filter((order: any) => {
+    const cookieShareOrders = (ordersData.orders || []).filter((order: SCOrder) => {
       const type = order.transfer_type || order.type || '';
       const orderNum = String(order.order_number || '');
       return type.includes(TRANSFER_TYPE.COOKIE_SHARE) && !orderNum.startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX);
@@ -98,7 +101,7 @@ class SmartCookieScraper extends BaseScraper {
 
     for (const order of cookieShareOrders) {
       this.checkAborted(signal);
-      const orderId = order.id || order.order_id;
+      const orderId = String(order.id || order.order_id || '');
       if (orderId) {
         try {
           const details = await this.fetchVirtualCookieShare(orderId);
@@ -113,9 +116,9 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   async fetchCookieIdMap(): Promise<Record<string, string>> {
-    const data = await this.session.apiGet('/webapi/api/me/cookies', 'Cookie map fetch');
+    const data = await this.session.apiGet<SCCookieMapEntry[]>('/webapi/api/me/cookies', 'Cookie map fetch');
     const cookieMap: Record<string, string> = {};
-    (data || []).forEach((cookie: any) => {
+    (data || []).forEach((cookie) => {
       if (cookie.id && cookie.name) {
         const cookieType = normalizeCookieName(cookie.name);
         if (cookieType) {
@@ -128,15 +131,18 @@ class SmartCookieScraper extends BaseScraper {
     return cookieMap;
   }
 
-  async fetchReservations(): Promise<any> {
+  async fetchReservations(): Promise<SCReservationsResponse | null> {
     if (!this.session.troopId) {
       Logger.warn('Warning: No troopId available, skipping reservations fetch');
       return null;
     }
-    return this.session.apiGet(`/webapi/api/troops/reservations?troop_id=${this.session.troopId}`, 'Reservations fetch');
+    return this.session.apiGet<SCReservationsResponse>(
+      `/webapi/api/troops/reservations?troop_id=${this.session.troopId}`,
+      'Reservations fetch'
+    );
   }
 
-  async fetchSmartBoothDivider(reservationId: string): Promise<Record<string, any> | null> {
+  async fetchSmartBoothDivider(reservationId: string): Promise<{ girls?: SCDividerGirl[] } | null> {
     return this.session.apiGet(`/webapi/api/troops/reservations/smart-booth-divider/${reservationId}`, 'Booth divider fetch');
   }
 
@@ -144,14 +150,14 @@ class SmartCookieScraper extends BaseScraper {
    * Fetch all booth dividers with concurrency limiting.
    * Runs up to BOOTH_DIVIDER_CONCURRENCY fetches in parallel.
    */
-  async fetchAllBoothDividers(reservationsData: Record<string, any>, signal?: AbortSignal): Promise<Record<string, any>[]> {
-    const reservations = reservationsData?.reservations || reservationsData || [];
+  async fetchAllBoothDividers(reservationsData: SCReservationsResponse, signal?: AbortSignal): Promise<SCBoothDividerResult[]> {
+    const reservations = reservationsData?.reservations || [];
     if (!Array.isArray(reservations) || reservations.length === 0) return [];
 
-    const distributed = reservations.filter((r: any) => r.booth?.is_distributed || r.is_distributed);
+    const distributed = reservations.filter((r: SCReservation) => r.booth?.is_distributed || r.is_distributed);
     if (distributed.length === 0) return [];
 
-    const boothDividers: Record<string, any>[] = [];
+    const boothDividers: SCBoothDividerResult[] = [];
     let completed = 0;
 
     // Process in batches of BOOTH_DIVIDER_CONCURRENCY
@@ -160,7 +166,7 @@ class SmartCookieScraper extends BaseScraper {
       const batch = distributed.slice(i, i + BOOTH_DIVIDER_CONCURRENCY);
 
       const batchResults = await Promise.all(
-        batch.map(async (reservation: any) => {
+        batch.map(async (reservation: SCReservation) => {
           const reservationId = reservation.id || reservation.reservation_id;
           if (!reservationId) return null;
 
@@ -191,19 +197,23 @@ class SmartCookieScraper extends BaseScraper {
     return boothDividers;
   }
 
-  async fetchBoothLocations(boothIds: number[] = []): Promise<any[]> {
+  async fetchBoothLocations(boothIds: number[] = []): Promise<SCBoothLocationRaw[]> {
     if (!this.session.troopId) {
       Logger.warn('Warning: No troopId available, skipping booth locations fetch');
       return [];
     }
 
-    const allBooths = await this.session.apiPost('/webapi/api/booths/search', { troop_id: this.session.troopId }, 'Booth locations fetch');
+    const allBooths = await this.session.apiPost<SCBoothLocationRaw[]>(
+      '/webapi/api/booths/search',
+      { troop_id: this.session.troopId },
+      'Booth locations fetch'
+    );
 
-    const filtered = boothIds.length > 0 ? (allBooths || []).filter((b: any) => boothIds.includes(b.id || b.booth_id)) : allBooths || [];
+    const filtered = boothIds.length > 0 ? (allBooths || []).filter((b) => boothIds.includes(b.id || b.booth_id || 0)) : allBooths || [];
 
     if (boothIds.length > 0) {
       for (const booth of filtered) {
-        booth.availableDates = await this.fetchBoothAvailability(booth.id || booth.booth_id);
+        booth.availableDates = await this.fetchBoothAvailability(booth.id || booth.booth_id || 0);
       }
     }
 
@@ -257,7 +267,7 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   /** Extract troopId from C2T transfers when /me didn't provide it */
-  extractTroopIdFromOrders(orders: Record<string, any>[]): string | null {
+  extractTroopIdFromOrders(orders: SCOrder[]): string | null {
     for (const order of orders) {
       const type = order.transfer_type || order.type || '';
       if ((type === TRANSFER_TYPE.C2T || type.startsWith(TRANSFER_TYPE.C2T)) && order.to) {
@@ -391,7 +401,7 @@ class SmartCookieScraper extends BaseScraper {
       this.checkAborted(signal);
 
       // Step 7: Booth dividers with concurrent batching (non-fatal)
-      let boothDividers: Record<string, any>[] = [];
+      let boothDividers: SCBoothDividerResult[] = [];
       if (reservations) {
         this.sendProgress('Fetching booth allocations...', 65);
         boothDividers = await this.session.fetchOptional(

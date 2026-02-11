@@ -3,14 +3,14 @@
 
 import { ALLOCATION_CHANNEL, ALLOCATION_SOURCE, SCOUT_PHYSICAL_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
-import type { DataStore } from '../../data-store';
+import type { ReadonlyDataStore } from '../../data-store';
 import type { Allocation, Scout, Transfer } from '../../types';
 import { accumulateVarieties } from '../utils';
 
 import { buildGirlIdToNameMap, findScoutByGirlId } from './helpers';
 
 /** Process virtual booth T2G transfers (Troop girl delivery) */
-function processVirtualBoothAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>): void {
+function processVirtualBoothAllocations(reconciler: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
   reconciler.transfers.forEach((transfer: Transfer) => {
     if (transfer.category !== TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) return;
 
@@ -33,7 +33,11 @@ function processVirtualBoothAllocations(reconciler: DataStore, scoutDataset: Map
 }
 
 /** Process imported allocations (direct ship + booth) from reconciler → scout */
-function processImportedAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): void {
+function processImportedAllocations(
+  reconciler: ReadonlyDataStore,
+  scoutDataset: Map<string, Scout>,
+  girlIdToName: Map<number, string>
+): void {
   reconciler.allocations.forEach((allocation: Allocation) => {
     const scout = findScoutByGirlId(allocation.girlId, scoutDataset, girlIdToName);
     if (!scout) return;
@@ -43,7 +47,7 @@ function processImportedAllocations(reconciler: DataStore, scoutDataset: Map<str
 }
 
 /** Add inventory from Smart Cookie physical transfers (T2G pickup adds, G2T subtracts) */
-function addInventory(reconciler: DataStore, scoutDataset: Map<string, Scout>): void {
+function addInventory(reconciler: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
   reconciler.transfers.forEach((transfer: Transfer) => {
     if (!SCOUT_PHYSICAL_CATEGORIES.has(transfer.category)) return;
 
@@ -59,7 +63,7 @@ function addInventory(reconciler: DataStore, scoutDataset: Map<string, Scout>): 
 }
 
 /** Add all allocations to scout dataset */
-function addAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>): void {
+function addAllocations(reconciler: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
   // Process virtual booth allocations (Type 4: Troop girl delivery)
   processVirtualBoothAllocations(reconciler, scoutDataset);
 

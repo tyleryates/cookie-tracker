@@ -1,7 +1,7 @@
 // Data Calculators - Main Orchestrator
 // This module coordinates all calculation sub-modules to build the unified dataset
 
-import type { DataStore } from '../../data-store';
+import type { ReadonlyDataStore } from '../../data-store';
 import type { Scout, UnifiedDataset, Warning } from '../../types';
 import { addAllocations, addInventory } from './allocation-processing';
 import { buildCookieShareTracking } from './cookie-share-tracking';
@@ -16,7 +16,7 @@ import { buildTroopTotals } from './troop-totals';
 import { buildVarieties } from './varieties';
 
 /** Build complete scout dataset with all calculations */
-function buildScoutDataset(reconciler: DataStore, warnings: Warning[]): Map<string, Scout> {
+function buildScoutDataset(reconciler: ReadonlyDataStore, warnings: Warning[]): Map<string, Scout> {
   const rawDCData = reconciler.metadata.rawDCData || [];
   const scoutDataset = initializeScouts(reconciler, rawDCData);
 
@@ -36,7 +36,7 @@ function buildScoutDataset(reconciler: DataStore, warnings: Warning[]): Map<stri
 }
 
 /** Build unified dataset from reconciled data */
-export function buildUnifiedDataset(reconciler: DataStore): UnifiedDataset {
+export function buildUnifiedDataset(reconciler: ReadonlyDataStore): UnifiedDataset {
   const warnings: Warning[] = [];
 
   // Build complete scout dataset

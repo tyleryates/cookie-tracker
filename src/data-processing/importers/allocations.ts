@@ -3,16 +3,25 @@
 import { ALLOCATION_CHANNEL, ALLOCATION_SOURCE } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
+import type {
+  SCBoothDividerResult,
+  SCBoothLocationRaw,
+  SCCombinedData,
+  SCDirectShipDivider,
+  SCDividerGirl,
+  SCReservationsResponse,
+  SCVirtualCookieShare
+} from '../../scrapers/sc-types';
 import type { BoothAvailableDate, BoothLocation, CookieType } from '../../types';
 import { sumPhysicalPackages } from '../utils';
 import { parseVarietiesFromAPI } from './parsers';
 import { parseGirlAllocation, registerScout } from './scout-helpers';
 
 /** Import Smart Direct Ship Divider allocations */
-function importDirectShipDivider(reconciler: DataStore, dividerData: Record<string, any>): void {
+function importDirectShipDivider(reconciler: DataStore, dividerData: SCDirectShipDivider): void {
   const girls = dividerData.girls || [];
 
-  girls.forEach((girl: Record<string, any>) => {
+  girls.forEach((girl: SCDividerGirl) => {
     const girlId = girl.id;
     const cookies = girl.cookies || [];
 
@@ -31,14 +40,14 @@ function importDirectShipDivider(reconciler: DataStore, dividerData: Record<stri
 }
 
 /** Import Virtual Cookie Share allocations */
-function importVirtualCookieShares(reconciler: DataStore, virtualCookieShares: Record<string, any>[]): void {
-  virtualCookieShares.forEach((cookieShare: Record<string, any>) => {
+function importVirtualCookieShares(reconciler: DataStore, virtualCookieShares: SCVirtualCookieShare[]): void {
+  virtualCookieShares.forEach((cookieShare) => {
     const girls = cookieShare.girls || [];
     const isBoothDivider = !!cookieShare.smart_divider_id;
     if (isBoothDivider) return; // Booth cookie share tracked via booth divider allocations
     const targetMap = reconciler.virtualCookieShareAllocations;
 
-    girls.forEach((girl: Record<string, any>) => {
+    girls.forEach((girl: SCDividerGirl) => {
       const girlId = girl.id;
       const quantity = girl.quantity || 0;
 
@@ -54,10 +63,10 @@ function importVirtualCookieShares(reconciler: DataStore, virtualCookieShares: R
 /** Import booth reservation data from Smart Cookie reservations API */
 function importReservations(
   reconciler: DataStore,
-  reservationsData: Record<string, any>,
+  reservationsData: SCReservationsResponse,
   dynamicCookieIdMap: Record<number, CookieType> | null
 ): void {
-  const reservations = reservationsData?.reservations || reservationsData || [];
+  const reservations = reservationsData?.reservations || [];
   if (!Array.isArray(reservations) || reservations.length === 0) return;
 
   reconciler.boothReservations = [];
@@ -68,10 +77,10 @@ function importReservations(
     const { varieties, totalPackages } = parseVarietiesFromAPI(r.cookies, dynamicCookieIdMap);
 
     reconciler.boothReservations.push({
-      id: r.id || r.reservation_id,
-      troopId: r.troop_id,
+      id: r.id || r.reservation_id || '',
+      troopId: r.troop_id || '',
       booth: {
-        boothId: booth.booth_id,
+        boothId: booth.booth_id || '',
         storeName: booth.store_name || '',
         address: booth.address || '',
         reservationType: booth.reservation_type || '',
@@ -98,7 +107,7 @@ function importReservations(
  */
 function importBoothDividers(
   reconciler: DataStore,
-  boothDividers: Record<string, any>[],
+  boothDividers: SCBoothDividerResult[],
   dynamicCookieIdMap: Record<number, CookieType> | null
 ): void {
   if (!Array.isArray(boothDividers) || boothDividers.length === 0) return;
@@ -114,7 +123,7 @@ function importBoothDividers(
     const booth = rawBooth.booth_id ? rawBooth : rawBooth.booth || rawBooth;
     const timeslot = rawBooth.timeslot || entry.timeslot || {};
 
-    girls.forEach((girl: Record<string, any>) => {
+    girls.forEach((girl: SCDividerGirl) => {
       const alloc = parseGirlAllocation(girl, entry.reservationId, seen, reconciler, dynamicCookieIdMap);
       if (!alloc) return;
 
@@ -136,7 +145,7 @@ function importBoothDividers(
   });
 }
 
-/** Import Direct Ship Divider allocations from Smart Cookie API */
+/** Import Direct Ship Divider allocations from Smart Cookie API (legacy array format) */
 function importDirectShipDividers(
   reconciler: DataStore,
   directShipDividers: Record<string, any>[],
@@ -151,7 +160,7 @@ function importDirectShipDividers(
     const divider = entry.divider || entry;
     const girls = divider.girls || [];
 
-    girls.forEach((girl: Record<string, any>) => {
+    girls.forEach((girl: SCDividerGirl) => {
       const orderId = entry.orderId || entry.id || '';
       const alloc = parseGirlAllocation(girl, orderId, seen, reconciler, dynamicCookieIdMap);
       if (!alloc) return;
@@ -170,12 +179,12 @@ function importDirectShipDividers(
 }
 
 /** Normalize a raw booth location from the API to a BoothLocation */
-export function normalizeBoothLocation(loc: Record<string, any>): BoothLocation {
+export function normalizeBoothLocation(loc: SCBoothLocationRaw): BoothLocation {
   const addr = loc.address || {};
 
   let availableDates: BoothAvailableDate[] | undefined;
-  if (loc.availableDates?.length > 0) {
-    availableDates = loc.availableDates.map((d: any) => ({
+  if (loc.availableDates && loc.availableDates.length > 0) {
+    availableDates = loc.availableDates.map((d) => ({
       date: d.date || '',
       timeSlots: (d.timeSlots || []).map((s: any) => ({
         startTime: s.start_time || s.startTime || '',
@@ -200,13 +209,15 @@ export function normalizeBoothLocation(loc: Record<string, any>): BoothLocation 
 }
 
 /** Import booth locations from Smart Cookie booths/search API */
-function importBoothLocations(reconciler: DataStore, locationsData: Record<string, any>[]): void {
+function importBoothLocations(reconciler: DataStore, locationsData: SCBoothLocationRaw[]): void {
   if (!Array.isArray(locationsData) || locationsData.length === 0) return;
   reconciler.boothLocations = locationsData.map(normalizeBoothLocation);
 }
 
 /** Import optional supplemental data from Smart Cookie API (dividers, booths, cookie shares) */
-export function importAllocations(reconciler: DataStore, apiData: Record<string, any>): void {
+export function importAllocations(reconciler: DataStore, apiData: SCCombinedData): void {
+  const cookieIdMap = (apiData.cookieIdMap as Record<number, CookieType>) ?? null;
+
   if (apiData.directShipDivider?.girls) {
     importDirectShipDivider(reconciler, apiData.directShipDivider);
   }
@@ -215,19 +226,19 @@ export function importAllocations(reconciler: DataStore, apiData: Record<string,
     importVirtualCookieShares(reconciler, apiData.virtualCookieShares);
   }
 
-  if (apiData.cookieIdMap) {
-    reconciler.metadata.cookieIdMap = apiData.cookieIdMap;
+  if (cookieIdMap) {
+    reconciler.metadata.cookieIdMap = cookieIdMap;
   }
   if (apiData.reservations) {
-    importReservations(reconciler, apiData.reservations, apiData.cookieIdMap);
+    importReservations(reconciler, apiData.reservations, cookieIdMap);
   }
-  if (apiData.boothDividers?.length > 0) {
-    importBoothDividers(reconciler, apiData.boothDividers, apiData.cookieIdMap);
+  if (apiData.boothDividers && apiData.boothDividers.length > 0) {
+    importBoothDividers(reconciler, apiData.boothDividers, cookieIdMap);
   }
-  if (apiData.directShipDivider?.length > 0) {
-    importDirectShipDividers(reconciler, apiData.directShipDivider, apiData.cookieIdMap);
+  if (apiData.directShipDivider && 'length' in apiData.directShipDivider && (apiData.directShipDivider as any).length > 0) {
+    importDirectShipDividers(reconciler, apiData.directShipDivider as any, cookieIdMap);
   }
-  if (apiData.boothLocations?.length > 0) {
+  if (apiData.boothLocations && apiData.boothLocations.length > 0) {
     importBoothLocations(reconciler, apiData.boothLocations);
   }
 }

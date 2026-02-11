@@ -1,11 +1,11 @@
 // Metadata Builder
 // Builds unified metadata with health checks and statistics
 
-import type { DataStore } from '../../data-store';
+import type { ReadonlyDataStore } from '../../data-store';
 import type { HealthChecks, Scout, UnifiedMetadata, Warning } from '../../types';
 
 /** Build unified metadata with health checks */
-export function buildUnifiedMetadata(reconciler: DataStore, warnings: Warning[] = [], scouts: Map<string, Scout>): UnifiedMetadata {
+export function buildUnifiedMetadata(reconciler: ReadonlyDataStore, warnings: Warning[] = [], scouts: Map<string, Scout>): UnifiedMetadata {
   const healthChecks: HealthChecks = {
     warningsCount: warnings.length,
     unknownOrderTypes: warnings.filter((w) => w.type === 'UNKNOWN_ORDER_TYPE').length,

@@ -9,7 +9,7 @@ import { normalizeBoothLocation } from './data-processing/importers';
 import Logger from './logger';
 import ScraperOrchestrator from './scrapers';
 import SmartCookieScraper from './scrapers/smart-cookie';
-import type { AppConfig, Credentials, DataFileInfo } from './types';
+import type { AppConfig, Credentials, DataFileInfo, IpcResponse } from './types';
 
 let mainWindow: BrowserWindow | null = null;
 let lastScraper: ScraperOrchestrator | null = null;
@@ -26,7 +26,7 @@ const credentialsManager = new CredentialsManager(dataDir);
 const configManager = new ConfigManager(dataDir);
 
 // Standardized IPC error handler wrapper — always wraps to { success, data/error }
-function handleIpcError(handler: (...args: any[]) => Promise<any>): (...args: any[]) => Promise<any> {
+function handleIpcError<T>(handler: (...args: any[]) => Promise<T>): (...args: any[]) => Promise<IpcResponse<T>> {
   return async (...args) => {
     try {
       const result = await handler(...args);

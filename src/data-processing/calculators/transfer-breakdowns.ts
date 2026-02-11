@@ -2,13 +2,13 @@
 // Pre-classifies transfers into categories (C2T, T2G, G2T) with totals
 
 import { TRANSFER_CATEGORY } from '../../constants';
-import type { DataStore } from '../../data-store';
+import type { ReadonlyDataStore } from '../../data-store';
 import Logger from '../../logger';
 import type { Transfer, TransferBreakdowns, Warning } from '../../types';
 import { isKnownTransferType } from '../utils';
 
 /** Build pre-classified transfer lists with totals */
-export function buildTransferBreakdowns(reconciler: DataStore, warnings: Warning[]): TransferBreakdowns {
+export function buildTransferBreakdowns(reconciler: ReadonlyDataStore, warnings: Warning[]): TransferBreakdowns {
   const seenUnknownTypes = new Set<string>();
   const c2t: Transfer[] = [];
   const t2g: Transfer[] = [];

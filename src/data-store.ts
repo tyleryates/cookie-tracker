@@ -14,6 +14,8 @@ export interface DataStore {
   metadata: ReconcilerMetadata;
 }
 
+export type ReadonlyDataStore = Readonly<DataStore>;
+
 export function createDataStore(): DataStore {
   return {
     orders: new Map(),

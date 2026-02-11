@@ -210,7 +210,11 @@ export function SyncSection({
         <ProgressBar visible={showDcProgress} progress={syncState.dc.progress} text={syncState.dc.progressText} />
 
         <SourceStatus label="Booth Availability" badge="Every 15 min" status={syncState.booth.status} lastSync={syncState.booth.lastSync} />
-        <ProgressBar visible={syncState.booth.status === 'syncing' && syncState.booth.progress > 0} progress={syncState.booth.progress} text={syncState.booth.progressText} />
+        <ProgressBar
+          visible={syncState.booth.status === 'syncing' && syncState.booth.progress > 0}
+          progress={syncState.booth.progress}
+          text={syncState.booth.progressText}
+        />
 
         <SyncControls syncing={syncState.syncing} autoSyncEnabled={autoSyncEnabled} onSync={onSync} onToggleAutoSync={onToggleAutoSync} />
 

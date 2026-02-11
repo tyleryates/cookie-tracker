@@ -2,7 +2,7 @@
 // Aggregates cookie variety counts and calculates troop inventory by variety
 
 import { ORDER_TYPE, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
-import type { DataStore } from '../../data-store';
+import type { ReadonlyDataStore } from '../../data-store';
 import type { Scout, Transfer, Varieties, VarietiesResult } from '../../types';
 import { accumulateVarieties } from '../utils';
 import { needsInventory } from './helpers';
@@ -20,7 +20,7 @@ import { needsInventory } from './helpers';
  * - Subtract ALL T2G varieties (physical + virtual booth + booth divider)
  * - Cookie Share excluded (virtual, never in physical inventory)
  */
-export function buildVarieties(reconciler: DataStore, scouts: Map<string, Scout>): VarietiesResult {
+export function buildVarieties(reconciler: ReadonlyDataStore, scouts: Map<string, Scout>): VarietiesResult {
   const byCookie: Varieties = {};
   const inventory: Varieties = {};
 

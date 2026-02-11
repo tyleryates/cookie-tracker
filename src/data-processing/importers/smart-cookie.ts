@@ -3,7 +3,8 @@
 import { DATA_SOURCES, PACKAGES_PER_CASE, SC_API_COLUMNS, SC_REPORT_COLUMNS, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../../constants';
 import type { DataStore } from '../../data-store';
 import { createTransfer, mergeOrCreateOrder } from '../../data-store-operations';
-import type { Order } from '../../types';
+import type { SCCombinedData, SCOrder } from '../../scrapers/sc-types';
+import type { Order, TransferInput } from '../../types';
 import { isC2TTransfer } from '../utils';
 import { importAllocations } from './allocations';
 import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSCTransfer } from './parsers';
@@ -76,10 +77,10 @@ export function importSmartCookieReport(reconciler: DataStore, reportData: Recor
 }
 
 /** Import Smart Cookie API data from API endpoints */
-export function importSmartCookieAPI(reconciler: DataStore, apiData: Record<string, any>): void {
+export function importSmartCookieAPI(reconciler: DataStore, apiData: SCCombinedData): void {
   const orders = apiData.orders || [];
 
-  orders.forEach((order: Record<string, any>) => {
+  orders.forEach((order: SCOrder) => {
     // Handle both old format and new /orders/search API format
     // Use transfer_type for actual transfer type (C2T(P), T2G, D, etc.)
     // order.type is just "TRANSFER" for all transfers
@@ -92,8 +93,11 @@ export function importSmartCookieAPI(reconciler: DataStore, apiData: Record<stri
     // Handle both formats: cookies[].id (new API) or cookies[].cookieId (old format)
     const { varieties, totalPackages } = parseVarietiesFromAPI(order.cookies);
 
+    const date = order.date || order.createdDate || '';
+    const totalValue = String(order.total ?? order.totalPrice ?? '0');
+
     const transferData = {
-      date: order.date || order.createdDate,
+      date,
       type: type,
       orderNumber: orderNum,
       from: from,
@@ -101,17 +105,17 @@ export function importSmartCookieAPI(reconciler: DataStore, apiData: Record<stri
       packages: totalPackages,
       cases: Math.round(Math.abs(order.total_cases || 0) / PACKAGES_PER_CASE), // Convert packages to cases
       varieties: varieties,
-      amount: Math.abs(parseFloat(order.total || order.totalPrice) || 0),
+      amount: Math.abs(parseFloat(totalValue) || 0),
       virtualBooth: order.virtual_booth || false,
       boothDivider: !!(order.smart_divider_id && !order.virtual_booth),
       status: order.status || '',
       actions: order.actions || {}
     };
 
-    reconciler.transfers.push(createTransfer(transferData));
+    reconciler.transfers.push(createTransfer(transferData as TransferInput));
 
     if (orderNum.startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX)) {
-      mergeDCOrderFromSC(reconciler, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE_API, order);
+      mergeDCOrderFromSC(reconciler, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE_API, order as Record<string, any>);
     }
 
     trackScoutFromAPITransfer(reconciler, type, to, from);
