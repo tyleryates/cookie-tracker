@@ -133,9 +133,7 @@ export function mergeOrCreateOrder(
       existing.sources.push(source);
     }
 
-    if (existing.metadata) {
-      existing.metadata[metadataKey] = rawData;
-    }
+    existing.metadata[metadataKey] = rawData;
 
     if (enrichmentFn) {
       enrichmentFn(existing, orderData);
@@ -146,9 +144,7 @@ export function mergeOrCreateOrder(
     return existing;
   } else {
     const order = createOrder(orderData, source);
-    if (order.metadata) {
-      order.metadata[metadataKey] = rawData;
-    }
+    order.metadata[metadataKey] = rawData;
     store.orders.set(orderNum, order);
     return order;
   }

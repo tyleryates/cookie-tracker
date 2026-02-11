@@ -2,6 +2,7 @@
  * Request utilities for rate limiting and retry logic
  */
 
+import { isAxiosError } from 'axios';
 import Logger from '../logger';
 
 /**
@@ -35,20 +36,22 @@ function getBackoffDelay(attempt: number): number {
   return RATE_LIMIT.RETRY_DELAY_BASE * RATE_LIMIT.BACKOFF_MULTIPLIER ** attempt;
 }
 
+/** Get error message from unknown error */
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Check if error indicates session timeout (401/403)
  */
-function isSessionExpired(error: any): boolean {
-  if (!error) return false;
-
-  // Check axios response
-  if (error.response) {
+function isSessionExpired(error: unknown): boolean {
+  if (isAxiosError(error) && error.response) {
     const status = error.response.status;
     return status === 401 || status === 403;
   }
 
   // Check error message for auth-related keywords
-  const message = error.message?.toLowerCase() || '';
+  const message = getErrorMessage(error).toLowerCase();
   return (
     message.includes('unauthorized') ||
     message.includes('forbidden') ||
@@ -60,14 +63,12 @@ function isSessionExpired(error: any): boolean {
 /**
  * Check if error indicates rate limiting (429)
  */
-function isRateLimited(error: any): boolean {
-  if (!error) return false;
-
-  if (error.response) {
+function isRateLimited(error: unknown): boolean {
+  if (isAxiosError(error) && error.response) {
     return error.response.status === 429;
   }
 
-  const message = error.message?.toLowerCase() || '';
+  const message = getErrorMessage(error).toLowerCase();
   return message.includes('rate limit') || message.includes('too many requests');
 }
 
@@ -76,7 +77,7 @@ function isRateLimited(error: any): boolean {
  * Throws if unrecoverable; returns normally if the caller should retry.
  */
 async function handleRequestError(
-  error: any,
+  error: unknown,
   attempt: number,
   maxRetries: number,
   reloginFn: (() => Promise<boolean>) | null,
@@ -85,14 +86,15 @@ async function handleRequestError(
   const isLastAttempt = attempt === maxRetries - 1;
 
   if (isSessionExpired(error) && !isLastAttempt && reloginFn) {
-    Logger.warn(`${logPrefix}: Session expired (${error.response?.status || 'auth error'})`);
+    const status = isAxiosError(error) ? error.response?.status : undefined;
+    Logger.warn(`${logPrefix}: Session expired (${status || 'auth error'})`);
     Logger.info(`${logPrefix}: Attempting re-authentication...`);
     try {
       await reloginFn();
       Logger.info(`${logPrefix}: Re-authentication successful, retrying request`);
       return;
     } catch (loginError) {
-      throw new Error(`Session expired and re-authentication failed: ${(loginError as Error).message}`);
+      throw new Error(`Session expired and re-authentication failed: ${getErrorMessage(loginError)}`);
     }
   }
 
@@ -109,7 +111,7 @@ async function handleRequestError(
     throw error;
   }
 
-  Logger.warn(`${logPrefix}: Request failed (attempt ${attempt + 1}/${maxRetries}):`, error.message);
+  Logger.warn(`${logPrefix}: Request failed (attempt ${attempt + 1}/${maxRetries}):`, getErrorMessage(error));
 }
 
 /**

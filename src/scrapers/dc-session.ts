@@ -1,14 +1,14 @@
 // Digital Cookie Session — owns auth state (cookie jar, CSRF, role selection)
 // Scrapers and main process use this for authenticated requests.
 
-import axios from 'axios';
+import axios, { type AxiosInstance } from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import * as cheerio from 'cheerio';
 import { CookieJar } from 'tough-cookie';
 import { HTTP_STATUS } from '../constants';
 
 export class DigitalCookieSession {
-  client: any;
+  client: AxiosInstance;
   selectedRoleName: string | null = null;
   private credentials: { username: string; password: string; role?: string } | null = null;
 

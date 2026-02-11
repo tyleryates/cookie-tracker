@@ -180,8 +180,8 @@ tr:hover {
   background: rgba(156, 39, 176, 0.13);
 }
 .booth-type-badge.type-fcfs {
-  color: #ff9800;
-  background: rgba(255, 152, 0, 0.13);
+  color: #4caf50;
+  background: rgba(76, 175, 80, 0.13);
 }
 .booth-type-badge.type-default {
   color: var(--gray-600);

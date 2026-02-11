@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { isAxiosError } from 'axios';
 import { SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../constants';
 import { normalizeCookieName } from '../cookie-constants';
 import Logger from '../logger';
@@ -63,11 +64,10 @@ class SmartCookieScraper extends BaseScraper {
       this.sendProgress('Orders fetched', 35);
       return data;
     } catch (error: unknown) {
-      const axiosError = error as any;
-      if (axiosError.response) {
+      if (isAxiosError(error) && error.response) {
         Logger.error('Orders API Error Response:', {
-          status: axiosError.response.status,
-          statusText: axiosError.response.statusText
+          status: error.response.status,
+          statusText: error.response.statusText
         });
       }
       throw error;

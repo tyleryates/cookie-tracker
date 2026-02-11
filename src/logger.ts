@@ -2,7 +2,7 @@
  * Simple logging utility with development/production mode support
  */
 
-function log(method: 'log' | 'warn' | 'error', prefix: string, message: string, data: any): void {
+function log(method: 'log' | 'warn' | 'error', prefix: string, message: string, data: unknown): void {
   if (data !== null) {
     console[method](`[${prefix}] ${message}`, data);
   } else {
@@ -11,21 +11,21 @@ function log(method: 'log' | 'warn' | 'error', prefix: string, message: string, 
 }
 
 const Logger = {
-  debug(message: string, data: any = null): void {
+  debug(message: string, data: unknown = null): void {
     if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
       log('log', 'DEBUG', message, data);
     }
   },
 
-  info(message: string, data: any = null): void {
+  info(message: string, data: unknown = null): void {
     log('log', 'INFO', message, data);
   },
 
-  warn(message: string, data: any = null): void {
+  warn(message: string, data: unknown = null): void {
     log('warn', 'WARN', message, data);
   },
 
-  error(message: string, error: Error | any = null): void {
+  error(message: string, error: unknown = null): void {
     log('error', 'ERROR', message, error);
   }
 };

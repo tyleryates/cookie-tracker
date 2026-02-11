@@ -10,7 +10,6 @@ export interface PackageTotals {
   allocated: number;
   virtualBoothT2G: number;
   boothDividerT2G: number;
-  donations: number;
   directShip: number;
   g2t: number;
 }
@@ -52,7 +51,6 @@ function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
     allocated: totalAllocated,
     virtualBoothT2G: totalVirtualBoothT2G,
     boothDividerT2G: totalBoothDividerT2G,
-    donations: 0, // Computed from scout orders in troop-totals.ts (SC transfers incomplete)
     directShip: totalDirectShip,
     g2t: totalG2T
   };

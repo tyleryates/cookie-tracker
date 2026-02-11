@@ -130,5 +130,8 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'IGNORE_SLOT':
       return { ...state, appConfig: action.config };
+
+    default:
+      return state;
   }
 }

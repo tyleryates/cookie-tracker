@@ -38,14 +38,10 @@ class CredentialsManager {
       const decryptedBuffer = safeStorage.decryptString(encryptedBuffer);
       const credentials = JSON.parse(decryptedBuffer);
 
-      // Ensure fields exist (backward compatibility)
+      // Ensure optional fields have defaults
       if (credentials.digitalCookie) {
-        if (!Object.prototype.hasOwnProperty.call(credentials.digitalCookie, 'role')) {
-          credentials.digitalCookie.role = '';
-        }
-        if (!Object.prototype.hasOwnProperty.call(credentials.digitalCookie, 'councilId')) {
-          credentials.digitalCookie.councilId = DEFAULT_COUNCIL_ID; // Default
-        }
+        credentials.digitalCookie.role ??= '';
+        credentials.digitalCookie.councilId ??= DEFAULT_COUNCIL_ID;
       }
 
       return credentials;

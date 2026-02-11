@@ -85,7 +85,10 @@ function CreditedCell({ isSiteRow, scout, siteOrders }: { isSiteRow: boolean; sc
   }
 
   if (isSiteRow && siteOrders) {
-    const hasSiteOrders = (siteOrders.directShip?.orders?.length || 0) > 0 || (siteOrders.girlDelivery?.orders?.length || 0) > 0;
+    const hasSiteOrders =
+      (siteOrders.directShip?.orders?.length || 0) > 0 ||
+      (siteOrders.girlDelivery?.orders?.length || 0) > 0 ||
+      (siteOrders.boothSale?.orders?.length || 0) > 0;
     if (hasSiteOrders) {
       sources.push(
         `\nNote: Troop booth sales and direct ship orders are allocated to scouts in Smart Cookie. See site orders in scout details.`

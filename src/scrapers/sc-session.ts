@@ -1,9 +1,9 @@
 // Smart Cookie Session — owns auth state (cookie jar, XSRF, troopId)
 // Scrapers and main process use this for authenticated API calls.
 
-import axios from 'axios';
+import axios, { type AxiosInstance, isAxiosError } from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
-import { CookieJar } from 'tough-cookie';
+import { type Cookie, CookieJar } from 'tough-cookie';
 import { HTTP_STATUS, SPECIAL_IDENTIFIERS } from '../constants';
 import Logger from '../logger';
 import { requestWithRetry } from './request-utils';
@@ -11,8 +11,8 @@ import { requestWithRetry } from './request-utils';
 export class SmartCookieSession {
   xsrfToken: string | null = null;
   troopId: string | null = null;
-  meResponse: any = null;
-  client: any;
+  meResponse: Record<string, unknown> | null = null;
+  client: AxiosInstance;
   private cookieJar: CookieJar;
   private credentials: { username: string; password: string } | null = null;
 
@@ -40,7 +40,7 @@ export class SmartCookieSession {
   /** Extract XSRF token from cookie jar */
   private async extractXsrfToken(): Promise<string> {
     const cookies = await this.cookieJar.getCookies('https://app.abcsmartcookies.com');
-    const xsrfCookie = cookies.find((cookie: any) => cookie.key === SPECIAL_IDENTIFIERS.XSRF_TOKEN_COOKIE);
+    const xsrfCookie = cookies.find((cookie: Cookie) => cookie.key === SPECIAL_IDENTIFIERS.XSRF_TOKEN_COOKIE);
 
     if (!xsrfCookie) {
       throw new Error(`${SPECIAL_IDENTIFIERS.XSRF_TOKEN_COOKIE} cookie not found after login`);
@@ -99,51 +99,40 @@ export class SmartCookieSession {
     return this.login(this.credentials.username, this.credentials.password, true);
   }
 
+  private get authHeaders() {
+    return { 'x-xsrf-token': this.xsrfToken!, Referer: 'https://app.abcsmartcookies.com/' };
+  }
+
+  private formatApiError(error: unknown, label: string): Error {
+    if (isAxiosError(error) && error.response) {
+      return new Error(`${label} failed: ${error.response.status} ${error.response.statusText}`);
+    }
+    return new Error(`${label} failed: ${(error as Error).message}`);
+  }
+
   /** Authenticated GET request */
   async apiGet(url: string, label: string): Promise<any> {
     if (!this.xsrfToken) throw new Error('XSRF token not available. Must login first.');
-
     try {
-      const response = await this.client.get(url, {
-        headers: { 'x-xsrf-token': this.xsrfToken, Referer: 'https://app.abcsmartcookies.com/' }
-      });
-
-      if (response.status !== HTTP_STATUS.OK) {
-        throw new Error(`${label} failed with status ${response.status}`);
-      }
+      const response = await this.client.get(url, { headers: this.authHeaders });
+      if (response.status !== HTTP_STATUS.OK) throw new Error(`${label} failed with status ${response.status}`);
       return response.data;
     } catch (error: unknown) {
-      const axiosError = error as any;
-      if (axiosError.response) {
-        throw new Error(`${label} failed: ${axiosError.response.status} ${axiosError.response.statusText}`);
-      }
-      throw new Error(`${label} failed: ${(error as Error).message}`);
+      throw this.formatApiError(error, label);
     }
   }
 
   /** Authenticated POST request */
   async apiPost(url: string, body: Record<string, any>, label: string): Promise<any> {
     if (!this.xsrfToken) throw new Error('XSRF token not available. Must login first.');
-
     try {
       const response = await this.client.post(url, body, {
-        headers: {
-          'Content-Type': 'application/json;charset=UTF-8',
-          'x-xsrf-token': this.xsrfToken,
-          Referer: 'https://app.abcsmartcookies.com/'
-        }
+        headers: { 'Content-Type': 'application/json;charset=UTF-8', ...this.authHeaders }
       });
-
-      if (response.status !== HTTP_STATUS.OK) {
-        throw new Error(`${label} failed with status ${response.status}`);
-      }
+      if (response.status !== HTTP_STATUS.OK) throw new Error(`${label} failed with status ${response.status}`);
       return response.data;
     } catch (error: unknown) {
-      const axiosError = error as any;
-      if (axiosError.response) {
-        throw new Error(`${label} failed: ${axiosError.response.status} ${axiosError.response.statusText}`);
-      }
-      throw new Error(`${label} failed: ${(error as Error).message}`);
+      throw this.formatApiError(error, label);
     }
   }
 

@@ -1,6 +1,5 @@
 import type { Credentials, ProgressCallback } from '../types';
 import DigitalCookieScraper from './digital-cookie';
-import type { SmartCookieSession } from './sc-session';
 import SmartCookieScraper from './smart-cookie';
 
 /**
@@ -21,11 +20,6 @@ class ScraperOrchestrator {
 
   setProgressCallback(callback: ProgressCallback): void {
     this.progressCallback = callback;
-  }
-
-  /** Get the Smart Cookie session (for on-demand API calls after sync) */
-  getSmartCookieSession(): SmartCookieSession | null {
-    return this.smartCookieScraper?.session || null;
   }
 
   /** Get the Smart Cookie scraper instance (for booth location fetches after sync) */

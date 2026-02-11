@@ -94,7 +94,6 @@ export type TransferCategory = (typeof TRANSFER_CATEGORY)[keyof typeof TRANSFER_
 // Category groups — define once, use everywhere.
 // When adding a new TRANSFER_CATEGORY, update the relevant groups here.
 
-// Used by: package-totals.ts (troop inventory out), troop-totals.ts (net inventory)
 export const T2G_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.GIRL_PICKUP,
   TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
@@ -102,13 +101,11 @@ export const T2G_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION
 ]);
 
-// Used by: troop-totals.ts (troop inventory in)
 export const TROOP_INVENTORY_IN_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.COUNCIL_TO_TROOP,
   TRANSFER_CATEGORY.GIRL_RETURN
 ]);
 
-// Used by: scout-inventory.ts (scout physical inventory in/out)
 export const SCOUT_PHYSICAL_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.GIRL_PICKUP,
   TRANSFER_CATEGORY.GIRL_RETURN
@@ -147,8 +144,6 @@ export const ALLOCATION_METHOD = {
   BOOTH_SALES_DIVIDER: 'BOOTH_SALES_DIVIDER', // For TROOP BOOTH orders (Smart Booth Divider API)
   MANUAL: 'MANUAL' // For manual allocation (fallback)
 } as const;
-
-type AllocationMethod = (typeof ALLOCATION_METHOD)[keyof typeof ALLOCATION_METHOD];
 
 // ============================================================================
 // DATA SOURCE COLUMN NAMES
@@ -204,7 +199,7 @@ export const SC_API_COLUMNS = {
 // DISPLAY STRINGS (UI Labels & Tooltips)
 // ============================================================================
 
-export const DISPLAY_STRINGS: Record<AllocationMethod, string> = {
+export const DISPLAY_STRINGS: Record<string, string> = {
   [ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]: 'Troop Girl Delivered',
   [ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]: 'Troop Direct Ship',
   [ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]: 'Booth Sales',

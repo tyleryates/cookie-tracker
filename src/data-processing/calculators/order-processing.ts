@@ -55,7 +55,7 @@ function classifyDCOrder(isSiteOrder: boolean, dcOrderType: string): { owner: Ow
 /** Extract basic order information from DC row */
 function extractBasicOrderInfo(row: Record<string, any>): {
   orderNumber: string;
-  date: any;
+  date: string;
   packages: number;
   physicalPackages: number;
   donations: number;
@@ -116,7 +116,8 @@ function buildOrderObject(
     status: basicInfo.status,
     paymentStatus: basicInfo.paymentStatus,
     paymentMethod: paymentMethod,
-    sources: [DATA_SOURCES.DIGITAL_COOKIE]
+    sources: [DATA_SOURCES.DIGITAL_COOKIE],
+    metadata: { dc: null, sc: null, scReport: null, scApi: null }
   };
 }
 

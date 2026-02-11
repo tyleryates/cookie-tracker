@@ -1,3 +1,4 @@
+import { BOOTH_RESERVATION_TYPE } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
 import type { BoothReservationImported, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
@@ -165,7 +166,11 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
                   cells={[
                     formatDate(r.timeslot.date),
                     timeDisplay,
-                    r.booth.reservationType || '-',
+                    <span
+                      class={`booth-type-badge ${r.booth.reservationType === BOOTH_RESERVATION_TYPE.LOTTERY ? 'type-lottery' : r.booth.reservationType === BOOTH_RESERVATION_TYPE.FCFS ? 'type-fcfs' : 'type-default'}`}
+                    >
+                      {r.booth.reservationType || '-'}
+                    </span>,
                     tip ? (
                       <TooltipCell tooltip={tip} tag="span" className="tooltip-cell">
                         {physicalPackages}

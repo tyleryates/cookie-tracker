@@ -7,16 +7,20 @@ import { mergeOrCreateOrder } from '../../data-store-operations';
 import type { CookieType, RawScoutData, Varieties } from '../../types';
 import { parseVarietiesFromAPI } from './parsers';
 
-/** Update scout aggregated data (additive for numeric, direct set for metadata) */
-export function updateScoutData(
+/** Record import metadata (timestamp + source entry) */
+export function recordImportMetadata(
   reconciler: DataStore,
-  scoutName: string,
-  updates: Partial<RawScoutData>,
-  metadata: Partial<RawScoutData> = {}
+  timestampField: 'lastImportDC' | 'lastImportSC' | 'lastImportSCReport',
+  sourceType: string,
+  records: number
 ): void {
-  // Metadata fields that should be set directly (not added)
-  const metadataFields = ['scoutId', 'gsusaId', 'gradeLevel', 'serviceUnit', 'troopId', 'council', 'district'];
+  const now = new Date().toISOString();
+  reconciler.metadata[timestampField] = now;
+  reconciler.metadata.sources.push({ type: sourceType, date: now, records });
+}
 
+/** Register a scout by name, optionally setting metadata fields (non-null values only) */
+export function updateScoutData(reconciler: DataStore, scoutName: string, data: Partial<RawScoutData> = {}): void {
   if (!reconciler.scouts.has(scoutName)) {
     reconciler.scouts.set(scoutName, {
       name: scoutName,
@@ -33,30 +37,20 @@ export function updateScoutData(
   const scout = reconciler.scouts.get(scoutName);
   if (!scout) return;
 
-  // Handle metadata updates (set directly if not null)
-  (Object.keys(updates) as Array<keyof RawScoutData>).forEach((key) => {
-    if (metadataFields.includes(key)) {
-      if (updates[key] !== null && updates[key] !== undefined) {
-        (scout as Record<string, any>)[key] = updates[key];
-      }
+  for (const key of Object.keys(data) as Array<keyof RawScoutData>) {
+    if (data[key] !== null && data[key] !== undefined) {
+      (scout as Record<string, any>)[key] = data[key];
     }
-  });
-
-  // Handle separate metadata object (for backward compatibility)
-  (Object.keys(metadata) as Array<keyof RawScoutData>).forEach((key) => {
-    if (metadata[key] !== null && metadata[key] !== undefined) {
-      (scout as Record<string, any>)[key] = metadata[key];
-    }
-  });
+  }
 }
 
 /** Register a scout by girlId, creating the scout entry if needed */
-export function registerScout(reconciler: DataStore, girlId: any, girl: Record<string, any>): void {
+export function registerScout(reconciler: DataStore, girlId: number, girl: Record<string, any>): void {
   const scoutName = `${girl.first_name || ''} ${girl.last_name || ''}`.trim();
   if (!girlId || !scoutName) return;
 
   if (!reconciler.scouts.has(scoutName)) {
-    updateScoutData(reconciler, scoutName, {}, { scoutId: girlId });
+    updateScoutData(reconciler, scoutName, { scoutId: girlId });
   } else {
     const scout = reconciler.scouts.get(scoutName);
     if (scout && !scout.scoutId) {

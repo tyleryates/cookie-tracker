@@ -43,15 +43,11 @@ export function buildVarieties(reconciler: DataStore, scouts: Map<string, Scout>
   // Calculate net troop inventory by variety (SC transfer data)
   // C2T/G2T add to troop stock, all T2G categories subtract from troop stock
   reconciler.transfers.forEach((transfer: Transfer) => {
-    let sign = 0;
     if (TROOP_INVENTORY_IN_CATEGORIES.has(transfer.category)) {
-      sign = 1; // Inventory in
+      accumulateVarieties(transfer.physicalVarieties, inventory);
     } else if (T2G_CATEGORIES.has(transfer.category)) {
-      sign = -1; // Inventory out
+      accumulateVarieties(transfer.physicalVarieties, inventory, { sign: -1 });
     }
-    if (sign === 0) return;
-
-    accumulateVarieties(transfer.physicalVarieties, inventory, { sign });
   });
 
   const total = Object.values(byCookie).reduce((sum, count) => sum + (count || 0), 0);

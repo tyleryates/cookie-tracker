@@ -4,7 +4,7 @@ import { ipcRenderer, shell } from 'electron';
 import { useCallback, useEffect, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
 import Logger from '../logger';
-import type { Credentials, ScrapeProgress } from '../types';
+import type { Credentials, DataFileInfo, ScrapeProgress } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { LoginModal } from './components/login-modal';
 import { ReportsSection } from './components/reports-section';
@@ -65,7 +65,12 @@ export function App() {
 
   // --- Core data operations ---
   const doLoadDataFromDisk = useCallback(
-    async (opts?: { specificSc?: any; specificDc?: any; showMessages?: boolean; updateSyncTimestamps?: boolean }) => {
+    async (opts?: {
+      specificSc?: DataFileInfo | null;
+      specificDc?: DataFileInfo | null;
+      showMessages?: boolean;
+      updateSyncTimestamps?: boolean;
+    }) => {
       const showMessages = opts?.showMessages ?? true;
       try {
         if (showMessages) showStatus('Loading data...', 'success');
@@ -149,6 +154,12 @@ export function App() {
           dispatch({ type: 'SYNC_SOURCE_UPDATE', source: key, patch: { status: 'error', errorMessage: sourceResult.error } });
           if (sourceResult.error) errors.push(`${label}: ${sourceResult.error}`);
         }
+      }
+
+      // Booth availability is fetched as part of the SC scrape — update booth timestamp too
+      if (scrapeData.smartCookie?.success) {
+        dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'booth', patch: { status: 'synced', lastSync: now } });
+        ipcRenderer.invoke('update-config', { lastBoothSync: now });
       }
 
       if (scrapeData.error) errors.push(scrapeData.error);

@@ -4,7 +4,7 @@ import { DATA_SOURCES, DC_COLUMNS } from '../../constants';
 import type { DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
 import { parseExcelDate, parseVarietiesFromDC } from './parsers';
-import { updateScoutData } from './scout-helpers';
+import { recordImportMetadata, updateScoutData } from './scout-helpers';
 
 /** Import Digital Cookie order data from Excel export */
 export function importDigitalCookie(reconciler: DataStore, dcData: Record<string, any>[]): void {
@@ -34,10 +34,5 @@ export function importDigitalCookie(reconciler: DataStore, dcData: Record<string
     updateScoutData(reconciler, scout, {});
   });
 
-  reconciler.metadata.lastImportDC = new Date().toISOString();
-  reconciler.metadata.sources.push({
-    type: DATA_SOURCES.DIGITAL_COOKIE,
-    date: new Date().toISOString(),
-    records: dcData.length
-  });
+  recordImportMetadata(reconciler, 'lastImportDC', DATA_SOURCES.DIGITAL_COOKIE, dcData.length);
 }

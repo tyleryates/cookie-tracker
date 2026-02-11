@@ -133,14 +133,6 @@ function parseTimestampFromFilename(name: string, prefix: string, ext: string): 
   return new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}`);
 }
 
-function extractTimestamp(filename: string, prefix: string, extension: string): string | null {
-  const timestampStr = filename.replace(prefix, '').replace(extension, '');
-  const isoTimestamp = timestampStr.replace(/-(\d{2})-(\d{2})-(\d{2})$/, 'T$1:$2:$3');
-  const d = new Date(isoTimestamp);
-  if (Number.isNaN(d.getTime())) return null;
-  return isoTimestamp;
-}
-
 function formatTimestamp(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
@@ -251,7 +243,7 @@ async function loadSourceFiles(
   if (scFile) {
     const r = loadJsonFile(scFile, rec);
     sc = r.loaded;
-    if (r.loaded) scTimestamp = extractTimestamp(scFile.name, 'SC-', '.json');
+    if (r.loaded) scTimestamp = parseTimestampFromFilename(scFile.name, 'SC-', '.json')?.toISOString() ?? null;
     else if (r.issue) issues.push(r.issue);
   }
 
@@ -265,7 +257,7 @@ async function loadSourceFiles(
       'Digital Cookie XLSX not recognized'
     );
     dc = r.loaded;
-    if (r.loaded) dcTimestamp = extractTimestamp(dcFile.name, 'DC-', '.xlsx');
+    if (r.loaded) dcTimestamp = parseTimestampFromFilename(dcFile.name, 'DC-', '.xlsx')?.toISOString() ?? null;
     else if (r.issue) issues.push(r.issue);
   }
 

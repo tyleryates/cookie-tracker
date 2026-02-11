@@ -58,7 +58,7 @@ export interface Order {
     district?: string | null;
   };
   sources: string[];
-  metadata?: OrderMetadata;
+  metadata: OrderMetadata;
 }
 
 // ============================================================================
@@ -95,8 +95,7 @@ export type TransferInput = Partial<Transfer> & {
 };
 
 // ============================================================================
-// ALLOCATION TYPES — Normalized single type replacing BoothSalesAllocation,
-// DirectShipAllocation, and virtual booth transfer processing.
+// ALLOCATION TYPES
 // ============================================================================
 
 export type AllocationChannel = (typeof ALLOCATION_CHANNEL)[keyof typeof ALLOCATION_CHANNEL];

@@ -9,7 +9,7 @@ import { normalizeBoothLocation } from './data-processing/importers';
 import Logger from './logger';
 import ScraperOrchestrator from './scrapers';
 import SmartCookieScraper from './scrapers/smart-cookie';
-import type { AppConfig, Credentials } from './types';
+import type { AppConfig, Credentials, DataFileInfo } from './types';
 
 let mainWindow: BrowserWindow | null = null;
 let lastScraper: ScraperOrchestrator | null = null;
@@ -171,56 +171,10 @@ app.on('activate', () => {
   }
 });
 
-// Handle scan and import from 'in' directory
-ipcMain.handle(
-  'scan-in-directory',
-  handleIpcError(async () => {
-    const inDir = path.join(dataDir, 'in');
-
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(inDir)) {
-      fs.mkdirSync(inDir, { recursive: true });
-    }
-
-    // Find all supported files
-    const files = fs.readdirSync(inDir).filter((file) => {
-      const ext = path.extname(file).toLowerCase();
-      return ['.xlsx', '.xls', '.csv', '.json'].includes(ext);
-    });
-
-    if (files.length === 0) {
-      throw new Error('No files found in /data/in/ directory');
-    }
-
-    const fileData = [];
-    for (const file of files) {
-      const filePath = path.join(inDir, file);
-      const ext = path.extname(file).toLowerCase();
-      // Read JSON files as parsed objects, binary files as buffers
-      let data: any;
-      if (ext === '.json') {
-        const jsonStr = fs.readFileSync(filePath, 'utf8');
-        data = JSON.parse(jsonStr);
-      } else {
-        data = fs.readFileSync(filePath);
-      }
-
-      fileData.push({
-        name: file,
-        path: filePath,
-        data: data,
-        extension: ext
-      });
-    }
-
-    return fileData;
-  })
-);
-
 // Handle load-data: full data pipeline (scan → parse → build → return UnifiedDataset)
 ipcMain.handle(
   'load-data',
-  handleIpcError(async (_event, options?: { specificSc?: any; specificDc?: any }) => {
+  handleIpcError(async (_event, options?: { specificSc?: DataFileInfo | null; specificDc?: DataFileInfo | null }) => {
     const inDir = path.join(dataDir, 'in');
     const result = await loadData(inDir, options);
     return result;
@@ -230,7 +184,7 @@ ipcMain.handle(
 // Handle save file (for unified dataset caching)
 ipcMain.handle(
   'save-file',
-  handleIpcError(async (_event, { filename, content, type: _type }) => {
+  handleIpcError(async (_event, { filename, content }) => {
     const inDir = path.join(dataDir, 'in');
 
     // Create directory if it doesn't exist

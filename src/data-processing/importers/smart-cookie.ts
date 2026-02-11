@@ -7,19 +7,7 @@ import type { Order } from '../../types';
 import { isC2TTransfer } from '../utils';
 import { importAllocations } from './allocations';
 import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSCTransfer } from './parsers';
-import { mergeDCOrderFromSC, trackScoutFromAPITransfer, updateScoutData } from './scout-helpers';
-
-/** Record import metadata (timestamp + source entry) */
-function recordImportMetadata(
-  reconciler: DataStore,
-  timestampField: 'lastImportSC' | 'lastImportSCReport',
-  sourceType: string,
-  records: number
-): void {
-  const now = new Date().toISOString();
-  reconciler.metadata[timestampField] = now;
-  reconciler.metadata.sources.push({ type: sourceType, date: now, records });
-}
+import { mergeDCOrderFromSC, recordImportMetadata, trackScoutFromAPITransfer, updateScoutData } from './scout-helpers';
 
 /** Import Smart Cookie Report data (ReportExport.xlsx) */
 export function importSmartCookieReport(reconciler: DataStore, reportData: Record<string, any>[]): void {
@@ -27,7 +15,7 @@ export function importSmartCookieReport(reconciler: DataStore, reportData: Recor
     const orderNum = String(row[SC_REPORT_COLUMNS.ORDER_ID] || row[SC_REPORT_COLUMNS.REF_NUMBER]);
     const scout = row[SC_REPORT_COLUMNS.GIRL_NAME] || '';
 
-    // Parse varieties from C1-C13 columns (format: "cases/packages")
+    // Parse varieties from C1-C11 columns (format: "cases/packages")
     const { varieties, totalCases, totalPackages } = parseVarietiesFromSCReport(row);
 
     // Parse total (also in "cases/packages" format)

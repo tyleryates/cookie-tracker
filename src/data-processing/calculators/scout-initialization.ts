@@ -7,7 +7,7 @@ import type { RawScoutData, Scout } from '../../types';
 
 /** Initialize scouts from Digital Cookie and Smart Cookie data */
 function initializeScouts(reconciler: DataStore, rawDCData: Record<string, any>[]): Map<string, Scout> {
-  const scoutDataset = new Map();
+  const scoutDataset = new Map<string, Scout>();
 
   // From Digital Cookie orders
   rawDCData.forEach((row: Record<string, any>) => {
@@ -27,7 +27,7 @@ function initializeScouts(reconciler: DataStore, rawDCData: Record<string, any>[
       scoutDataset.set(scoutName, createScoutStructure(scoutName, scoutData.scoutId || null, false));
     } else {
       // Update girlId if we have it from SC
-      const scout = scoutDataset.get(scoutName);
+      const scout = scoutDataset.get(scoutName)!;
       if (scoutData.scoutId && !scout.girlId) {
         scout.girlId = scoutData.scoutId;
       }
