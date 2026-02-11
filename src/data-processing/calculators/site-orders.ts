@@ -74,8 +74,7 @@ function buildSiteOrdersDataset(reconciler: IDataReconciler, scoutDataset: Map<s
 
   // Set flag for scout-summary to control site row display and warning
   if (siteScout) {
-    (siteScout as any).$hasUnallocatedSiteOrders =
-      result.directShip.hasWarning || result.girlDelivery.hasWarning || result.boothSale.hasWarning;
+    siteScout.$hasUnallocatedSiteOrders = result.directShip.hasWarning || result.girlDelivery.hasWarning || result.boothSale.hasWarning;
   }
 
   return result;

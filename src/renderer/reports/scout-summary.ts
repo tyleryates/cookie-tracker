@@ -321,7 +321,7 @@ function buildOrdersTable(scout: Scout): string {
     const tooltipAttr = buildVarietyTooltipAttr(order.varieties);
 
     const PAYMENT_LABELS: Record<string, string> = { CREDIT_CARD: 'Credit Card', VENMO: 'Venmo', CASH: 'Cash' };
-    const paymentDisplay = order.paymentMethod ? PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod : (order.paymentStatus || '-');
+    const paymentDisplay = order.paymentMethod ? PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod : order.paymentStatus || '-';
 
     const { style: statusStyle, text: statusText } = getStatusStyle(order.status);
 
@@ -409,7 +409,7 @@ function getOrderStatusStyle(scout: Scout): { color: string; icon: string; toolt
 }
 
 function buildDeliveredCell(sales: number, isSiteRow: boolean, scout: Scout, siteOrders: SiteOrdersDataset): string {
-  if (!isSiteRow || !(scout as any).$hasUnallocatedSiteOrders || !siteOrders) {
+  if (!isSiteRow || !scout.$hasUnallocatedSiteOrders || !siteOrders) {
     return `<td>${sales}</td>`;
   }
   const dsUnalloc = siteOrders.directShip.unallocated || 0;
@@ -423,13 +423,13 @@ function buildDeliveredCell(sales: number, isSiteRow: boolean, scout: Scout, sit
   return `<td><span class="tooltip-cell" data-tooltip="${escapeHtml(parts.join('\n'))}" style="color: #ff9800; font-weight: 600;">${sales} ⚠️</span></td>`;
 }
 
-function buildProceedsCell(isSiteRow: boolean, totals: Scout['totals']): string {
+function buildProceedsCell(isSiteRow: boolean, totals: Scout['totals'], proceedsRate: number): string {
   if (isSiteRow) return '<td>-</td>';
   const proceeds = Math.round(totals.$troopProceeds || 0);
   const deduction = Math.round(totals.$proceedsDeduction || 0);
   const style = proceeds > 0 ? 'color: #4CAF50; font-weight: 600;' : '';
   if (deduction > 0) {
-    const tooltip = `First ${PROCEEDS_EXEMPT_PACKAGES} pkg exempt: -$${deduction}\nGross: $${Math.round((totals.totalSold || 0) * 0.9)}`;
+    const tooltip = `First ${PROCEEDS_EXEMPT_PACKAGES} pkg exempt: -$${deduction}\nGross: $${Math.round((totals.totalSold || 0) * proceedsRate)}`;
     return `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltip)}" style="${style}">$${proceeds}</td>`;
   }
   return `<td style="${style}">${proceeds > 0 ? `$${proceeds}` : '$0'}</td>`;
@@ -451,9 +451,16 @@ function buildCashOwedCell(isSiteRow: boolean, totals: Scout['totals']): string 
   return `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltipParts.join('\n'))}" style="${style}">${cashOwed > 0 ? `$${cashOwed}` : '$0'}</td>`;
 }
 
-function buildScoutRow(name: string, scout: Scout, idx: number, isSiteRow: boolean, siteOrders: SiteOrdersDataset): string {
+function buildScoutRow(
+  name: string,
+  scout: Scout,
+  idx: number,
+  isSiteRow: boolean,
+  siteOrders: SiteOrdersDataset,
+  proceedsRate: number
+): string {
   const { totals, credited } = scout;
-  const sales = totals.sales || 0;
+  const sales = totals.delivered || 0;
 
   const netInventory = totals.inventory;
   const inventoryCell = buildInventoryCell(netInventory, scout.$issues?.negativeInventory, totals.inventory || 0);
@@ -475,7 +482,7 @@ function buildScoutRow(name: string, scout: Scout, idx: number, isSiteRow: boole
   html += `<td>${totals.donations || 0}</td>`;
   html += `<td>${creditedCell}</td>`;
   html += `<td class="tooltip-cell" data-tooltip="${escapeHtml(soldTooltip)}">${totalSold}</td>`;
-  html += buildProceedsCell(isSiteRow, totals);
+  html += buildProceedsCell(isSiteRow, totals, proceedsRate);
   html += buildCashOwedCell(isSiteRow, totals);
   html += '</tr>';
   return html;
@@ -489,20 +496,18 @@ function generateSummaryReport(reconciler: IDataReconciler): string {
 
   const scouts = reconciler.unified.scouts;
   const siteOrders = reconciler.unified.siteOrders;
+  const proceedsRate = reconciler.unified.troopTotals.proceedsRate;
 
   // Convert Map to sorted array of [name, scout] entries, filtering out scouts with no sales
   // Site row only shows when it has unallocated items (donations are handled by booth divider)
   const sortedScouts = Array.from(scouts.entries())
-    .filter(([_name, scout]: [string, Scout]) =>
-      scout.isSiteOrder ? (scout as any).$hasUnallocatedSiteOrders : (scout.totals.totalSold || 0) > 0
-    )
+    .filter(([_name, scout]: [string, Scout]) => (scout.isSiteOrder ? scout.$hasUnallocatedSiteOrders : (scout.totals.totalSold || 0) > 0))
     .sort((a: [string, Scout], b: [string, Scout]) => a[0].localeCompare(b[0]));
 
   const SCOUT_SUMMARY_COLUMN_COUNT = 10;
 
   let html = '<div class="report-visual"><h3>Scout Summary</h3>';
-  html +=
-    '<p class="table-hint">💡 Click on any scout to see detailed breakdown. <strong>Delivered</strong> = packages for in-person delivery. <strong>Inventory</strong> = net on hand. <strong>Credited</strong> = troop booth sales + direct ship allocated to scout. <strong>Shipped</strong> = scout\'s own direct ship orders. <strong>Proceeds</strong> = $0.90/pkg after first 50 exempt. <strong>Cash Due</strong> = pickup value minus electronic DC payments.</p>';
+  html += `<p class="table-hint">💡 Click on any scout to see detailed breakdown. <strong>Delivered</strong> = packages for in-person delivery. <strong>Inventory</strong> = net on hand. <strong>Credited</strong> = troop booth sales + direct ship allocated to scout. <strong>Shipped</strong> = scout's own direct ship orders. <strong>Proceeds</strong> = $${proceedsRate.toFixed(2)}/pkg after first 50 exempt. <strong>Cash Due</strong> = pickup value minus electronic DC payments.</p>`;
   html += startTable('table-normal scout-table');
   html += createTableHeader([
     'Scout',
@@ -521,7 +526,7 @@ function generateSummaryReport(reconciler: IDataReconciler): string {
     const isSiteRow = name.endsWith(' Site');
 
     // Main row (clickable)
-    html += buildScoutRow(name, scout, idx, isSiteRow, siteOrders);
+    html += buildScoutRow(name, scout, idx, isSiteRow, siteOrders, proceedsRate);
 
     // Detail row (expandable)
     html += `<tr class="scout-detail" data-scout-index="${idx}" style="display: none;">`;

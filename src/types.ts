@@ -142,7 +142,7 @@ export type TransferInput = Partial<Transfer> & {
 
 export interface ScoutTotals {
   orders: number;
-  sales: number;
+  delivered: number;
   shipped: number;
   donations: number;
   /** Total credited packages (booth + virtual booth + direct ship). Used by totalSold calculation — reports use totalCredited() helper for display. */
@@ -222,6 +222,7 @@ export interface Scout {
   inventory: ScoutInventory;
   credited: ScoutCredited;
   orders: Order[];
+  $hasUnallocatedSiteOrders?: boolean;
   $issues?: {
     negativeInventory?: Array<{
       variety: CookieType;
@@ -540,4 +541,3 @@ export interface DataFileInfo {
   path: string;
   data?: any;
 }
-

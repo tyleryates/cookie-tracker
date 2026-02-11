@@ -51,7 +51,7 @@ export function buildUnifiedDataset(reconciler: IDataReconciler): UnifiedDataset
   const packageTotals = calculatePackageTotals(reconciler.transfers);
 
   // Build troop totals
-  const troopTotals = buildTroopTotals(reconciler, scouts, siteOrders, packageTotals, scoutCounts);
+  const troopTotals = buildTroopTotals(reconciler, scouts, packageTotals, scoutCounts);
 
   // Build transfer breakdowns
   const transferBreakdowns = buildTransferBreakdowns(reconciler, warnings);

@@ -47,8 +47,18 @@ function generateTroopSummaryReport(reconciler: IDataReconciler): string {
   const grossProceeds = troopTotals.troopProceeds + troopTotals.proceedsDeduction;
   const financialStats: { label: string; value: string; description: string; color: string }[] = [
     { label: 'Packages Credited', value: `${packagesCredited}`, description: 'Received + direct ship + donations', color: '#1565C0' },
-    { label: 'Per Girl Average', value: `$${troopTotals.scouts.active > 0 ? Math.round(packagesCredited / troopTotals.scouts.active) : 0}`, description: `${troopTotals.scouts.active} girls participating`, color: '#6A1B9A' },
-    { label: 'Gross Proceeds', value: `$${Math.round(grossProceeds)}`, description: `$${troopTotals.proceedsRate.toFixed(2)}/pkg owed to troop`, color: '#EF6C00' }
+    {
+      label: 'Per Girl Average',
+      value: `$${troopTotals.scouts.active > 0 ? Math.round(packagesCredited / troopTotals.scouts.active) : 0}`,
+      description: `${troopTotals.scouts.active} girls participating`,
+      color: '#6A1B9A'
+    },
+    {
+      label: 'Gross Proceeds',
+      value: `$${Math.round(grossProceeds)}`,
+      description: `$${troopTotals.proceedsRate.toFixed(2)}/pkg owed to troop`,
+      color: '#EF6C00'
+    }
   ];
   if (troopTotals.proceedsDeduction > 0) {
     financialStats.push({

@@ -84,7 +84,7 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
     // Totals (calculated later)
     totals: {
       orders: 0,
-      sales: 0, // Physical packages for girl delivery
+      delivered: 0, // Physical packages for girl delivery
       shipped: 0, // Scout's own direct ship orders
       credited: 0, // Virtual booth + direct ship + booth sales allocations
       donations: 0, // Cookie Share

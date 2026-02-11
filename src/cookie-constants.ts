@@ -198,7 +198,7 @@ export const TROOP_PROCEEDS_PER_PACKAGE = 0.9; // Default, used for per-scout es
 /** Get troop proceeds rate based on Per Girl Average */
 export function getTroopProceedsRate(pga: number): number {
   if (pga >= 350) return 0.95;
-  if (pga >= 200) return 0.90;
+  if (pga >= 200) return 0.9;
   return 0.85;
 }
 

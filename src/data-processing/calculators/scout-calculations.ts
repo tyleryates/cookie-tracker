@@ -56,7 +56,7 @@ function calculateOrderTotals(scout: Scout): void {
   scout.orders.forEach((order: Order) => {
     // Physical packages by delivery method
     if (order.needsInventory) {
-      scout.totals.sales += order.physicalPackages;
+      scout.totals.delivered += order.physicalPackages;
     } else if (order.orderType === ORDER_TYPE.DIRECT_SHIP) {
       scout.totals.shipped += order.physicalPackages;
     }
@@ -79,7 +79,7 @@ function calculateCreditedTotals(scout: Scout): void {
 /** Calculate sold totals and proceeds */
 function calculateRevenueTotals(scout: Scout): void {
   // Total sold across all channels
-  scout.totals.totalSold = scout.totals.sales + scout.totals.shipped + scout.totals.donations + scout.totals.credited;
+  scout.totals.totalSold = scout.totals.delivered + scout.totals.shipped + scout.totals.donations + scout.totals.credited;
 
   // Troop proceeds (first 50 packages per active girl are exempt)
   const grossProceeds = scout.totals.totalSold * TROOP_PROCEEDS_PER_PACKAGE;

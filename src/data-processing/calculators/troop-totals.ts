@@ -3,14 +3,12 @@
 
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import { PROCEEDS_EXEMPT_PACKAGES, getTroopProceedsRate } from '../../cookie-constants';
-import type { IDataReconciler, Scout, ScoutCounts, SiteOrdersDataset, TroopTotals } from '../../types';
+import type { IDataReconciler, Scout, ScoutCounts, TroopTotals } from '../../types';
 
 /** Aggregate scout-level totals: delivery, inventory, shipping, and proceeds */
 function aggregateScoutTotals(scouts: Map<string, Scout>) {
   let directShip = 0;
   let creditedDonations = 0;
-  let proceedsDeduction = 0;
-  let exemptPackages = 0;
   let girlDelivery = 0;
   let girlInventory = 0;
   let pendingPickup = 0;
@@ -19,7 +17,7 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
 
   scouts.forEach((scout) => {
     if (!scout.isSiteOrder) {
-      girlDelivery += (scout.totals.sales || 0) + (scout.credited.virtualBooth.packages || 0);
+      girlDelivery += (scout.totals.delivered || 0) + (scout.credited.virtualBooth.packages || 0);
       girlInventory += Math.max(0, scout.totals.inventory || 0);
       // Credited Cookie Share from divider allocations (site orders distributed to scouts)
       creditedDonations += scout.credited.virtualBooth.donations || 0;
@@ -36,13 +34,9 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
       }
     }
     directShip += scout.totals.shipped || 0;
-    proceedsDeduction += scout.totals.$proceedsDeduction || 0;
-    if (!scout.isSiteOrder && scout.totals.totalSold > 0) {
-      exemptPackages += Math.min(scout.totals.totalSold, PROCEEDS_EXEMPT_PACKAGES);
-    }
   });
 
-  return { directShip, creditedDonations, proceedsDeduction, exemptPackages, girlDelivery, girlInventory, pendingPickup, boothSalesPackages, boothSalesDonations };
+  return { directShip, creditedDonations, girlDelivery, girlInventory, pendingPickup, boothSalesPackages, boothSalesDonations };
 }
 
 /** Count Cookie Share donations from DC raw data (non-site orders only).
@@ -62,8 +56,15 @@ function countDCDonations(rawDCData: Record<string, any>[]): number {
 export function buildTroopTotals(
   reconciler: IDataReconciler,
   scouts: Map<string, Scout>,
-  _siteOrders: SiteOrdersDataset,
-  packageTotals: { ordered: number; allocated: number; virtualBoothT2G: number; boothDividerT2G: number; donations: number; directShip: number; g2t: number },
+  packageTotals: {
+    ordered: number;
+    allocated: number;
+    virtualBoothT2G: number;
+    boothDividerT2G: number;
+    donations: number;
+    directShip: number;
+    g2t: number;
+  },
   scoutCounts: ScoutCounts
 ): TroopTotals {
   const rawDCData = reconciler.metadata.rawDCData || [];

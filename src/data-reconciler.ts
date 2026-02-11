@@ -1,7 +1,7 @@
 // Data Reconciliation System
 // Standardizes and merges data from Digital Cookie and Smart Cookie
 
-import { DATA_SOURCES, TRANSFER_CATEGORY, type TransferCategory } from './constants';
+import { DATA_SOURCES, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
 import { COOKIE_TYPE } from './cookie-constants';
 import { buildUnifiedDataset } from './data-processing/data-calculators';
 import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './data-processing/data-importers';
@@ -31,20 +31,20 @@ function classifyTransferCategory(
   directShipDivider: boolean
 ): TransferCategory {
   if (isIncomingInventory(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
-  if (type === 'G2T') return TRANSFER_CATEGORY.GIRL_RETURN;
-  if (type === 'T2G') {
+  if (type === TRANSFER_TYPE.G2T) return TRANSFER_CATEGORY.GIRL_RETURN;
+  if (type === TRANSFER_TYPE.T2G) {
     if (virtualBooth) return TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION;
     if (boothDivider) return TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION;
     if (directShipDivider) return TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION;
     return TRANSFER_CATEGORY.GIRL_PICKUP;
   }
-  if (type === 'D') return TRANSFER_CATEGORY.DC_ORDER_RECORD;
-  if (type === 'COOKIE_SHARE' || type === 'COOKIE_SHARE_D') {
+  if (type === TRANSFER_TYPE.D) return TRANSFER_CATEGORY.DC_ORDER_RECORD;
+  if (type === TRANSFER_TYPE.COOKIE_SHARE || type === TRANSFER_TYPE.COOKIE_SHARE_D) {
     if (boothDivider) return TRANSFER_CATEGORY.BOOTH_COOKIE_SHARE;
     return TRANSFER_CATEGORY.COOKIE_SHARE_RECORD;
   }
-  if (type === 'DIRECT_SHIP') return TRANSFER_CATEGORY.DIRECT_SHIP;
-  if (type === 'PLANNED') return TRANSFER_CATEGORY.PLANNED;
+  if (type === TRANSFER_TYPE.DIRECT_SHIP) return TRANSFER_CATEGORY.DIRECT_SHIP;
+  if (type === TRANSFER_TYPE.PLANNED) return TRANSFER_CATEGORY.PLANNED;
   Logger.warn(`Unknown transfer type "${type}" — defaulting to DC_ORDER_RECORD category`);
   return TRANSFER_CATEGORY.DC_ORDER_RECORD;
 }
