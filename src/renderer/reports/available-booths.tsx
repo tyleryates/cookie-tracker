@@ -1,35 +1,12 @@
 // Available Booths Report — Preact component
 // Shows booth locations with filtered availability dates/times
 
-import type { BoothAvailableDate, BoothLocation, BoothTimeSlot, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
+import type { BoothAvailableDate, BoothLocation, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
+import { parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
 
 interface AvailableBoothsConfig {
   filters: DayFilter[];
   ignoredTimeSlots: IgnoredTimeSlot[];
-}
-
-/** Parse a time string like "4:00 PM" or "16:00" to minutes since midnight */
-function parseTimeToMinutes(time: string): number {
-  const match24 = time.match(/^(\d{1,2}):(\d{2})$/);
-  if (match24) return Number(match24[1]) * 60 + Number(match24[2]);
-  const match12 = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (match12) {
-    let hours = Number(match12[1]);
-    const minutes = Number(match12[2]);
-    const period = match12[3].toUpperCase();
-    if (period === 'PM' && hours !== 12) hours += 12;
-    if (period === 'AM' && hours === 12) hours = 0;
-    return hours * 60 + minutes;
-  }
-  return -1;
-}
-
-function slotOverlapsRange(slot: BoothTimeSlot, afterStr: string, beforeStr: string): boolean {
-  const after = parseTimeToMinutes(afterStr);
-  const before = parseTimeToMinutes(beforeStr);
-  const start = parseTimeToMinutes(slot.startTime);
-  if (after < 0 || before < 0 || start < 0) return true;
-  return start >= after && start < before;
 }
 
 function isSlotIgnored(boothId: number, date: string, startTime: string, ignored: IgnoredTimeSlot[]): boolean {

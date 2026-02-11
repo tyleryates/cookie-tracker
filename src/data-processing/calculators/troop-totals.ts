@@ -5,7 +5,7 @@ import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import { getTroopProceedsRate, PROCEEDS_EXEMPT_PACKAGES } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
 import type { Scout, ScoutCounts, TroopTotals } from '../../types';
-import { channelTotals } from './helpers';
+import type { PackageTotals } from './package-totals';
 
 /** Aggregate scout-level totals: delivery, inventory, shipping, and proceeds */
 function aggregateScoutTotals(scouts: Map<string, Scout>) {
@@ -19,9 +19,7 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
 
   scouts.forEach((scout) => {
     if (!scout.isSiteOrder) {
-      const vb = channelTotals(scout.allocations, 'virtualBooth');
-      const ds = channelTotals(scout.allocations, 'directShip');
-      const bs = channelTotals(scout.allocations, 'booth');
+      const { booth: bs, directShip: ds, virtualBooth: vb } = scout.totals.$allocationSummary;
 
       girlDelivery += (scout.totals.delivered || 0) + vb.packages;
       girlInventory += Math.max(0, scout.totals.inventory || 0);
@@ -60,28 +58,20 @@ function countDCDonations(rawDCData: Record<string, any>[]): number {
 export function buildTroopTotals(
   reconciler: DataStore,
   scouts: Map<string, Scout>,
-  packageTotals: {
-    ordered: number;
-    allocated: number;
-    virtualBoothT2G: number;
-    boothDividerT2G: number;
-    donations: number;
-    directShip: number;
-    g2t: number;
-  },
+  packageTotals: PackageTotals,
   scoutCounts: ScoutCounts
 ): TroopTotals {
   const rawDCData = reconciler.metadata.rawDCData || [];
 
   // Net troop inventory: received from council minus all outflows, plus returns
   const totalInventory =
-    packageTotals.ordered - packageTotals.allocated - packageTotals.virtualBoothT2G - packageTotals.boothDividerT2G + packageTotals.g2t;
+    packageTotals.c2tReceived - packageTotals.allocated - packageTotals.virtualBoothT2G - packageTotals.boothDividerT2G + packageTotals.g2t;
   const scoutAgg = aggregateScoutTotals(scouts);
   // Total donations = DC non-site (individual girl orders) + credited allocations (site orders distributed to scouts)
   const donations = countDCDonations(rawDCData) + scoutAgg.creditedDonations;
 
   // Troop proceeds: rate depends on Per Girl Average (PGA)
-  const packagesCredited = packageTotals.ordered + donations + scoutAgg.directShip;
+  const packagesCredited = packageTotals.c2tReceived + donations + scoutAgg.directShip;
   const pga = scoutCounts.active > 0 ? Math.round(packagesCredited / scoutCounts.active) : 0;
   const proceedsRate = getTroopProceedsRate(pga);
   const grossProceeds = packagesCredited * proceedsRate;
@@ -96,7 +86,7 @@ export function buildTroopTotals(
     proceedsExemptPackages: exemptPackages,
     inventory: totalInventory,
     donations,
-    ordered: packageTotals.ordered,
+    c2tReceived: packageTotals.c2tReceived,
     directShip: packageTotals.directShip,
     boothDividerT2G: packageTotals.boothDividerT2G,
     virtualBoothT2G: packageTotals.virtualBoothT2G,

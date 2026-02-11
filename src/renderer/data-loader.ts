@@ -3,35 +3,10 @@
 
 import { ipcRenderer } from 'electron';
 import Logger from '../logger';
-import type { AppConfig, DataFileInfo, UnifiedDataset } from '../types';
+import type { AppConfig, DataFileInfo, DatasetEntry, IpcResponse, LoadDataResult, UnifiedDataset } from '../types';
 import { DateFormatter } from './format-utils';
 
-// ============================================================================
-// TYPES (mirrored from data-pipeline.ts for renderer use)
-// ============================================================================
-
-export interface DatasetEntry {
-  label: string;
-  scFile: DataFileInfo | null;
-  dcFile: DataFileInfo | null;
-  timestamp: string;
-}
-
-interface LoadedSources {
-  sc: boolean;
-  dc: boolean;
-  scReport: boolean;
-  scTransfer: boolean;
-  issues: string[];
-  scTimestamp: string | null;
-  dcTimestamp: string | null;
-}
-
-interface LoadDataResult {
-  unified: UnifiedDataset;
-  datasetList: DatasetEntry[];
-  loaded: LoadedSources;
-}
+export type { DatasetEntry };
 
 // ============================================================================
 // DATA LOADING (delegates to main process)
@@ -41,26 +16,23 @@ export async function loadDataFromDisk(options?: {
   specificSc?: DataFileInfo | null;
   specificDc?: DataFileInfo | null;
 }): Promise<LoadDataResult | null> {
-  const result = await ipcRenderer.invoke('load-data', options);
+  const result: IpcResponse<LoadDataResult | null> = await ipcRenderer.invoke('load-data', options);
 
-  // Handle IPC wrapper format
-  if (result && typeof result === 'object' && 'success' in result) {
-    if (!result.success) return null;
-    return result.data || null;
+  // Unwrap standardized IPC format { success, data }
+  if (!result?.success) return null;
+  const data = result.data;
+  if (!data) return null;
+
+  // Rehydrate Maps (IPC serializes Map as plain object)
+  if (data.unified?.scouts && !(data.unified.scouts instanceof Map)) {
+    data.unified.scouts = new Map(Object.entries(data.unified.scouts));
+  }
+  if (data.unified?.virtualCookieShareAllocations && !(data.unified.virtualCookieShareAllocations instanceof Map)) {
+    const raw = data.unified.virtualCookieShareAllocations;
+    data.unified.virtualCookieShareAllocations = new Map(Object.entries(raw).map(([k, v]) => [Number(k), v as number]));
   }
 
-  if (!result) return null;
-
-  // Rehydrate the Map (IPC serializes Map as plain object)
-  if (result.unified?.scouts && !(result.unified.scouts instanceof Map)) {
-    result.unified.scouts = new Map(Object.entries(result.unified.scouts));
-  }
-  if (result.unified?.virtualCookieShareAllocations && !(result.unified.virtualCookieShareAllocations instanceof Map)) {
-    const raw = result.unified.virtualCookieShareAllocations;
-    result.unified.virtualCookieShareAllocations = new Map(Object.entries(raw).map(([k, v]) => [Number(k), v as number]));
-  }
-
-  return result;
+  return data;
 }
 
 // ============================================================================
@@ -122,11 +94,11 @@ export function exportUnifiedDataset(unified: UnifiedDataset): void {
 
 export async function loadAppConfig(): Promise<AppConfig> {
   try {
-    const result = await ipcRenderer.invoke('load-config');
-    if (result && typeof result === 'object' && 'success' in result) {
+    const result: IpcResponse<AppConfig> = await ipcRenderer.invoke('load-config');
+    if (result.success) {
       return result.data;
     }
-    return result;
+    throw new Error(result.error);
   } catch (err) {
     Logger.error('Failed to load config:', err);
     return { autoSyncEnabled: true, boothIds: [], boothDayFilters: [], ignoredTimeSlots: [] };

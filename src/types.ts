@@ -100,6 +100,7 @@ export type TransferInput = Partial<Transfer> & {
 // ============================================================================
 
 export type AllocationChannel = 'booth' | 'directShip' | 'virtualBooth';
+export type AllocationSource = 'DirectShipDivider' | 'SmartBoothDivider' | 'SmartDirectShipDivider' | 'VirtualBoothTransfer';
 
 /**
  * Unified allocation record. Every credited allocation across all channels
@@ -112,7 +113,7 @@ export interface Allocation {
   packages: number;
   donations: number;
   varieties: Varieties;
-  source: string;
+  source: AllocationSource;
 
   // Booth-specific
   reservationId?: string;
@@ -137,6 +138,18 @@ export interface Allocation {
 // SCOUT TYPES
 // ============================================================================
 
+export interface AllocationChannelSummary {
+  packages: number;
+  donations: number;
+  varieties: Varieties;
+}
+
+export interface AllocationSummary {
+  booth: AllocationChannelSummary;
+  directShip: AllocationChannelSummary;
+  virtualBooth: AllocationChannelSummary;
+}
+
 export interface ScoutTotals {
   orders: number;
   delivered: number;
@@ -153,6 +166,9 @@ export interface ScoutTotals {
     cashOwed: number;
   };
   $inventoryDisplay: Varieties;
+  $salesByVariety: Varieties;
+  $shippedByVariety: Varieties;
+  $allocationSummary: AllocationSummary;
 }
 
 export interface ScoutInventory {
@@ -173,6 +189,11 @@ export interface Scout {
   inventory: ScoutInventory;
   /** Flat list of all credited allocations (booth, directShip, virtualBooth) */
   allocations: Allocation[];
+  $allocationsByChannel: {
+    booth: Allocation[];
+    directShip: Allocation[];
+    virtualBooth: Allocation[];
+  };
   orders: Order[];
   $hasUnallocatedSiteOrders?: boolean;
   $issues?: {
@@ -222,8 +243,10 @@ export interface RawScoutData {
 // WARNING TYPE
 // ============================================================================
 
+export type WarningType = 'UNKNOWN_ORDER_TYPE' | 'UNKNOWN_PAYMENT_METHOD' | 'UNKNOWN_TRANSFER_TYPE' | 'SC_TRANSFER_SKIPPED';
+
 export interface Warning {
-  type: string;
+  type: WarningType;
   message?: string;
   orderNumber?: string;
   orderType?: string;
@@ -272,6 +295,7 @@ export interface BoothReservationImported {
   timeslot: { date: string; startTime: string; endTime: string };
   cookies: Varieties;
   totalPackages: number;
+  physicalPackages: number;
   trackedCookieShare: number;
 }
 
@@ -301,8 +325,8 @@ export interface BoothLocation {
 export interface SiteOrderEntry {
   orderNumber: string;
   packages: number;
-  owner: string;
-  orderType: string | null;
+  owner: Owner;
+  orderType: OrderType | null;
 }
 
 export interface SiteOrderCategory {
@@ -333,7 +357,7 @@ export interface TroopTotals {
   proceedsExemptPackages: number;
   inventory: number;
   donations: number;
-  ordered: number;
+  c2tReceived: number;
   directShip: number;
   boothDividerT2G: number;
   virtualBoothT2G: number;
@@ -440,9 +464,42 @@ export interface AppConfig {
 // DATA FILE INFO
 // ============================================================================
 
+// ============================================================================
+// IPC RESPONSE TYPE
+// ============================================================================
+
+export type IpcResponse<T = unknown> = { success: true; data: T } | { success: false; error: string };
+
+// ============================================================================
+// DATA FILE INFO
+// ============================================================================
+
 export interface DataFileInfo {
   name: string;
   extension: string;
   path: string;
   data?: any;
+}
+
+export interface DatasetEntry {
+  label: string;
+  scFile: DataFileInfo | null;
+  dcFile: DataFileInfo | null;
+  timestamp: string;
+}
+
+export interface LoadedSources {
+  sc: boolean;
+  dc: boolean;
+  scReport: boolean;
+  scTransfer: boolean;
+  issues: string[];
+  scTimestamp: string | null;
+  dcTimestamp: string | null;
+}
+
+export interface LoadDataResult {
+  unified: UnifiedDataset;
+  datasetList: DatasetEntry[];
+  loaded: LoadedSources;
 }

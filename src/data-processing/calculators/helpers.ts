@@ -2,8 +2,8 @@
 // Pure utility functions used across calculator modules
 
 import { ORDER_TYPE, OWNER } from '../../constants';
-import { COOKIE_TYPE } from '../../cookie-constants';
 import type { Allocation, AllocationChannel, Order, Scout, Varieties } from '../../types';
+import { accumulateVarieties } from '../utils';
 
 /**
  * Whether an order draws from the scout's physical inventory.
@@ -39,11 +39,7 @@ export function channelTotals(
     packages += a.packages;
     donations += a.donations;
     if (a.varieties) {
-      Object.entries(a.varieties).forEach(([variety, count]) => {
-        if (count !== undefined) {
-          varieties[variety as keyof Varieties] = (varieties[variety as keyof Varieties] || 0) + count;
-        }
-      });
+      accumulateVarieties(a.varieties, varieties);
     }
   }
   return { packages, donations, varieties };
@@ -68,23 +64,10 @@ export function calculateSalesByVariety(scout: Scout): Varieties {
   const inventoryOrders = scout.orders.filter((order) => needsInventory(order));
 
   inventoryOrders.forEach((order) => {
-    addPhysicalVarietiesToSales(order.varieties, salesByVariety);
+    accumulateVarieties(order.varieties, salesByVariety, { excludeCookieShare: true });
   });
 
   return salesByVariety;
-}
-
-/**
- * Add physical varieties (excluding Cookie Share) to sales totals
- * @param varieties - Varieties from order
- * @param salesByVariety - Sales accumulator
- */
-function addPhysicalVarietiesToSales(varieties: Varieties, salesByVariety: Varieties): void {
-  Object.entries(varieties).forEach(([variety, count]) => {
-    if (variety !== COOKIE_TYPE.COOKIE_SHARE && count !== undefined) {
-      salesByVariety[variety as keyof Varieties] = (salesByVariety[variety as keyof Varieties] || 0) + count;
-    }
-  });
 }
 
 /**

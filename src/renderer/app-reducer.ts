@@ -2,9 +2,8 @@
 // Side effects (IPC calls, timers) stay in the component; only pure state
 // transitions live here.
 
-import type { AppConfig, UnifiedDataset } from '../types';
+import type { AppConfig, DatasetEntry, UnifiedDataset } from '../types';
 import type { SyncState } from './components/sync-section';
-import type { DatasetEntry } from './data-loader';
 
 // ============================================================================
 // STATE

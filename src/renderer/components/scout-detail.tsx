@@ -1,28 +1,12 @@
 // Scout detail breakdown — expandable content inside each scout row
 
 import type preact from 'preact';
-import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, OWNER } from '../../constants';
+import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
-import { allocationsByChannel, calculateSalesByVariety, channelTotals } from '../../data-processing/calculators/helpers';
-import type { Allocation, Order, Scout, Varieties } from '../../types';
-import { buildVarietyTooltip, formatDate, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
+import type { Order, Scout, Varieties } from '../../types';
+import { buildVarietyTooltip, classifyOrderStatus, formatDate, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
-
-// ============================================================================
-// Shared helpers (also used by scout-summary.tsx)
-// ============================================================================
-
-type OrderStatusClass = 'NEEDS_APPROVAL' | 'COMPLETED' | 'PENDING' | 'UNKNOWN';
-
-export function classifyOrderStatus(status: string | undefined): OrderStatusClass {
-  if (!status) return 'UNKNOWN';
-  if (status.includes('Needs Approval')) return 'NEEDS_APPROVAL';
-  if (status === 'Status Delivered' || status.includes('Completed') || status.includes('Delivered') || status.includes('Shipped'))
-    return 'COMPLETED';
-  if (status.includes('Pending') || status.includes('Approved for Delivery')) return 'PENDING';
-  return 'UNKNOWN';
-}
 
 // ============================================================================
 // Internal helpers
@@ -43,17 +27,11 @@ function getStatusStyle(status: string | undefined): { className: string; text: 
 }
 
 function calculateVarietyBreakdowns(scout: Scout) {
-  const salesVarieties = calculateSalesByVariety(scout) as Record<string, number>;
-  const shippedVarieties: Record<string, number> = {};
+  const salesVarieties = (scout.totals.$salesByVariety || {}) as Record<string, number>;
+  const shippedVarieties = (scout.totals.$shippedByVariety || {}) as Record<string, number>;
   let totalDonations = 0;
-
   scout.orders.forEach((order: Order) => {
     if (order.donations > 0) totalDonations += order.donations;
-    if (order.owner === OWNER.GIRL && order.orderType === ORDER_TYPE.DIRECT_SHIP) {
-      (Object.entries(order.varieties) as [string, number][]).forEach(([variety, count]) => {
-        if (variety !== COOKIE_TYPE.COOKIE_SHARE) shippedVarieties[variety] = (shippedVarieties[variety] || 0) + count;
-      });
-    }
   });
   return { salesVarieties, shippedVarieties, totalDonations };
 }
@@ -65,10 +43,8 @@ function formatNetInventory(net: number, isCookieShare: boolean) {
   return { html: <>{'—'}</>, className: '' };
 }
 
-function formatCreditedVariety(variety: string, allocations: Allocation[]) {
-  const vb = channelTotals(allocations, 'virtualBooth');
-  const ds = channelTotals(allocations, 'directShip');
-  const bs = channelTotals(allocations, 'booth');
+function formatCreditedVariety(variety: string, scout: Scout) {
+  const { virtualBooth: vb, directShip: ds, booth: bs } = scout.totals.$allocationSummary;
   const vbCount = vb.varieties[variety as keyof Varieties] || 0;
   const dsCount = ds.varieties[variety as keyof Varieties] || 0;
   const bsCount = bs.varieties[variety as keyof Varieties] || 0;
@@ -93,12 +69,10 @@ function formatCreditedVariety(variety: string, allocations: Allocation[]) {
 // ============================================================================
 
 function CookieBreakdownTable({ scout }: { scout: Scout }) {
-  const { inventory, allocations } = scout;
+  const { inventory } = scout;
   const { salesVarieties, shippedVarieties, totalDonations } = calculateVarietyBreakdowns(scout);
 
-  const vb = channelTotals(allocations, 'virtualBooth');
-  const ds = channelTotals(allocations, 'directShip');
-  const bs = channelTotals(allocations, 'booth');
+  const { virtualBooth: vb, directShip: ds, booth: bs } = scout.totals.$allocationSummary;
 
   const salesWithDonations = { ...salesVarieties };
   const allCreditedDonations = vb.donations + ds.donations + bs.donations;
@@ -136,12 +110,12 @@ function CookieBreakdownTable({ scout }: { scout: Scout }) {
               <td class={netClass}>{netHtml}</td>
               <td>{sold}</td>
               <td>{shipped > 0 ? shipped : '—'}</td>
-              <td>{formatCreditedVariety(variety, allocations)}</td>
+              <td>{formatCreditedVariety(variety, scout)}</td>
             </tr>
           );
         })}
       </DataTable>
-      <AllocationDetails allocations={allocations} />
+      <AllocationDetails scout={scout} />
     </>
   );
 }
@@ -152,13 +126,13 @@ function PackagesCell({ varieties, packages }: { varieties: Record<string, numbe
   return tip ? <TooltipCell tooltip={tip}>{packages}</TooltipCell> : <td>{packages}</td>;
 }
 
-function AllocationDetails({ allocations }: { allocations: Allocation[] }) {
+function AllocationDetails({ scout }: { scout: Scout }) {
+  const { virtualBooth: vbTotals, directShip: dsTotals, booth: bsTotals } = scout.totals.$allocationSummary;
   const sections: preact.JSX.Element[] = [];
 
   // Virtual booth allocations
-  const vbAllocs = allocationsByChannel(allocations, 'virtualBooth');
+  const vbAllocs = scout.$allocationsByChannel.virtualBooth;
   if (vbAllocs.length > 0) {
-    const vbTotals = channelTotals(allocations, 'virtualBooth');
     sections.push(
       <AllocationSection
         key="vb"
@@ -181,9 +155,8 @@ function AllocationDetails({ allocations }: { allocations: Allocation[] }) {
   }
 
   // Direct ship allocations
-  const dsAllocs = allocationsByChannel(allocations, 'directShip');
+  const dsAllocs = scout.$allocationsByChannel.directShip;
   if (dsAllocs.length > 0) {
-    const dsTotals = channelTotals(allocations, 'directShip');
     sections.push(
       <AllocationSection
         key="ds"
@@ -204,9 +177,8 @@ function AllocationDetails({ allocations }: { allocations: Allocation[] }) {
   }
 
   // Booth sales allocations
-  const bsAllocs = allocationsByChannel(allocations, 'booth');
+  const bsAllocs = scout.$allocationsByChannel.booth;
   if (bsAllocs.length > 0) {
-    const bsTotals = channelTotals(allocations, 'booth');
     sections.push(
       <AllocationSection
         key="bs"
@@ -269,9 +241,9 @@ function AllocationSection({
   );
 }
 
-function OrdersTable({ scout }: { scout: Scout }) {
-  const PAYMENT_LABELS: Record<string, string> = { CREDIT_CARD: 'Credit Card', VENMO: 'Venmo', CASH: 'Cash' };
+const PAYMENT_LABELS: Record<string, string> = { CREDIT_CARD: 'Credit Card', VENMO: 'Venmo', CASH: 'Cash' };
 
+function OrdersTable({ scout }: { scout: Scout }) {
   return (
     <div class="section-break">
       <h5>Orders ({scout.orders.length})</h5>

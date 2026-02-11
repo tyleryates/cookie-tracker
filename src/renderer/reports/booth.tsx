@@ -1,6 +1,4 @@
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
-import { allocationsByChannel } from '../../data-processing/calculators/helpers';
-import { sumPhysicalPackages } from '../../data-processing/utils';
 import type { BoothReservationImported, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
@@ -14,7 +12,7 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
   const scoutsForBooth: Array<{ name: string; packages: number; donations: number }> = [];
   scouts.forEach((scout: Scout, name: string) => {
     if (scout.isSiteOrder) return;
-    const boothAllocations = allocationsByChannel(scout.allocations, 'booth');
+    const boothAllocations = scout.$allocationsByChannel.booth;
     const matchingAllocations = boothAllocations.filter((a) => {
       const storeMatch = (a.storeName || '').toLowerCase() === (booth.booth.storeName || '').toLowerCase();
       const dateMatch = a.date === booth.timeslot.date;
@@ -157,7 +155,7 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
               }
 
               const donations = r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
-              const physicalPackages = sumPhysicalPackages(r.cookies);
+              const physicalPackages = r.physicalPackages;
               const physicalCookies = { ...r.cookies };
               delete physicalCookies[COOKIE_TYPE.COOKIE_SHARE];
               const tip = buildVarietyTooltip(physicalCookies);

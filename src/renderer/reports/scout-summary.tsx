@@ -1,11 +1,11 @@
 import { ALLOCATION_METHOD, DISPLAY_STRINGS } from '../../constants';
 import { getCookieDisplayName, PROCEEDS_EXEMPT_PACKAGES } from '../../cookie-constants';
-import { allocationsByChannel, channelTotals, totalCredited } from '../../data-processing/calculators/helpers';
-import type { Allocation, Order, Scout, SiteOrdersDataset, UnifiedDataset } from '../../types';
+import type { Order, Scout, SiteOrdersDataset, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
-import { classifyOrderStatus, ScoutDetailBreakdown } from '../components/scout-detail';
+import { ScoutDetailBreakdown } from '../components/scout-detail';
 import { TooltipCell } from '../components/tooltip-cell';
+import { classifyOrderStatus } from '../format-utils';
 
 // ============================================================================
 // Helper functions
@@ -66,27 +66,17 @@ function InventoryCell({
   return <span>—</span>;
 }
 
-function CreditedCell({
-  isSiteRow,
-  allocations,
-  siteOrders
-}: {
-  isSiteRow: boolean;
-  allocations: Allocation[];
-  siteOrders: SiteOrdersDataset;
-}) {
-  const total = totalCredited(allocations);
+function CreditedCell({ isSiteRow, scout, siteOrders }: { isSiteRow: boolean; scout: Scout; siteOrders: SiteOrdersDataset }) {
+  const total = scout.totals.credited;
   if (total === 0) return <>{'—'}</>;
 
-  const vb = channelTotals(allocations, 'virtualBooth');
-  const ds = channelTotals(allocations, 'directShip');
-  const bs = channelTotals(allocations, 'booth');
+  const { virtualBooth: vb, directShip: ds, booth: bs } = scout.totals.$allocationSummary;
 
   const sources: string[] = [];
   // Virtual booth
   if (vb.packages + vb.donations > 0) {
     sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vb.packages + vb.donations}`);
-    allocationsByChannel(allocations, 'virtualBooth').forEach((a) => {
+    scout.$allocationsByChannel.virtualBooth.forEach((a) => {
       const order = a.orderNumber ? `#${a.orderNumber}` : 'Unknown';
       const date = a.date ? ` (${a.date})` : '';
       sources.push(`  ${order}${date}: ${a.packages} pkg`);
@@ -95,13 +85,13 @@ function CreditedCell({
   // Direct ship
   if (ds.packages + ds.donations > 0) {
     sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${ds.packages + ds.donations}`);
-    const n = allocationsByChannel(allocations, 'directShip').length;
+    const n = scout.$allocationsByChannel.directShip.length;
     if (n > 0) sources.push(`  (${n} allocation${n === 1 ? '' : 's'} from SC divider)`);
   }
   // Booth sales
   if (bs.packages + bs.donations > 0) {
     sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bs.packages + bs.donations}`);
-    allocationsByChannel(allocations, 'booth').forEach((a) => {
+    scout.$allocationsByChannel.booth.forEach((a) => {
       const store = a.storeName || 'Booth';
       const date = a.date ? ` (${a.date})` : '';
       const parts = [`${a.packages} pkg`];
@@ -232,9 +222,9 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
       >
         {sortedScouts.map(([name, scout]) => {
           const isSiteRow = name.endsWith(' Site');
-          const { totals, allocations } = scout;
+          const { totals } = scout;
           const sales = totals.delivered || 0;
-          const totalCreditedCount = totalCredited(allocations);
+          const totalCreditedCount = totals.credited;
           const { className: orderClass, icon: orderIcon, tooltip: orderTooltip } = getOrderStatusStyle(scout);
           const totalSold = totals.totalSold || 0;
           const directSales = sales + (totals.shipped || 0) + (totals.donations || 0);
@@ -267,7 +257,7 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
                 <DeliveredCell sales={sales} isSiteRow={isSiteRow} scout={scout} siteOrders={siteOrders} />,
                 totals.shipped || 0,
                 totals.donations || 0,
-                <CreditedCell isSiteRow={isSiteRow} allocations={allocations} siteOrders={siteOrders} />,
+                <CreditedCell isSiteRow={isSiteRow} scout={scout} siteOrders={siteOrders} />,
                 <TooltipCell tooltip={soldTooltip} tag="span">
                   {totalSold}
                 </TooltipCell>,

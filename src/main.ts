@@ -5,6 +5,7 @@ import { autoUpdater } from 'electron-updater';
 import ConfigManager from './config-manager';
 import CredentialsManager from './credentials-manager';
 import { loadData } from './data-pipeline';
+import { normalizeBoothLocation } from './data-processing/importers';
 import Logger from './logger';
 import ScraperOrchestrator from './scrapers';
 import SmartCookieScraper from './scrapers/smart-cookie';
@@ -24,16 +25,11 @@ const dataDir = path.join(userDataPath, 'data');
 const credentialsManager = new CredentialsManager(dataDir);
 const configManager = new ConfigManager(dataDir);
 
-// Standardized IPC error handler wrapper
+// Standardized IPC error handler wrapper — always wraps to { success, data/error }
 function handleIpcError(handler: (...args: any[]) => Promise<any>): (...args: any[]) => Promise<any> {
   return async (...args) => {
     try {
       const result = await handler(...args);
-      // If handler returns explicit success/error format, use it
-      if (result && typeof result === 'object' && 'success' in result) {
-        return result;
-      }
-      // Otherwise wrap successful result
       return { success: true, data: result };
     } catch (error) {
       Logger.error('IPC Handler Error:', error);
@@ -193,10 +189,7 @@ ipcMain.handle(
     });
 
     if (files.length === 0) {
-      return {
-        success: false,
-        message: 'No files found in /data/in/ directory'
-      };
+      throw new Error('No files found in /data/in/ directory');
     }
 
     const fileData = [];
@@ -220,10 +213,7 @@ ipcMain.handle(
       });
     }
 
-    return {
-      success: true,
-      files: fileData
-    };
+    return fileData;
   })
 );
 
@@ -281,11 +271,7 @@ ipcMain.handle(
 ipcMain.handle(
   'load-credentials',
   handleIpcError(async () => {
-    const credentials = credentialsManager.loadCredentials();
-    return {
-      success: true,
-      credentials: credentials
-    };
+    return credentialsManager.loadCredentials();
   })
 );
 
@@ -309,7 +295,6 @@ ipcMain.handle(
   'save-config',
   handleIpcError(async (_event: any, config: AppConfig) => {
     configManager.saveConfig(config);
-    return { success: true };
   })
 );
 
@@ -327,7 +312,7 @@ ipcMain.handle(
   handleIpcError(async (event) => {
     const auth = loadAndValidateCredentials();
     if (auth.error || !auth.credentials) {
-      return { success: false, error: auth.error || 'No credentials available' };
+      throw new Error(auth.error || 'No credentials available');
     }
 
     // Initialize scraper orchestrator (use userData path)
@@ -359,7 +344,6 @@ ipcMain.handle(
     if (lastScraper) {
       lastScraper.cancel();
     }
-    return { success: true };
   })
 );
 
@@ -375,7 +359,7 @@ ipcMain.handle(
       // No active session — create fresh scraper and login
       const credentials = credentialsManager.loadCredentials();
       if (!credentials?.smartCookie?.username || !credentials?.smartCookie?.password) {
-        return { success: false, error: 'No Smart Cookie credentials configured. Please set up logins first.' };
+        throw new Error('No Smart Cookie credentials configured. Please set up logins first.');
       }
 
       scraper = new SmartCookieScraper(dataDir);
@@ -384,6 +368,6 @@ ipcMain.handle(
 
     const config = configManager.loadConfig();
     const boothLocations = await scraper.fetchBoothLocations(config.boothIds);
-    return { success: true, data: boothLocations };
+    return boothLocations.map(normalizeBoothLocation);
   })
 );

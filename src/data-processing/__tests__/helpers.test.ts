@@ -162,23 +162,26 @@ function makeScout(name: string, girlId?: number): Scout {
     girlId,
     isSiteOrder: false,
     orders: [],
-    inventory: {},
+    inventory: { total: 0, varieties: {} },
     allocations: [],
+    $allocationsByChannel: { booth: [], directShip: [], virtualBooth: [] },
     totals: {
-      totalOrders: 0,
-      totalDelivered: 0,
-      totalShipped: 0,
-      totalDonations: 0,
-      totalCredited: 0,
+      orders: 0,
+      delivered: 0,
+      shipped: 0,
+      donations: 0,
+      credited: 0,
       totalSold: 0,
-      totalAmount: 0,
-      cashCollected: 0,
-      electronicPayments: 0,
-      inventoryPackages: 0,
-      inventoryValue: 0,
-      unsoldValue: 0,
-      cashOwed: 0,
-      negativeInventoryIssues: []
+      inventory: 0,
+      $financials: { cashCollected: 0, electronicPayments: 0, inventoryValue: 0, unsoldValue: 0, cashOwed: 0 },
+      $inventoryDisplay: {},
+      $salesByVariety: {},
+      $shippedByVariety: {},
+      $allocationSummary: {
+        booth: { packages: 0, donations: 0, varieties: {} },
+        directShip: { packages: 0, donations: 0, varieties: {} },
+        virtualBooth: { packages: 0, donations: 0, varieties: {} }
+      }
     }
   };
 }

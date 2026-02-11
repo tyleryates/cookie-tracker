@@ -70,12 +70,12 @@ export function LoginModal({ onClose, onSave, showStatus }: LoginModalProps) {
     (async () => {
       try {
         const result = await ipcRenderer.invoke('load-credentials');
-        if (result.success && result.credentials) {
-          setDcUsername(result.credentials.digitalCookie.username || '');
-          setDcPassword(result.credentials.digitalCookie.password || '');
-          setDcRole(result.credentials.digitalCookie.role || '');
-          setScUsername(result.credentials.smartCookie.username || '');
-          setScPassword(result.credentials.smartCookie.password || '');
+        if (result.success && result.data) {
+          setDcUsername(result.data.digitalCookie.username || '');
+          setDcPassword(result.data.digitalCookie.password || '');
+          setDcRole(result.data.digitalCookie.role || '');
+          setScUsername(result.data.smartCookie.username || '');
+          setScPassword(result.data.smartCookie.password || '');
         }
       } catch (error) {
         Logger.error('Error loading credentials:', error);

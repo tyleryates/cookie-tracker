@@ -3,7 +3,6 @@
 import { ipcRenderer, shell } from 'electron';
 import { useCallback, useEffect, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
-import { normalizeBoothLocation } from '../data-processing/data-importers';
 import Logger from '../logger';
 import type { Credentials, ScrapeProgress } from '../types';
 import { type AppState, appReducer } from './app-reducer';
@@ -52,9 +51,9 @@ export function App() {
   const checkLoginStatus = useCallback(async () => {
     try {
       const result = await ipcRenderer.invoke('load-credentials');
-      if (result.success && result.credentials) {
-        const dc = result.credentials.digitalCookie;
-        const sc = result.credentials.smartCookie;
+      if (result.success && result.data) {
+        const dc = result.data.digitalCookie;
+        const sc = result.data.smartCookie;
         dispatch({ type: 'SET_SETUP_HINT', show: !(dc.username && dc.password && sc.username && sc.password) });
       } else {
         dispatch({ type: 'SET_SETUP_HINT', show: true });
@@ -129,13 +128,19 @@ export function App() {
       const errors: string[] = [];
       const parts: string[] = [];
 
+      if (!result.success) {
+        errors.push(result.error || 'Unknown error');
+      }
+
+      const scrapeData = result.data || {};
+
       // Update DC and SC status
       for (const [key, label] of [
         ['dc', 'Digital Cookie'],
         ['sc', 'Smart Cookie']
       ] as const) {
         const sourceKey = key === 'dc' ? 'digitalCookie' : 'smartCookie';
-        const sourceResult = result[sourceKey];
+        const sourceResult = scrapeData[sourceKey];
         if (!sourceResult) continue;
         if (sourceResult.success) {
           dispatch({ type: 'SYNC_SOURCE_UPDATE', source: key, patch: { status: 'synced', lastSync: now, progress: 100 } });
@@ -146,7 +151,7 @@ export function App() {
         }
       }
 
-      if (result.error) errors.push(result.error);
+      if (scrapeData.error) errors.push(scrapeData.error);
 
       // Reload data if anything succeeded (even partial — e.g. SC ok, DC failed)
       if (parts.length > 0) {
@@ -184,8 +189,7 @@ export function App() {
         return;
       }
 
-      const rawLocations: any[] = result.data || [];
-      const updated = rawLocations.map(normalizeBoothLocation);
+      const updated = result.data || [];
       dispatch({ type: 'UPDATE_BOOTH_LOCATIONS', boothLocations: updated });
 
       const now = new Date().toISOString();

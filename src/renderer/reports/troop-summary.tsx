@@ -17,7 +17,7 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
   const grossProceeds = troopTotals.grossProceeds;
 
   const inventoryStats: Array<{ label: string; value: string | number; description: string; color: string }> = [
-    { label: 'Total Received', value: troopTotals.ordered, description: 'C2T and T2T pickups', color: '#1565C0' },
+    { label: 'Total Received', value: troopTotals.c2tReceived, description: 'C2T and T2T pickups', color: '#1565C0' },
     { label: 'Sold from Stock', value: soldFromStock, description: 'Physical pkgs sold', color: '#2E7D32' },
     { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls, unsold', color: '#F57F17' },
     { label: 'Troop Inventory', value: troopTotals.inventory, description: 'Troop on hand', color: '#E65100' }
@@ -60,7 +60,7 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
     <div class="report-visual">
       <h3>Troop Summary</h3>
 
-      <h4 class="report-section-header">"Sales by Channel</h4>
+      <h4 class="report-section-header">Sales by Channel</h4>
       <StatCards
         stats={[
           { label: 'Booth Sales', value: troopTotals.boothDividerT2G, description: 'Via booth divider', color: '#7B1FA2' },
@@ -71,10 +71,10 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
         ]}
       />
 
-      <h4 class="report-section-header">"Inventory</h4>
+      <h4 class="report-section-header">Inventory</h4>
       <StatCards stats={inventoryStats} />
 
-      <h4 class="report-section-header">"Finances</h4>
+      <h4 class="report-section-header">Finances</h4>
       <StatCards stats={financialStats} />
 
       <div class="info-box info-box-info">

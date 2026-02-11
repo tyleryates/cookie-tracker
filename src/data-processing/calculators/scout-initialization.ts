@@ -62,6 +62,7 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
 
     // Flat allocation list (booth, directShip, virtualBooth)
     allocations: [],
+    $allocationsByChannel: { booth: [], directShip: [], virtualBooth: [] },
 
     // Totals (calculated later)
     totals: {
@@ -79,7 +80,14 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
         unsoldValue: 0,
         cashOwed: 0
       },
-      $inventoryDisplay: {} // Net inventory by variety
+      $inventoryDisplay: {}, // Net inventory by variety
+      $salesByVariety: {},
+      $shippedByVariety: {},
+      $allocationSummary: {
+        booth: { packages: 0, donations: 0, varieties: {} },
+        directShip: { packages: 0, donations: 0, varieties: {} },
+        virtualBooth: { packages: 0, donations: 0, varieties: {} }
+      }
     }
   };
 }

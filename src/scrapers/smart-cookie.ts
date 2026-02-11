@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { normalizeCookieName } from '../cookie-constants';
 import Logger from '../logger';
-import { getTimestamp } from '../scraper-utils';
 import type { ProgressCallback } from '../types';
+import { BaseScraper, getTimestamp } from './base-scraper';
 import { requestWithRetry } from './request-utils';
 import { SmartCookieSession } from './sc-session';
 
@@ -25,27 +25,13 @@ interface SaveOrdersParams {
  * Uses a SmartCookieSession for all authenticated requests.
  * Supports AbortSignal for cancellation.
  */
-class SmartCookieApiScraper {
-  dataDir: string;
-  inDir: string;
-  progressCallback: ProgressCallback;
+class SmartCookieApiScraper extends BaseScraper {
+  readonly source = 'sc' as const;
   session: SmartCookieSession;
 
   constructor(dataDir: string, progressCallback: ProgressCallback = null) {
-    this.dataDir = dataDir;
-    this.inDir = path.join(dataDir, 'in');
-    this.progressCallback = progressCallback;
+    super(dataDir, progressCallback);
     this.session = new SmartCookieSession();
-  }
-
-  sendProgress(status: string, progress: number): void {
-    if (this.progressCallback) {
-      this.progressCallback({ source: 'sc', status, progress });
-    }
-  }
-
-  private checkAborted(signal?: AbortSignal): void {
-    if (signal?.aborted) throw new Error('Sync cancelled');
   }
 
   /** Initialize orders page context */

@@ -2,8 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { DEFAULT_COUNCIL_ID } from '../constants';
 import Logger from '../logger';
-import { getTimestamp } from '../scraper-utils';
 import type { ProgressCallback } from '../types';
+import { BaseScraper, getTimestamp } from './base-scraper';
 import { DigitalCookieSession } from './dc-session';
 import { requestWithRetry } from './request-utils';
 
@@ -13,27 +13,13 @@ import { requestWithRetry } from './request-utils';
  * Uses a DigitalCookieSession for all authenticated requests.
  * Supports AbortSignal for cancellation.
  */
-class DigitalCookieScraper {
-  dataDir: string;
-  inDir: string;
-  progressCallback: ProgressCallback;
+class DigitalCookieScraper extends BaseScraper {
+  readonly source = 'dc' as const;
   session: DigitalCookieSession;
 
   constructor(dataDir: string, progressCallback: ProgressCallback = null) {
-    this.dataDir = dataDir;
-    this.inDir = path.join(dataDir, 'in');
-    this.progressCallback = progressCallback;
+    super(dataDir, progressCallback);
     this.session = new DigitalCookieSession();
-  }
-
-  sendProgress(status: string, progress: number): void {
-    if (this.progressCallback) {
-      this.progressCallback({ source: 'dc', status, progress });
-    }
-  }
-
-  private checkAborted(signal?: AbortSignal): void {
-    if (signal?.aborted) throw new Error('Sync cancelled');
   }
 
   /** Download export file */

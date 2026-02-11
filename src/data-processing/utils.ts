@@ -3,6 +3,7 @@
 
 import { TRANSFER_TYPE } from '../constants';
 import { COOKIE_TYPE } from '../cookie-constants';
+import type { Varieties } from '../types';
 
 /**
  * Check if a transfer type is a Council-to-Troop (C2T) transfer
@@ -60,4 +61,27 @@ export function isKnownTransferType(transferType: string): boolean {
   if (!transferType) return true; // Empty handled elsewhere
   if (isC2TTransfer(transferType)) return true; // C2T, C2T(P), C2T-xxx variants
   return KNOWN_TRANSFER_TYPES.has(transferType);
+}
+
+/** Accumulate variety counts into a target, optionally excluding Cookie Share */
+export function accumulateVarieties(source: Varieties, target: Varieties, options?: { excludeCookieShare?: boolean; sign?: number }): void {
+  const sign = options?.sign ?? 1;
+  const excludeCS = options?.excludeCookieShare ?? false;
+  for (const [variety, count] of Object.entries(source)) {
+    if (excludeCS && variety === COOKIE_TYPE.COOKIE_SHARE) continue;
+    if (typeof count === 'number') {
+      target[variety as keyof Varieties] = (target[variety as keyof Varieties] || 0) + sign * count;
+    }
+  }
+}
+
+/** Build physical varieties (everything except Cookie Share) from a full varieties map */
+export function buildPhysicalVarieties(varieties: Varieties): Varieties {
+  const result: Varieties = {};
+  for (const [variety, count] of Object.entries(varieties)) {
+    if (variety !== COOKIE_TYPE.COOKIE_SHARE) {
+      result[variety as keyof Varieties] = count;
+    }
+  }
+  return result;
 }

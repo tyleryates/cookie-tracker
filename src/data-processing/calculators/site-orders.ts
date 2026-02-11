@@ -3,7 +3,7 @@
 
 import { ORDER_TYPE, OWNER, TRANSFER_CATEGORY } from '../../constants';
 import type { DataStore } from '../../data-store';
-import type { Order, Scout, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
+import type { Order, Scout, SiteOrderCategory, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
 
 /** Build site orders dataset with allocation tracking */
 function buildSiteOrdersDataset(reconciler: DataStore, scoutDataset: Map<string, Scout>): SiteOrdersDataset {
@@ -48,32 +48,10 @@ function buildSiteOrdersDataset(reconciler: DataStore, scoutDataset: Map<string,
   const allocations = calculateAllocations(reconciler);
 
   // Build site order summary with allocation tracking
-  const totalDirectShip = siteOrdersByType.directShip.reduce((sum: number, o: SiteOrderEntry) => sum + o.packages, 0);
-  const totalGirlDelivery = siteOrdersByType.girlDelivery.reduce((sum: number, o: SiteOrderEntry) => sum + o.packages, 0);
-  const totalBoothSale = siteOrdersByType.boothSale.reduce((sum: number, o: SiteOrderEntry) => sum + o.packages, 0);
-
   const result: SiteOrdersDataset = {
-    directShip: {
-      orders: siteOrdersByType.directShip,
-      total: totalDirectShip,
-      allocated: allocations.directShip,
-      unallocated: Math.max(0, totalDirectShip - allocations.directShip),
-      hasWarning: totalDirectShip - allocations.directShip > 0
-    },
-    girlDelivery: {
-      orders: siteOrdersByType.girlDelivery,
-      total: totalGirlDelivery,
-      allocated: allocations.virtualBooth,
-      unallocated: Math.max(0, totalGirlDelivery - allocations.virtualBooth),
-      hasWarning: totalGirlDelivery - allocations.virtualBooth > 0
-    },
-    boothSale: {
-      orders: siteOrdersByType.boothSale,
-      total: totalBoothSale,
-      allocated: allocations.boothSales,
-      unallocated: Math.max(0, totalBoothSale - allocations.boothSales),
-      hasWarning: totalBoothSale - allocations.boothSales > 0
-    }
+    directShip: buildCategory(siteOrdersByType.directShip, allocations.directShip),
+    girlDelivery: buildCategory(siteOrdersByType.girlDelivery, allocations.virtualBooth),
+    boothSale: buildCategory(siteOrdersByType.boothSale, allocations.boothSales)
   };
 
   // Set flag for scout-summary to control site row display and warning
@@ -82,6 +60,17 @@ function buildSiteOrdersDataset(reconciler: DataStore, scoutDataset: Map<string,
   }
 
   return result;
+}
+
+function buildCategory(orders: SiteOrderEntry[], allocated: number): SiteOrderCategory {
+  const total = orders.reduce((sum, o) => sum + o.packages, 0);
+  return {
+    orders,
+    total,
+    allocated,
+    unallocated: Math.max(0, total - allocated),
+    hasWarning: total > allocated
+  };
 }
 
 /** Calculate total allocated packages by type */

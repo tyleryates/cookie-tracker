@@ -129,7 +129,7 @@ function buildTestStore() {
     packages: 4,
     donations: 1,
     varieties: { THIN_MINTS: 2, TREFOILS: 2 },
-    source: 'BoothDivider'
+    source: 'SmartBoothDivider'
   };
   const directShipAllocation: Allocation = {
     channel: 'directShip',
@@ -306,7 +306,7 @@ describe('buildUnifiedDataset — integration', () => {
     });
 
     it('tracks package flow', () => {
-      expect(result.troopTotals.ordered).toBe(50);
+      expect(result.troopTotals.c2tReceived).toBe(50);
       // Girl delivery = Jane delivered(7) + Bob delivered(4) + Bob VB alloc(5) = 16
       expect(result.troopTotals.girlDelivery).toBe(16);
       // Girl inventory on hand = Jane(6) + Bob(6) = 12

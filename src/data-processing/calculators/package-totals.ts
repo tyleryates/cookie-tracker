@@ -5,8 +5,8 @@
 import { TRANSFER_CATEGORY } from '../../constants';
 import type { Transfer } from '../../types';
 
-interface PackageTotals {
-  ordered: number;
+export interface PackageTotals {
+  c2tReceived: number;
   allocated: number;
   virtualBoothT2G: number;
   boothDividerT2G: number;
@@ -17,7 +17,7 @@ interface PackageTotals {
 
 /** Calculate package totals across all transfers */
 function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
-  let totalOrdered = 0; // C2T pickups (excluding Cookie Share)
+  let totalC2TReceived = 0; // C2T pickups (excluding Cookie Share)
   let totalAllocated = 0; // Physical T2G only (scouts physically picked up)
   let totalVirtualBoothT2G = 0; // Virtual booth T2G (site orders allocated to scouts)
   let totalBoothDividerT2G = 0; // Booth divider T2G (booth sales allocated to scouts)
@@ -27,7 +27,7 @@ function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
   transfers.forEach((transfer: Transfer) => {
     switch (transfer.category) {
       case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
-        totalOrdered += transfer.physicalPackages || 0;
+        totalC2TReceived += transfer.physicalPackages || 0;
         break;
       case TRANSFER_CATEGORY.GIRL_RETURN:
         totalG2T += transfer.physicalPackages || 0;
@@ -48,7 +48,7 @@ function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
   });
 
   return {
-    ordered: totalOrdered,
+    c2tReceived: totalC2TReceived,
     allocated: totalAllocated,
     virtualBoothT2G: totalVirtualBoothT2G,
     boothDividerT2G: totalBoothDividerT2G,

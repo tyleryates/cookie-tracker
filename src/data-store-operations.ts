@@ -2,11 +2,10 @@
 // Extracted from DataReconciler class methods.
 
 import { DATA_SOURCES, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory, type TransferType } from './constants';
-import { COOKIE_TYPE } from './cookie-constants';
-import { isIncomingInventory, sumPhysicalPackages } from './data-processing/utils';
+import { buildPhysicalVarieties, isIncomingInventory, sumPhysicalPackages } from './data-processing/utils';
 import type { DataStore } from './data-store';
 import Logger from './logger';
-import type { Order, OrderMetadata, Transfer, TransferInput, Varieties } from './types';
+import type { Order, OrderMetadata, Transfer, TransferInput } from './types';
 
 /** Classify a transfer into an explicit category based on type + flags */
 function classifyTransferCategory(
@@ -80,14 +79,7 @@ export function createTransfer(data: TransferInput): Transfer {
 
   const physicalPackages = sumPhysicalPackages(data.varieties);
 
-  const physicalVarieties: Varieties = {};
-  if (data.varieties) {
-    Object.entries(data.varieties).forEach(([variety, count]) => {
-      if (variety !== COOKIE_TYPE.COOKIE_SHARE) {
-        (physicalVarieties as Record<string, any>)[variety] = count;
-      }
-    });
-  }
+  const physicalVarieties = data.varieties ? buildPhysicalVarieties(data.varieties) : {};
 
   return {
     date: data.date || '',

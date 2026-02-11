@@ -12,9 +12,10 @@ import {
   PAYMENT_METHOD,
   SPECIAL_IDENTIFIERS
 } from '../../constants';
-import { COOKIE_TYPE, DC_COOKIE_COLUMNS, normalizeCookieName } from '../../cookie-constants';
+import { COOKIE_TYPE } from '../../cookie-constants';
 import Logger from '../../logger';
 import type { Order, Scout, Varieties, Warning } from '../../types';
+import { parseVarietiesFromDC } from '../importers/parsers';
 
 /** Classify payment method from DC payment status string */
 function classifyPaymentMethod(paymentStatus: string): PaymentMethod | null {
@@ -84,27 +85,12 @@ function extractBasicOrderInfo(row: Record<string, any>): {
   };
 }
 
-/** Parse cookie varieties from DC row */
+/** Parse cookie varieties from DC row, adding Cookie Share for donations */
 function parseOrderVarieties(row: Record<string, any>, donations: number): Varieties {
-  const varieties: Varieties = {};
-
-  DC_COOKIE_COLUMNS.forEach((columnName) => {
-    const count = parseInt(row[columnName], 10) || 0;
-    if (count === 0) return;
-
-    const cookieType = normalizeCookieName(columnName);
-    if (!cookieType) {
-      Logger.warn(`Unknown cookie variety "${columnName}" in Digital Cookie data. Update COOKIE_NAME_NORMALIZATION in cookie-constants.ts`);
-      return;
-    }
-
-    (varieties as Record<string, number>)[cookieType] = count;
-  });
-
+  const varieties = parseVarietiesFromDC(row);
   if (donations > 0) {
     (varieties as Record<string, number>)[COOKIE_TYPE.COOKIE_SHARE] = donations;
   }
-
   return varieties;
 }
 

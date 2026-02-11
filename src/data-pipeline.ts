@@ -6,37 +6,10 @@ import * as path from 'node:path';
 import ExcelJS from 'exceljs';
 import { DC_COLUMNS } from './constants';
 import { buildUnifiedDataset } from './data-processing/calculators/index';
-import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './data-processing/data-importers';
+import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './data-processing/importers';
 import { createDataStore, type DataStore } from './data-store';
 import Logger from './logger';
-import type { DataFileInfo, UnifiedDataset } from './types';
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-interface DatasetEntry {
-  label: string;
-  scFile: DataFileInfo | null;
-  dcFile: DataFileInfo | null;
-  timestamp: string;
-}
-
-interface LoadedSources {
-  sc: boolean;
-  dc: boolean;
-  scReport: boolean;
-  scTransfer: boolean;
-  issues: string[];
-  scTimestamp: string | null;
-  dcTimestamp: string | null;
-}
-
-interface LoadDataResult {
-  unified: UnifiedDataset;
-  datasetList: DatasetEntry[];
-  loaded: LoadedSources;
-}
+import type { DataFileInfo, DatasetEntry, LoadDataResult, LoadedSources, UnifiedDataset } from './types';
 
 // ============================================================================
 // EXCEL PARSING

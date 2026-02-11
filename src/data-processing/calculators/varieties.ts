@@ -2,20 +2,10 @@
 // Aggregates cookie variety counts and calculates troop inventory by variety
 
 import { ORDER_TYPE, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
-import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
 import type { Scout, Transfer, Varieties, VarietiesResult } from '../../types';
+import { accumulateVarieties } from '../utils';
 import { needsInventory } from './helpers';
-
-/** Add physical varieties (excluding Cookie Share) to accumulator */
-function addVarieties(source: Varieties, target: Varieties): void {
-  Object.entries(source).forEach(([variety, count]) => {
-    if (variety === COOKIE_TYPE.COOKIE_SHARE) return;
-    if (typeof count === 'number' && count > 0) {
-      target[variety as keyof Varieties] = (target[variety as keyof Varieties] || 0) + count;
-    }
-  });
-}
 
 /**
  * Build aggregate variety counts from actual customer sales
@@ -39,13 +29,13 @@ export function buildVarieties(reconciler: DataStore, scouts: Map<string, Scout>
     // Girl delivery + direct ship orders
     scout.orders.forEach((order) => {
       if (needsInventory(order) || order.orderType === ORDER_TYPE.DIRECT_SHIP) {
-        addVarieties(order.varieties, byCookie);
+        accumulateVarieties(order.varieties, byCookie, { excludeCookieShare: true });
       }
     });
     // Credited allocations (booth sales, virtual booth, direct ship)
     if (!scout.isSiteOrder) {
       scout.allocations.forEach((alloc) => {
-        addVarieties(alloc.varieties, byCookie);
+        accumulateVarieties(alloc.varieties, byCookie, { excludeCookieShare: true });
       });
     }
   });
@@ -61,11 +51,7 @@ export function buildVarieties(reconciler: DataStore, scouts: Map<string, Scout>
     }
     if (sign === 0) return;
 
-    Object.entries(transfer.physicalVarieties).forEach(([variety, count]) => {
-      if (typeof count === 'number') {
-        inventory[variety as keyof Varieties] = (inventory[variety as keyof Varieties] || 0) + sign * count;
-      }
-    });
+    accumulateVarieties(transfer.physicalVarieties, inventory, { sign });
   });
 
   const total = Object.values(byCookie).reduce((sum, count) => sum + (count || 0), 0);

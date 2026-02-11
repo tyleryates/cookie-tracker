@@ -4,7 +4,8 @@
 import { ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
 import { COOKIE_TYPE, calculateRevenue, PHYSICAL_COOKIE_TYPES } from '../../cookie-constants';
 import type { CookieType, Order, Scout, Varieties } from '../../types';
-import { calculateSalesByVariety, needsInventory, totalCredited } from './helpers';
+import { buildPhysicalVarieties } from '../utils';
+import { calculateSalesByVariety, channelTotals, needsInventory, totalCredited } from './helpers';
 
 /** Check single variety for negative inventory */
 function checkVarietyInventory(
@@ -73,13 +74,7 @@ function calculateRevenueTotals(scout: Scout): void {
 
 /** Calculate physical revenue from order varieties (excludes Cookie Share) */
 function physicalOrderRevenue(order: Order): number {
-  const physicalVarieties: Record<string, number> = {};
-  Object.entries(order.varieties).forEach(([variety, count]) => {
-    if (variety !== COOKIE_TYPE.COOKIE_SHARE && count) {
-      physicalVarieties[variety] = count;
-    }
-  });
-  return calculateRevenue(physicalVarieties as Varieties);
+  return calculateRevenue(buildPhysicalVarieties(order.varieties));
 }
 
 /** Calculate financial tracking (cash vs electronic payments) */
@@ -127,10 +122,7 @@ function calculateFinancialTracking(scout: Scout): void {
 }
 
 /** Calculate inventory display and detect issues */
-function calculateInventoryDisplay(scout: Scout): void {
-  // Sales by variety (for net inventory calculation)
-  const salesByVariety = calculateSalesByVariety(scout);
-
+function calculateInventoryDisplay(scout: Scout, salesByVariety: Varieties): void {
   // Net inventory by variety
   scout.totals.$inventoryDisplay = {};
   let inventoryTotal = 0;
@@ -149,13 +141,43 @@ function calculateInventoryDisplay(scout: Scout): void {
   detectNegativeInventory(scout, salesByVariety);
 }
 
+/** Pre-compute shipped-by-variety from direct ship orders */
+function computeShippedByVariety(scout: Scout): Varieties {
+  const shipped: Varieties = {};
+  for (const order of scout.orders) {
+    if (order.owner === OWNER.GIRL && order.orderType === ORDER_TYPE.DIRECT_SHIP) {
+      for (const [variety, count] of Object.entries(order.varieties)) {
+        if (variety !== COOKIE_TYPE.COOKIE_SHARE && typeof count === 'number') {
+          shipped[variety as keyof Varieties] = (shipped[variety as keyof Varieties] || 0) + count;
+        }
+      }
+    }
+  }
+  return shipped;
+}
+
 /** Calculate variety totals and financial data for a single scout */
 function calculateVarietyTotals(scout: Scout): void {
   calculateOrderTotals(scout);
   calculateCreditedTotals(scout);
   calculateRevenueTotals(scout);
   calculateFinancialTracking(scout);
-  calculateInventoryDisplay(scout);
+
+  // Pre-compute derived data for renderer consumption
+  const salesByVariety = calculateSalesByVariety(scout);
+  scout.totals.$salesByVariety = salesByVariety;
+  calculateInventoryDisplay(scout, salesByVariety);
+  scout.totals.$shippedByVariety = computeShippedByVariety(scout);
+  scout.$allocationsByChannel = {
+    booth: scout.allocations.filter((a) => a.channel === 'booth'),
+    directShip: scout.allocations.filter((a) => a.channel === 'directShip'),
+    virtualBooth: scout.allocations.filter((a) => a.channel === 'virtualBooth')
+  };
+  scout.totals.$allocationSummary = {
+    booth: channelTotals(scout.allocations, 'booth'),
+    directShip: channelTotals(scout.allocations, 'directShip'),
+    virtualBooth: channelTotals(scout.allocations, 'virtualBooth')
+  };
 }
 
 /** Calculate totals for all scouts in dataset */
