@@ -66,7 +66,7 @@ class SmartCookieApiScraper {
 
   sendProgress(status: string, progress: number): void {
     if (this.progressCallback) {
-      this.progressCallback({ status, progress });
+      this.progressCallback({ source: 'sc', status, progress });
     }
   }
 
@@ -180,7 +180,7 @@ class SmartCookieApiScraper {
    */
   async login(username: string, password: string, silent = false): Promise<boolean> {
     if (!silent) {
-      this.sendProgress('Smart Cookie API: Logging in...', 10);
+      this.sendProgress('Logging in...', 10);
     }
 
     try {
@@ -221,7 +221,7 @@ class SmartCookieApiScraper {
       }
 
       if (!silent) {
-        this.sendProgress('Smart Cookie API: Login successful', 20);
+        this.sendProgress('Login successful', 20);
       }
       return true;
     } catch (error) {
@@ -255,7 +255,7 @@ class SmartCookieApiScraper {
    * Includes x-xsrf-token header for CSRF protection
    */
   async fetchOrders() {
-    this.sendProgress('Smart Cookie API: Fetching orders...', 25);
+    this.sendProgress('Fetching orders...', 25);
 
     // Initialize orders page context first
     await this.initializeOrdersContext();
@@ -296,7 +296,7 @@ class SmartCookieApiScraper {
 
       const ordersData = response.data;
 
-      this.sendProgress('Smart Cookie API: Orders fetched', 35);
+      this.sendProgress('Orders fetched', 35);
       return ordersData;
     } catch (error) {
       if (error.response) {
@@ -317,7 +317,7 @@ class SmartCookieApiScraper {
    * Shows how troop direct ship orders are allocated to individual scouts
    */
   async fetchDirectShipDivider() {
-    this.sendProgress('Smart Cookie API: Fetching direct ship allocations...', 40);
+    this.sendProgress('Fetching direct ship allocations...', 40);
     return this.apiGet('/webapi/api/troops/directship/smart-directship-divider', 'Direct ship divider fetch');
   }
 
@@ -334,7 +334,7 @@ class SmartCookieApiScraper {
    * Finds all COOKIE_SHARE transfers and fetches their per-scout breakdowns
    */
   async fetchAllVirtualCookieShares(ordersData: Record<string, any>): Promise<Record<string, any>[]> {
-    this.sendProgress('Smart Cookie API: Fetching virtual cookie share details...', 45);
+    this.sendProgress('Fetching virtual cookie share details...', 45);
 
     const virtualCookieShares = [];
 
@@ -536,7 +536,7 @@ class SmartCookieApiScraper {
    * Save orders data to JSON file
    */
   async saveOrdersData(params: SaveOrdersParams) {
-    this.sendProgress('Smart Cookie API: Saving data...', 80);
+    this.sendProgress('Saving data...', 80);
 
     const { ordersData, directShipDivider, virtualCookieShares, reservations, boothDividers, boothLocations, cookieIdMap } = params;
 
@@ -566,7 +566,7 @@ class SmartCookieApiScraper {
     // Save raw API responses for debugging (overwrite each sync)
     this.saveDebugData({ ordersData, directShipDivider, virtualCookieShares, reservations, boothDividers, cookieIdMap });
 
-    this.sendProgress('Smart Cookie API: Data saved', 90);
+    this.sendProgress('Data saved', 90);
 
     return filePath;
   }
@@ -623,7 +623,7 @@ class SmartCookieApiScraper {
     }
 
     try {
-      this.sendProgress('Smart Cookie API: Starting...', 5);
+      this.sendProgress('Starting...', 5);
 
       // Store credentials for potential re-login
       this.credentials = credentials;
@@ -658,21 +658,21 @@ class SmartCookieApiScraper {
       );
 
       // Step 4: Fetch cookie ID map (non-fatal)
-      this.sendProgress('Smart Cookie API: Fetching cookie map...', 50);
+      this.sendProgress('Fetching cookie map...', 50);
       const cookieIdMap = await this.fetchOptional(() => this.fetchCookieIdMap(), 'Fetch Cookie Map', null);
 
       // Step 5: Fetch booth locations (non-fatal)
-      this.sendProgress('Smart Cookie API: Fetching booth locations...', 55);
+      this.sendProgress('Fetching booth locations...', 55);
       const boothLocations = await this.fetchOptional(() => this.fetchBoothLocations(boothIds), 'Fetch Booth Locations', []);
 
       // Step 6: Fetch booth reservations (non-fatal)
-      this.sendProgress('Smart Cookie API: Fetching reservations...', 60);
+      this.sendProgress('Fetching reservations...', 60);
       const reservations = await this.fetchOptional(() => this.fetchReservations(), 'Fetch Reservations', null);
 
       // Step 7: Fetch booth divider allocations if reservations exist (non-fatal)
       let boothDividers = [];
       if (reservations) {
-        this.sendProgress('Smart Cookie API: Fetching booth allocations...', 65);
+        this.sendProgress('Fetching booth allocations...', 65);
         boothDividers = await this.fetchOptional(() => this.fetchAllBoothDividers(reservations), 'Fetch Booth Dividers', []);
       }
 
@@ -687,7 +687,7 @@ class SmartCookieApiScraper {
         cookieIdMap
       });
 
-      this.sendProgress('Smart Cookie API: Complete', 100);
+      this.sendProgress('Complete', 100);
 
       return {
         success: true,

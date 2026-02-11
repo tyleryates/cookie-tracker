@@ -17,12 +17,12 @@ export function DataTable({ columns, className, style, hint, children }: DataTab
       <table class={className || 'table-normal'} style={style}>
         <thead>
           <tr>
-            {columns.map((col, i) => <th key={i}>{col}</th>)}
+            {columns.map((col, i) => (
+              <th key={i}>{col}</th>
+            ))}
           </tr>
         </thead>
-        <tbody>
-          {children}
-        </tbody>
+        <tbody>{children}</tbody>
       </table>
     </>
   );

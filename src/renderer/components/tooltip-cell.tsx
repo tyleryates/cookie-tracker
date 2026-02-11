@@ -15,7 +15,9 @@ interface TooltipCellProps {
 
 export function TooltipCell({ tooltip, children, style, tag, className }: TooltipCellProps) {
   const ref = useRef<HTMLElement | null>(null);
-  const setRef = (el: HTMLElement | null) => { ref.current = el; };
+  const setRef = (el: HTMLElement | null) => {
+    ref.current = el;
+  };
 
   useEffect(() => {
     if (ref.current && tooltip) {
@@ -29,15 +31,17 @@ export function TooltipCell({ tooltip, children, style, tag, className }: Toolti
         theme: 'dark',
         maxWidth: 'none',
         popperOptions: {
-          modifiers: [{
-            name: 'preventOverflow',
-            options: { boundary: 'viewport' }
-          }]
+          modifiers: [
+            {
+              name: 'preventOverflow',
+              options: { boundary: 'viewport' }
+            }
+          ]
         }
       });
       return () => {
         const arr = Array.isArray(instances) ? instances : [instances];
-        arr.forEach((i) => i.destroy());
+        for (const i of arr) i.destroy();
       };
     }
   }, [tooltip]);

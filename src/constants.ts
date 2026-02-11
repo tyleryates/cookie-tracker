@@ -19,8 +19,6 @@ export const DATA_SOURCES = {
   SMART_COOKIE_API: 'SC-API'
 } as const;
 
-type DataSource = (typeof DATA_SOURCES)[keyof typeof DATA_SOURCES];
-
 // ============================================================================
 // ORDER CLASSIFICATION — Multi-dimensional type system (see RULES.md)
 // ============================================================================

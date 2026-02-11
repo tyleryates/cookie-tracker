@@ -58,8 +58,6 @@ export interface Order {
   /** Classified order type enum — used for logic/dispatch (from classifyDCOrder) */
   orderType: OrderType | null;
   owner: Owner;
-  /** Whether this order draws from the scout's physical inventory (GIRL + DELIVERY/IN_HAND only) */
-  needsInventory: boolean;
   packages: number;
   physicalPackages: number;
   donations: number;
@@ -282,7 +280,13 @@ export interface Warning {
 // PROGRESS CALLBACK
 // ============================================================================
 
-export type ProgressCallback = ((progress: { status: string; progress: number }) => void) | null;
+export interface ScrapeProgress {
+  source: 'dc' | 'sc';
+  status: string;
+  progress: number;
+}
+
+export type ProgressCallback = ((progress: ScrapeProgress) => void) | null;
 
 // ============================================================================
 // CREDENTIALS
@@ -452,11 +456,15 @@ export interface HealthChecks {
   unknownTransferTypes: number;
 }
 
-export interface UnifiedMetadata extends ReconcilerMetadata {
+export interface UnifiedMetadata {
+  lastImportDC: string | null;
+  lastImportSC: string | null;
+  lastImportSCReport?: string;
+  cookieIdMap: Record<number, CookieType> | null;
+  sources: Array<{ type: string; date: string; records: number }>;
   unifiedBuildTime: string;
   scoutCount: number;
   orderCount: number;
-  warnings: Warning[];
   healthChecks: HealthChecks;
 }
 
@@ -499,6 +507,7 @@ export interface AppConfig {
   boothIds: number[];
   boothDayFilters: DayFilter[];
   ignoredTimeSlots: IgnoredTimeSlot[];
+  lastBoothSync?: string;
 }
 
 // ============================================================================

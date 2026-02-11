@@ -3,8 +3,9 @@
 
 import { ORDER_TYPE, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
-import type { Scout, Transfer, Varieties, VarietiesResult } from '../../types';
 import type { DataStore } from '../../data-store';
+import type { Scout, Transfer, Varieties, VarietiesResult } from '../../types';
+import { needsInventory } from './helpers';
 
 /** Add physical varieties (excluding Cookie Share) to accumulator */
 function addVarieties(source: Varieties, target: Varieties): void {
@@ -37,7 +38,7 @@ export function buildVarieties(reconciler: DataStore, scouts: Map<string, Scout>
   scouts.forEach((scout) => {
     // Girl delivery + direct ship orders
     scout.orders.forEach((order) => {
-      if (order.needsInventory || order.orderType === ORDER_TYPE.DIRECT_SHIP) {
+      if (needsInventory(order) || order.orderType === ORDER_TYPE.DIRECT_SHIP) {
         addVarieties(order.varieties, byCookie);
       }
     });

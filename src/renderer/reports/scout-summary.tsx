@@ -12,12 +12,20 @@ import { TooltipCell } from '../components/tooltip-cell';
 // ============================================================================
 
 function getOrderStatusStyle(scout: Scout): { className: string; icon: string; tooltip: string } {
-  let needsApproval = 0, pending = 0, completed = 0;
+  let needsApproval = 0,
+    pending = 0,
+    completed = 0;
   scout.orders.forEach((order: Order) => {
     switch (classifyOrderStatus(order.status)) {
-      case 'NEEDS_APPROVAL': needsApproval++; break;
-      case 'PENDING': pending++; break;
-      case 'COMPLETED': completed++; break;
+      case 'NEEDS_APPROVAL':
+        needsApproval++;
+        break;
+      case 'PENDING':
+        pending++;
+        break;
+      case 'COMPLETED':
+        completed++;
+        break;
     }
   });
 
@@ -35,11 +43,23 @@ function getOrderStatusStyle(scout: Scout): { className: string; icon: string; t
 // Cell sub-components
 // ============================================================================
 
-function InventoryCell({ netInventory, negativeVarieties, actualNet }: { netInventory: number; negativeVarieties: NonNullable<Scout['$issues']>['negativeInventory']; actualNet: number }) {
+function InventoryCell({
+  netInventory,
+  negativeVarieties,
+  actualNet
+}: {
+  netInventory: number;
+  negativeVarieties: NonNullable<Scout['$issues']>['negativeInventory'];
+  actualNet: number;
+}) {
   if (negativeVarieties && negativeVarieties.length > 0) {
     const varietyList = negativeVarieties.map((v) => `${getCookieDisplayName(v.variety)}: -${v.shortfall}`).join('\n');
     const display = netInventory > 0 ? `+${netInventory}` : actualNet;
-    return <TooltipCell tooltip={varietyList} tag="span" className="tooltip-cell status-error">{display} ⚠️</TooltipCell>;
+    return (
+      <TooltipCell tooltip={varietyList} tag="span" className="tooltip-cell status-error">
+        {display} ⚠️
+      </TooltipCell>
+    );
   }
   if (netInventory < 0) return <span class="warning-text">{netInventory}</span>;
   if (netInventory > 0) return <span class="success-text">+{netInventory}</span>;
@@ -87,14 +107,30 @@ function CreditedCell({ isSiteRow, credited, siteOrders }: { isSiteRow: boolean;
   if (isSiteRow && siteOrders) {
     const hasSiteOrders = (siteOrders.directShip?.orders?.length || 0) > 0 || (siteOrders.girlDelivery?.orders?.length || 0) > 0;
     if (hasSiteOrders) {
-      sources.push(`\nNote: Troop booth sales and direct ship orders are allocated to scouts in Smart Cookie. See site orders in scout details.`);
+      sources.push(
+        `\nNote: Troop booth sales and direct ship orders are allocated to scouts in Smart Cookie. See site orders in scout details.`
+      );
     }
   }
 
-  return <TooltipCell tooltip={sources.join('\n')} tag="span">{total}</TooltipCell>;
+  return (
+    <TooltipCell tooltip={sources.join('\n')} tag="span">
+      {total}
+    </TooltipCell>
+  );
 }
 
-function DeliveredCell({ sales, isSiteRow, scout, siteOrders }: { sales: number; isSiteRow: boolean; scout: Scout; siteOrders: SiteOrdersDataset }) {
+function DeliveredCell({
+  sales,
+  isSiteRow,
+  scout,
+  siteOrders
+}: {
+  sales: number;
+  isSiteRow: boolean;
+  scout: Scout;
+  siteOrders: SiteOrdersDataset;
+}) {
   if (!isSiteRow || !scout.$hasUnallocatedSiteOrders || !siteOrders) return <>{sales}</>;
 
   const dsUnalloc = siteOrders.directShip.unallocated || 0;
@@ -105,7 +141,11 @@ function DeliveredCell({ sales, isSiteRow, scout, siteOrders }: { sales: number;
   if (gdUnalloc > 0) parts.push(`Troop Girl Delivered: ${gdUnalloc}`);
   if (dsUnalloc > 0) parts.push(`Troop Direct Ship: ${dsUnalloc}`);
   parts.push('\nAllocate in Smart Cookie');
-  return <TooltipCell tooltip={parts.join('\n')} tag="span" className="tooltip-cell status-warning">{sales} ⚠️</TooltipCell>;
+  return (
+    <TooltipCell tooltip={parts.join('\n')} tag="span" className="tooltip-cell status-warning">
+      {sales} ⚠️
+    </TooltipCell>
+  );
 }
 
 function ProceedsCell({ isSiteRow, totals, proceedsRate }: { isSiteRow: boolean; totals: Scout['totals']; proceedsRate: number }) {
@@ -113,13 +153,17 @@ function ProceedsCell({ isSiteRow, totals, proceedsRate }: { isSiteRow: boolean;
   const totalSold = totals.totalSold || 0;
   const exemptPackages = totalSold > 0 ? Math.min(totalSold, PROCEEDS_EXEMPT_PACKAGES) : 0;
   const deduction = exemptPackages * proceedsRate;
-  const proceeds = (totalSold * proceedsRate) - deduction;
+  const proceeds = totalSold * proceedsRate - deduction;
   const proceedsRounded = Math.round(proceeds);
   const deductionRounded = Math.round(deduction);
   const className = proceedsRounded > 0 ? 'status-success' : '';
   if (deductionRounded > 0) {
     const tip = `First ${PROCEEDS_EXEMPT_PACKAGES} pkg exempt: -$${deductionRounded}\nGross: $${Math.round(totalSold * proceedsRate)}`;
-    return <TooltipCell tooltip={tip} tag="span" className={className ? `tooltip-cell ${className}` : undefined}>${proceedsRounded}</TooltipCell>;
+    return (
+      <TooltipCell tooltip={tip} tag="span" className={className ? `tooltip-cell ${className}` : undefined}>
+        ${proceedsRounded}
+      </TooltipCell>
+    );
   }
   return <span class={className}>{proceedsRounded > 0 ? `$${proceedsRounded}` : '$0'}</span>;
 }
@@ -137,7 +181,11 @@ function CashOwedCell({ isSiteRow, totals }: { isSiteRow: boolean; totals: Scout
   if (electronic > 0) tooltipParts.push(`Digital payments: -$${electronic}`);
   if (salesCash > 0) tooltipParts.push(`Sales cash: $${salesCash}`);
   if (unsold > 0) tooltipParts.push(`Unsold inventory: $${unsold}`);
-  return <TooltipCell tooltip={tooltipParts.join('\n')} tag="span" className={`tooltip-cell ${className}`}>{cashOwed > 0 ? `$${cashOwed}` : '$0'}</TooltipCell>;
+  return (
+    <TooltipCell tooltip={tooltipParts.join('\n')} tag="span" className={`tooltip-cell ${className}`}>
+      {cashOwed > 0 ? `$${cashOwed}` : '$0'}
+    </TooltipCell>
+  );
 }
 
 // ============================================================================
@@ -146,7 +194,11 @@ function CashOwedCell({ isSiteRow, totals }: { isSiteRow: boolean; totals: Scout
 
 export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
   if (!data?.scouts) {
-    return <div class="report-visual"><p>No data available. Please import data first.</p></div>;
+    return (
+      <div class="report-visual">
+        <p>No data available. Please import data first.</p>
+      </div>
+    );
   }
 
   const scouts = data.scouts;
@@ -163,19 +215,16 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
     <div class="report-visual">
       <h3>Scout Summary</h3>
       <p class="table-hint">
-        Click on any scout to see detailed breakdown.{' '}
-        <strong>Delivered</strong> = packages for in-person delivery.{' '}
-        <strong>Inventory</strong> = net on hand.{' '}
-        <strong>Credited</strong> = troop booth sales + direct ship allocated to scout.{' '}
-        <strong>Shipped</strong> = scout's own direct ship orders.{' '}
-        <strong>Proceeds</strong> = ${proceedsRate.toFixed(2)}/pkg after first 50 exempt.{' '}
-        <strong>Cash Due</strong> = pickup value minus electronic DC payments.
+        Click on any scout to see detailed breakdown. <strong>Delivered</strong> = packages for in-person delivery.{' '}
+        <strong>Inventory</strong> = net on hand. <strong>Credited</strong> = troop booth sales + direct ship allocated to scout.{' '}
+        <strong>Shipped</strong> = scout's own direct ship orders. <strong>Proceeds</strong> = ${proceedsRate.toFixed(2)}/pkg after first 50
+        exempt. <strong>Cash Due</strong> = pickup value minus electronic DC payments.
       </p>
       <DataTable
         columns={['Scout', 'Orders', 'Inventory', 'Delivered', 'Shipped', 'Donations', 'Credited', 'Total Sold', 'Proceeds', 'Cash Due']}
         className="table-normal scout-table"
       >
-        {sortedScouts.map(([name, scout], idx) => {
+        {sortedScouts.map(([name, scout]) => {
           const isSiteRow = name.endsWith(' Site');
           const { totals, credited } = scout;
           const sales = totals.delivered || 0;
@@ -191,13 +240,31 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
               rowClass="scout-row"
               firstCell={<strong>{name}</strong>}
               cells={[
-                orderTooltip ? <TooltipCell tooltip={orderTooltip} tag="span"><span class={orderClass}>{scout.orders.length}{orderIcon}</span></TooltipCell> : <span class={orderClass}>{scout.orders.length}{orderIcon}</span>,
-                <InventoryCell netInventory={totals.inventory} negativeVarieties={scout.$issues?.negativeInventory} actualNet={totals.inventory || 0} />,
+                orderTooltip ? (
+                  <TooltipCell tooltip={orderTooltip} tag="span">
+                    <span class={orderClass}>
+                      {scout.orders.length}
+                      {orderIcon}
+                    </span>
+                  </TooltipCell>
+                ) : (
+                  <span class={orderClass}>
+                    {scout.orders.length}
+                    {orderIcon}
+                  </span>
+                ),
+                <InventoryCell
+                  netInventory={totals.inventory}
+                  negativeVarieties={scout.$issues?.negativeInventory}
+                  actualNet={totals.inventory || 0}
+                />,
                 <DeliveredCell sales={sales} isSiteRow={isSiteRow} scout={scout} siteOrders={siteOrders} />,
                 totals.shipped || 0,
                 totals.donations || 0,
                 <CreditedCell isSiteRow={isSiteRow} credited={credited} siteOrders={siteOrders} />,
-                <TooltipCell tooltip={soldTooltip} tag="span">{totalSold}</TooltipCell>,
+                <TooltipCell tooltip={soldTooltip} tag="span">
+                  {totalSold}
+                </TooltipCell>,
                 <ProceedsCell isSiteRow={isSiteRow} totals={totals} proceedsRate={proceedsRate} />,
                 <CashOwedCell isSiteRow={isSiteRow} totals={totals} />
               ]}

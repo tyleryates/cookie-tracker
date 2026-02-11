@@ -3,10 +3,10 @@
 
 import { SCOUT_PHYSICAL_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
+import type { DataStore } from '../../data-store';
 import type { BoothSalesAllocation, DirectShipAllocation, Scout, Transfer } from '../../types';
 import { sumPhysicalPackages } from '../utils';
 import { addVarietiesToTarget, buildGirlIdToNameMap, findScoutByGirlId } from './helpers';
-import type { DataStore } from '../../data-store';
 
 /** Process virtual booth T2G transfers (Troop girl delivery) */
 function processVirtualBoothAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>): void {
@@ -33,13 +33,7 @@ function processVirtualBoothAllocations(reconciler: DataStore, scoutDataset: Map
 }
 
 /** Process direct ship divider allocations */
-function processDirectShipAllocations(
-  reconciler: DataStore,
-  scoutDataset: Map<string, Scout>,
-  girlIdToName: Map<number, string>
-): void {
-  if (!reconciler.directShipAllocations) return;
-
+function processDirectShipAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): void {
   reconciler.directShipAllocations.forEach((allocation: DirectShipAllocation) => {
     const scout = findScoutByGirlId(allocation.girlId, scoutDataset, girlIdToName);
     if (!scout) return;
@@ -60,13 +54,7 @@ function processDirectShipAllocations(
 }
 
 /** Process booth sales divider allocations */
-function processBoothSalesAllocations(
-  reconciler: DataStore,
-  scoutDataset: Map<string, Scout>,
-  girlIdToName: Map<number, string>
-): void {
-  if (!reconciler.boothSalesAllocations) return;
-
+function processBoothSalesAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): void {
   reconciler.boothSalesAllocations.forEach((allocation: BoothSalesAllocation) => {
     const scout = findScoutByGirlId(allocation.girlId, scoutDataset, girlIdToName);
     if (!scout) return;

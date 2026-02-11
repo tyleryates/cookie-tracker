@@ -13,7 +13,9 @@ export function StatCards({ stats }: { stats: Stat[] }) {
       {stats.map((stat, i) => (
         <div key={i} class="stat-card">
           <div class="stat-card-label">{stat.label}</div>
-          <div class="stat-card-value" style={{ color: stat.color || '#666' }}>{stat.value}</div>
+          <div class="stat-card-value" style={{ color: stat.color || '#666' }}>
+            {stat.value}
+          </div>
           <div class="stat-card-description">{stat.description}</div>
         </div>
       ))}

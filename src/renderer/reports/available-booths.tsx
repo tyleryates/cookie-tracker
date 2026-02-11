@@ -120,7 +120,11 @@ interface AvailableBoothsProps {
 
 export function AvailableBoothsReport({ data, config, onIgnoreSlot, onRefresh }: AvailableBoothsProps) {
   if (!data) {
-    return <div class="report-visual"><p>No data available. Please import data first.</p></div>;
+    return (
+      <div class="report-visual">
+        <p>No data available. Please import data first.</p>
+      </div>
+    );
   }
 
   const { filters, ignoredTimeSlots } = config;
@@ -135,18 +139,19 @@ export function AvailableBoothsReport({ data, config, onIgnoreSlot, onRefresh }:
     <div class="report-visual">
       <h3>Available Booths</h3>
       <div class="report-toolbar">
-        <button class="btn btn-secondary" onClick={onRefresh}>Refresh Availability</button>
+        <button type="button" class="btn btn-secondary" onClick={onRefresh}>
+          Refresh Availability
+        </button>
       </div>
 
       {boothsWithDates.length === 0 ? (
-        <p class="muted-text">
-          No available booth slots found. Booth availability is fetched from Smart Cookie during sync.
-        </p>
+        <p class="muted-text">No available booth slots found. Booth availability is fetched from Smart Cookie during sync.</p>
       ) : (
         boothsWithDates.map((loc) => {
           const addrParts = [loc.address.street, loc.address.city, loc.address.state, loc.address.zip].filter(Boolean);
           const addressStr = addrParts.join(', ');
-          const typeClass = loc.reservationType === 'LOTTERY' ? 'type-lottery' : loc.reservationType === 'FCFS' ? 'type-fcfs' : 'type-default';
+          const typeClass =
+            loc.reservationType === 'LOTTERY' ? 'type-lottery' : loc.reservationType === 'FCFS' ? 'type-fcfs' : 'type-default';
 
           const filtered = filterAvailableDates(loc.availableDates || [], filters);
           const dates = removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots);
@@ -171,17 +176,22 @@ export function AvailableBoothsReport({ data, config, onIgnoreSlot, onRefresh }:
                     ) : (
                       <div class="booth-slot-list">
                         {d.timeSlots.map((slot) => {
-                          const friendly = slot.startTime && slot.endTime
-                            ? `${formatTime12h(slot.startTime)} – ${formatTime12h(slot.endTime)}`
-                            : formatTime12h(slot.startTime) || '-';
+                          const friendly =
+                            slot.startTime && slot.endTime
+                              ? `${formatTime12h(slot.startTime)} – ${formatTime12h(slot.endTime)}`
+                              : formatTime12h(slot.startTime) || '-';
                           const raw = slot.startTime && slot.endTime ? `${slot.startTime} – ${slot.endTime}` : slot.startTime || '-';
 
                           return (
                             <span key={`${d.date}-${slot.startTime}`} title={raw} class="booth-time-slot">
                               {friendly}
                               <button
+                                type="button"
                                 class="booth-slot-dismiss"
-                                onClick={(e) => { e.stopPropagation(); onIgnoreSlot(loc.id, d.date, slot.startTime); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onIgnoreSlot(loc.id, d.date, slot.startTime);
+                                }}
                                 title="Ignore this time slot"
                               >
                                 &times;

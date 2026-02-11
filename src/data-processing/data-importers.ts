@@ -142,13 +142,14 @@ function mergeDCOrderFromSC(
   orderNum: string,
   scout: string,
   transferData: { date: string; packages: number; amount: number },
-  type: string,
+  _type: string,
   varieties: Varieties,
   source: string,
   rawData: Record<string, any>
 ): void {
   const dcOrderNum = orderNum.substring(1);
-  mergeOrCreateOrder(reconciler,
+  mergeOrCreateOrder(
+    reconciler,
     dcOrderNum,
     {
       orderNumber: dcOrderNum,
@@ -202,12 +203,7 @@ function parseGirlAllocation(
 // ============================================================================
 
 /** Update scout aggregated data (additive for numeric, direct set for metadata) */
-function updateScoutData(
-  reconciler: DataStore,
-  scoutName: string,
-  updates: Record<string, any>,
-  metadata: Record<string, any> = {}
-): void {
+function updateScoutData(reconciler: DataStore, scoutName: string, updates: Record<string, any>, metadata: Record<string, any> = {}): void {
   // Metadata fields that should be set directly (not added)
   const metadataFields = ['scoutId', 'gsusaId', 'gradeLevel', 'serviceUnit', 'troopId', 'council', 'district'];
 
@@ -265,7 +261,7 @@ function importDigitalCookie(reconciler: DataStore, dcData: Record<string, any>[
     };
 
     // Merge or create order (DC is source of truth for order details)
-    mergeOrCreateOrder(reconciler,orderNum, orderData, DATA_SOURCES.DIGITAL_COOKIE, row);
+    mergeOrCreateOrder(reconciler, orderNum, orderData, DATA_SOURCES.DIGITAL_COOKIE, row);
 
     // Register scout
     updateScoutData(reconciler, scout, {});
@@ -313,7 +309,8 @@ function importSmartCookieReport(reconciler: DataStore, reportData: Record<strin
     };
 
     // Merge or create order with enrichment
-    mergeOrCreateOrder(reconciler,
+    mergeOrCreateOrder(
+      reconciler,
       orderNum,
       orderData,
       DATA_SOURCES.SMART_COOKIE_REPORT,
@@ -446,23 +443,12 @@ function importDirectShipDivider(reconciler: DataStore, dividerData: Record<stri
       source: 'DirectShipDivider'
     };
 
-    // Store in a new array for direct ship allocations
-    if (!reconciler.directShipAllocations) {
-      reconciler.directShipAllocations = [];
-    }
     reconciler.directShipAllocations.push(allocation);
   });
 }
 
 /** Import Virtual Cookie Share allocations */
 function importVirtualCookieShares(reconciler: DataStore, virtualCookieShares: Record<string, any>[]): void {
-  if (!reconciler.virtualCookieShareAllocations) {
-    reconciler.virtualCookieShareAllocations = new Map(); // Key: girlId, Value: manual entry packages
-  }
-  if (!reconciler.boothCookieShareAllocations) {
-    reconciler.boothCookieShareAllocations = new Map(); // Key: girlId, Value: booth divider CS packages
-  }
-
   virtualCookieShares.forEach((cookieShare: Record<string, any>) => {
     const girls = cookieShare.girls || [];
     const isBoothDivider = !!cookieShare.smart_divider_id;
@@ -579,8 +565,6 @@ function importDirectShipDividers(
   dynamicCookieIdMap: Record<number, CookieType> | null
 ): void {
   if (!Array.isArray(directShipDividers) || directShipDividers.length === 0) return;
-
-  reconciler.directShipAllocations = reconciler.directShipAllocations || [];
 
   // Track seen (orderId, girlId) pairs to prevent duplicates
   const seen = new Set<string>();

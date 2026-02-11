@@ -30,12 +30,12 @@ Ask: **"Is this just for one report?"** → Don't add it to the data model.
 
 ```javascript
 // ❌ BAD: Report-specific aggregations
-scout.$varietyBreakdowns = {          // Only scout-summary.js needs this
+scout.$varietyBreakdowns = {          // Only scout-summary.tsx needs this
   fromSales: { ... },
   fromShipped: { ... }
 };
 
-scout.$cookieShare = {                // Only donation-alert.js needs this
+scout.$cookieShare = {                // Only donation-alert.tsx needs this
   dcTotal: 50,
   dcAutoSync: 30
 };
@@ -113,7 +113,7 @@ transfer.physicalVarieties = { /* varieties without Cookie Share */ };
 ### ✅ Right: Classify at Creation
 
 ```typescript
-// data-reconciler.ts - classifyTransferCategory()
+// data-store-operations.ts - classifyTransferCategory()
 // Explicit category from raw type + API flags — no remainder logic
 function classifyTransferCategory(type, virtualBooth, boothDivider, directShipDivider) {
   if (isIncomingInventory(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
@@ -162,7 +162,7 @@ function calculateTotals(transfer) {
 ### ✅ Right: Simple Report Logic
 
 ```javascript
-// scout-summary.js
+// scout-summary.tsx
 function buildVarietyBreakdown(scout) {
   const salesVarieties = {};
 
@@ -188,7 +188,7 @@ function buildVarietyBreakdown(scout) {
 ### ❌ Wrong: Pre-Aggregate Everything
 
 ```javascript
-// ❌ BAD: data-calculators.js
+// ❌ BAD: calculators/
 scout.$varietyBreakdowns = {
   fromSales: {},
   fromShipped: {},
@@ -255,88 +255,6 @@ scout.breakdown           // Ambiguous: breakdown of what?
 - ✅ Format for display (tooltips, tables, charts)
 - ✅ Generate HTML
 - ❌ NOT: Modify data model, add computed fields to scouts
-
----
-
-## Examples: Applying the Principles
-
-### Example 1: Adding Variety Breakdown to Report
-
-**Wrong Approach:**
-```javascript
-// ❌ Add to data-calculators.js
-scout.$inventoryByVariety = {};
-scout.orders.forEach(order => {
-  // ... build breakdown for inventory report
-});
-```
-
-**Right Approach:**
-```javascript
-// ✅ Calculate in inventory.js report
-function buildInventoryBreakdown(scout) {
-  const breakdown = {};
-  scout.orders.forEach(order => {
-    // ... simple loop, calculate what we need
-  });
-  return breakdown;
-}
-```
-
-### Example 2: Dispatching on Transfer Type
-
-**Wrong Approach:**
-```javascript
-// ❌ Re-compute from raw fields in every function
-function processTransfer(transfer) {
-  if (transfer.type === 'T2G' && !transfer.virtualBooth && !transfer.boothDivider) {
-    // ... check repeated everywhere
-  }
-}
-```
-
-**Right Approach:**
-```typescript
-// ✅ Classify once at creation (data-reconciler.ts)
-// classifyTransferCategory() assigns an explicit TRANSFER_CATEGORY
-
-// Use everywhere via switch
-function processTransfer(transfer) {
-  switch (transfer.category) {
-    case TRANSFER_CATEGORY.GIRL_PICKUP:
-      // ... physical T2G logic
-      break;
-    case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
-      // ... virtual booth logic
-      break;
-  }
-}
-```
-
-### Example 3: Cookie Share Tracking
-
-**Wrong Approach:**
-```javascript
-// ❌ Pre-aggregate in data model
-scout.$cookieShare = {
-  dcTotal: 50,
-  dcAutoSync: 30,
-  dcManualEntry: 20
-};
-```
-
-**Right Approach:**
-```javascript
-// ✅ Calculate in donation-alert.js report
-let dcTotal = 0;
-let dcAutoSync = 0;
-scout.orders.forEach(order => {
-  if (order.donations > 0) {
-    dcTotal += order.donations;
-    if (isAutoSyncOrder(order)) dcAutoSync += order.donations;
-  }
-});
-```
 
 ---
 
@@ -445,7 +363,7 @@ When adding a new `TRANSFER_CATEGORY`, update the relevant group sets in `consta
 🚩 **Data model growing with each new report**
 - Data model should be stable; reports come and go
 
-🚩 **Report logic in data-calculators.js**
+🚩 **Report logic in calculators/**
 - If it says "for scout-summary report" → Wrong layer
 
 🚩 **Setting then immediately reading fields**
@@ -478,11 +396,18 @@ If you answered "no" to most of these → **Don't add it. Calculate in reports i
 | Separation | Data in data layer | Display in data layer |
 | Category Groups | Central sets in constants.ts | Per-report category lists |
 | Granular Sums | `sum(classified.field)` | `totalA - totalB` |
+| Silent Defaults | Return null, let caller handle | Default to "safe" value silently |
 
 **Remember:** Clean data models are stable. They describe what data fundamentally **IS**, independent of how any particular report chooses to **USE** it.
 
 ---
 
-*Follow these principles and the codebase stays clean, maintainable, and easy to understand.*
+## #7: No Silent Defaults for Financial Data
 
-See also: [IMPLEMENTATION-NOTES.md](IMPLEMENTATION-NOTES.md) for code patterns and conventions.
+Classification functions return `null` for unknown values. The caller handles null by logging warnings or errors. This ensures unknown cookie varieties, payment methods, or order types are immediately visible rather than silently defaulting to incorrect values.
+
+If a new cookie type appears in the data, the app should warn loudly rather than silently treating it as zero or skipping it.
+
+---
+
+See also: [DOMAIN.md](DOMAIN.md) for data format reference and domain knowledge.

@@ -249,7 +249,7 @@ When a booth divider distributes cookies, SC creates separate records: T2G trans
 
 ## Smart Cookie Transfer Types
 
-The SC API returns all record types through `/orders/search`. Each transfer is assigned a `TRANSFER_CATEGORY` at creation time (see `classifyTransferCategory()` in `data-reconciler.ts`). Reports dispatch on `category`, not raw `transfer_type`.
+The SC API returns all record types through `/orders/search`. Each transfer is assigned a `TRANSFER_CATEGORY` at creation time (see `classifyTransferCategory()` in `data-store-operations.ts`). Reports dispatch on `category`, not raw `transfer_type`.
 
 | Transfer Type | Category | Direction | Meaning | Counted as "Sold"? |
 |--------------|----------|-----------|---------|-------------------|

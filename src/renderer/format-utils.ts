@@ -139,11 +139,4 @@ function buildVarietyTooltip(varieties: Varieties): string {
     .join('\n');
 }
 
-export {
-  buildVarietyTooltip,
-  sortVarietiesByOrder,
-  getCompleteVarieties,
-  DateFormatter,
-  formatDate,
-  formatCurrency
-};
+export { buildVarietyTooltip, sortVarietiesByOrder, getCompleteVarieties, DateFormatter, formatDate, formatCurrency };

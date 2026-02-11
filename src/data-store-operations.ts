@@ -3,8 +3,8 @@
 
 import { DATA_SOURCES, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
 import { COOKIE_TYPE } from './cookie-constants';
-import type { DataStore } from './data-store';
 import { isIncomingInventory, sumPhysicalPackages } from './data-processing/utils';
+import type { DataStore } from './data-store';
 import Logger from './logger';
 import type { Order, OrderMetadata, Transfer, TransferInput, Varieties } from './types';
 
@@ -35,7 +35,7 @@ function classifyTransferCategory(
 }
 
 /** Create a new Order object with defaults */
-export function createOrder(data: Partial<Order>, source: string): Order {
+function createOrder(data: Partial<Order>, source: string): Order {
   return {
     orderNumber: data.orderNumber || '',
     scout: data.scout || '',
@@ -45,7 +45,6 @@ export function createOrder(data: Partial<Order>, source: string): Order {
     date: data.date || '',
     orderType: data.orderType || null,
     owner: data.owner || 'TROOP',
-    needsInventory: data.needsInventory || false,
     packages: data.packages || 0,
     physicalPackages: data.physicalPackages || 0,
     donations: data.donations || 0,
@@ -109,7 +108,7 @@ export function createTransfer(data: TransferInput): Transfer {
 }
 
 /** Get the metadata key for a data source */
-export function getMetadataKey(source: string): keyof OrderMetadata {
+function getMetadataKey(source: string): keyof OrderMetadata {
   const keyMap: Record<string, keyof OrderMetadata> = {
     [DATA_SOURCES.DIGITAL_COOKIE]: 'dc',
     [DATA_SOURCES.SMART_COOKIE]: 'sc',

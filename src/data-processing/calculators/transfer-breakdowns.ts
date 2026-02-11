@@ -2,10 +2,10 @@
 // Pre-classifies transfers into categories (C2T, T2G, G2T) with totals
 
 import { TRANSFER_CATEGORY } from '../../constants';
+import type { DataStore } from '../../data-store';
 import Logger from '../../logger';
 import type { Transfer, TransferBreakdowns, Warning } from '../../types';
 import { isKnownTransferType } from '../utils';
-import type { DataStore } from '../../data-store';
 
 /** Build pre-classified transfer lists with totals */
 export function buildTransferBreakdowns(reconciler: DataStore, warnings: Warning[]): TransferBreakdowns {
@@ -19,8 +19,6 @@ export function buildTransferBreakdowns(reconciler: DataStore, warnings: Warning
   let g2tTotal = 0;
 
   reconciler.transfers.forEach((transfer: Transfer) => {
-    const packages = transfer.packages || 0;
-
     // Warn on unknown transfer types (deduplicated by type string)
     if (transfer.type && !isKnownTransferType(transfer.type) && !seenUnknownTypes.has(transfer.type)) {
       seenUnknownTypes.add(transfer.type);

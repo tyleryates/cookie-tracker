@@ -2,16 +2,19 @@
 // Handles troop booth sale orders and allocation tracking
 
 import { ORDER_TYPE, OWNER, TRANSFER_CATEGORY } from '../../constants';
-import type { Order, Scout, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
 import type { DataStore } from '../../data-store';
+import type { Order, Scout, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
 
 /** Build site orders dataset with allocation tracking */
 function buildSiteOrdersDataset(reconciler: DataStore, scoutDataset: Map<string, Scout>): SiteOrdersDataset {
   // Find site scout from pre-classified scout data
   let siteScout: Scout | null = null;
-  scoutDataset.forEach((s: Scout) => {
-    if (s.isSiteOrder) siteScout = s;
-  });
+  for (const s of scoutDataset.values()) {
+    if (s.isSiteOrder) {
+      siteScout = s;
+      break;
+    }
+  }
 
   const siteOrdersByType: { directShip: SiteOrderEntry[]; girlDelivery: SiteOrderEntry[]; boothSale: SiteOrderEntry[] } = {
     directShip: [],
@@ -88,11 +91,9 @@ function calculateAllocations(reconciler: DataStore): { directShip: number; virt
   let boothSales = 0;
 
   // Direct ship allocations
-  if (reconciler.directShipAllocations) {
-    reconciler.directShipAllocations.forEach((allocation) => {
-      directShip += allocation.packages || 0;
-    });
-  }
+  reconciler.directShipAllocations.forEach((allocation) => {
+    directShip += allocation.packages || 0;
+  });
 
   // Virtual booth allocations (T2G transfers)
   reconciler.transfers.forEach((transfer: Transfer) => {
@@ -102,11 +103,9 @@ function calculateAllocations(reconciler: DataStore): { directShip: number; virt
   });
 
   // Booth sales allocations
-  if (reconciler.boothSalesAllocations) {
-    reconciler.boothSalesAllocations.forEach((allocation) => {
-      boothSales += allocation.packages || 0;
-    });
-  }
+  reconciler.boothSalesAllocations.forEach((allocation) => {
+    boothSales += allocation.packages || 0;
+  });
 
   return { directShip, virtualBooth, boothSales };
 }

@@ -22,12 +22,6 @@ class ScraperOrchestrator {
     this.progressCallback = callback;
   }
 
-  sendProgress(status: string, progress: number): void {
-    if (this.progressCallback) {
-      this.progressCallback({ status, progress });
-    }
-  }
-
   /** Get the Smart Cookie scraper instance (for on-demand API calls after sync) */
   getSmartCookieScraper(): SmartCookieScraper | null {
     return this.smartCookieScraper;
@@ -55,8 +49,6 @@ class ScraperOrchestrator {
       results.digitalCookie = digitalCookieResult;
       results.smartCookie = smartCookieResult;
       results.success = results.digitalCookie.success || results.smartCookie.success;
-
-      this.sendProgress('Complete!', 100);
 
       return results;
     } catch (error) {

@@ -1,13 +1,13 @@
 import type { UnifiedDataset } from '../../types';
 import { StatCards } from '../components/stat-cards';
 
-const SectionHeader = ({ text }: { text: string }) => (
-  <h4 class="report-section-header">{text}</h4>
-);
-
 export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
   if (!data?.troopTotals) {
-    return <div class="report-visual"><p>No data available. Please import data first.</p></div>;
+    return (
+      <div class="report-visual">
+        <p>No data available. Please import data first.</p>
+      </div>
+    );
   }
 
   const troopTotals = data.troopTotals;
@@ -60,30 +60,46 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
     <div class="report-visual">
       <h3>Troop Summary</h3>
 
-      <SectionHeader text="Sales by Channel" />
-      <StatCards stats={[
-        { label: 'Booth Sales', value: troopTotals.boothDividerT2G, description: 'Via booth divider', color: '#7B1FA2' },
-        { label: 'Girl Delivery', value: troopTotals.girlDelivery, description: 'In-person & online delivery', color: '#1976D2' },
-        { label: 'Direct Ship', value: troopTotals.directShip, description: 'Shipped orders', color: '#00838F' },
-        { label: 'Donations', value: troopTotals.donations, description: 'Cookie Share', color: '#E91E63' },
-        { label: 'Total Sold', value: totalSold, description: 'To customers', color: '#2E7D32' }
-      ]} />
+      <h4 class="report-section-header">"Sales by Channel</h4>
+      <StatCards
+        stats={[
+          { label: 'Booth Sales', value: troopTotals.boothDividerT2G, description: 'Via booth divider', color: '#7B1FA2' },
+          { label: 'Girl Delivery', value: troopTotals.girlDelivery, description: 'In-person & online delivery', color: '#1976D2' },
+          { label: 'Direct Ship', value: troopTotals.directShip, description: 'Shipped orders', color: '#00838F' },
+          { label: 'Donations', value: troopTotals.donations, description: 'Cookie Share', color: '#E91E63' },
+          { label: 'Total Sold', value: totalSold, description: 'To customers', color: '#2E7D32' }
+        ]}
+      />
 
-      <SectionHeader text="Inventory" />
+      <h4 class="report-section-header">"Inventory</h4>
       <StatCards stats={inventoryStats} />
 
-      <SectionHeader text="Finances" />
+      <h4 class="report-section-header">"Finances</h4>
       <StatCards stats={financialStats} />
 
       <div class="info-box info-box-info">
-        <p class="meta-text"><strong>Other Reports:</strong></p>
+        <p class="meta-text">
+          <strong>Other Reports:</strong>
+        </p>
         <ul class="info-box-list">
-          <li><strong>Scouts:</strong> Per-scout sales, inventory, credited booth/direct ship allocations, and cash owed</li>
-          <li><strong>Donations:</strong> Cookie Share reconciliation between Digital Cookie and Smart Cookie</li>
-          <li><strong>Booths:</strong> Booth reservations, distribution status, and per-scout booth sale allocations</li>
-          <li><strong>Available Booths:</strong> Upcoming booth locations with available time slots</li>
-          <li><strong>Inventory:</strong> Troop inventory by variety, council pickups (C2T), and scout allocations (T2G)</li>
-          <li><strong>Cookies:</strong> Sales breakdown by cookie type with percentages</li>
+          <li>
+            <strong>Scouts:</strong> Per-scout sales, inventory, credited booth/direct ship allocations, and cash owed
+          </li>
+          <li>
+            <strong>Donations:</strong> Cookie Share reconciliation between Digital Cookie and Smart Cookie
+          </li>
+          <li>
+            <strong>Booths:</strong> Booth reservations, distribution status, and per-scout booth sale allocations
+          </li>
+          <li>
+            <strong>Available Booths:</strong> Upcoming booth locations with available time slots
+          </li>
+          <li>
+            <strong>Inventory:</strong> Troop inventory by variety, council pickups (C2T), and scout allocations (T2G)
+          </li>
+          <li>
+            <strong>Cookies:</strong> Sales breakdown by cookie type with percentages
+          </li>
         </ul>
       </div>
     </div>

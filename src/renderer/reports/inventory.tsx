@@ -4,13 +4,7 @@ import type { Transfer, UnifiedDataset, Varieties } from '../../types';
 import { DataTable } from '../components/data-table';
 import { StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import {
-  buildVarietyTooltip,
-  formatCurrency,
-  formatDate,
-  getCompleteVarieties,
-  sortVarietiesByOrder
-} from '../format-utils';
+import { buildVarietyTooltip, formatCurrency, formatDate, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
 
 function transferTooltip(varieties: Varieties | undefined, transform?: (count: number) => number): string {
   if (!varieties || Object.keys(varieties).length === 0) return '';
@@ -23,7 +17,11 @@ function transferTooltip(varieties: Varieties | undefined, transform?: (count: n
 
 export function InventoryReport({ data, transfers }: { data: UnifiedDataset; transfers?: Transfer[] }) {
   if (!data?.transferBreakdowns) {
-    return <div class="report-visual"><p>No data available. Please import data first.</p></div>;
+    return (
+      <div class="report-visual">
+        <p>No data available. Please import data first.</p>
+      </div>
+    );
   }
 
   const troopTotals = data.troopTotals;
@@ -50,18 +48,22 @@ export function InventoryReport({ data, transfers }: { data: UnifiedDataset; tra
   }
   stats.push({ label: 'Troop Inventory', value: netInventory, description: 'Packages on hand', color: '#9C27B0' });
 
-  const inventoryRows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(inventoryVarieties)))
-    .filter(([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE);
+  const inventoryRows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(inventoryVarieties))).filter(
+    ([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE
+  );
 
-  const allScoutTransfers = [...t2gTransfers, ...g2tTransfers]
-    .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  const allScoutTransfers = [...t2gTransfers, ...g2tTransfers].sort(
+    (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+  );
 
   const hasTransferData = transfers && transfers.length > 0;
 
   return (
     <div class="report-visual">
       <h3>Inventory Report</h3>
-      <p class="meta-text" style={{ marginBottom: '20px' }}>Track inventory from Council to Troop to Scouts</p>
+      <p class="meta-text" style={{ marginBottom: '20px' }}>
+        Track inventory from Council to Troop to Scouts
+      </p>
 
       <StatCards stats={stats} />
 
@@ -71,7 +73,8 @@ export function InventoryReport({ data, transfers }: { data: UnifiedDataset; tra
           const cases = Math.floor(count / PACKAGES_PER_CASE);
           const remaining = count % PACKAGES_PER_CASE;
           let breakdown = '';
-          if (cases > 0 && remaining > 0) breakdown = `${cases} case${cases !== 1 ? 's' : ''} + ${remaining} pkg${remaining !== 1 ? 's' : ''}`;
+          if (cases > 0 && remaining > 0)
+            breakdown = `${cases} case${cases !== 1 ? 's' : ''} + ${remaining} pkg${remaining !== 1 ? 's' : ''}`;
           else if (cases > 0) breakdown = `${cases} case${cases !== 1 ? 's' : ''}`;
           else breakdown = `${remaining} pkg${remaining !== 1 ? 's' : ''}`;
 
@@ -93,7 +96,8 @@ export function InventoryReport({ data, transfers }: { data: UnifiedDataset; tra
           </p>
           <DataTable columns={['Date', 'From', 'Order #', 'Cases', 'Packages', 'Amount', 'Status']}>
             {c2tTransfers.map((transfer: Transfer, i: number) => {
-              const isPending = transfer.status === 'SAVED' || (transfer.actions && (transfer.actions.submittable || transfer.actions.approvable));
+              const isPending =
+                transfer.status === 'SAVED' || (transfer.actions && (transfer.actions.submittable || transfer.actions.approvable));
               const statusText = isPending ? 'Pending' : 'Completed';
               const statusClass = isPending ? 'status-warning' : 'status-success';
               const tip = transferTooltip(transfer.varieties);
@@ -136,7 +140,13 @@ export function InventoryReport({ data, transfers }: { data: UnifiedDataset; tra
                 <tr key={i}>
                   <td>{formatDate(transfer.date)}</td>
                   <td>{String(scoutName || '-')}</td>
-                  {tip ? <TooltipCell tooltip={tip} className={cellClass ? `tooltip-cell ${cellClass}` : undefined}>{displayPackages}</TooltipCell> : <td class={cellClass}>{displayPackages}</td>}
+                  {tip ? (
+                    <TooltipCell tooltip={tip} className={cellClass ? `tooltip-cell ${cellClass}` : undefined}>
+                      {displayPackages}
+                    </TooltipCell>
+                  ) : (
+                    <td class={cellClass}>{displayPackages}</td>
+                  )}
                   <td class={cellClass}>{formatCurrency(transfer.amount)}</td>
                 </tr>
               );
@@ -145,23 +155,25 @@ export function InventoryReport({ data, transfers }: { data: UnifiedDataset; tra
         </>
       )}
 
-      {c2tTransfers.length === 0 && (
-        hasTransferData ? (
+      {c2tTransfers.length === 0 &&
+        (hasTransferData ? (
           <div class="info-box info-box-neutral" style={{ margin: '30px 0' }}>
             <p class="meta-text">
-              <strong>Note:</strong> No C2T (Council to Troop) inventory pickups found in Smart Cookie data.
-              C2T transfers appear after picking up your Initial Order on Delivery Day or Cupboard Orders during the season.
+              <strong>Note:</strong> No C2T (Council to Troop) inventory pickups found in Smart Cookie data. C2T transfers appear after
+              picking up your Initial Order on Delivery Day or Cupboard Orders during the season.
             </p>
           </div>
         ) : (
           <div class="info-box info-box-warning">
-            <p class="meta-text"><strong>No Smart Cookie Data</strong></p>
             <p class="meta-text">
-              Inventory pickups (C2T transfers) come from Smart Cookies. Click "Sync from Websites" to download Smart Cookie data including Initial Order and Cupboard Order pickups.
+              <strong>No Smart Cookie Data</strong>
+            </p>
+            <p class="meta-text">
+              Inventory pickups (C2T transfers) come from Smart Cookies. Click "Sync from Websites" to download Smart Cookie data including
+              Initial Order and Cupboard Order pickups.
             </p>
           </div>
-        )
-      )}
+        ))}
     </div>
   );
 }

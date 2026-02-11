@@ -1,4 +1,4 @@
-.PHONY: help dev compile watch build build-win build-all clean install version lint format fix knip \
+.PHONY: help dev compile watch build build-win build-all clean install version lint format knip \
        publish publish-mac publish-win test-build \
        bump-patch bump-minor bump-major release-patch release-minor release-major commit-version \
        check-token pre-release show-releases dist-info git-status
@@ -26,11 +26,8 @@ version:  ## Show current version
 lint:  ## Check formatting and lint rules (no changes)
 	npx biome check src/
 
-format:  ## Auto-format all source files
-	npx biome format --write src/
-
-fix:  ## Auto-fix lint issues and format
-	npx biome check --fix src/
+format:  ## Auto-format, organize imports, and fix lint issues
+	npx biome check --write src/
 
 knip:  ## Find unused files, exports, and dependencies
 	pnpm knip

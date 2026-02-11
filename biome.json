@@ -24,7 +24,8 @@
       },
       "style": {
         "noNonNullAssertion": "off",
-        "useConst": "warn"
+        "useConst": "warn",
+        "useImportType": "warn"
       }
     }
   },

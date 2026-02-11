@@ -18,12 +18,12 @@ export interface DataStore {
   transfers: Transfer[];
   scouts: Map<string, RawScoutData>;
   troopNumber: string | null;
-  boothSalesAllocations: BoothSalesAllocation[] | null;
-  boothReservations: BoothReservationImported[] | null;
-  boothLocations: BoothLocation[] | null;
-  directShipAllocations: DirectShipAllocation[] | null;
-  virtualCookieShareAllocations: Map<number, number> | null;
-  boothCookieShareAllocations: Map<number, number> | null;
+  boothSalesAllocations: BoothSalesAllocation[];
+  boothReservations: BoothReservationImported[];
+  boothLocations: BoothLocation[];
+  directShipAllocations: DirectShipAllocation[];
+  virtualCookieShareAllocations: Map<number, number>;
+  boothCookieShareAllocations: Map<number, number>;
   metadata: ReconcilerMetadata;
   unified: UnifiedDataset | null;
 }
@@ -34,12 +34,12 @@ export function createDataStore(): DataStore {
     transfers: [],
     scouts: new Map(),
     troopNumber: null,
-    boothSalesAllocations: null,
-    boothReservations: null,
-    boothLocations: null,
-    directShipAllocations: null,
-    virtualCookieShareAllocations: null,
-    boothCookieShareAllocations: null,
+    boothSalesAllocations: [],
+    boothReservations: [],
+    boothLocations: [],
+    directShipAllocations: [],
+    virtualCookieShareAllocations: new Map(),
+    boothCookieShareAllocations: new Map(),
     metadata: {
       lastImportDC: null,
       lastImportSC: null,

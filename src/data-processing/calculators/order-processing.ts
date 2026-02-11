@@ -115,10 +115,6 @@ function buildOrderObject(
   classification: { owner: Owner; orderType: OrderType | null },
   paymentMethod: PaymentMethod | null
 ): Order {
-  const needsInventory =
-    classification.owner === OWNER.GIRL &&
-    (classification.orderType === ORDER_TYPE.DELIVERY || classification.orderType === ORDER_TYPE.IN_HAND);
-
   return {
     orderNumber: basicInfo.orderNumber,
     scout: '',
@@ -134,7 +130,6 @@ function buildOrderObject(
     status: basicInfo.status,
     paymentStatus: basicInfo.paymentStatus,
     paymentMethod: paymentMethod,
-    needsInventory: needsInventory,
     sources: [DATA_SOURCES.DIGITAL_COOKIE]
   };
 }

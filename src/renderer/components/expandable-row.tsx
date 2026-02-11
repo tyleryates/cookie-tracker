@@ -28,7 +28,9 @@ export function ExpandableRow({ firstCell, cells, detail, colSpan, rowClass, det
           <span class="expand-icon">{expanded ? '▼' : '▶'}</span>
           {firstCell}
         </td>
-        {cells.map((cell, i) => <td key={i}>{cell}</td>)}
+        {cells.map((cell, i) => (
+          <td key={i}>{cell}</td>
+        ))}
       </tr>
       {expanded && (
         <tr class={detailClass || 'scout-detail'}>

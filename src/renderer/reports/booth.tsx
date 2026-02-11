@@ -43,7 +43,9 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
       <DataTable columns={['Scout', 'Packages', 'Donations']} className="table-compact">
         {scoutsForBooth.map(({ name, packages, donations }) => (
           <tr key={name}>
-            <td><strong>{name}</strong></td>
+            <td>
+              <strong>{name}</strong>
+            </td>
             <td>{packages}</td>
             <td>{donations > 0 ? donations : '—'}</td>
           </tr>
@@ -55,7 +57,11 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
 
 export function BoothReport({ data }: { data: UnifiedDataset }) {
   if (!data) {
-    return <div class="report-visual"><p>No data available. Please import data first.</p></div>;
+    return (
+      <div class="report-visual">
+        <p>No data available. Please import data first.</p>
+      </div>
+    );
   }
 
   const boothReservations = data.boothReservations || [];
@@ -100,13 +106,25 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
     <div class="report-visual">
       <h3>Booth Reservations & Sales</h3>
 
-      <StatCards stats={[
-        { label: 'Reservations', value: totalReservations, description: 'Total booth slots', color: '#2196F3' },
-        { label: 'Distributed', value: distributed, description: 'Allocations complete', color: '#4CAF50' },
-        { label: 'Needs Distribution', value: pastNotDistributed, description: 'Past booths pending', color: pastNotDistributed > 0 ? '#ff9800' : '#999' },
-        { label: 'Booth Packages', value: totalBoothPackages, description: 'Physical cookies', color: '#9C27B0' },
-        { label: 'Booth Donations', value: totalBoothDonations, description: getCookieDisplayName(COOKIE_TYPE.COOKIE_SHARE), color: totalBoothDonations > 0 ? '#7B1FA2' : '#999' }
-      ]} />
+      <StatCards
+        stats={[
+          { label: 'Reservations', value: totalReservations, description: 'Total booth slots', color: '#2196F3' },
+          { label: 'Distributed', value: distributed, description: 'Allocations complete', color: '#4CAF50' },
+          {
+            label: 'Needs Distribution',
+            value: pastNotDistributed,
+            description: 'Past booths pending',
+            color: pastNotDistributed > 0 ? '#ff9800' : '#999'
+          },
+          { label: 'Booth Packages', value: totalBoothPackages, description: 'Physical cookies', color: '#9C27B0' },
+          {
+            label: 'Booth Donations',
+            value: totalBoothDonations,
+            description: getCookieDisplayName(COOKIE_TYPE.COOKIE_SHARE),
+            color: totalBoothDonations > 0 ? '#7B1FA2' : '#999'
+          }
+        ]}
+      />
 
       {nonVirtualReservations.length > 0 && (
         <>
@@ -117,19 +135,24 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
             hint="Click on any booth to see scout allocations for that booth."
           >
             {sorted.map((r, idx) => {
-              const timeDisplay = r.timeslot.startTime && r.timeslot.endTime
-                ? `${r.timeslot.startTime} - ${r.timeslot.endTime}` : r.timeslot.startTime || '-';
+              const timeDisplay =
+                r.timeslot.startTime && r.timeslot.endTime
+                  ? `${r.timeslot.startTime} - ${r.timeslot.endTime}`
+                  : r.timeslot.startTime || '-';
 
               const boothDate = r.timeslot.date ? new Date(r.timeslot.date) : null;
               const isFuture = boothDate && boothDate >= today;
 
               let statusText: string, statusClass: string;
               if (r.booth.isDistributed) {
-                statusText = 'Distributed'; statusClass = 'status-success';
+                statusText = 'Distributed';
+                statusClass = 'status-success';
               } else if (isFuture) {
-                statusText = 'Upcoming'; statusClass = 'muted-text';
+                statusText = 'Upcoming';
+                statusClass = 'muted-text';
               } else {
-                statusText = 'Not Distributed'; statusClass = 'status-warning';
+                statusText = 'Not Distributed';
+                statusClass = 'status-warning';
               }
 
               const donations = r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
@@ -147,7 +170,13 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
                     formatDate(r.timeslot.date),
                     timeDisplay,
                     r.booth.reservationType || '-',
-                    tip ? <TooltipCell tooltip={tip} tag="span" className="tooltip-cell">{physicalPackages}</TooltipCell> : physicalPackages,
+                    tip ? (
+                      <TooltipCell tooltip={tip} tag="span" className="tooltip-cell">
+                        {physicalPackages}
+                      </TooltipCell>
+                    ) : (
+                      physicalPackages
+                    ),
                     donations > 0 ? donations : '—',
                     <span class={statusClass}>{statusText}</span>
                   ]}

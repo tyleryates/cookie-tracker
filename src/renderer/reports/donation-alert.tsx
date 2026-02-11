@@ -18,21 +18,31 @@ function StatusBanner({ adjustmentNeeded }: { adjustmentNeeded: number }) {
   if (adjustmentNeeded === 0) {
     return (
       <div class="info-box info-box-success">
-        <p><strong>Reconciled — no manual entries needed in Smart Cookie.</strong></p>
+        <p>
+          <strong>Reconciled — no manual entries needed in Smart Cookie.</strong>
+        </p>
       </div>
     );
   }
   if (adjustmentNeeded > 0) {
     return (
       <div class="info-box info-box-warning">
-        <p><strong>Add {adjustmentNeeded} Cookie Share package{adjustmentNeeded !== 1 ? 's' : ''} in Smart Cookie (Orders → Virtual Cookie Share).</strong></p>
+        <p>
+          <strong>
+            Add {adjustmentNeeded} Cookie Share package{adjustmentNeeded !== 1 ? 's' : ''} in Smart Cookie (Orders → Virtual Cookie Share).
+          </strong>
+        </p>
       </div>
     );
   }
   const count = Math.abs(adjustmentNeeded);
   return (
     <div class="info-box info-box-error">
-      <p><strong>Remove {count} Cookie Share package{count !== 1 ? 's' : ''} from Smart Cookie.</strong></p>
+      <p>
+        <strong>
+          Remove {count} Cookie Share package{count !== 1 ? 's' : ''} from Smart Cookie.
+        </strong>
+      </p>
     </div>
   );
 }
@@ -67,7 +77,13 @@ function buildScoutDonationRows(scouts: Map<string, Scout>, virtualCSAllocations
     }
 
     rows.push({
-      name: scoutName, dcAutoSync, manualNeeded, dcTotal, manualEntered, boothCS, totalCS,
+      name: scoutName,
+      dcAutoSync,
+      manualNeeded,
+      dcTotal,
+      manualEntered,
+      boothCS,
+      totalCS,
       adjustment: manualNeeded - manualEntered
     });
   });
@@ -75,14 +91,34 @@ function buildScoutDonationRows(scouts: Map<string, Scout>, virtualCSAllocations
 }
 
 function AdjustmentCell({ adjustment }: { adjustment: number }) {
-  if (adjustment > 0) return <td class="status-warning"><strong>+{adjustment}</strong></td>;
-  if (adjustment < 0) return <td class="status-error"><strong>{adjustment}</strong></td>;
+  if (adjustment > 0)
+    return (
+      <td class="status-warning">
+        <strong>+{adjustment}</strong>
+      </td>
+    );
+  if (adjustment < 0)
+    return (
+      <td class="status-error">
+        <strong>{adjustment}</strong>
+      </td>
+    );
   return <td class="status-success">—</td>;
 }
 
-export function DonationAlertReport({ data, virtualCSAllocations }: { data: UnifiedDataset; virtualCSAllocations: Map<number, number> | null }) {
+export function DonationAlertReport({
+  data,
+  virtualCSAllocations
+}: {
+  data: UnifiedDataset;
+  virtualCSAllocations: Map<number, number> | null;
+}) {
   if (!data?.cookieShare) {
-    return <div class="report-visual"><p>No data available. Please import data first.</p></div>;
+    return (
+      <div class="report-visual">
+        <p>No data available. Please import data first.</p>
+      </div>
+    );
   }
 
   const cookieShare = data.cookieShare;
@@ -126,12 +162,16 @@ export function DonationAlertReport({ data, virtualCSAllocations }: { data: Unif
         <DataTable columns={headers}>
           {scoutRows.map(({ name, dcAutoSync, manualNeeded, manualEntered, boothCS, totalCS, adjustment }) => (
             <tr key={name} class={adjustment > 0 ? 'row-highlight-warning' : adjustment < 0 ? 'row-highlight-error' : undefined}>
-              <td><strong>{name}</strong></td>
+              <td>
+                <strong>{name}</strong>
+              </td>
               <td>{dcAutoSync || '—'}</td>
               <td>{manualNeeded || '—'}</td>
               <td>{manualEntered || '—'}</td>
               {hasBoothCS && <td>{boothCS || '—'}</td>}
-              <td><strong>{totalCS}</strong></td>
+              <td>
+                <strong>{totalCS}</strong>
+              </td>
               <AdjustmentCell adjustment={adjustment} />
             </tr>
           ))}

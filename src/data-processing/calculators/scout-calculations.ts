@@ -2,13 +2,9 @@
 // Handles all per-scout totals, variety calculations, and financial tracking
 
 import { ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
-import {
-  COOKIE_TYPE,
-  calculateRevenue,
-  PHYSICAL_COOKIE_TYPES
-} from '../../cookie-constants';
+import { COOKIE_TYPE, calculateRevenue, PHYSICAL_COOKIE_TYPES } from '../../cookie-constants';
 import type { CookieType, Order, Scout, Varieties } from '../../types';
-import { calculateSalesByVariety, totalCredited } from './helpers';
+import { calculateSalesByVariety, needsInventory, totalCredited } from './helpers';
 
 /** Check single variety for negative inventory */
 function checkVarietyInventory(
@@ -53,7 +49,7 @@ function calculateOrderTotals(scout: Scout): void {
 
   scout.orders.forEach((order: Order) => {
     // Physical packages by delivery method
-    if (order.needsInventory) {
+    if (needsInventory(order)) {
       scout.totals.delivered += order.physicalPackages;
     } else if (order.orderType === ORDER_TYPE.DIRECT_SHIP) {
       scout.totals.shipped += order.physicalPackages;
@@ -99,14 +95,14 @@ function calculateFinancialTracking(scout: Scout): void {
 
     if (isElectronic) {
       // Only inventory orders reduce what's owed for physical cookies
-      if (order.needsInventory) {
+      if (needsInventory(order)) {
         inventoryElectronic += physicalOrderRevenue(order);
       }
     } else {
       // ALL cash must be turned in (delivery, booth, donation — doesn't matter)
       allCashCollected += order.amount;
       // Track physical portion separately for inventory accounting
-      if (order.needsInventory) {
+      if (needsInventory(order)) {
         inventoryCashPhysical += physicalOrderRevenue(order);
       }
     }

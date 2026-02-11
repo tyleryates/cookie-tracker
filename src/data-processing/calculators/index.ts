@@ -1,6 +1,7 @@
 // Data Calculators - Main Orchestrator
 // This module coordinates all calculation sub-modules to build the unified dataset
 
+import type { DataStore } from '../../data-store';
 import type { Scout, UnifiedDataset, Warning } from '../../types';
 import { addAllocations, addInventory } from './allocation-processing';
 import { buildCookieShareTracking } from './cookie-share-tracking';
@@ -13,7 +14,6 @@ import { buildSiteOrdersDataset } from './site-orders';
 import { buildTransferBreakdowns } from './transfer-breakdowns';
 import { buildTroopTotals } from './troop-totals';
 import { buildVarieties } from './varieties';
-import type { DataStore } from '../../data-store';
 
 /** Build complete scout dataset with all calculations */
 function buildScoutDataset(reconciler: DataStore, warnings: Warning[]): Map<string, Scout> {
@@ -73,8 +73,8 @@ export function buildUnifiedDataset(reconciler: DataStore): UnifiedDataset {
     transferBreakdowns,
     varieties,
     cookieShare: cookieShareTracking,
-    boothReservations: reconciler.boothReservations || [],
-    boothLocations: reconciler.boothLocations || [],
+    boothReservations: reconciler.boothReservations,
+    boothLocations: reconciler.boothLocations,
     metadata,
     warnings
   };

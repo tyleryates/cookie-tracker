@@ -1,8 +1,17 @@
 // Shared Helper Functions for Calculations
 // Pure utility functions used across calculator modules
 
+import { ORDER_TYPE, OWNER } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
-import type { Scout, ScoutCredited, Varieties } from '../../types';
+import type { Order, Scout, ScoutCredited, Varieties } from '../../types';
+
+/**
+ * Whether an order draws from the scout's physical inventory.
+ * True only for GIRL-owned DELIVERY or IN_HAND orders.
+ */
+export function needsInventory(order: Pick<Order, 'owner' | 'orderType'>): boolean {
+  return order.owner === OWNER.GIRL && (order.orderType === ORDER_TYPE.DELIVERY || order.orderType === ORDER_TYPE.IN_HAND);
+}
 
 /**
  * Calculate total credited packages (all 6 fields) for a scout.
@@ -45,7 +54,7 @@ export function calculateSalesByVariety(scout: Scout): Varieties {
   const salesByVariety: Varieties = {};
 
   // Only process orders that need inventory
-  const inventoryOrders = scout.orders.filter((order) => order.needsInventory);
+  const inventoryOrders = scout.orders.filter((order) => needsInventory(order));
 
   inventoryOrders.forEach((order) => {
     addPhysicalVarietiesToSales(order.varieties, salesByVariety);

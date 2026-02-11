@@ -2,9 +2,9 @@
 // Calculates troop-level aggregate totals and inventory
 
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
-import { PROCEEDS_EXEMPT_PACKAGES, getTroopProceedsRate } from '../../cookie-constants';
-import type { Scout, ScoutCounts, TroopTotals } from '../../types';
+import { getTroopProceedsRate, PROCEEDS_EXEMPT_PACKAGES } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
+import type { Scout, ScoutCounts, TroopTotals } from '../../types';
 
 /** Aggregate scout-level totals: delivery, inventory, shipping, and proceeds */
 function aggregateScoutTotals(scouts: Map<string, Scout>) {

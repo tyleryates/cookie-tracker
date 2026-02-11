@@ -20,7 +20,6 @@
   "license": "MIT",
   "type": "commonjs",
   "dependencies": {
-    "@popperjs/core": "^2.11.8",
     "axios": "^1.13.4",
     "axios-cookiejar-support": "^6.0.5",
     "cheerio": "^1.2.0",
@@ -37,7 +36,6 @@
     "electron": "^40.1.0",
     "electron-builder": "^26.0.0",
     "knip": "^5.83.1",
-    "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   },
   "build": {

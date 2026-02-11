@@ -202,8 +202,6 @@ ipcMain.handle(
     for (const file of files) {
       const filePath = path.join(inDir, file);
       const ext = path.extname(file).toLowerCase();
-      const stats = fs.statSync(filePath);
-
       // Read JSON files as parsed objects, binary files as buffers
       let data: any;
       if (ext === '.json') {
@@ -325,7 +323,7 @@ ipcMain.handle(
     const scraper = new ScraperOrchestrator(dataDir);
 
     // Set up progress callback
-    scraper.setProgressCallback((progress: { status: string; progress: number }) => {
+    scraper.setProgressCallback((progress) => {
       event.sender.send('scrape-progress', progress);
     });
 

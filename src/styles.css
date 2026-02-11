@@ -45,10 +45,10 @@
   --text-primary: var(--gray-900);
 
   /* Status accent colors */
-  --status-info: #2196F3;
-  --status-success-dark: #2E7D32;
-  --status-error-dark: #C62828;
-  --status-warning-dark: #E65100;
+  --status-info: #2196f3;
+  --status-success-dark: #2e7d32;
+  --status-error-dark: #c62828;
+  --status-warning-dark: #e65100;
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -405,9 +405,6 @@ h2 {
 
 /* Dataset Selector */
 .dataset-selector {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--gray-200);
-  margin-bottom: 8px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -753,9 +750,18 @@ tr:hover {
   font-weight: 600;
 }
 
-.booth-type-badge.type-lottery { color: #9C27B0; background: rgba(156, 39, 176, 0.13); }
-.booth-type-badge.type-fcfs { color: #FF9800; background: rgba(255, 152, 0, 0.13); }
-.booth-type-badge.type-default { color: var(--gray-600); background: var(--gray-100); }
+.booth-type-badge.type-lottery {
+  color: #9c27b0;
+  background: rgba(156, 39, 176, 0.13);
+}
+.booth-type-badge.type-fcfs {
+  color: #ff9800;
+  background: rgba(255, 152, 0, 0.13);
+}
+.booth-type-badge.type-default {
+  color: var(--gray-600);
+  background: var(--gray-100);
+}
 
 .booth-date-group {
   margin-bottom: 10px;
@@ -767,7 +773,7 @@ tr:hover {
 
 .booth-date-label {
   font-weight: 600;
-  color: #1565C0;
+  color: #1565c0;
   margin-bottom: 6px;
 }
 
@@ -783,7 +789,7 @@ tr:hover {
   color: var(--status-success-dark);
   border-radius: 10px;
   font-size: 0.82em;
-  border: 1px solid #A5D6A7;
+  border: 1px solid #a5d6a7;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -846,10 +852,6 @@ tr:hover {
 
 .warning-text {
   color: var(--warning);
-}
-
-.error-text {
-  color: var(--error);
 }
 
 /* Reusable report utility classes */
@@ -936,19 +938,41 @@ tr:hover {
 }
 
 /* Status text — inline status indicators */
-.status-success { color: var(--success); font-weight: 600; }
-.status-warning { color: var(--warning); font-weight: 600; }
-.status-error { color: var(--error); font-weight: 600; }
-.status-error-dark { color: var(--status-error-dark); font-weight: 600; }
-.status-warning-dark { color: var(--status-warning-dark); }
+.status-success {
+  color: var(--success);
+  font-weight: 600;
+}
+.status-warning {
+  color: var(--warning);
+  font-weight: 600;
+}
+.status-error {
+  color: var(--error);
+  font-weight: 600;
+}
+.status-error-dark {
+  color: var(--status-error-dark);
+  font-weight: 600;
+}
+.status-warning-dark {
+  color: var(--status-warning-dark);
+}
 
 /* Spacing utilities */
-.section-break { margin-top: 24px; }
-.section-break-sm { margin-top: 12px; }
+.section-break {
+  margin-top: 24px;
+}
+.section-break-sm {
+  margin-top: 12px;
+}
 
 /* Row highlight backgrounds */
-.row-highlight-warning { background: var(--warning-light); }
-.row-highlight-error { background: var(--error-light); }
+.row-highlight-warning {
+  background: var(--warning-light);
+}
+.row-highlight-error {
+  background: var(--error-light);
+}
 
 /* Report toolbar — action bar above report content */
 .report-toolbar {
@@ -1166,7 +1190,6 @@ tr:hover {
 .tippy-box[data-theme~="dark"][data-placement^="top"] > .tippy-arrow::before {
   border-top-color: rgba(0, 0, 0, 0.9);
 }
-
 
 /* Scout table - wider name column, no wrapping */
 .scout-table td:first-child,
