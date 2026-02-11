@@ -1,8 +1,9 @@
 // Available Booths Report — Preact component
 // Shows booth locations with filtered availability dates/times
 
+import { BOOTH_RESERVATION_TYPE } from '../../constants';
 import type { BoothAvailableDate, BoothLocation, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
-import { parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
+import { formatBoothDate, formatTime12h, parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
 
 interface AvailableBoothsConfig {
   filters: DayFilter[];
@@ -50,31 +51,6 @@ function removeIgnoredSlots(dates: BoothAvailableDate[], boothId: number, ignore
     if (slots.length > 0) result.push({ date: d.date, timeSlots: slots });
   }
   return result;
-}
-
-function formatTime12h(time: string): string {
-  const match12 = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (match12) return `${Number(match12[1])}:${match12[2]} ${match12[3].toLowerCase()}`;
-  const match24 = time.match(/^(\d{1,2}):(\d{2})$/);
-  if (match24) {
-    let hours = Number(match24[1]);
-    const mins = match24[2];
-    const period = hours >= 12 ? 'pm' : 'am';
-    if (hours === 0) hours = 12;
-    else if (hours > 12) hours -= 12;
-    return `${hours}:${mins} ${period}`;
-  }
-  return time;
-}
-
-function formatBoothDate(dateStr: string): string {
-  const parts = dateStr.split(/[-/]/);
-  if (parts.length >= 3) {
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-    return `${dayName} ${parts[1]}/${parts[2]}/${parts[0]}`;
-  }
-  return dateStr;
 }
 
 /** Count total available (non-ignored) slots across all booths */
@@ -129,7 +105,11 @@ export function AvailableBoothsReport({ data, config, refreshing, onIgnoreSlot, 
           const addrParts = [loc.address.street, loc.address.city, loc.address.state, loc.address.zip].filter(Boolean);
           const addressStr = addrParts.join(', ');
           const typeClass =
-            loc.reservationType === 'LOTTERY' ? 'type-lottery' : loc.reservationType === 'FCFS' ? 'type-fcfs' : 'type-default';
+            loc.reservationType === BOOTH_RESERVATION_TYPE.LOTTERY
+              ? 'type-lottery'
+              : loc.reservationType === BOOTH_RESERVATION_TYPE.FCFS
+                ? 'type-fcfs'
+                : 'type-default';
 
           const filtered = filterAvailableDates(loc.availableDates || [], filters);
           const dates = removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots);

@@ -4,7 +4,7 @@ import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, formatDate } from '../format-utils';
+import { buildVarietyTooltip, formatDate, formatTimeRange } from '../format-utils';
 
 function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImported; scouts: Map<string, Scout> }) {
   if (!scouts) return null;
@@ -134,10 +134,7 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
             hint="Click on any booth to see scout allocations for that booth."
           >
             {sorted.map((r, idx) => {
-              const timeDisplay =
-                r.timeslot.startTime && r.timeslot.endTime
-                  ? `${r.timeslot.startTime} - ${r.timeslot.endTime}`
-                  : r.timeslot.startTime || '-';
+              const timeDisplay = formatTimeRange(r.timeslot.startTime, r.timeslot.endTime);
 
               const boothDate = r.timeslot.date ? new Date(r.timeslot.date) : null;
               const isFuture = boothDate && boothDate >= today;

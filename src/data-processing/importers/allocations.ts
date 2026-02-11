@@ -1,5 +1,6 @@
 // Allocation Import Functions (direct ship dividers, booth dividers, reservations, booth locations)
 
+import { ALLOCATION_CHANNEL, ALLOCATION_SOURCE } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
 import type { BoothAvailableDate, BoothLocation, CookieType } from '../../types';
@@ -19,12 +20,12 @@ function importDirectShipDivider(reconciler: DataStore, dividerData: Record<stri
     const { varieties } = parseVarietiesFromAPI(cookies);
 
     reconciler.allocations.push({
-      channel: 'directShip',
+      channel: ALLOCATION_CHANNEL.DIRECT_SHIP,
       girlId: girlId,
       packages: sumPhysicalPackages(varieties),
       donations: varieties[COOKIE_TYPE.COOKIE_SHARE] || 0,
       varieties: varieties,
-      source: 'DirectShipDivider'
+      source: ALLOCATION_SOURCE.DIRECT_SHIP_DIVIDER
     });
   });
 }
@@ -34,7 +35,8 @@ function importVirtualCookieShares(reconciler: DataStore, virtualCookieShares: R
   virtualCookieShares.forEach((cookieShare: Record<string, any>) => {
     const girls = cookieShare.girls || [];
     const isBoothDivider = !!cookieShare.smart_divider_id;
-    const targetMap = isBoothDivider ? reconciler.boothCookieShareAllocations : reconciler.virtualCookieShareAllocations;
+    if (isBoothDivider) return; // Booth cookie share tracked via booth divider allocations
+    const targetMap = reconciler.virtualCookieShareAllocations;
 
     girls.forEach((girl: Record<string, any>) => {
       const girlId = girl.id;
@@ -117,12 +119,12 @@ function importBoothDividers(
       if (!alloc) return;
 
       reconciler.allocations.push({
-        channel: 'booth',
+        channel: ALLOCATION_CHANNEL.BOOTH,
         girlId: alloc.girlId,
         packages: sumPhysicalPackages(alloc.varieties),
         donations: alloc.trackedCookieShare,
         varieties: alloc.varieties,
-        source: 'SmartBoothDivider',
+        source: ALLOCATION_SOURCE.SMART_BOOTH_DIVIDER,
         reservationId: entry.reservationId,
         storeName: booth.store_name || booth.booth_name || booth.location || '',
         date: timeslot.date || '',
@@ -155,12 +157,12 @@ function importDirectShipDividers(
       if (!alloc) return;
 
       reconciler.allocations.push({
-        channel: 'directShip',
+        channel: ALLOCATION_CHANNEL.DIRECT_SHIP,
         girlId: alloc.girlId,
         packages: sumPhysicalPackages(alloc.varieties),
         donations: alloc.trackedCookieShare,
         varieties: alloc.varieties,
-        source: 'SmartDirectShipDivider',
+        source: ALLOCATION_SOURCE.SMART_DIRECT_SHIP_DIVIDER,
         orderId: orderId
       });
     });

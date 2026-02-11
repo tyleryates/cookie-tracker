@@ -9,7 +9,7 @@ import { buildUnifiedDataset } from './data-processing/calculators/index';
 import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './data-processing/importers';
 import { createDataStore, type DataStore } from './data-store';
 import Logger from './logger';
-import type { DataFileInfo, DatasetEntry, LoadDataResult, LoadedSources, UnifiedDataset } from './types';
+import type { DataFileInfo, DatasetEntry, LoadDataResult, LoadedSources } from './types';
 
 // ============================================================================
 // EXCEL PARSING

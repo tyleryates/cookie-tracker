@@ -150,7 +150,7 @@ This automatically:
 
 ### How It Works:
 
-- `src/main.ts` (compiled to `dist/main.js`) checks GitHub Releases on startup
+- `src/main.ts` checks GitHub Releases on startup
 - Compares installed version vs latest release
 - If newer version exists, prompts user
 - Downloads update in background
@@ -170,7 +170,7 @@ If you don't want to use GitHub public releases:
 
 1. **Build locally:**
    ```bash
-   npm run build:all
+   make build-all
    ```
 
 2. **Upload to private file host:**
@@ -211,10 +211,10 @@ If you don't want to use GitHub public releases:
 **Debug:**
 ```bash
 # Check what electron-builder will upload
-npm run build -- --publish never
+make test-build
 
 # Manually create release
-npm run build -- --publish always
+make publish
 ```
 
 ### Build fails with "publish" error:
@@ -300,11 +300,11 @@ Before publishing an update:
 - [ ] Update version in `package.json`
 - [ ] Test the new features/fixes
 - [ ] Update README.md if needed
-- [ ] Compile TypeScript: `npm run compile`
+- [ ] Compile TypeScript: `make compile`
 - [ ] Commit changes to git
-- [ ] Build and test locally: `npm run build && open dist/*.dmg`
+- [ ] Build and test locally: `make build && open dist/*.dmg`
 - [ ] Verify app opens and works
-- [ ] Publish: `npm run build -- --publish always`
+- [ ] Publish: `make publish`
 - [ ] Verify GitHub release was created
 - [ ] (Optional) Notify users via email/Slack
 

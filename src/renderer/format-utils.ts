@@ -1,5 +1,6 @@
 // HTML Builder Utilities
 
+import { classifyOrderStatus } from '../constants';
 import { COOKIE_ORDER, getCookieDisplayName } from '../cookie-constants';
 import type { BoothTimeSlot, CookieType, Varieties } from '../types';
 
@@ -127,6 +128,10 @@ function formatDate(dateStr: string | null | undefined): string {
   return DateFormatter.toDisplay(dateStr);
 }
 
+function formatTimeRange(startTime: string | undefined, endTime: string | undefined): string {
+  return startTime && endTime ? `${startTime} - ${endTime}` : startTime || '-';
+}
+
 function formatCurrency(value: number): string {
   return `$${Math.round(value || 0)}`;
 }
@@ -163,15 +168,31 @@ function slotOverlapsRange(slot: BoothTimeSlot, afterStr: string, beforeStr: str
   return start >= after && start < before;
 }
 
-type OrderStatusClass = 'NEEDS_APPROVAL' | 'COMPLETED' | 'PENDING' | 'UNKNOWN';
+/** Convert a 24h or 12h time string to a friendly 12h format (e.g., "4:00 pm") */
+function formatTime12h(time: string): string {
+  const match12 = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match12) return `${Number(match12[1])}:${match12[2]} ${match12[3].toLowerCase()}`;
+  const match24 = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    let hours = Number(match24[1]);
+    const mins = match24[2];
+    const period = hours >= 12 ? 'pm' : 'am';
+    if (hours === 0) hours = 12;
+    else if (hours > 12) hours -= 12;
+    return `${hours}:${mins} ${period}`;
+  }
+  return time;
+}
 
-function classifyOrderStatus(status: string | undefined): OrderStatusClass {
-  if (!status) return 'UNKNOWN';
-  if (status.includes('Needs Approval')) return 'NEEDS_APPROVAL';
-  if (status === 'Status Delivered' || status.includes('Completed') || status.includes('Delivered') || status.includes('Shipped'))
-    return 'COMPLETED';
-  if (status.includes('Pending') || status.includes('Approved for Delivery')) return 'PENDING';
-  return 'UNKNOWN';
+/** Format a YYYY-MM-DD date string as "Mon MM/DD/YYYY" */
+function formatBoothDate(dateStr: string): string {
+  const parts = dateStr.split(/[-/]/);
+  if (parts.length >= 3) {
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+    return `${dayName} ${parts[1]}/${parts[2]}/${parts[0]}`;
+  }
+  return dateStr;
 }
 
 export {
@@ -182,7 +203,9 @@ export {
   DateFormatter,
   formatDate,
   formatCurrency,
+  formatTimeRange,
+  formatTime12h,
+  formatBoothDate,
   parseTimeToMinutes,
   slotOverlapsRange
 };
-export type { OrderStatusClass };

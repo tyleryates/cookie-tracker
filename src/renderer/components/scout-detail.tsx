@@ -1,10 +1,17 @@
 // Scout detail breakdown — expandable content inside each scout row
 
 import type preact from 'preact';
-import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE } from '../../constants';
+import { ALLOCATION_METHOD, DC_ORDER_STATUS, DISPLAY_STRINGS, ORDER_TYPE } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
 import type { Order, Scout, Varieties } from '../../types';
-import { buildVarietyTooltip, classifyOrderStatus, formatDate, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
+import {
+  buildVarietyTooltip,
+  classifyOrderStatus,
+  formatDate,
+  formatTimeRange,
+  getCompleteVarieties,
+  sortVarietiesByOrder
+} from '../format-utils';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
 
@@ -13,7 +20,7 @@ import { TooltipCell } from './tooltip-cell';
 // ============================================================================
 
 function getStatusStyle(status: string | undefined): { className: string; text: string } {
-  const text = status === 'Status Delivered' ? 'Completed' : status || '';
+  const text = status === DC_ORDER_STATUS.STATUS_DELIVERED ? 'Completed' : status || '';
   switch (classifyOrderStatus(status)) {
     case 'NEEDS_APPROVAL':
       return { className: 'status-error', text: `${text} ⚠️` };
@@ -188,7 +195,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
         columns={['Store', 'Date', 'Time', 'Packages', 'Donations']}
       >
         {bsAllocs.map((a, i) => {
-          const time = a.startTime && a.endTime ? `${a.startTime} - ${a.endTime}` : a.startTime || '-';
+          const time = formatTimeRange(a.startTime, a.endTime);
           return (
             <tr key={i}>
               <td>{String(a.storeName || '-')}</td>

@@ -1,4 +1,4 @@
-import { PACKAGES_PER_CASE, TRANSFER_CATEGORY } from '../../constants';
+import { PACKAGES_PER_CASE, SC_TRANSFER_STATUS, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
 import type { Transfer, UnifiedDataset, Varieties } from '../../types';
 import { DataTable } from '../components/data-table';
@@ -97,12 +97,13 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
           <DataTable columns={['Date', 'From', 'Order #', 'Cases', 'Packages', 'Amount', 'Status']}>
             {c2tTransfers.map((transfer: Transfer, i: number) => {
               const isPending =
-                transfer.status === 'SAVED' || (transfer.actions && (transfer.actions.submittable || transfer.actions.approvable));
+                transfer.status === SC_TRANSFER_STATUS.SAVED ||
+                (transfer.actions && (transfer.actions.submittable || transfer.actions.approvable));
               const statusText = isPending ? 'Pending' : 'Completed';
               const statusClass = isPending ? 'status-warning' : 'status-success';
               const tip = transferTooltip(transfer.varieties);
               const casesTip = transferTooltip(transfer.varieties, (count) => Math.round(count / PACKAGES_PER_CASE));
-              const fromLabel = transfer.type === 'T2T' ? `Troop ${transfer.from}` : transfer.from || 'Council';
+              const fromLabel = transfer.type === TRANSFER_TYPE.T2T ? `Troop ${transfer.from}` : transfer.from || 'Council';
 
               return (
                 <tr key={i}>

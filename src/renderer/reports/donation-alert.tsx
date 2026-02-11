@@ -106,13 +106,7 @@ function AdjustmentCell({ adjustment }: { adjustment: number }) {
   return <td class="status-success">—</td>;
 }
 
-export function DonationAlertReport({
-  data,
-  virtualCSAllocations
-}: {
-  data: UnifiedDataset;
-  virtualCSAllocations: Map<number, number> | null;
-}) {
+export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
   if (!data?.cookieShare) {
     return (
       <div class="report-visual">
@@ -146,7 +140,7 @@ export function DonationAlertReport({
   });
 
   const hasBoothCS = totalBoothCookieShare > 0;
-  const scoutRows = buildScoutDonationRows(scouts, virtualCSAllocations);
+  const scoutRows = buildScoutDonationRows(scouts, data.virtualCookieShareAllocations);
 
   const headers = ['Scout', 'DC Auto', 'DC Manual', 'SC Entered'];
   if (hasBoothCS) headers.push('Booth');

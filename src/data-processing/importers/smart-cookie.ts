@@ -1,6 +1,6 @@
 // Smart Cookie Import Functions
 
-import { DATA_SOURCES, PACKAGES_PER_CASE, SC_API_COLUMNS, SC_REPORT_COLUMNS, TRANSFER_TYPE } from '../../constants';
+import { DATA_SOURCES, PACKAGES_PER_CASE, SC_API_COLUMNS, SC_REPORT_COLUMNS, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../../constants';
 import type { DataStore } from '../../data-store';
 import { createTransfer, mergeOrCreateOrder } from '../../data-store-operations';
 import type { Order } from '../../types';
@@ -8,6 +8,18 @@ import { isC2TTransfer } from '../utils';
 import { importAllocations } from './allocations';
 import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSCTransfer } from './parsers';
 import { mergeDCOrderFromSC, trackScoutFromAPITransfer, updateScoutData } from './scout-helpers';
+
+/** Record import metadata (timestamp + source entry) */
+function recordImportMetadata(
+  reconciler: DataStore,
+  timestampField: 'lastImportSC' | 'lastImportSCReport',
+  sourceType: string,
+  records: number
+): void {
+  const now = new Date().toISOString();
+  reconciler.metadata[timestampField] = now;
+  reconciler.metadata.sources.push({ type: sourceType, date: now, records });
+}
 
 /** Import Smart Cookie Report data (ReportExport.xlsx) */
 export function importSmartCookieReport(reconciler: DataStore, reportData: Record<string, any>[]): void {
@@ -72,12 +84,7 @@ export function importSmartCookieReport(reconciler: DataStore, reportData: Recor
     });
   });
 
-  reconciler.metadata.lastImportSCReport = new Date().toISOString();
-  reconciler.metadata.sources.push({
-    type: DATA_SOURCES.SMART_COOKIE_REPORT,
-    date: new Date().toISOString(),
-    records: reportData.length
-  });
+  recordImportMetadata(reconciler, 'lastImportSCReport', DATA_SOURCES.SMART_COOKIE_REPORT, reportData.length);
 }
 
 /** Import Smart Cookie API data from API endpoints */
@@ -115,7 +122,7 @@ export function importSmartCookieAPI(reconciler: DataStore, apiData: Record<stri
 
     reconciler.transfers.push(createTransfer(transferData));
 
-    if (orderNum.startsWith('D')) {
+    if (orderNum.startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX)) {
       mergeDCOrderFromSC(reconciler, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE_API, order);
     }
 
@@ -124,12 +131,7 @@ export function importSmartCookieAPI(reconciler: DataStore, apiData: Record<stri
 
   importAllocations(reconciler, apiData);
 
-  reconciler.metadata.lastImportSC = new Date().toISOString();
-  reconciler.metadata.sources.push({
-    type: DATA_SOURCES.SMART_COOKIE_API,
-    date: new Date().toISOString(),
-    records: orders.length
-  });
+  recordImportMetadata(reconciler, 'lastImportSC', DATA_SOURCES.SMART_COOKIE_API, orders.length);
 }
 
 /** Import Smart Cookie data */
@@ -156,7 +158,7 @@ export function importSmartCookie(reconciler: DataStore, scData: Record<string, 
     reconciler.transfers.push(createTransfer(transferData));
 
     // Handle Digital Cookie orders in Smart Cookie (COOKIE_SHARE with D prefix)
-    if (type.includes('COOKIE_SHARE') && orderNum.startsWith('D')) {
+    if (type.includes(TRANSFER_TYPE.COOKIE_SHARE) && orderNum.startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX)) {
       mergeDCOrderFromSC(reconciler, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE, row);
     }
 
@@ -177,15 +179,10 @@ export function importSmartCookie(reconciler: DataStore, scData: Record<string, 
     }
 
     // Register scouts from Cookie Share transfers
-    if (type.includes('COOKIE_SHARE') && reconciler.troopNumber && from === reconciler.troopNumber) {
+    if (type.includes(TRANSFER_TYPE.COOKIE_SHARE) && reconciler.troopNumber && from === reconciler.troopNumber) {
       updateScoutData(reconciler, to, {});
     }
   });
 
-  reconciler.metadata.lastImportSC = new Date().toISOString();
-  reconciler.metadata.sources.push({
-    type: DATA_SOURCES.SMART_COOKIE,
-    date: new Date().toISOString(),
-    records: scData.length
-  });
+  recordImportMetadata(reconciler, 'lastImportSC', DATA_SOURCES.SMART_COOKIE, scData.length);
 }

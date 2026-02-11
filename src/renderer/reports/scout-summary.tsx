@@ -1,33 +1,17 @@
 import { ALLOCATION_METHOD, DISPLAY_STRINGS } from '../../constants';
 import { getCookieDisplayName, PROCEEDS_EXEMPT_PACKAGES } from '../../cookie-constants';
-import type { Order, Scout, SiteOrdersDataset, UnifiedDataset } from '../../types';
+import type { Scout, SiteOrdersDataset, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { ScoutDetailBreakdown } from '../components/scout-detail';
 import { TooltipCell } from '../components/tooltip-cell';
-import { classifyOrderStatus } from '../format-utils';
 
 // ============================================================================
 // Helper functions
 // ============================================================================
 
 function getOrderStatusStyle(scout: Scout): { className: string; icon: string; tooltip: string } {
-  let needsApproval = 0,
-    pending = 0,
-    completed = 0;
-  scout.orders.forEach((order: Order) => {
-    switch (classifyOrderStatus(order.status)) {
-      case 'NEEDS_APPROVAL':
-        needsApproval++;
-        break;
-      case 'PENDING':
-        pending++;
-        break;
-      case 'COMPLETED':
-        completed++;
-        break;
-    }
-  });
+  const { needsApproval, pending, completed } = scout.totals.$orderStatusCounts;
 
   if (needsApproval > 0) {
     const parts = [`${needsApproval} need${needsApproval === 1 ? 's' : ''} approval`];

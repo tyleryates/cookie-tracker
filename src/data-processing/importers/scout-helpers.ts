@@ -4,25 +4,15 @@ import { TRANSFER_TYPE } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
-import type { CookieType, Varieties } from '../../types';
+import type { CookieType, RawScoutData, Varieties } from '../../types';
 import { parseVarietiesFromAPI } from './parsers';
-
-interface ScoutMetadataUpdate {
-  scoutId?: number | null;
-  gsusaId?: string | null;
-  gradeLevel?: string | null;
-  serviceUnit?: string | null;
-  troopId?: string | null;
-  council?: string | null;
-  district?: string | null;
-}
 
 /** Update scout aggregated data (additive for numeric, direct set for metadata) */
 export function updateScoutData(
   reconciler: DataStore,
   scoutName: string,
-  updates: ScoutMetadataUpdate,
-  metadata: ScoutMetadataUpdate = {}
+  updates: Partial<RawScoutData>,
+  metadata: Partial<RawScoutData> = {}
 ): void {
   // Metadata fields that should be set directly (not added)
   const metadataFields = ['scoutId', 'gsusaId', 'gradeLevel', 'serviceUnit', 'troopId', 'council', 'district'];
@@ -44,7 +34,7 @@ export function updateScoutData(
   if (!scout) return;
 
   // Handle metadata updates (set directly if not null)
-  (Object.keys(updates) as Array<keyof ScoutMetadataUpdate>).forEach((key) => {
+  (Object.keys(updates) as Array<keyof RawScoutData>).forEach((key) => {
     if (metadataFields.includes(key)) {
       if (updates[key] !== null && updates[key] !== undefined) {
         (scout as Record<string, any>)[key] = updates[key];
@@ -53,7 +43,7 @@ export function updateScoutData(
   });
 
   // Handle separate metadata object (for backward compatibility)
-  (Object.keys(metadata) as Array<keyof ScoutMetadataUpdate>).forEach((key) => {
+  (Object.keys(metadata) as Array<keyof RawScoutData>).forEach((key) => {
     if (metadata[key] !== null && metadata[key] !== undefined) {
       (scout as Record<string, any>)[key] = metadata[key];
     }
@@ -83,7 +73,7 @@ export function trackScoutFromAPITransfer(reconciler: DataStore, type: string, t
   if (type === TRANSFER_TYPE.G2T && to !== from) {
     updateScoutData(reconciler, from, {});
   }
-  if (type.includes('COOKIE_SHARE')) {
+  if (type.includes(TRANSFER_TYPE.COOKIE_SHARE)) {
     updateScoutData(reconciler, to, {});
   }
 }

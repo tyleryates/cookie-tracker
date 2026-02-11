@@ -1,7 +1,7 @@
 // Smart Cookie Allocation Processing
 // Handles virtual booth, direct ship, and booth sales allocations
 
-import { SCOUT_PHYSICAL_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
+import { ALLOCATION_CHANNEL, ALLOCATION_SOURCE, SCOUT_PHYSICAL_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
 import type { Allocation, Scout, Transfer } from '../../types';
@@ -18,12 +18,12 @@ function processVirtualBoothAllocations(reconciler: DataStore, scoutDataset: Map
     if (!scout) return;
 
     scout.allocations.push({
-      channel: 'virtualBooth',
+      channel: ALLOCATION_CHANNEL.VIRTUAL_BOOTH,
       girlId: scout.girlId || 0,
       packages: transfer.physicalPackages || 0,
       donations: transfer.varieties?.[COOKIE_TYPE.COOKIE_SHARE] || 0,
       varieties: { ...transfer.varieties },
-      source: 'VirtualBoothTransfer',
+      source: ALLOCATION_SOURCE.VIRTUAL_BOOTH_TRANSFER,
       date: transfer.date,
       orderNumber: transfer.orderNumber,
       from: transfer.from,

@@ -1,7 +1,7 @@
 // Site Orders Processing
 // Handles troop booth sale orders and allocation tracking
 
-import { ORDER_TYPE, OWNER, TRANSFER_CATEGORY } from '../../constants';
+import { ALLOCATION_CHANNEL, ORDER_TYPE, OWNER, TRANSFER_CATEGORY } from '../../constants';
 import type { DataStore } from '../../data-store';
 import type { Order, Scout, SiteOrderCategory, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
 
@@ -81,9 +81,9 @@ function calculateAllocations(reconciler: DataStore): { directShip: number; virt
 
   // Imported allocations (booth + direct ship from divider APIs)
   reconciler.allocations.forEach((allocation) => {
-    if (allocation.channel === 'directShip') {
+    if (allocation.channel === ALLOCATION_CHANNEL.DIRECT_SHIP) {
       directShip += allocation.packages || 0;
-    } else if (allocation.channel === 'booth') {
+    } else if (allocation.channel === ALLOCATION_CHANNEL.BOOTH) {
       boothSales += allocation.packages || 0;
     }
   });

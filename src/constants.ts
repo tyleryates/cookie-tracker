@@ -114,6 +114,32 @@ export const SCOUT_PHYSICAL_CATEGORIES: ReadonlySet<TransferCategory> = new Set(
   TRANSFER_CATEGORY.GIRL_RETURN
 ]);
 
+// Allocation channel — how the credited sale was made
+export const ALLOCATION_CHANNEL = {
+  BOOTH: 'booth',
+  DIRECT_SHIP: 'directShip',
+  VIRTUAL_BOOTH: 'virtualBooth'
+} as const;
+
+// Allocation source — which SC system produced the allocation
+export const ALLOCATION_SOURCE = {
+  DIRECT_SHIP_DIVIDER: 'DirectShipDivider',
+  SMART_BOOTH_DIVIDER: 'SmartBoothDivider',
+  SMART_DIRECT_SHIP_DIVIDER: 'SmartDirectShipDivider',
+  VIRTUAL_BOOTH_TRANSFER: 'VirtualBoothTransfer'
+} as const;
+
+// Smart Cookie booth reservation types
+export const BOOTH_RESERVATION_TYPE = {
+  LOTTERY: 'LOTTERY',
+  FCFS: 'FCFS'
+} as const;
+
+// Smart Cookie transfer status values
+export const SC_TRANSFER_STATUS = {
+  SAVED: 'SAVED'
+} as const;
+
 // How troop orders get credited to girls in SC
 export const ALLOCATION_METHOD = {
   VIRTUAL_BOOTH_DIVIDER: 'VIRTUAL_BOOTH_DIVIDER', // For TROOP DELIVERY orders
@@ -200,6 +226,7 @@ export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export const SPECIAL_IDENTIFIERS = {
   SITE_ORDER_LASTNAME: 'Site', // DC: Identifies troop site orders (booth sales)
   TROOP_FIRSTNAME_PREFIX: 'Troop', // DC: Site order first name format ("Troop3990")
+  DC_ORDER_PREFIX: 'D', // SC: DC orders in Smart Cookie are prefixed with "D"
   XSRF_TOKEN_COOKIE: 'XSRF-TOKEN' // SC: Cookie name for CSRF token
 } as const;
 
@@ -214,6 +241,34 @@ export const DC_PAYMENT_STATUS = {
   CASH: 'CASH', // Cash payment
   VENMO: 'VENMO' // Venmo payment (may appear in variations)
 } as const;
+
+// Digital Cookie order status values (raw API strings, used in includes() checks)
+export const DC_ORDER_STATUS = {
+  NEEDS_APPROVAL: 'Needs Approval',
+  STATUS_DELIVERED: 'Status Delivered',
+  COMPLETED: 'Completed',
+  DELIVERED: 'Delivered',
+  SHIPPED: 'Shipped',
+  PENDING: 'Pending',
+  APPROVED_FOR_DELIVERY: 'Approved for Delivery'
+} as const;
+
+type OrderStatusClass = 'NEEDS_APPROVAL' | 'COMPLETED' | 'PENDING' | 'UNKNOWN';
+
+/** Classify a raw DC order status string into a status category */
+export function classifyOrderStatus(status: string | undefined): OrderStatusClass {
+  if (!status) return 'UNKNOWN';
+  if (status.includes(DC_ORDER_STATUS.NEEDS_APPROVAL)) return 'NEEDS_APPROVAL';
+  if (
+    status === DC_ORDER_STATUS.STATUS_DELIVERED ||
+    status.includes(DC_ORDER_STATUS.COMPLETED) ||
+    status.includes(DC_ORDER_STATUS.DELIVERED) ||
+    status.includes(DC_ORDER_STATUS.SHIPPED)
+  )
+    return 'COMPLETED';
+  if (status.includes(DC_ORDER_STATUS.PENDING) || status.includes(DC_ORDER_STATUS.APPROVED_FOR_DELIVERY)) return 'PENDING';
+  return 'UNKNOWN';
+}
 
 // Digital Cookie order type strings (for pattern matching)
 export const DC_ORDER_TYPE_STRINGS = {

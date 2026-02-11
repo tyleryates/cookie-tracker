@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DC_COLUMNS, ORDER_TYPE, OWNER, TRANSFER_TYPE } from '../../constants';
+import { ALLOCATION_CHANNEL, ALLOCATION_SOURCE, DC_COLUMNS, ORDER_TYPE, OWNER, TRANSFER_TYPE } from '../../constants';
 import { createDataStore } from '../../data-store';
 import { createTransfer } from '../../data-store-operations';
 import type { Allocation } from '../../types';
@@ -124,20 +124,20 @@ function buildTestStore() {
 
   // --- Imported Allocations (from SC divider APIs) ---
   const boothAllocation: Allocation = {
-    channel: 'booth',
+    channel: ALLOCATION_CHANNEL.BOOTH,
     girlId: 101,
     packages: 4,
     donations: 1,
     varieties: { THIN_MINTS: 2, TREFOILS: 2 },
-    source: 'SmartBoothDivider'
+    source: ALLOCATION_SOURCE.SMART_BOOTH_DIVIDER
   };
   const directShipAllocation: Allocation = {
-    channel: 'directShip',
+    channel: ALLOCATION_CHANNEL.DIRECT_SHIP,
     girlId: 102,
     packages: 3,
     donations: 0,
     varieties: { THIN_MINTS: 1, CARAMEL_DELITES: 2 },
-    source: 'DirectShipDivider'
+    source: ALLOCATION_SOURCE.DIRECT_SHIP_DIVIDER
   };
   store.allocations = [boothAllocation, directShipAllocation];
 

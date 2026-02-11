@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../constants';
 import { normalizeCookieName } from '../cookie-constants';
 import Logger from '../logger';
 import type { ProgressCallback } from '../types';
@@ -25,7 +26,7 @@ interface SaveOrdersParams {
  * Uses a SmartCookieSession for all authenticated requests.
  * Supports AbortSignal for cancellation.
  */
-class SmartCookieApiScraper extends BaseScraper {
+class SmartCookieScraper extends BaseScraper {
   readonly source = 'sc' as const;
   session: SmartCookieSession;
 
@@ -92,7 +93,7 @@ class SmartCookieApiScraper extends BaseScraper {
     const cookieShareOrders = (ordersData.orders || []).filter((order: any) => {
       const type = order.transfer_type || order.type || '';
       const orderNum = String(order.order_number || '');
-      return type.includes('COOKIE_SHARE') && !orderNum.startsWith('D');
+      return type.includes(TRANSFER_TYPE.COOKIE_SHARE) && !orderNum.startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX);
     });
 
     for (const order of cookieShareOrders) {
@@ -259,7 +260,7 @@ class SmartCookieApiScraper extends BaseScraper {
   extractTroopIdFromOrders(orders: Record<string, any>[]): string | null {
     for (const order of orders) {
       const type = order.transfer_type || order.type || '';
-      if ((type === 'C2T' || type.startsWith('C2T')) && order.to) {
+      if ((type === TRANSFER_TYPE.C2T || type.startsWith(TRANSFER_TYPE.C2T)) && order.to) {
         const match = String(order.to).match(/\d+/);
         if (match) {
           Logger.debug(`Extracted troopId from C2T transfer: ${match[0]}`);
@@ -432,4 +433,4 @@ class SmartCookieApiScraper extends BaseScraper {
   }
 }
 
-export default SmartCookieApiScraper;
+export default SmartCookieScraper;

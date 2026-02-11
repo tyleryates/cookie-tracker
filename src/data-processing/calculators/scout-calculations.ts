@@ -1,10 +1,10 @@
 // Scout-Level Calculations
 // Handles all per-scout totals, variety calculations, and financial tracking
 
-import { ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
-import { COOKIE_TYPE, calculateRevenue, PHYSICAL_COOKIE_TYPES } from '../../cookie-constants';
+import { ALLOCATION_CHANNEL, classifyOrderStatus, ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
+import { calculateRevenue, PHYSICAL_COOKIE_TYPES } from '../../cookie-constants';
 import type { CookieType, Order, Scout, Varieties } from '../../types';
-import { buildPhysicalVarieties } from '../utils';
+import { accumulateVarieties, buildPhysicalVarieties } from '../utils';
 import { calculateSalesByVariety, channelTotals, needsInventory, totalCredited } from './helpers';
 
 /** Check single variety for negative inventory */
@@ -146,14 +146,31 @@ function computeShippedByVariety(scout: Scout): Varieties {
   const shipped: Varieties = {};
   for (const order of scout.orders) {
     if (order.owner === OWNER.GIRL && order.orderType === ORDER_TYPE.DIRECT_SHIP) {
-      for (const [variety, count] of Object.entries(order.varieties)) {
-        if (variety !== COOKIE_TYPE.COOKIE_SHARE && typeof count === 'number') {
-          shipped[variety as keyof Varieties] = (shipped[variety as keyof Varieties] || 0) + count;
-        }
-      }
+      accumulateVarieties(order.varieties, shipped, { excludeCookieShare: true });
     }
   }
   return shipped;
+}
+
+/** Count order statuses for a scout */
+function countOrderStatuses(scout: Scout): { needsApproval: number; pending: number; completed: number } {
+  let needsApproval = 0;
+  let pending = 0;
+  let completed = 0;
+  for (const order of scout.orders) {
+    switch (classifyOrderStatus(order.status)) {
+      case 'NEEDS_APPROVAL':
+        needsApproval++;
+        break;
+      case 'PENDING':
+        pending++;
+        break;
+      case 'COMPLETED':
+        completed++;
+        break;
+    }
+  }
+  return { needsApproval, pending, completed };
 }
 
 /** Calculate variety totals and financial data for a single scout */
@@ -169,15 +186,16 @@ function calculateVarietyTotals(scout: Scout): void {
   calculateInventoryDisplay(scout, salesByVariety);
   scout.totals.$shippedByVariety = computeShippedByVariety(scout);
   scout.$allocationsByChannel = {
-    booth: scout.allocations.filter((a) => a.channel === 'booth'),
-    directShip: scout.allocations.filter((a) => a.channel === 'directShip'),
-    virtualBooth: scout.allocations.filter((a) => a.channel === 'virtualBooth')
+    booth: scout.allocations.filter((a) => a.channel === ALLOCATION_CHANNEL.BOOTH),
+    directShip: scout.allocations.filter((a) => a.channel === ALLOCATION_CHANNEL.DIRECT_SHIP),
+    virtualBooth: scout.allocations.filter((a) => a.channel === ALLOCATION_CHANNEL.VIRTUAL_BOOTH)
   };
   scout.totals.$allocationSummary = {
-    booth: channelTotals(scout.allocations, 'booth'),
-    directShip: channelTotals(scout.allocations, 'directShip'),
-    virtualBooth: channelTotals(scout.allocations, 'virtualBooth')
+    booth: channelTotals(scout.$allocationsByChannel.booth),
+    directShip: channelTotals(scout.$allocationsByChannel.directShip),
+    virtualBooth: channelTotals(scout.$allocationsByChannel.virtualBooth)
   };
+  scout.totals.$orderStatusCounts = countOrderStatuses(scout);
 }
 
 /** Calculate totals for all scouts in dataset */

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { ORDER_TYPE, OWNER } from '../../constants';
+import { ALLOCATION_CHANNEL, ORDER_TYPE, OWNER } from '../../constants';
 import type { Allocation, Scout } from '../../types';
 import {
-  allocationsByChannel,
   buildGirlIdToNameMap,
   calculateSalesByVariety,
   channelTotals,
@@ -42,8 +41,8 @@ describe('needsInventory', () => {
 describe('totalCredited', () => {
   it('sums packages + donations across allocations', () => {
     const allocations: Allocation[] = [
-      { channel: 'booth', girlId: 1, packages: 5, donations: 2, varieties: {} },
-      { channel: 'directShip', girlId: 1, packages: 3, donations: 1, varieties: {} }
+      { channel: ALLOCATION_CHANNEL.BOOTH, girlId: 1, packages: 5, donations: 2, varieties: {} },
+      { channel: ALLOCATION_CHANNEL.DIRECT_SHIP, girlId: 1, packages: 3, donations: 1, varieties: {} }
     ];
     expect(totalCredited(allocations)).toBe(11);
   });
@@ -54,42 +53,27 @@ describe('totalCredited', () => {
 });
 
 describe('channelTotals', () => {
-  const allocations: Allocation[] = [
-    { channel: 'booth', girlId: 1, packages: 5, donations: 2, varieties: { THIN_MINTS: 3 } },
-    { channel: 'booth', girlId: 2, packages: 3, donations: 0, varieties: { THIN_MINTS: 1, TREFOILS: 2 } },
-    { channel: 'directShip', girlId: 1, packages: 10, donations: 1, varieties: {} }
+  const boothAllocations: Allocation[] = [
+    { channel: ALLOCATION_CHANNEL.BOOTH, girlId: 1, packages: 5, donations: 2, varieties: { THIN_MINTS: 3 } },
+    { channel: ALLOCATION_CHANNEL.BOOTH, girlId: 2, packages: 3, donations: 0, varieties: { THIN_MINTS: 1, TREFOILS: 2 } }
   ];
 
-  it('sums only matching channel', () => {
-    const result = channelTotals(allocations, 'booth');
+  it('sums all allocations passed', () => {
+    const result = channelTotals(boothAllocations);
     expect(result.packages).toBe(8);
     expect(result.donations).toBe(2);
   });
 
-  it('merges varieties across matching allocations', () => {
-    const result = channelTotals(allocations, 'booth');
+  it('merges varieties across allocations', () => {
+    const result = channelTotals(boothAllocations);
     expect(result.varieties.THIN_MINTS).toBe(4);
     expect(result.varieties.TREFOILS).toBe(2);
   });
 
-  it('returns zeros for non-matching channel', () => {
-    const result = channelTotals(allocations, 'virtualBooth');
+  it('returns zeros for empty array', () => {
+    const result = channelTotals([]);
     expect(result.packages).toBe(0);
     expect(result.donations).toBe(0);
-  });
-});
-
-describe('allocationsByChannel', () => {
-  const allocations: Allocation[] = [
-    { channel: 'booth', girlId: 1, packages: 5, donations: 0, varieties: {} },
-    { channel: 'directShip', girlId: 1, packages: 3, donations: 0, varieties: {} },
-    { channel: 'booth', girlId: 2, packages: 2, donations: 0, varieties: {} }
-  ];
-
-  it('filters by channel', () => {
-    expect(allocationsByChannel(allocations, 'booth')).toHaveLength(2);
-    expect(allocationsByChannel(allocations, 'directShip')).toHaveLength(1);
-    expect(allocationsByChannel(allocations, 'virtualBooth')).toHaveLength(0);
   });
 });
 

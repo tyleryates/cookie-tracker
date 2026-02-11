@@ -278,14 +278,6 @@ tr:hover {
   animation: fadeIn 0.3s ease;
 }
 
-.report-visual {
-  background: var(--surface);
-  padding: 32px;
-  border-radius: 12px;
-  border: 1px solid var(--gray-200);
-  box-shadow: var(--shadow-md);
-}
-
 .report-visual h3 {
   color: var(--primary);
   font-size: 1.75em;

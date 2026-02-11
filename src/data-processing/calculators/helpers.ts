@@ -2,7 +2,7 @@
 // Pure utility functions used across calculator modules
 
 import { ORDER_TYPE, OWNER } from '../../constants';
-import type { Allocation, AllocationChannel, Order, Scout, Varieties } from '../../types';
+import type { Allocation, Order, Scout, Varieties } from '../../types';
 import { accumulateVarieties } from '../utils';
 
 /**
@@ -25,17 +25,13 @@ export function totalCredited(allocations: Allocation[]): number {
 }
 
 /**
- * Get aggregate totals for a specific allocation channel.
+ * Get aggregate totals for a list of allocations.
  */
-export function channelTotals(
-  allocations: Allocation[],
-  channel: AllocationChannel
-): { packages: number; donations: number; varieties: Varieties } {
+export function channelTotals(allocations: Allocation[]): { packages: number; donations: number; varieties: Varieties } {
   let packages = 0;
   let donations = 0;
   const varieties: Varieties = {};
   for (const a of allocations) {
-    if (a.channel !== channel) continue;
     packages += a.packages;
     donations += a.donations;
     if (a.varieties) {
@@ -43,13 +39,6 @@ export function channelTotals(
     }
   }
   return { packages, donations, varieties };
-}
-
-/**
- * Filter allocations by channel.
- */
-export function allocationsByChannel(allocations: Allocation[], channel: AllocationChannel): Allocation[] {
-  return allocations.filter((a) => a.channel === channel);
 }
 
 /**

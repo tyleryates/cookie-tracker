@@ -1,5 +1,4 @@
-// Data Store Operations — Standalone factory functions for creating orders and transfers
-// Extracted from DataReconciler class methods.
+// Data Store Operations — Factory functions for creating orders and transfers
 
 import { DATA_SOURCES, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory, type TransferType } from './constants';
 import { buildPhysicalVarieties, isIncomingInventory, sumPhysicalPackages } from './data-processing/utils';

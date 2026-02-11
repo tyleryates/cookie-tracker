@@ -144,7 +144,7 @@ function renderReport(
     case 'variety':
       return <VarietyReport data={unified} />;
     case 'donation-alert':
-      return <DonationAlertReport data={unified} virtualCSAllocations={unified.virtualCookieShareAllocations} />;
+      return <DonationAlertReport data={unified} />;
     case 'booth':
       return <BoothReport data={unified} />;
     case 'available-booths':

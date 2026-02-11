@@ -17,18 +17,14 @@ function initializeScouts(reconciler: DataStore, rawDCData: Record<string, any>[
 
     if (!scoutDataset.has(name)) {
       const isSiteOrder = lastName === SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME;
-      scoutDataset.set(name, createScoutStructure(name, firstName, lastName, null, isSiteOrder));
+      scoutDataset.set(name, createScoutStructure(name, null, isSiteOrder));
     }
   });
 
   // Add scouts from Smart Cookie data (may have scouts without DC orders)
   reconciler.scouts.forEach((scoutData: RawScoutData, scoutName: string) => {
     if (!scoutDataset.has(scoutName)) {
-      const nameParts = scoutName.split(' ');
-      const lastName = nameParts[nameParts.length - 1];
-      const firstName = nameParts.slice(0, -1).join(' ');
-
-      scoutDataset.set(scoutName, createScoutStructure(scoutName, firstName, lastName, scoutData.scoutId || null, false));
+      scoutDataset.set(scoutName, createScoutStructure(scoutName, scoutData.scoutId || null, false));
     } else {
       // Update girlId if we have it from SC
       const scout = scoutDataset.get(scoutName);
@@ -42,12 +38,10 @@ function initializeScouts(reconciler: DataStore, rawDCData: Record<string, any>[
 }
 
 /** Create empty scout data structure */
-function createScoutStructure(name: string, firstName: string, lastName: string, girlId: number | null, isSiteOrder: boolean): Scout {
+function createScoutStructure(name: string, girlId: number | null, isSiteOrder: boolean): Scout {
   return {
     // Identity
     name: name,
-    firstName: firstName,
-    lastName: lastName,
     girlId: girlId ?? undefined,
     isSiteOrder: isSiteOrder,
 
@@ -87,7 +81,8 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
         booth: { packages: 0, donations: 0, varieties: {} },
         directShip: { packages: 0, donations: 0, varieties: {} },
         virtualBooth: { packages: 0, donations: 0, varieties: {} }
-      }
+      },
+      $orderStatusCounts: { needsApproval: 0, pending: 0, completed: 0 }
     }
   };
 }

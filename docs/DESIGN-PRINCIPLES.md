@@ -18,7 +18,7 @@ Ask: **"Is this a fundamental property of this data?"**
 // ✅ GOOD: Fundamental properties
 transfer.category = TRANSFER_CATEGORY.GIRL_PICKUP; // What kind of transfer is this?
 order.owner = OWNER.GIRL;             // Whose sale is this?
-order.needsInventory = true;          // Does this require physical fulfillment?
+order.orderType = ORDER_TYPE.DELIVERY; // How was the sale fulfilled?
 scout.$issues = { hasNegative: true }; // Are there data quality problems?
 ```
 
@@ -162,19 +162,14 @@ function calculateTotals(transfer) {
 ### ✅ Right: Simple Report Logic
 
 ```javascript
-// scout-summary.tsx
+// scout-summary.tsx — simple loop over pre-classified data
 function buildVarietyBreakdown(scout) {
   const salesVarieties = {};
-
-  // Simple loop - calculate what we need
-  scout.orders.forEach(order => {
-    if (order.needsInventory) {  // Use pre-computed classification
-      Object.entries(order.varieties).forEach(([variety, count]) => {
-        salesVarieties[variety] = (salesVarieties[variety] || 0) + count;
-      });
-    }
-  });
-
+  for (const order of scout.orders) {
+    Object.entries(order.varieties).forEach(([variety, count]) => {
+      salesVarieties[variety] = (salesVarieties[variety] || 0) + count;
+    });
+  }
   return salesVarieties;
 }
 ```
@@ -216,7 +211,7 @@ scout.$varietyBreakdowns = {
 transfer.physicalPackages   // Clear: excludes virtual (Cookie Share)
 transfer.packages          // Clear: includes everything
 
-order.needsInventory       // Clear: boolean, does it need fulfillment?
+order.orderType            // Clear: DELIVERY, DIRECT_SHIP, BOOTH, etc.
 order.physicalPackages     // Clear: excludes virtual donations
 ```
 
@@ -231,8 +226,8 @@ scout.breakdown           // Ambiguous: breakdown of what?
 ### Naming Convention
 
 - **Regular fields:** `packages`, `varieties`, `amount`
-- **Computed fields:** `physicalPackages`, `category`, `needsInventory`
-- **Derived aggregates:** `$issues`, `$financials`, `$inventoryDisplay` ($ prefix)
+- **Computed fields:** `physicalPackages`, `physicalVarieties`, `category`
+- **Derived aggregates ($ prefix):** `$financials`, `$inventoryDisplay`, `$salesByVariety`, `$shippedByVariety`, `$allocationSummary`, `$orderStatusCounts`, `$issues`, `$hasUnallocatedSiteOrders`
 
 ---
 

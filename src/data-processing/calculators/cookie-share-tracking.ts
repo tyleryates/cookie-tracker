@@ -37,7 +37,10 @@ export function buildCookieShareTracking(reconciler: DataStore): CookieShareTrac
 
   reconciler.transfers.forEach((transfer: Transfer) => {
     // Only count manually-entered COOKIE_SHARE records (exclude DC-synced and booth divider)
-    if (transfer.category === TRANSFER_CATEGORY.COOKIE_SHARE_RECORD && !String(transfer.orderNumber || '').startsWith('D')) {
+    if (
+      transfer.category === TRANSFER_CATEGORY.COOKIE_SHARE_RECORD &&
+      !String(transfer.orderNumber || '').startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX)
+    ) {
       scManualEntries += Math.abs(transfer.packages || 0);
     }
   });

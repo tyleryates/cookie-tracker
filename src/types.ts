@@ -1,7 +1,7 @@
 // Core Type Definitions for Cookie Tracker
 // Single source of truth for all data structure types
 
-import type { OrderType, Owner, PaymentMethod, TransferCategory, TransferType } from './constants';
+import type { ALLOCATION_CHANNEL, ALLOCATION_SOURCE, OrderType, Owner, PaymentMethod, TransferCategory, TransferType } from './constants';
 
 // ============================================================================
 // COOKIE TYPES
@@ -99,8 +99,8 @@ export type TransferInput = Partial<Transfer> & {
 // DirectShipAllocation, and virtual booth transfer processing.
 // ============================================================================
 
-export type AllocationChannel = 'booth' | 'directShip' | 'virtualBooth';
-export type AllocationSource = 'DirectShipDivider' | 'SmartBoothDivider' | 'SmartDirectShipDivider' | 'VirtualBoothTransfer';
+export type AllocationChannel = (typeof ALLOCATION_CHANNEL)[keyof typeof ALLOCATION_CHANNEL];
+export type AllocationSource = (typeof ALLOCATION_SOURCE)[keyof typeof ALLOCATION_SOURCE];
 
 /**
  * Unified allocation record. Every credited allocation across all channels
@@ -138,13 +138,13 @@ export interface Allocation {
 // SCOUT TYPES
 // ============================================================================
 
-export interface AllocationChannelSummary {
+interface AllocationChannelSummary {
   packages: number;
   donations: number;
   varieties: Varieties;
 }
 
-export interface AllocationSummary {
+interface AllocationSummary {
   booth: AllocationChannelSummary;
   directShip: AllocationChannelSummary;
   virtualBooth: AllocationChannelSummary;
@@ -169,6 +169,7 @@ export interface ScoutTotals {
   $salesByVariety: Varieties;
   $shippedByVariety: Varieties;
   $allocationSummary: AllocationSummary;
+  $orderStatusCounts: { needsApproval: number; pending: number; completed: number };
 }
 
 export interface ScoutInventory {
@@ -178,8 +179,6 @@ export interface ScoutInventory {
 
 export interface Scout {
   name: string;
-  firstName?: string;
-  lastName?: string;
   girlId?: number;
   scoutId?: string;
   gsusaId?: string;
@@ -210,17 +209,16 @@ export interface Scout {
 // RECONCILER METADATA
 // ============================================================================
 
-export interface ReconcilerMetadata {
+interface ImportMetadata {
   lastImportDC: string | null;
   lastImportSC: string | null;
   lastImportSCReport?: string;
   cookieIdMap: Record<number, CookieType> | null;
+  sources: Array<{ type: string; date: string; records: number }>;
+}
+
+export interface ReconcilerMetadata extends ImportMetadata {
   rawDCData?: Record<string, any>[];
-  sources: Array<{
-    type: string;
-    date: string;
-    records: number;
-  }>;
   warnings: Warning[];
 }
 
@@ -273,7 +271,7 @@ export type ProgressCallback = ((progress: ScrapeProgress) => void) | null;
 // ============================================================================
 
 export interface Credentials {
-  digitalCookie: { username: string; password: string; role?: string };
+  digitalCookie: { username: string; password: string; role?: string; councilId?: string };
   smartCookie: { username: string; password: string };
 }
 
@@ -406,12 +404,7 @@ export interface HealthChecks {
   unknownTransferTypes: number;
 }
 
-export interface UnifiedMetadata {
-  lastImportDC: string | null;
-  lastImportSC: string | null;
-  lastImportSCReport?: string;
-  cookieIdMap: Record<number, CookieType> | null;
-  sources: Array<{ type: string; date: string; records: number }>;
+export interface UnifiedMetadata extends ImportMetadata {
   unifiedBuildTime: string;
   scoutCount: number;
   orderCount: number;
@@ -459,10 +452,6 @@ export interface AppConfig {
   ignoredTimeSlots: IgnoredTimeSlot[];
   lastBoothSync?: string;
 }
-
-// ============================================================================
-// DATA FILE INFO
-// ============================================================================
 
 // ============================================================================
 // IPC RESPONSE TYPE
