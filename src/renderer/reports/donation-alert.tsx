@@ -74,7 +74,7 @@ function buildScoutDonationRows(scouts: Map<string, Scout>, virtualCSAllocations
 
     let manualEntered = 0;
     if (virtualCSAllocations && scout.girlId && virtualCSAllocations.has(scout.girlId)) {
-      manualEntered = virtualCSAllocations.get(scout.girlId);
+      manualEntered = virtualCSAllocations.get(scout.girlId) ?? 0;
     }
 
     rows.push({

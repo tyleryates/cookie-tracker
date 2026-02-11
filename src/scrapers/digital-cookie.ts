@@ -123,7 +123,7 @@ class DigitalCookieScraper {
         return { success: false, source: 'Digital Cookie', error: 'Sync cancelled' };
       }
       Logger.error('Digital Cookie scrape failed:', error);
-      return { success: false, source: 'Digital Cookie', error: error.message };
+      return { success: false, source: 'Digital Cookie', error: (error as Error).message };
     }
   }
 }

@@ -87,7 +87,7 @@ export class SmartCookieSession {
 
       await this.extractXsrfToken();
     } catch (err) {
-      if (!silent) Logger.warn('Warning: /me endpoint failed:', err.message);
+      if (!silent) Logger.warn('Warning: /me endpoint failed:', (err as Error).message);
     }
 
     return true;
@@ -112,11 +112,12 @@ export class SmartCookieSession {
         throw new Error(`${label} failed with status ${response.status}`);
       }
       return response.data;
-    } catch (error) {
-      if (error.response) {
-        throw new Error(`${label} failed: ${error.response.status} ${error.response.statusText}`);
+    } catch (error: unknown) {
+      const axiosError = error as any;
+      if (axiosError.response) {
+        throw new Error(`${label} failed: ${axiosError.response.status} ${axiosError.response.statusText}`);
       }
-      throw new Error(`${label} failed: ${error.message}`);
+      throw new Error(`${label} failed: ${(error as Error).message}`);
     }
   }
 
@@ -137,11 +138,12 @@ export class SmartCookieSession {
         throw new Error(`${label} failed with status ${response.status}`);
       }
       return response.data;
-    } catch (error) {
-      if (error.response) {
-        throw new Error(`${label} failed: ${error.response.status} ${error.response.statusText}`);
+    } catch (error: unknown) {
+      const axiosError = error as any;
+      if (axiosError.response) {
+        throw new Error(`${label} failed: ${axiosError.response.status} ${axiosError.response.statusText}`);
       }
-      throw new Error(`${label} failed: ${error.message}`);
+      throw new Error(`${label} failed: ${(error as Error).message}`);
     }
   }
 
@@ -150,7 +152,7 @@ export class SmartCookieSession {
     try {
       return await requestWithRetry(fetchFn, () => this.relogin(), { logPrefix: `Smart Cookie: ${label}` });
     } catch (error) {
-      Logger.warn(`Warning: Could not fetch ${label.toLowerCase()}:`, error.message);
+      Logger.warn(`Warning: Could not fetch ${label.toLowerCase()}:`, (error as Error).message);
       return fallback;
     }
   }

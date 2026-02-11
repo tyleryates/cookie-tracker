@@ -44,29 +44,31 @@ export class DigitalCookieSession {
   /** Extract role ID from role selection page. Auto-selects first "Troop" role if no name given. */
   private extractRoleId(html: string, roleName: string | null): { roleId: string; selectedRoleName: string } {
     const $ = cheerio.load(html);
-    let roleId = null;
-    let selectedRoleName = null;
-    const availableRoles: Array<{ value: string; text: string }> = [];
+    let roleId: string | null = null;
+    let selectedRoleName: string | null = null;
+    const availableRoles: Array<{ value: string | undefined; text: string }> = [];
 
-    $('.custom-dropdown-option').each((_i, elem) => {
+    $('.custom-dropdown-option').each((_i: number, elem: any) => {
       const optionText = $(elem).text().trim();
       const optionValue = $(elem).attr('data-value');
       availableRoles.push({ value: optionValue, text: optionText });
 
-      if (roleName && optionText === roleName) {
+      if (roleName && optionText === roleName && optionValue) {
         roleId = optionValue;
         selectedRoleName = optionText;
         return false;
       }
 
-      if (!roleName && roleId === null && optionText.startsWith('Troop')) {
+      if (!roleName && roleId === null && optionText.startsWith('Troop') && optionValue) {
         roleId = optionValue;
         selectedRoleName = optionText;
         return false;
       }
+
+      return true;
     });
 
-    if (roleId === null) {
+    if (roleId === null || selectedRoleName === null) {
       const rolesList = availableRoles.map((r) => `  [${r.value}] "${r.text}"`).join('\n');
       if (roleName) {
         throw new Error(`Role "${roleName}" not found.\n\nAvailable roles:\n${rolesList}`);

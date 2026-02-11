@@ -1,6 +1,6 @@
 // App — Root Preact component. Owns all state, effects, and callbacks.
 
-import { ipcRenderer } from 'electron';
+import { ipcRenderer, shell } from 'electron';
 import { useCallback, useEffect, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
 import { normalizeBoothLocation } from '../data-processing/data-importers';
@@ -164,7 +164,7 @@ export function App() {
       }
     } catch (error) {
       showStatus(`Error: ${(error as Error).message}`, 'error');
-      Logger.error(error);
+      Logger.error('Sync error:', error);
     } finally {
       dispatch({ type: 'SYNC_FINISHED' });
     }
@@ -332,7 +332,7 @@ export function App() {
           'Click OK to download the latest version from GitHub.'
       );
       if (response) {
-        require('electron').shell.openExternal('https://github.com/tyleryates/cookie-tracker/releases/latest');
+        shell.openExternal('https://github.com/tyleryates/cookie-tracker/releases/latest');
         showStatus('Opening download page...', 'success');
       }
     };

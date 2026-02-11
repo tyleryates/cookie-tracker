@@ -39,7 +39,7 @@ function handleIpcError(handler: (...args: any[]) => Promise<any>): (...args: an
       Logger.error('IPC Handler Error:', error);
       return {
         success: false,
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   };
@@ -66,7 +66,7 @@ function cleanupOldDataFiles(directory: string, keepCount: number = 10): void {
     const files = fs.readdirSync(directory);
 
     // Group files by type (prefix)
-    const fileGroups = {
+    const fileGroups: Record<string, Array<{ name: string; path: string; mtime: number }>> = {
       'unified-': [],
       'SC-': [],
       'DC-': []
@@ -105,7 +105,7 @@ function cleanupOldDataFiles(directory: string, keepCount: number = 10): void {
           totalDeleted++;
           Logger.debug(`Deleted old data file: ${file.name}`);
         } catch (err) {
-          Logger.error(`Failed to delete ${file.name}:`, err.message);
+          Logger.error(`Failed to delete ${file.name}:`, (err as Error).message);
         }
       });
     });
@@ -139,7 +139,7 @@ autoUpdater.autoDownload = false; // Don't auto-download
 
 autoUpdater.on('update-available', (info) => {
   Logger.debug('Update available:', info.version);
-  mainWindow.webContents.send('update-available', info);
+  mainWindow?.webContents.send('update-available', info);
 });
 
 autoUpdater.on('error', (err) => {
@@ -232,7 +232,7 @@ ipcMain.handle(
   'load-data',
   handleIpcError(async (_event, options?: { specificSc?: any; specificDc?: any }) => {
     const inDir = path.join(dataDir, 'in');
-    const result = loadData(inDir, options);
+    const result = await loadData(inDir, options);
     return result;
   })
 );
@@ -326,8 +326,8 @@ ipcMain.handle(
   'scrape-websites',
   handleIpcError(async (event) => {
     const auth = loadAndValidateCredentials();
-    if (auth.error) {
-      return { success: false, error: auth.error };
+    if (auth.error || !auth.credentials) {
+      return { success: false, error: auth.error || 'No credentials available' };
     }
 
     // Initialize scraper orchestrator (use userData path)

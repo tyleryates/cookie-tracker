@@ -1,7 +1,7 @@
 // Data Store Operations — Standalone factory functions for creating orders and transfers
 // Extracted from DataReconciler class methods.
 
-import { DATA_SOURCES, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
+import { DATA_SOURCES, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory, type TransferType } from './constants';
 import { COOKIE_TYPE } from './cookie-constants';
 import { isIncomingInventory, sumPhysicalPackages } from './data-processing/utils';
 import type { DataStore } from './data-store';
@@ -39,9 +39,9 @@ function createOrder(data: Partial<Order>, source: string): Order {
   return {
     orderNumber: data.orderNumber || '',
     scout: data.scout || '',
-    scoutId: data.scoutId || null,
-    gsusaId: data.gsusaId || null,
-    gradeLevel: data.gradeLevel || null,
+    scoutId: data.scoutId ?? undefined,
+    gsusaId: data.gsusaId ?? undefined,
+    gradeLevel: data.gradeLevel ?? undefined,
     date: data.date || '',
     orderType: data.orderType || null,
     owner: data.owner || 'TROOP',
@@ -54,10 +54,10 @@ function createOrder(data: Partial<Order>, source: string): Order {
     paymentStatus: data.paymentStatus,
     varieties: data.varieties || {},
     organization: {
-      troopId: data.organization?.troopId || null,
-      serviceUnit: data.organization?.serviceUnit || null,
-      council: data.organization?.council || null,
-      district: data.organization?.district || null
+      troopId: data.organization?.troopId ?? undefined,
+      serviceUnit: data.organization?.serviceUnit ?? undefined,
+      council: data.organization?.council ?? undefined,
+      district: data.organization?.district ?? undefined
     },
     sources: [source],
     metadata: {
@@ -90,16 +90,16 @@ export function createTransfer(data: TransferInput): Transfer {
   }
 
   return {
-    date: data.date,
-    type: data.type,
+    date: data.date || '',
+    type: data.type || ('' as TransferType),
     category: category,
     orderNumber: data.orderNumber,
-    from: data.from,
-    to: data.to,
-    packages: data.packages,
+    from: data.from || '',
+    to: data.to || '',
+    packages: data.packages || 0,
     physicalPackages: physicalPackages,
     cases: data.cases || 0,
-    varieties: data.varieties,
+    varieties: data.varieties || {},
     physicalVarieties: physicalVarieties,
     amount: data.amount,
     status: data.status || '',
@@ -136,13 +136,15 @@ export function mergeOrCreateOrder(
   const metadataKey = getMetadataKey(source);
 
   if (store.orders.has(orderNum)) {
-    const existing = store.orders.get(orderNum);
+    const existing = store.orders.get(orderNum)!;
 
     if (!existing.sources.includes(source)) {
       existing.sources.push(source);
     }
 
-    existing.metadata[metadataKey] = rawData;
+    if (existing.metadata) {
+      existing.metadata[metadataKey] = rawData;
+    }
 
     if (enrichmentFn) {
       enrichmentFn(existing, orderData);
@@ -153,7 +155,9 @@ export function mergeOrCreateOrder(
     return existing;
   } else {
     const order = createOrder(orderData, source);
-    order.metadata[metadataKey] = rawData;
+    if (order.metadata) {
+      order.metadata[metadataKey] = rawData;
+    }
     store.orders.set(orderNum, order);
     return order;
   }

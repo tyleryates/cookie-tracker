@@ -48,7 +48,7 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
     name: name,
     firstName: firstName,
     lastName: lastName,
-    girlId: girlId,
+    girlId: girlId ?? undefined,
     isSiteOrder: isSiteOrder,
 
     // Orders (classified)

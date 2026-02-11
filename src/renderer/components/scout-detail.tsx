@@ -4,7 +4,7 @@ import type preact from 'preact';
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, OWNER } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
 import { allocationsByChannel, calculateSalesByVariety, channelTotals } from '../../data-processing/calculators/helpers';
-import type { Allocation, Order, Scout } from '../../types';
+import type { Allocation, Order, Scout, Varieties } from '../../types';
 import { buildVarietyTooltip, formatDate, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
@@ -69,9 +69,9 @@ function formatCreditedVariety(variety: string, allocations: Allocation[]) {
   const vb = channelTotals(allocations, 'virtualBooth');
   const ds = channelTotals(allocations, 'directShip');
   const bs = channelTotals(allocations, 'booth');
-  const vbCount = vb.varieties[variety] || 0;
-  const dsCount = ds.varieties[variety] || 0;
-  const bsCount = bs.varieties[variety] || 0;
+  const vbCount = vb.varieties[variety as keyof Varieties] || 0;
+  const dsCount = ds.varieties[variety as keyof Varieties] || 0;
+  const bsCount = bs.varieties[variety as keyof Varieties] || 0;
   const total = vbCount + dsCount + bsCount;
   if (total === 0) return <>{'—'}</>;
 
@@ -122,7 +122,7 @@ function CookieBreakdownTable({ scout }: { scout: Scout }) {
       </h5>
       <DataTable columns={['Variety', 'Inventory', 'Delivered', 'Shipped', 'Credited']} className="table-compact">
         {sortVarietiesByOrder(Object.entries(allVarieties)).map(([variety]) => {
-          const pickedUp = inventory.varieties[variety] || 0;
+          const pickedUp = inventory.varieties[variety as keyof Varieties] || 0;
           const sold = salesVarieties[variety] || 0;
           const shipped = shippedVarieties[variety] || 0;
           const isCookieShare = variety === COOKIE_TYPE.COOKIE_SHARE;
@@ -260,7 +260,7 @@ function AllocationSection({
   return (
     <div class="section-break-sm">
       <h6 class="section-subheader">
-        {DISPLAY_STRINGS[method]} ({label})
+        {DISPLAY_STRINGS[method as keyof typeof DISPLAY_STRINGS]} ({label})
       </h6>
       <DataTable columns={columns} className="table-compact">
         {children}

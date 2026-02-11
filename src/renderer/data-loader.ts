@@ -69,10 +69,10 @@ export async function loadDataFromDisk(options?: {
 
 function serializeUnifiedDataset(unified: UnifiedDataset): Record<string, any> {
   return {
-    scouts: Array.from(unified.scouts.entries()).map(([name, scout]) => ({
-      name,
-      ...scout
-    })),
+    scouts: Array.from(unified.scouts.entries()).map(([name, scout]) => {
+      const { name: _existingName, ...rest } = scout;
+      return { name, ...rest };
+    }),
     siteOrders: unified.siteOrders,
     troopTotals: unified.troopTotals,
     transferBreakdowns: unified.transferBreakdowns,

@@ -70,7 +70,7 @@ class ScraperOrchestrator {
       return {
         ...results,
         success: false,
-        error: error.message
+        error: (error as Error).message
       };
     } finally {
       this.abortController = null;

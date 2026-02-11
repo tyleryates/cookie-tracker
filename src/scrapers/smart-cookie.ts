@@ -53,7 +53,7 @@ class SmartCookieApiScraper {
     try {
       await this.session.apiGet('/webapi/api/orders/dashboard', 'Orders dashboard');
     } catch (error) {
-      Logger.warn('Warning: Could not initialize orders context:', error.message);
+      Logger.warn('Warning: Could not initialize orders context:', (error as Error).message);
     }
   }
 
@@ -75,11 +75,12 @@ class SmartCookieApiScraper {
       const data = await this.session.apiPost('/webapi/api/orders/search', searchPayload, 'Orders search');
       this.sendProgress('Orders fetched', 35);
       return data;
-    } catch (error) {
-      if (error.response) {
+    } catch (error: unknown) {
+      const axiosError = error as any;
+      if (axiosError.response) {
         Logger.error('Orders API Error Response:', {
-          status: error.response.status,
-          statusText: error.response.statusText
+          status: axiosError.response.status,
+          statusText: axiosError.response.statusText
         });
       }
       throw error;
@@ -116,7 +117,7 @@ class SmartCookieApiScraper {
           const details = await this.fetchVirtualCookieShare(orderId);
           virtualCookieShares.push(details);
         } catch (error) {
-          Logger.warn(`Warning: Could not fetch virtual cookie share ${orderId}:`, error.message);
+          Logger.warn(`Warning: Could not fetch virtual cookie share ${orderId}:`, (error as Error).message);
         }
       }
     }
@@ -185,7 +186,7 @@ class SmartCookieApiScraper {
               divider
             };
           } catch (error) {
-            Logger.warn(`Warning: Could not fetch booth divider for reservation ${reservationId}:`, error.message);
+            Logger.warn(`Warning: Could not fetch booth divider for reservation ${reservationId}:`, (error as Error).message);
             return null;
           }
         })
@@ -236,7 +237,7 @@ class SmartCookieApiScraper {
 
       return result;
     } catch (err) {
-      Logger.warn(`Warning: Could not fetch dates for booth ${boothId}:`, err.message);
+      Logger.warn(`Warning: Could not fetch dates for booth ${boothId}:`, (err as Error).message);
       return [];
     }
   }
@@ -250,7 +251,7 @@ class SmartCookieApiScraper {
         end_time: s.end_time || s.endTime || s.end || ''
       }));
     } catch (err) {
-      Logger.warn(`Warning: Could not fetch times for booth ${boothId} on ${date}:`, err.message);
+      Logger.warn(`Warning: Could not fetch times for booth ${boothId} on ${date}:`, (err as Error).message);
       return [];
     }
   }
@@ -325,7 +326,7 @@ class SmartCookieApiScraper {
       };
       fs.writeFileSync(path.join(debugDir, 'SC-debug-latest.json'), JSON.stringify(debugData, null, 2));
     } catch (err) {
-      Logger.warn('Warning: Could not save debug data:', err.message);
+      Logger.warn('Warning: Could not save debug data:', (err as Error).message);
     }
   }
 
@@ -440,7 +441,7 @@ class SmartCookieApiScraper {
         return { success: false, source: 'Smart Cookie API', error: 'Sync cancelled' };
       }
       Logger.error('Smart Cookie API scraper error:', error);
-      return { success: false, source: 'Smart Cookie API', error: error.message };
+      return { success: false, source: 'Smart Cookie API', error: (error as Error).message };
     }
   }
 }

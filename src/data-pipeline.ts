@@ -3,7 +3,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { DC_COLUMNS } from './constants';
 import { buildUnifiedDataset } from './data-processing/calculators/index';
 import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './data-processing/data-importers';
@@ -42,35 +42,54 @@ interface LoadDataResult {
 // EXCEL PARSING
 // ============================================================================
 
-function parseExcel(buffer: Buffer): Record<string, any>[] {
-  const workbook = XLSX.read(buffer, { type: 'buffer' });
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-  fixWorksheetRange(firstSheet);
-  return XLSX.utils.sheet_to_json(firstSheet, { raw: false });
+/** Convert an ExcelJS cell value to a string, matching xlsx's { raw: false } behavior. */
+function cellToString(value: ExcelJS.CellValue): string {
+  if (value == null) return '';
+  if (value instanceof Date) {
+    // Format dates as MM/DD/YYYY to match xlsx raw:false output
+    const m = String(value.getMonth() + 1).padStart(2, '0');
+    const d = String(value.getDate()).padStart(2, '0');
+    return `${m}/${d}/${value.getFullYear()}`;
+  }
+  if (typeof value === 'object' && 'richText' in value) {
+    return (value as ExcelJS.CellRichTextValue).richText.map((rt) => rt.text).join('');
+  }
+  if (typeof value === 'object' && 'error' in value) return '';
+  if (typeof value === 'object' && 'result' in value) {
+    return cellToString((value as ExcelJS.CellFormulaValue).result);
+  }
+  return String(value);
 }
 
-function fixWorksheetRange(worksheet: XLSX.WorkSheet): void {
-  if (!worksheet) return;
-  const keys = Object.keys(worksheet).filter((k) => !k.startsWith('!'));
-  if (keys.length === 0) return;
+async function parseExcel(buffer: Buffer): Promise<Record<string, any>[]> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as any);
+  const worksheet = workbook.worksheets[0];
+  if (!worksheet) return [];
 
-  let maxRow = 0;
-  let maxCol = 0;
+  const headers: string[] = [];
+  const rows: Record<string, any>[] = [];
 
-  keys.forEach((key) => {
-    const match = key.match(/^([A-Z]+)(\d+)$/);
-    if (!match) return;
-    const [, colLetters, rowStr] = match;
-    const row = parseInt(rowStr, 10);
-    const col = XLSX.utils.decode_col(colLetters);
-    if (row > maxRow) maxRow = row;
-    if (col > maxCol) maxCol = col;
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) {
+      row.eachCell((cell, colNumber) => {
+        headers[colNumber - 1] = cellToString(cell.value);
+      });
+    } else {
+      const obj: Record<string, any> = {};
+      row.eachCell((cell, colNumber) => {
+        const header = headers[colNumber - 1];
+        if (header) {
+          obj[header] = cellToString(cell.value);
+        }
+      });
+      if (Object.keys(obj).length > 0) {
+        rows.push(obj);
+      }
+    }
   });
 
-  if (maxRow > 0) {
-    const range = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxRow - 1, c: maxCol } });
-    worksheet['!ref'] = range;
-  }
+  return rows;
 }
 
 // ============================================================================
@@ -225,13 +244,13 @@ function loadJsonFile(file: DataFileInfo, rec: DataStore): FileLoadResult {
   return { loaded: false, issue: `Smart Cookie JSON not recognized: ${file.name}` };
 }
 
-function loadExcelFile(
+async function loadExcelFile(
   file: DataFileInfo,
   validator: (data: Record<string, any>[]) => boolean,
   importer: (data: Record<string, any>[]) => void,
   errorLabel: string
-): FileLoadResult {
-  const parsedData = parseExcel(file.data);
+): Promise<FileLoadResult> {
+  const parsedData = await parseExcel(file.data);
   if (validator(parsedData)) {
     importer(parsedData);
     return { loaded: true };
@@ -239,12 +258,12 @@ function loadExcelFile(
   return { loaded: false, issue: `${errorLabel}: ${file.name}` };
 }
 
-function loadSourceFiles(
+async function loadSourceFiles(
   files: DataFileInfo[],
   rec: DataStore,
   specificSc?: DataFileInfo | null,
   specificDc?: DataFileInfo | null
-): LoadedSources {
+): Promise<LoadedSources> {
   const issues: string[] = [];
   const scFile = specificSc !== undefined ? specificSc : findLatestFile(files, 'SC-', '.json');
   const dcFile = specificDc !== undefined ? specificDc : findLatestFile(files, 'DC-', '.xlsx');
@@ -266,7 +285,12 @@ function loadSourceFiles(
   // Digital Cookie (Excel)
   let dc = false;
   if (dcFile) {
-    const r = loadExcelFile(dcFile, isDigitalCookieFormat, (data) => importDigitalCookie(rec, data), 'Digital Cookie XLSX not recognized');
+    const r = await loadExcelFile(
+      dcFile,
+      isDigitalCookieFormat,
+      (data) => importDigitalCookie(rec, data),
+      'Digital Cookie XLSX not recognized'
+    );
     dc = r.loaded;
     if (r.loaded) dcTimestamp = extractTimestamp(dcFile.name, 'DC-', '.xlsx');
     else if (r.issue) issues.push(r.issue);
@@ -275,7 +299,7 @@ function loadSourceFiles(
   // Smart Cookie Report (Excel)
   let scReport = false;
   if (scReportFile) {
-    const r = loadExcelFile(
+    const r = await loadExcelFile(
       scReportFile,
       (data) => data?.length > 0,
       (data) => importSmartCookieReport(rec, data),
@@ -288,7 +312,7 @@ function loadSourceFiles(
   // Smart Cookie Transfers (Excel) — skipped if API data present
   let scTransfer = false;
   if (!sc && scTransferFile) {
-    const r = loadExcelFile(
+    const r = await loadExcelFile(
       scTransferFile,
       (data) => data?.length > 0,
       (data) => importSmartCookie(rec, data),
@@ -312,16 +336,16 @@ function loadSourceFiles(
  * Load and build unified dataset from files on disk.
  * This is the main entry point for the data pipeline, called from the main process.
  */
-export function loadData(
+export async function loadData(
   inDir: string,
   options?: { specificSc?: DataFileInfo | null; specificDc?: DataFileInfo | null }
-): LoadDataResult | null {
+): Promise<LoadDataResult | null> {
   const files = scanDataFiles(inDir);
   if (files.length === 0) return null;
 
   const store = createDataStore();
   const datasetList = buildDatasetList(files);
-  const loaded = loadSourceFiles(files, store, options?.specificSc, options?.specificDc);
+  const loaded = await loadSourceFiles(files, store, options?.specificSc, options?.specificDc);
   const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;
 
   if (!anyLoaded) return null;

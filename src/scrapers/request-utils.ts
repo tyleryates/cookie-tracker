@@ -92,7 +92,7 @@ async function handleRequestError(
       Logger.info(`${logPrefix}: Re-authentication successful, retrying request`);
       return;
     } catch (loginError) {
-      throw new Error(`Session expired and re-authentication failed: ${loginError.message}`);
+      throw new Error(`Session expired and re-authentication failed: ${(loginError as Error).message}`);
     }
   }
 

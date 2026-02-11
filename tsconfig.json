@@ -1,13 +1,10 @@
 {
   "compilerOptions": {
-    // Target ES2020 for modern Node.js features
+    // Type-checking only (tsup handles compilation)
+    "noEmit": true,
     "target": "ES2020",
     "module": "commonjs",
     "lib": ["ES2020", "DOM"],
-
-    // Output configuration
-    "rootDir": "src",
-    "outDir": "dist",
 
     // Module resolution
     "moduleResolution": "node",
@@ -15,20 +12,10 @@
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
 
-    // Type checking - relaxed for initial migration
-    "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "strictFunctionTypes": false,
-    "strictPropertyInitialization": false,
-    "noImplicitThis": false,
-    "alwaysStrict": false,
-
-    // Additional checks - disabled for now
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noImplicitReturns": false,
-    "noFallthroughCasesInSwitch": false,
+    // Type checking — strict
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
 
     // JSX support (Preact)
     "jsx": "react-jsx",
@@ -36,9 +23,7 @@
 
     // Other options
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "allowJs": true,  // Allow JS files during migration
-    "checkJs": false  // Don't type-check JS files yet
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "src/**/*.ts",

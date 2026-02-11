@@ -8,7 +8,7 @@ import type { Credentials } from '../../types';
 interface LoginModalProps {
   onClose: () => void;
   onSave: (credentials: Credentials) => void;
-  showStatus: (msg: string, type: string) => void;
+  showStatus: (msg: string, type: 'success' | 'warning' | 'error') => void;
 }
 
 function CredentialFields({

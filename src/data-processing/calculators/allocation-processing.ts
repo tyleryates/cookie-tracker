@@ -4,7 +4,7 @@
 import { SCOUT_PHYSICAL_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
-import type { Allocation, Scout, Transfer } from '../../types';
+import type { Allocation, CookieType, Scout, Transfer } from '../../types';
 
 import { buildGirlIdToNameMap, findScoutByGirlId } from './helpers';
 
@@ -54,7 +54,8 @@ function addInventory(reconciler: DataStore, scoutDataset: Map<string, Scout>): 
     const sign = isPickup ? 1 : -1;
     scout.inventory.total += sign * (transfer.physicalPackages || 0);
     Object.entries(transfer.physicalVarieties).forEach(([variety, count]) => {
-      scout.inventory.varieties[variety] = (scout.inventory.varieties[variety] || 0) + sign * count;
+      const key = variety as CookieType;
+      scout.inventory.varieties[key] = (scout.inventory.varieties[key] || 0) + sign * count;
     });
   });
 }

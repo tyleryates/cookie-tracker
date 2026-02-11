@@ -111,7 +111,7 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
                   <td>{String(transfer.orderNumber || '-')}</td>
                   {casesTip ? <TooltipCell tooltip={casesTip}>{transfer.cases || 0}</TooltipCell> : <td>{transfer.cases || 0}</td>}
                   {tip ? <TooltipCell tooltip={tip}>{transfer.packages || 0}</TooltipCell> : <td>{transfer.packages || 0}</td>}
-                  <td>{formatCurrency(transfer.amount)}</td>
+                  <td>{formatCurrency(transfer.amount ?? 0)}</td>
                   <td class={statusClass}>{statusText}</td>
                 </tr>
               );
@@ -147,7 +147,7 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
                   ) : (
                     <td class={cellClass}>{displayPackages}</td>
                   )}
-                  <td class={cellClass}>{formatCurrency(transfer.amount)}</td>
+                  <td class={cellClass}>{formatCurrency(transfer.amount ?? 0)}</td>
                 </tr>
               );
             })}

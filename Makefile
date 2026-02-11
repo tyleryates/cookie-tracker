@@ -1,4 +1,4 @@
-.PHONY: help dev compile watch build build-win build-all clean install version lint format knip \
+.PHONY: help dev compile watch build build-win build-all clean install version lint format knip typecheck test \
        publish publish-mac publish-win test-build \
        bump-patch bump-minor bump-major release-patch release-minor release-major commit-version \
        check-token pre-release show-releases dist-info git-status
@@ -7,15 +7,20 @@
 
 dev: compile  ## Compile, start app, and auto-recompile on changes
 	@trap 'kill %1 2>/dev/null' EXIT; \
-	npx tsc --watch --preserveWatchOutput & \
-	npx electron .
+	npx tsup --watch & \
+	sleep 2 && npx electron .
 
-compile:  ## One-shot compile TypeScript + copy assets to dist/
-	@npx tsc || true
-	@cp src/index.html src/styles.css dist/
+compile:  ## One-shot compile (tsup bundles main + renderer, copies assets)
+	@npx tsup
+
+typecheck:  ## Type-check without emitting (uses tsc)
+	npx tsc --noEmit
 
 watch:  ## Auto-recompile only (no app start, for a separate terminal)
-	npx tsc --watch
+	npx tsup --watch
+
+test:  ## Run unit tests
+	npx vitest run
 
 install:  ## Install dependencies
 	npm install

@@ -81,6 +81,7 @@ function parseVarietiesFromAPI(
 
   (cookiesArray || []).forEach((cookie) => {
     const cookieId = cookie.id || cookie.cookieId;
+    if (cookieId === undefined) return;
     const cookieName = idMap[cookieId];
 
     if (!cookieName && cookieId && cookie.quantity !== 0) {
@@ -130,7 +131,7 @@ function registerScout(reconciler: DataStore, girlId: any, girl: Record<string, 
     updateScoutData(reconciler, scoutName, {}, { scoutId: girlId });
   } else {
     const scout = reconciler.scouts.get(scoutName);
-    if (!scout.scoutId) {
+    if (scout && !scout.scoutId) {
       scout.scoutId = girlId;
     }
   }
@@ -221,12 +222,13 @@ function updateScoutData(reconciler: DataStore, scoutName: string, updates: Reco
   }
 
   const scout = reconciler.scouts.get(scoutName);
+  if (!scout) return;
 
   // Handle metadata updates (set directly if not null)
   Object.keys(updates).forEach((key) => {
     if (metadataFields.includes(key)) {
       if (updates[key] !== null && updates[key] !== undefined) {
-        scout[key] = updates[key];
+        (scout as Record<string, any>)[key] = updates[key];
       }
     }
   });
@@ -234,7 +236,7 @@ function updateScoutData(reconciler: DataStore, scoutName: string, updates: Reco
   // Handle separate metadata object (for backward compatibility)
   Object.keys(metadata).forEach((key) => {
     if (metadata[key] !== null && metadata[key] !== undefined) {
-      scout[key] = metadata[key];
+      (scout as Record<string, any>)[key] = metadata[key];
     }
   });
 }
@@ -252,7 +254,7 @@ function importDigitalCookie(reconciler: DataStore, dcData: Record<string, any>[
     const orderData = {
       orderNumber: orderNum,
       scout: scout,
-      date: parseExcelDate(row[DC_COLUMNS.ORDER_DATE]),
+      date: parseExcelDate(row[DC_COLUMNS.ORDER_DATE]) ?? undefined,
       packages: (parseInt(row[DC_COLUMNS.TOTAL_PACKAGES], 10) || 0) - (parseInt(row[DC_COLUMNS.REFUNDED_PACKAGES], 10) || 0),
       amount: parseFloat(row[DC_COLUMNS.CURRENT_SALE_AMOUNT]) || 0,
       status: row[DC_COLUMNS.ORDER_STATUS],

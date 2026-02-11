@@ -1,9 +1,6 @@
-// TooltipCell — Preact replacement for MutationObserver + Tippy.js pattern
+// TooltipCell — Pure CSS tooltip using data-tooltip attribute
 
 import type { ComponentChildren, JSX } from 'preact';
-import { useEffect, useRef } from 'preact/hooks';
-import tippy from 'tippy.js';
-import { UI_TIMING } from '../../constants';
 
 interface TooltipCellProps {
   tooltip: string;
@@ -14,41 +11,9 @@ interface TooltipCellProps {
 }
 
 export function TooltipCell({ tooltip, children, style, tag, className }: TooltipCellProps) {
-  const ref = useRef<HTMLElement | null>(null);
-  const setRef = (el: HTMLElement | null) => {
-    ref.current = el;
-  };
-
-  useEffect(() => {
-    if (ref.current && tooltip) {
-      const instances = tippy(ref.current, {
-        content: tooltip,
-        allowHTML: false,
-        interactive: true,
-        delay: [UI_TIMING.TOOLTIP_DELAY_SHOW, UI_TIMING.TOOLTIP_DELAY_HIDE],
-        placement: 'top',
-        arrow: false,
-        theme: 'dark',
-        maxWidth: 'none',
-        popperOptions: {
-          modifiers: [
-            {
-              name: 'preventOverflow',
-              options: { boundary: 'viewport' }
-            }
-          ]
-        }
-      });
-      return () => {
-        const arr = Array.isArray(instances) ? instances : [instances];
-        for (const i of arr) i.destroy();
-      };
-    }
-  }, [tooltip]);
-
   const Tag = tag || 'td';
   return (
-    <Tag ref={setRef} class={className || 'tooltip-cell'} style={style}>
+    <Tag class={className || 'tooltip-cell'} style={style} data-tooltip={tooltip || undefined}>
       {children}
     </Tag>
   );

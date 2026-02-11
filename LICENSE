@@ -29,8 +29,7 @@ This software includes the following third-party packages:
 - Electron (MIT License)
 - Axios (MIT License)
 - Cheerio (MIT License)
-- XLSX (Apache 2.0 License)
-- Tippy.js (MIT License)
+- ExcelJS (MIT License)
 - electron-updater (MIT License)
 - And others - see package.json for complete list
 

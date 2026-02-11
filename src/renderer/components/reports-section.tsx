@@ -50,7 +50,7 @@ function getBoothWarningLabel(unified: UnifiedDataset | null): string {
 }
 
 function getScoutWarningLabel(unified: UnifiedDataset | null): string {
-  const hasNegativeInventory = unified?.troopTotals?.scouts?.withNegativeInventory > 0;
+  const hasNegativeInventory = (unified?.troopTotals?.scouts?.withNegativeInventory ?? 0) > 0;
   const hasUnallocated =
     unified?.siteOrders?.directShip?.hasWarning ||
     unified?.siteOrders?.girlDelivery?.hasWarning ||

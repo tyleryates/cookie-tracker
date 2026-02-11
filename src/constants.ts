@@ -244,12 +244,3 @@ export const HTTP_STATUS = {
   OK: 200, // Request successful
   FOUND: 302 // Redirect (used by authentication endpoints)
 } as const;
-
-// ============================================================================
-// UI TIMING CONSTANTS
-// ============================================================================
-
-export const UI_TIMING = {
-  TOOLTIP_DELAY_SHOW: 100, // Milliseconds before showing tooltip
-  TOOLTIP_DELAY_HIDE: 0 // Milliseconds before hiding tooltip
-} as const;
