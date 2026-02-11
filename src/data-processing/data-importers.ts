@@ -18,8 +18,10 @@ import {
   DC_COOKIE_COLUMNS,
   normalizeCookieName
 } from '../cookie-constants';
+import type { DataStore } from '../data-store';
+import { createTransfer, mergeOrCreateOrder } from '../data-store-operations';
 import Logger from '../logger';
-import type { BoothAvailableDate, BoothLocation, CookieType, IDataReconciler, Order, Varieties } from '../types';
+import type { BoothAvailableDate, BoothLocation, CookieType, Order, Varieties } from '../types';
 import { isC2TTransfer } from './utils';
 
 // ============================================================================
@@ -120,7 +122,7 @@ function parseExcelDate(excelDate: number | null | undefined): string | null {
 // ============================================================================
 
 /** Register a scout by girlId, creating the scout entry if needed */
-function registerScout(reconciler: IDataReconciler, girlId: any, girl: Record<string, any>): void {
+function registerScout(reconciler: DataStore, girlId: any, girl: Record<string, any>): void {
   const scoutName = `${girl.first_name || ''} ${girl.last_name || ''}`.trim();
   if (!girlId || !scoutName) return;
 
@@ -136,7 +138,7 @@ function registerScout(reconciler: IDataReconciler, girlId: any, girl: Record<st
 
 /** Merge a Digital Cookie order found in Smart Cookie data (D-prefixed order numbers) */
 function mergeDCOrderFromSC(
-  reconciler: IDataReconciler,
+  reconciler: DataStore,
   orderNum: string,
   scout: string,
   transferData: { date: string; packages: number; amount: number },
@@ -146,7 +148,7 @@ function mergeDCOrderFromSC(
   rawData: Record<string, any>
 ): void {
   const dcOrderNum = orderNum.substring(1);
-  reconciler.mergeOrCreateOrder(
+  mergeOrCreateOrder(reconciler,
     dcOrderNum,
     {
       orderNumber: dcOrderNum,
@@ -163,7 +165,7 @@ function mergeDCOrderFromSC(
 }
 
 /** Register scouts from an API transfer (T2G pickup, G2T return, Cookie Share) */
-function trackScoutFromAPITransfer(reconciler: IDataReconciler, type: string, to: string, from: string, _packages: number): void {
+function trackScoutFromAPITransfer(reconciler: DataStore, type: string, to: string, from: string, _packages: number): void {
   if (type === TRANSFER_TYPE.T2G && to !== from) {
     updateScoutData(reconciler, to, {});
   }
@@ -180,7 +182,7 @@ function parseGirlAllocation(
   girl: Record<string, any>,
   dedupePrefix: string | number,
   seen: Set<string>,
-  reconciler: IDataReconciler,
+  reconciler: DataStore,
   dynamicCookieIdMap: Record<number, CookieType> | null
 ): { girlId: number; varieties: Varieties; totalPackages: number; trackedCookieShare: number } | null {
   const girlId = girl.id;
@@ -201,7 +203,7 @@ function parseGirlAllocation(
 
 /** Update scout aggregated data (additive for numeric, direct set for metadata) */
 function updateScoutData(
-  reconciler: IDataReconciler,
+  reconciler: DataStore,
   scoutName: string,
   updates: Record<string, any>,
   metadata: Record<string, any> = {}
@@ -242,7 +244,7 @@ function updateScoutData(
 }
 
 /** Import Digital Cookie order data from Excel export */
-function importDigitalCookie(reconciler: IDataReconciler, dcData: Record<string, any>[]): void {
+function importDigitalCookie(reconciler: DataStore, dcData: Record<string, any>[]): void {
   reconciler.metadata.rawDCData = dcData;
 
   dcData.forEach((row: Record<string, any>) => {
@@ -263,7 +265,7 @@ function importDigitalCookie(reconciler: IDataReconciler, dcData: Record<string,
     };
 
     // Merge or create order (DC is source of truth for order details)
-    reconciler.mergeOrCreateOrder(orderNum, orderData, DATA_SOURCES.DIGITAL_COOKIE, row);
+    mergeOrCreateOrder(reconciler,orderNum, orderData, DATA_SOURCES.DIGITAL_COOKIE, row);
 
     // Register scout
     updateScoutData(reconciler, scout, {});
@@ -278,7 +280,7 @@ function importDigitalCookie(reconciler: IDataReconciler, dcData: Record<string,
 }
 
 /** Import Smart Cookie Report data (ReportExport.xlsx) */
-function importSmartCookieReport(reconciler: IDataReconciler, reportData: Record<string, any>[]): void {
+function importSmartCookieReport(reconciler: DataStore, reportData: Record<string, any>[]): void {
   reportData.forEach((row: Record<string, any>) => {
     const orderNum = String(row[SC_REPORT_COLUMNS.ORDER_ID] || row[SC_REPORT_COLUMNS.REF_NUMBER]);
     const scout = row[SC_REPORT_COLUMNS.GIRL_NAME] || '';
@@ -311,7 +313,7 @@ function importSmartCookieReport(reconciler: IDataReconciler, reportData: Record
     };
 
     // Merge or create order with enrichment
-    reconciler.mergeOrCreateOrder(
+    mergeOrCreateOrder(reconciler,
       orderNum,
       orderData,
       DATA_SOURCES.SMART_COOKIE_REPORT,
@@ -348,7 +350,7 @@ function importSmartCookieReport(reconciler: IDataReconciler, reportData: Record
 }
 
 /** Import optional supplemental data from Smart Cookie API (dividers, booths, cookie shares) */
-function importOptionalData(reconciler: IDataReconciler, apiData: Record<string, any>): void {
+function importOptionalData(reconciler: DataStore, apiData: Record<string, any>): void {
   if (apiData.directShipDivider?.girls) {
     importDirectShipDivider(reconciler, apiData.directShipDivider);
   }
@@ -375,7 +377,7 @@ function importOptionalData(reconciler: IDataReconciler, apiData: Record<string,
 }
 
 /** Import Smart Cookie API data from API endpoints */
-function importSmartCookieAPI(reconciler: IDataReconciler, apiData: Record<string, any>): void {
+function importSmartCookieAPI(reconciler: DataStore, apiData: Record<string, any>): void {
   const orders = apiData.orders || [];
 
   orders.forEach((order: Record<string, any>) => {
@@ -407,7 +409,7 @@ function importSmartCookieAPI(reconciler: IDataReconciler, apiData: Record<strin
       actions: order.actions || {}
     };
 
-    reconciler.transfers.push(reconciler.createTransfer(transferData));
+    reconciler.transfers.push(createTransfer(transferData));
 
     if (orderNum.startsWith('D')) {
       mergeDCOrderFromSC(reconciler, orderNum, to, transferData, type, varieties, DATA_SOURCES.SMART_COOKIE_API, order);
@@ -427,7 +429,7 @@ function importSmartCookieAPI(reconciler: IDataReconciler, apiData: Record<strin
 }
 
 /** Import Smart Direct Ship Divider allocations */
-function importDirectShipDivider(reconciler: IDataReconciler, dividerData: Record<string, any>): void {
+function importDirectShipDivider(reconciler: DataStore, dividerData: Record<string, any>): void {
   const girls = dividerData.girls || [];
 
   girls.forEach((girl: Record<string, any>) => {
@@ -453,7 +455,7 @@ function importDirectShipDivider(reconciler: IDataReconciler, dividerData: Recor
 }
 
 /** Import Virtual Cookie Share allocations */
-function importVirtualCookieShares(reconciler: IDataReconciler, virtualCookieShares: Record<string, any>[]): void {
+function importVirtualCookieShares(reconciler: DataStore, virtualCookieShares: Record<string, any>[]): void {
   if (!reconciler.virtualCookieShareAllocations) {
     reconciler.virtualCookieShareAllocations = new Map(); // Key: girlId, Value: manual entry packages
   }
@@ -481,7 +483,7 @@ function importVirtualCookieShares(reconciler: IDataReconciler, virtualCookieSha
 
 /** Import booth reservation data from Smart Cookie reservations API */
 function importReservations(
-  reconciler: IDataReconciler,
+  reconciler: DataStore,
   reservationsData: Record<string, any>,
   dynamicCookieIdMap: Record<number, CookieType> | null
 ): void {
@@ -524,7 +526,7 @@ function importReservations(
  * so that allocations aren't silently dropped for girls without SC Report data.
  */
 function importBoothDividers(
-  reconciler: IDataReconciler,
+  reconciler: DataStore,
   boothDividers: Record<string, any>[],
   dynamicCookieIdMap: Record<number, CookieType> | null
 ): void {
@@ -572,7 +574,7 @@ function importBoothDividers(
 
 /** Import Direct Ship Divider allocations from Smart Cookie API */
 function importDirectShipDividers(
-  reconciler: IDataReconciler,
+  reconciler: DataStore,
   directShipDividers: Record<string, any>[],
   dynamicCookieIdMap: Record<number, CookieType> | null
 ): void {
@@ -605,7 +607,7 @@ function importDirectShipDividers(
 }
 
 /** Import Smart Cookie data */
-function importSmartCookie(reconciler: IDataReconciler, scData: Record<string, any>[]): void {
+function importSmartCookie(reconciler: DataStore, scData: Record<string, any>[]): void {
   scData.forEach((row: Record<string, any>) => {
     const type = row[SC_API_COLUMNS.TYPE] || '';
     const orderNum = String(row[SC_API_COLUMNS.ORDER_NUM] || '');
@@ -625,7 +627,7 @@ function importSmartCookie(reconciler: IDataReconciler, scData: Record<string, a
       amount: parseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT]) || 0
     };
 
-    reconciler.transfers.push(reconciler.createTransfer(transferData));
+    reconciler.transfers.push(createTransfer(transferData));
 
     // Handle Digital Cookie orders in Smart Cookie (COOKIE_SHARE with D prefix)
     if (type.includes('COOKIE_SHARE') && orderNum.startsWith('D')) {
@@ -693,7 +695,7 @@ function normalizeBoothLocation(loc: Record<string, any>): BoothLocation {
 }
 
 /** Import booth locations from Smart Cookie booths/search API */
-function importBoothLocations(reconciler: IDataReconciler, locationsData: Record<string, any>[]): void {
+function importBoothLocations(reconciler: DataStore, locationsData: Record<string, any>[]): void {
   if (!Array.isArray(locationsData) || locationsData.length === 0) return;
   reconciler.boothLocations = locationsData.map(normalizeBoothLocation);
 }

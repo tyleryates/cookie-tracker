@@ -3,11 +3,12 @@
 
 import { TRANSFER_CATEGORY } from '../../constants';
 import Logger from '../../logger';
-import type { IDataReconciler, Transfer, TransferBreakdowns, Warning } from '../../types';
+import type { Transfer, TransferBreakdowns, Warning } from '../../types';
 import { isKnownTransferType } from '../utils';
+import type { DataStore } from '../../data-store';
 
 /** Build pre-classified transfer lists with totals */
-export function buildTransferBreakdowns(reconciler: IDataReconciler, warnings: Warning[]): TransferBreakdowns {
+export function buildTransferBreakdowns(reconciler: DataStore, warnings: Warning[]): TransferBreakdowns {
   const seenUnknownTypes = new Set<string>();
   const c2t: Transfer[] = [];
   const t2g: Transfer[] = [];

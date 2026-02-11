@@ -1,198 +1,134 @@
 // Shared Cookie Constants
 // Single source of truth for all cookie-related data
+//
+// Adding a new cookie: Add one entry to COOKIE_REGISTRY. Everything else derives automatically.
 
 import type { CookieType, Varieties } from './types';
 
 // ============================================================================
-// COOKIE TYPE CONSTANTS (Internal IDs - use these in code, not strings)
+// COOKIE REGISTRY — Single source of truth for every cookie property
 // ============================================================================
 
-export const COOKIE_TYPE: Record<CookieType, CookieType> = {
-  THIN_MINTS: 'THIN_MINTS',
-  CARAMEL_DELITES: 'CARAMEL_DELITES',
-  PEANUT_BUTTER_PATTIES: 'PEANUT_BUTTER_PATTIES',
-  PEANUT_BUTTER_SANDWICH: 'PEANUT_BUTTER_SANDWICH',
-  TREFOILS: 'TREFOILS',
-  ADVENTUREFULS: 'ADVENTUREFULS',
-  LEMONADES: 'LEMONADES',
-  EXPLOREMORES: 'EXPLOREMORES',
-  CARAMEL_CHOCOLATE_CHIP: 'CARAMEL_CHOCOLATE_CHIP',
-  COOKIE_SHARE: 'COOKIE_SHARE' // Virtual donations
-};
+interface CookieRegistryEntry {
+  type: CookieType;
+  displayName: string;
+  price: number;
+  isPhysical: boolean;
+  dcColumnName: string | null;       // DC Excel column header (null = not in DC export)
+  scApiId: number | null;            // SC API numeric ID
+  scReportCode: string | null;       // SC Report C1-C11 code
+  scTransferAbbr: string | null;     // SC Transfer abbreviation
+  sortOrder: number;
+  nameVariations: string[];          // All known string variations for normalization
+}
 
-// Display names for cookie types (for UI rendering)
-const COOKIE_DISPLAY_NAMES = {
-  [COOKIE_TYPE.THIN_MINTS]: 'Thin Mints',
-  [COOKIE_TYPE.CARAMEL_DELITES]: 'Caramel deLites',
-  [COOKIE_TYPE.PEANUT_BUTTER_PATTIES]: 'Peanut Butter Patties',
-  [COOKIE_TYPE.PEANUT_BUTTER_SANDWICH]: 'Peanut Butter Sandwich',
-  [COOKIE_TYPE.TREFOILS]: 'Trefoils',
-  [COOKIE_TYPE.ADVENTUREFULS]: 'Adventurefuls',
-  [COOKIE_TYPE.LEMONADES]: 'Lemonades',
-  [COOKIE_TYPE.EXPLOREMORES]: 'Exploremores',
-  [COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP]: 'Caramel Chocolate Chip',
-  [COOKIE_TYPE.COOKIE_SHARE]: 'Cookie Share'
-} as { [K in CookieType]: string };
-
-// Standard cookie variety display order (used across all reports)
-export const COOKIE_ORDER: readonly CookieType[] = [
-  COOKIE_TYPE.THIN_MINTS,
-  COOKIE_TYPE.CARAMEL_DELITES,
-  COOKIE_TYPE.PEANUT_BUTTER_PATTIES,
-  COOKIE_TYPE.PEANUT_BUTTER_SANDWICH,
-  COOKIE_TYPE.TREFOILS,
-  COOKIE_TYPE.ADVENTUREFULS,
-  COOKIE_TYPE.LEMONADES,
-  COOKIE_TYPE.EXPLOREMORES,
-  COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP,
-  COOKIE_TYPE.COOKIE_SHARE
+const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
+  {
+    type: 'THIN_MINTS', displayName: 'Thin Mints', price: 6, isPhysical: true,
+    dcColumnName: 'Thin Mints', scApiId: 4, scReportCode: 'C6', scTransferAbbr: 'TM',
+    sortOrder: 0, nameVariations: ['Thin Mint', 'Thin Mints']
+  },
+  {
+    type: 'CARAMEL_DELITES', displayName: 'Caramel deLites', price: 6, isPhysical: true,
+    dcColumnName: 'Caramel deLites', scApiId: 1, scReportCode: 'C8', scTransferAbbr: 'CD',
+    sortOrder: 1, nameVariations: ['Caramel deLite', 'Caramel deLites']
+  },
+  {
+    type: 'PEANUT_BUTTER_PATTIES', displayName: 'Peanut Butter Patties', price: 6, isPhysical: true,
+    dcColumnName: 'Peanut Butter Patties', scApiId: 2, scReportCode: 'C7', scTransferAbbr: 'PBP',
+    sortOrder: 2, nameVariations: ['Peanut Butter Patty', 'Peanut Butter Patties']
+  },
+  {
+    type: 'PEANUT_BUTTER_SANDWICH', displayName: 'Peanut Butter Sandwich', price: 6, isPhysical: true,
+    dcColumnName: 'Peanut Butter Sandwich', scApiId: 5, scReportCode: 'C9', scTransferAbbr: 'PBS',
+    sortOrder: 3, nameVariations: ['Peanut Butter Sandwich', 'Peanut Butter Sandwiches']
+  },
+  {
+    type: 'TREFOILS', displayName: 'Trefoils', price: 6, isPhysical: true,
+    dcColumnName: 'Trefoils', scApiId: 3, scReportCode: 'C5', scTransferAbbr: 'TRE',
+    sortOrder: 4, nameVariations: ['Trefoil', 'Trefoils']
+  },
+  {
+    type: 'ADVENTUREFULS', displayName: 'Adventurefuls', price: 6, isPhysical: true,
+    dcColumnName: 'Adventurefuls', scApiId: 48, scReportCode: 'C2', scTransferAbbr: 'ADV',
+    sortOrder: 5, nameVariations: ['Adventureful', 'Adventurefuls']
+  },
+  {
+    type: 'LEMONADES', displayName: 'Lemonades', price: 6, isPhysical: true,
+    dcColumnName: 'Lemonades', scApiId: 34, scReportCode: 'C4', scTransferAbbr: 'LEM',
+    sortOrder: 6, nameVariations: ['Lemonade', 'Lemonades']
+  },
+  {
+    type: 'EXPLOREMORES', displayName: 'Exploremores', price: 6, isPhysical: true,
+    dcColumnName: 'Exploremores', scApiId: 56, scReportCode: 'C3', scTransferAbbr: 'EXP',
+    sortOrder: 7, nameVariations: ['Exploremore', 'Exploremores']
+  },
+  {
+    type: 'CARAMEL_CHOCOLATE_CHIP', displayName: 'Caramel Chocolate Chip', price: 7, isPhysical: true,
+    dcColumnName: 'Caramel Chocolate Chip', scApiId: 52, scReportCode: 'C11', scTransferAbbr: 'GFC',
+    sortOrder: 8, nameVariations: ['Caramel Chocolate Chip', 'Caramel Chocolate Chips']
+  },
+  {
+    type: 'COOKIE_SHARE', displayName: 'Cookie Share', price: 6, isPhysical: false,
+    dcColumnName: null, scApiId: 37, scReportCode: 'C1', scTransferAbbr: 'CShare',
+    sortOrder: 9, nameVariations: ['Cookie Share']
+  }
 ];
+
+// ============================================================================
+// DERIVED EXPORTS — Same names/values as before, computed from registry
+// ============================================================================
+
+// COOKIE_TYPE enum: Record<CookieType, CookieType>
+export const COOKIE_TYPE: Record<CookieType, CookieType> = Object.fromEntries(
+  COOKIE_REGISTRY.map(e => [e.type, e.type])
+) as Record<CookieType, CookieType>;
+
+// Standard display order (used across all reports)
+export const COOKIE_ORDER: readonly CookieType[] =
+  [...COOKIE_REGISTRY].sort((a, b) => a.sortOrder - b.sortOrder).map(e => e.type);
 
 // Physical cookie types (excludes Cookie Share which is virtual)
-export const PHYSICAL_COOKIE_TYPES: readonly CookieType[] = [
-  COOKIE_TYPE.THIN_MINTS,
-  COOKIE_TYPE.CARAMEL_DELITES,
-  COOKIE_TYPE.PEANUT_BUTTER_PATTIES,
-  COOKIE_TYPE.PEANUT_BUTTER_SANDWICH,
-  COOKIE_TYPE.TREFOILS,
-  COOKIE_TYPE.ADVENTUREFULS,
-  COOKIE_TYPE.LEMONADES,
-  COOKIE_TYPE.EXPLOREMORES,
-  COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP
-];
+export const PHYSICAL_COOKIE_TYPES: readonly CookieType[] =
+  COOKIE_REGISTRY.filter(e => e.isPhysical).sort((a, b) => a.sortOrder - b.sortOrder).map(e => e.type);
 
-// Digital Cookie Excel column names (display names used as column headers)
-// These are read from DC export, then normalized to COOKIE_TYPE constants
-export const DC_COOKIE_COLUMNS: readonly string[] = [
-  'Thin Mints',
-  'Caramel deLites',
-  'Peanut Butter Patties',
-  'Peanut Butter Sandwich',
-  'Trefoils',
-  'Adventurefuls',
-  'Lemonades',
-  'Exploremores',
-  'Caramel Chocolate Chip'
-];
+// Digital Cookie Excel column names
+export const DC_COOKIE_COLUMNS: readonly string[] =
+  COOKIE_REGISTRY.filter(e => e.dcColumnName !== null).sort((a, b) => a.sortOrder - b.sortOrder).map(e => e.dcColumnName!);
 
-// ============================================================================
-// DATA SOURCE MAPPINGS (External formats → Internal COOKIE_TYPE constants)
-// ============================================================================
-
-// Smart Cookie API numeric ID to cookie type mapping
-// Verified against Smart Cookie CSV export
-// Can also be fetched dynamically from: GET https://app.abcsmartcookies.com/webapi/api/me/allcookies
-// (includes pricing, sequence, and availability data)
-export const COOKIE_ID_MAP: Record<number, CookieType> = {
-  1: COOKIE_TYPE.CARAMEL_DELITES,
-  2: COOKIE_TYPE.PEANUT_BUTTER_PATTIES,
-  3: COOKIE_TYPE.TREFOILS,
-  4: COOKIE_TYPE.THIN_MINTS,
-  5: COOKIE_TYPE.PEANUT_BUTTER_SANDWICH,
-  34: COOKIE_TYPE.LEMONADES,
-  37: COOKIE_TYPE.COOKIE_SHARE,
-  48: COOKIE_TYPE.ADVENTUREFULS,
-  52: COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP,
-  56: COOKIE_TYPE.EXPLOREMORES
-};
+// Smart Cookie API numeric ID to cookie type
+export const COOKIE_ID_MAP: Record<number, CookieType> = Object.fromEntries(
+  COOKIE_REGISTRY.filter(e => e.scApiId !== null).map(e => [e.scApiId!, e.type])
+) as Record<number, CookieType>;
 
 // Smart Cookie Report column mapping (C1-C11)
-export const COOKIE_COLUMN_MAP: Record<string, CookieType> = {
-  C1: COOKIE_TYPE.COOKIE_SHARE,
-  C2: COOKIE_TYPE.ADVENTUREFULS,
-  C3: COOKIE_TYPE.EXPLOREMORES,
-  C4: COOKIE_TYPE.LEMONADES,
-  C5: COOKIE_TYPE.TREFOILS,
-  C6: COOKIE_TYPE.THIN_MINTS,
-  C7: COOKIE_TYPE.PEANUT_BUTTER_PATTIES,
-  C8: COOKIE_TYPE.CARAMEL_DELITES,
-  C9: COOKIE_TYPE.PEANUT_BUTTER_SANDWICH,
-  C11: COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP
-};
+export const COOKIE_COLUMN_MAP: Record<string, CookieType> = Object.fromEntries(
+  COOKIE_REGISTRY.filter(e => e.scReportCode !== null).map(e => [e.scReportCode!, e.type])
+) as Record<string, CookieType>;
 
 // Smart Cookie Transfer abbreviation mapping
-export const COOKIE_ABBR_MAP: Record<string, CookieType> = {
-  CShare: COOKIE_TYPE.COOKIE_SHARE,
-  ADV: COOKIE_TYPE.ADVENTUREFULS,
-  EXP: COOKIE_TYPE.EXPLOREMORES,
-  LEM: COOKIE_TYPE.LEMONADES,
-  TRE: COOKIE_TYPE.TREFOILS,
-  TM: COOKIE_TYPE.THIN_MINTS,
-  PBP: COOKIE_TYPE.PEANUT_BUTTER_PATTIES,
-  CD: COOKIE_TYPE.CARAMEL_DELITES,
-  PBS: COOKIE_TYPE.PEANUT_BUTTER_SANDWICH,
-  GFC: COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP
-};
+export const COOKIE_ABBR_MAP: Record<string, CookieType> = Object.fromEntries(
+  COOKIE_REGISTRY.filter(e => e.scTransferAbbr !== null).map(e => [e.scTransferAbbr!, e.type])
+) as Record<string, CookieType>;
+
+// Display names (internal, used by getCookieDisplayName)
+const COOKIE_DISPLAY_NAMES: Record<CookieType, string> = Object.fromEntries(
+  COOKIE_REGISTRY.map(e => [e.type, e.displayName])
+) as Record<CookieType, string>;
+
+// Prices (internal, used by getCookiePrice)
+const COOKIE_PRICES: Record<CookieType, number> = Object.fromEntries(
+  COOKIE_REGISTRY.map(e => [e.type, e.price])
+) as Record<CookieType, number>;
+
+// Name normalization map (internal, used by normalizeCookieName)
+const COOKIE_NAME_NORMALIZATION: Record<string, CookieType> = Object.fromEntries(
+  COOKIE_REGISTRY.flatMap(e => e.nameVariations.map(v => [v, e.type]))
+) as Record<string, CookieType>;
 
 // ============================================================================
-// NORMALIZATION (External string names → Internal COOKIE_TYPE constants)
+// TROOP PROCEEDS
 // ============================================================================
-
-// Cookie variety name normalization map
-// Maps all known variations from data sources to COOKIE_TYPE constants
-// New variations should be added here when discovered
-const COOKIE_NAME_NORMALIZATION: Record<string, CookieType> = {
-  // Thin Mints
-  'Thin Mint': COOKIE_TYPE.THIN_MINTS,
-  'Thin Mints': COOKIE_TYPE.THIN_MINTS,
-
-  // Caramel deLites
-  'Caramel deLite': COOKIE_TYPE.CARAMEL_DELITES,
-  'Caramel deLites': COOKIE_TYPE.CARAMEL_DELITES,
-
-  // Peanut Butter Patties
-  'Peanut Butter Patty': COOKIE_TYPE.PEANUT_BUTTER_PATTIES,
-  'Peanut Butter Patties': COOKIE_TYPE.PEANUT_BUTTER_PATTIES,
-
-  // Peanut Butter Sandwich
-  'Peanut Butter Sandwich': COOKIE_TYPE.PEANUT_BUTTER_SANDWICH,
-  'Peanut Butter Sandwiches': COOKIE_TYPE.PEANUT_BUTTER_SANDWICH,
-
-  // Trefoils
-  Trefoil: COOKIE_TYPE.TREFOILS,
-  Trefoils: COOKIE_TYPE.TREFOILS,
-
-  // Adventurefuls
-  Adventureful: COOKIE_TYPE.ADVENTUREFULS,
-  Adventurefuls: COOKIE_TYPE.ADVENTUREFULS,
-
-  // Lemonades
-  Lemonade: COOKIE_TYPE.LEMONADES,
-  Lemonades: COOKIE_TYPE.LEMONADES,
-
-  // Exploremores
-  Exploremore: COOKIE_TYPE.EXPLOREMORES,
-  Exploremores: COOKIE_TYPE.EXPLOREMORES,
-
-  // Caramel Chocolate Chip
-  'Caramel Chocolate Chip': COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP,
-  'Caramel Chocolate Chips': COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP,
-
-  // Cookie Share
-  'Cookie Share': COOKIE_TYPE.COOKIE_SHARE
-};
-
-// ============================================================================
-// COOKIE PRICING (Keyed by COOKIE_TYPE constants)
-// ============================================================================
-
-// Cookie prices (per package)
-// Most cookies are $6, but Caramel Chocolate Chip is $7
-const COOKIE_PRICES = {
-  [COOKIE_TYPE.THIN_MINTS]: 6,
-  [COOKIE_TYPE.CARAMEL_DELITES]: 6,
-  [COOKIE_TYPE.PEANUT_BUTTER_PATTIES]: 6,
-  [COOKIE_TYPE.PEANUT_BUTTER_SANDWICH]: 6,
-  [COOKIE_TYPE.TREFOILS]: 6,
-  [COOKIE_TYPE.ADVENTUREFULS]: 6,
-  [COOKIE_TYPE.LEMONADES]: 6,
-  [COOKIE_TYPE.EXPLOREMORES]: 6,
-  [COOKIE_TYPE.CARAMEL_CHOCOLATE_CHIP]: 7, // Premium price
-  [COOKIE_TYPE.COOKIE_SHARE]: 6 // Virtual donation
-} as { [K in CookieType]: number };
-
-// Troop proceeds per package (what the troop gets to keep)
-// Rate depends on Per Girl Average (PGA = packages credited / active girls)
 
 /** Get troop proceeds rate based on Per Girl Average */
 export function getTroopProceedsRate(pga: number): number {
@@ -202,7 +138,6 @@ export function getTroopProceedsRate(pga: number): number {
 }
 
 // First N packages per girl are exempt from troop proceeds
-// Only applies to girls who have sold at least 1 package
 export const PROCEEDS_EXEMPT_PACKAGES = 50;
 
 // ============================================================================
@@ -216,14 +151,7 @@ export const PROCEEDS_EXEMPT_PACKAGES = 50;
  */
 export function normalizeCookieName(rawName: string): CookieType | null {
   if (!rawName) return null;
-
-  const normalized = COOKIE_NAME_NORMALIZATION[rawName];
-  if (!normalized) {
-    // Unknown variety - caller must handle warning
-    return null;
-  }
-
-  return normalized;
+  return COOKIE_NAME_NORMALIZATION[rawName] || null;
 }
 
 /**
@@ -242,8 +170,6 @@ export function getCookieDisplayName(cookieType: string): string {
  */
 function getCookiePrice(cookieType: string): number | null {
   if (!Object.prototype.hasOwnProperty.call(COOKIE_PRICES, cookieType)) {
-    // Unknown variety - caller must handle warning
-    // Do NOT assume $6 - financial tracking requires accuracy
     return null;
   }
   return COOKIE_PRICES[cookieType as CookieType];
@@ -262,7 +188,7 @@ export function calculateRevenue(varieties: Varieties): number {
     if (price === null) {
       const displayName = getCookieDisplayName(cookieType);
       throw new Error(
-        `Cannot calculate revenue: unknown price for cookie type "${displayName}" (${cookieType}). Update COOKIE_PRICES in cookie-constants.ts`
+        `Cannot calculate revenue: unknown price for cookie type "${displayName}" (${cookieType}). Update COOKIE_REGISTRY in cookie-constants.ts`
       );
     }
     total += count! * price;

@@ -2,10 +2,11 @@
 // Handles troop booth sale orders and allocation tracking
 
 import { ORDER_TYPE, OWNER, TRANSFER_CATEGORY } from '../../constants';
-import type { IDataReconciler, Order, Scout, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
+import type { Order, Scout, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
+import type { DataStore } from '../../data-store';
 
 /** Build site orders dataset with allocation tracking */
-function buildSiteOrdersDataset(reconciler: IDataReconciler, scoutDataset: Map<string, Scout>): SiteOrdersDataset {
+function buildSiteOrdersDataset(reconciler: DataStore, scoutDataset: Map<string, Scout>): SiteOrdersDataset {
   // Find site scout from pre-classified scout data
   let siteScout: Scout | null = null;
   scoutDataset.forEach((s: Scout) => {
@@ -81,7 +82,7 @@ function buildSiteOrdersDataset(reconciler: IDataReconciler, scoutDataset: Map<s
 }
 
 /** Calculate total allocated packages by type */
-function calculateAllocations(reconciler: IDataReconciler): { directShip: number; virtualBooth: number; boothSales: number } {
+function calculateAllocations(reconciler: DataStore): { directShip: number; virtualBooth: number; boothSales: number } {
   let directShip = 0;
   let virtualBooth = 0;
   let boothSales = 0;

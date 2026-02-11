@@ -128,7 +128,7 @@ class DigitalCookieScraper {
    */
   async login(username: string, password: string, roleName: string | null, silent = false): Promise<boolean> {
     if (!silent) {
-      this.sendProgress('Digital Cookie: Getting CSRF token...', 10);
+      this.sendProgress('Digital Cookie: Getting CSRF token...', 5);
     }
 
     // Get CSRF token
@@ -136,7 +136,7 @@ class DigitalCookieScraper {
     const csrfToken = this.extractCSRFToken(loginPageResponse.data);
 
     if (!silent) {
-      this.sendProgress('Digital Cookie: Logging in...', 20);
+      this.sendProgress('Digital Cookie: Logging in...', 15);
     }
 
     // Submit login
@@ -157,7 +157,7 @@ class DigitalCookieScraper {
     }
 
     if (!silent) {
-      this.sendProgress('Digital Cookie: Selecting role...', 25);
+      this.sendProgress('Digital Cookie: Selecting role...', 30);
     }
 
     // Get and select role
@@ -171,7 +171,7 @@ class DigitalCookieScraper {
     }
 
     if (!silent) {
-      this.sendProgress('Digital Cookie: Login successful', 30);
+      this.sendProgress('Digital Cookie: Login successful', 40);
     }
 
     // Store the selected role name for use in downloadExport
@@ -183,12 +183,12 @@ class DigitalCookieScraper {
    * Download export file
    */
   async downloadExport(councilId = DEFAULT_COUNCIL_ID) {
-    this.sendProgress('Digital Cookie: Preparing export...', 40);
+    this.sendProgress('Digital Cookie: Preparing export...', 50);
 
     // Use the role name that was selected during login
     const { troopId, serviceUnitId } = this.extractTroopInfo(this.selectedRoleName);
 
-    this.sendProgress('Digital Cookie: Generating report...', 50);
+    this.sendProgress('Digital Cookie: Generating report...', 60);
 
     // Generate report
     const generateResponse = await this.client.get('/ajaxCall/generateReport', {
@@ -212,7 +212,7 @@ class DigitalCookieScraper {
       throw new Error('Report generation did not return a valid file name');
     }
 
-    this.sendProgress('Digital Cookie: Downloading file...', 60);
+    this.sendProgress('Digital Cookie: Downloading file...', 75);
 
     // Download file
     const downloadResponse = await this.client.get(`/ajaxCall/downloadFile/TROOP_ORDER_REPORT/${fileName}`, {
@@ -229,7 +229,7 @@ class DigitalCookieScraper {
 
     fs.writeFileSync(filePath, downloadResponse.data);
 
-    this.sendProgress('Digital Cookie: Export complete', 70);
+    this.sendProgress('Digital Cookie: Export complete', 90);
 
     return filePath;
   }
@@ -262,6 +262,8 @@ class DigitalCookieScraper {
         () => this.login(credentials.username, credentials.password, credentials.role || '', true),
         { logPrefix: 'Digital Cookie: Download Export', rateLimit: false }
       );
+
+      this.sendProgress('Digital Cookie: Complete', 100);
 
       return {
         success: true,

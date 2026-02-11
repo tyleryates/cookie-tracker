@@ -3,7 +3,8 @@
 
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import { PROCEEDS_EXEMPT_PACKAGES, getTroopProceedsRate } from '../../cookie-constants';
-import type { IDataReconciler, Scout, ScoutCounts, TroopTotals } from '../../types';
+import type { Scout, ScoutCounts, TroopTotals } from '../../types';
+import type { DataStore } from '../../data-store';
 
 /** Aggregate scout-level totals: delivery, inventory, shipping, and proceeds */
 function aggregateScoutTotals(scouts: Map<string, Scout>) {
@@ -54,7 +55,7 @@ function countDCDonations(rawDCData: Record<string, any>[]): number {
 
 /** Build troop-level aggregate totals */
 export function buildTroopTotals(
-  reconciler: IDataReconciler,
+  reconciler: DataStore,
   scouts: Map<string, Scout>,
   packageTotals: {
     ordered: number;

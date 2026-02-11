@@ -3,14 +3,6 @@
 import { COOKIE_ORDER, getCookieDisplayName } from '../cookie-constants';
 import type { CookieType, Varieties } from '../types';
 
-function buildVarietyTooltipAttr(varieties: Varieties): string {
-  if (!varieties || Object.keys(varieties).length === 0) return '';
-  const varietyList = sortVarietiesByOrder(Object.entries(varieties))
-    .map(([variety, count]) => `${getCookieDisplayName(variety)}: ${count}`)
-    .join('\n');
-  return ` data-tooltip="${escapeHtml(varietyList)}"`;
-}
-
 /** Sort varieties entries by preferred display order */
 function sortVarietiesByOrder(entries: [string, number][]): [string, number][] {
   return entries.sort((a: [string, number], b: [string, number]) => {
@@ -135,67 +127,23 @@ function formatDate(dateStr: string | null | undefined): string {
   return DateFormatter.toDisplay(dateStr);
 }
 
-// Helper function to create horizontal stats layout
-// stats: array of {label, value, description, color}
-function createHorizontalStats(stats: Array<{ label: string; value: string | number; description: string; color?: string }>): string {
-  const columns = stats.length;
-  let html = `<div style="display: grid; grid-template-columns: repeat(${columns}, 1fr); gap: 20px; margin: 20px 0; padding: 20px; background: #f8f9fa; border-radius: 8px;">`;
-
-  stats.forEach((stat) => {
-    const color = stat.color || '#666';
-    html += `<div style="text-align: center;">`;
-    html += `<div style="font-weight: 600; font-size: 0.9em; color: #666; margin-bottom: 8px;">${escapeHtml(stat.label)}</div>`;
-    html += `<div style="font-size: 2em; font-weight: 700; color: ${color};">${stat.value}</div>`;
-    html += `<div style="font-size: 0.8em; color: #888; margin-top: 5px;">${escapeHtml(stat.description)}</div>`;
-    html += `</div>`;
-  });
-
-  html += '</div>';
-  return html;
-}
-
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// Table generation helpers
-function startTable(className = 'report-table', style: string = ''): string {
-  const styleAttr = style ? ` style="${style}"` : '';
-  return `<table class="${className}"${styleAttr}>`;
-}
-
-function createTableHeader(columns: string[]): string {
-  const headerCells = columns.map((col: string) => `<th>${col}</th>`).join('');
-  return `<thead><tr>${headerCells}</tr></thead><tbody>`;
-}
-
-function createTableRow(cells: string[], rowAttrs: string = ''): string {
-  const attrStr = rowAttrs ? ` ${rowAttrs}` : '';
-  const cellsHtml = cells.join('');
-  return `<tr${attrStr}>${cellsHtml}</tr>`;
-}
-
-function endTable(): string {
-  return '</tbody></table>';
-}
-
 function formatCurrency(value: number): string {
   return `$${Math.round(value || 0)}`;
 }
 
+/** Build variety tooltip as plain text string (for Preact TooltipCell) */
+function buildVarietyTooltip(varieties: Varieties): string {
+  if (!varieties || Object.keys(varieties).length === 0) return '';
+  return sortVarietiesByOrder(Object.entries(varieties))
+    .map(([variety, count]) => `${getCookieDisplayName(variety)}: ${count}`)
+    .join('\n');
+}
+
 export {
-  buildVarietyTooltipAttr,
+  buildVarietyTooltip,
   sortVarietiesByOrder,
   getCompleteVarieties,
   DateFormatter,
   formatDate,
-  createHorizontalStats,
-  escapeHtml,
-  startTable,
-  createTableHeader,
-  createTableRow,
-  endTable,
   formatCurrency
 };

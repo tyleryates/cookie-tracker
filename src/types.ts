@@ -264,35 +264,6 @@ export interface RawScoutData {
 }
 
 // ============================================================================
-// RECONCILER INTERFACE (for typing function parameters)
-// ============================================================================
-
-export interface IDataReconciler {
-  orders: Map<string, Order>;
-  transfers: Transfer[];
-  scouts: Map<string, RawScoutData>;
-  troopNumber: string | null;
-  boothSalesAllocations: BoothSalesAllocation[] | null;
-  boothReservations: BoothReservationImported[] | null;
-  boothLocations: BoothLocation[] | null;
-  directShipAllocations: DirectShipAllocation[] | null;
-  virtualCookieShareAllocations: Map<number, number> | null;
-  boothCookieShareAllocations: Map<number, number> | null;
-  metadata: ReconcilerMetadata;
-  unified: UnifiedDataset | null;
-  createOrder(data: Partial<Order>, source: string): Order;
-  createTransfer(data: TransferInput): Transfer;
-  mergeOrCreateOrder(
-    orderNum: string,
-    orderData: Partial<Order>,
-    source: string,
-    rawData: Record<string, any>,
-    enrichmentFn?: ((existing: Order, newData: Partial<Order>) => void) | null
-  ): Order;
-  getMetadataKey(source: string): keyof OrderMetadata;
-}
-
-// ============================================================================
 // WARNING TYPE (used across calculator modules)
 // ============================================================================
 

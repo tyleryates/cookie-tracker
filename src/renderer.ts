@@ -1,31 +1,32 @@
 import { ipcRenderer } from 'electron';
+import { h, render } from 'preact';
 import XLSX from 'xlsx';
 import * as packageJson from '../package.json';
 import { DC_COLUMNS } from './constants';
-import { normalizeBoothLocation } from './data-processing/data-importers';
-import DataReconciler from './data-reconciler';
+import { buildUnifiedDataset } from './data-processing/data-calculators';
+import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport, normalizeBoothLocation } from './data-processing/data-importers';
+import { createDataStore, type DataStore } from './data-store';
 import Logger from './logger';
-import { DateFormatter } from './renderer/html-builder';
-import { countAvailableSlots, generateAvailableBoothsReport } from './renderer/reports/available-booths';
-import { generateBoothReport } from './renderer/reports/booth';
-import { generateDonationAlertReport } from './renderer/reports/donation-alert';
-import { generateInventoryReport } from './renderer/reports/inventory';
-import { generateSummaryReport } from './renderer/reports/scout-summary';
-import { generateTroopSummaryReport } from './renderer/reports/troop-summary';
-import { generateVarietyReport } from './renderer/reports/variety';
+import { DateFormatter } from './renderer/format-utils';
+import { AvailableBoothsReport, countAvailableSlots } from './renderer/reports/available-booths';
+import { BoothReport } from './renderer/reports/booth';
+import { DonationAlertReport } from './renderer/reports/donation-alert';
+import { InventoryReport } from './renderer/reports/inventory';
+import { ScoutSummaryReport } from './renderer/reports/scout-summary';
+import { TroopSummaryReport } from './renderer/reports/troop-summary';
+import { VarietyReport } from './renderer/reports/variety';
 import type { RefreshFromWebOptions } from './renderer/ui-controller';
 import {
   checkLoginStatus,
   handleRefreshFromWeb,
   setupEventListeners,
-  setupReportObserver,
   showStatus as showStatusUI,
   updateSourceStatus,
   updateSyncStatus
 } from './renderer/ui-controller';
 import type { AppConfig, BoothReservationImported, DataFileInfo } from './types';
 
-let reconciler = new DataReconciler();
+let store = createDataStore();
 let appConfig: AppConfig | null = null;
 
 interface DatasetEntry {
@@ -225,7 +226,6 @@ setupEventListeners({
     checkLoginStatus
   }
 });
-setupReportObserver(dom.reportContainer);
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -364,15 +364,15 @@ async function onDatasetChange(): Promise<void> {
   showStatus('Loading dataset...', 'success');
 
   // Reload from disk with specific SC/DC files
-  reconciler = new DataReconciler();
+  store = createDataStore();
   const result = await ipcRenderer.invoke('scan-in-directory');
   if (!result.success || !result.files?.length) return;
 
-  const loaded = loadSourceFiles(result.files, reconciler, false, dataset.scFile, dataset.dcFile);
+  const loaded = loadSourceFiles(result.files, store, false, dataset.scFile, dataset.dcFile);
   const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;
 
   if (anyLoaded) {
-    reconciler.buildUnifiedDataset();
+    store.unified = buildUnifiedDataset(store);
     await saveUnifiedDatasetToDisk();
     enableReportButtons();
     showStatus(`Loaded dataset: ${dataset.label}`, 'success');
@@ -390,9 +390,9 @@ if (dom.datasetSelect) {
 
 type FileLoadResult = { loaded: boolean; issue?: string };
 
-function loadJsonFile(file: DataFileInfo, rec: DataReconciler): FileLoadResult {
+function loadJsonFile(file: DataFileInfo, rec: DataStore): FileLoadResult {
   if (isSmartCookieAPIFormat(file.data)) {
-    rec.importSmartCookieAPI(file.data);
+    importSmartCookieAPI(rec, file.data);
     return { loaded: true };
   }
   return { loaded: false, issue: `Smart Cookie JSON not recognized: ${file.name}` };
@@ -421,7 +421,7 @@ interface LoadedSources {
 }
 
 /** Find and load all data source files, updating UI status indicators */
-function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: boolean, specificSc?: DataFileInfo | null, specificDc?: DataFileInfo | null): LoadedSources {
+function loadSourceFiles(files: DataFileInfo[], rec: DataStore, updateTs: boolean, specificSc?: DataFileInfo | null, specificDc?: DataFileInfo | null): LoadedSources {
   const issues: string[] = [];
   const scFile = specificSc !== undefined ? specificSc : findLatestFile(files, 'SC-', '.json');
   const dcFile = specificDc !== undefined ? specificDc : findLatestFile(files, 'DC-', '.xlsx');
@@ -440,7 +440,7 @@ function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: b
   // Digital Cookie (Excel)
   let dc = false;
   if (dcFile) {
-    const r = loadExcelFile(dcFile, isDigitalCookieFormat, (data) => rec.importDigitalCookie(data), 'Digital Cookie XLSX not recognized');
+    const r = loadExcelFile(dcFile, isDigitalCookieFormat, (data) => importDigitalCookie(rec, data), 'Digital Cookie XLSX not recognized');
     dc = r.loaded;
     if (r.loaded) updateSourceStatus(dom.status.dcStatus, dom.status.dcLastSync, dcFile.name, 'DC-', '.xlsx', updateTs);
     else if (r.issue) issues.push(r.issue);
@@ -452,7 +452,7 @@ function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: b
     const r = loadExcelFile(
       scReportFile,
       (data) => data?.length > 0,
-      (data) => rec.importSmartCookieReport(data),
+      (data) => importSmartCookieReport(rec, data),
       'Smart Cookie Report empty/unreadable'
     );
     scReport = r.loaded;
@@ -465,7 +465,7 @@ function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: b
     const r = loadExcelFile(
       scTransferFile,
       (data) => data?.length > 0,
-      (data) => rec.importSmartCookie(data),
+      (data) => importSmartCookie(rec, data),
       'Smart Cookie Transfer empty/unreadable'
     );
     scTransfer = r.loaded;
@@ -482,7 +482,7 @@ async function loadDataFromDisk(showMessages: boolean = true, updateTimestamps: 
   try {
     if (showMessages) showStatus('Loading data...', 'success');
 
-    reconciler = new DataReconciler();
+    store = createDataStore();
     const result = await ipcRenderer.invoke('scan-in-directory');
     if (!result.success || !result.files?.length) return false;
 
@@ -490,16 +490,16 @@ async function loadDataFromDisk(showMessages: boolean = true, updateTimestamps: 
     datasetList = buildDatasetList(result.files);
     populateDatasetDropdown(datasetList);
 
-    const loaded = loadSourceFiles(result.files, reconciler, updateTimestamps);
+    const loaded = loadSourceFiles(result.files, store, updateTimestamps);
     const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;
 
     if (anyLoaded) {
       Logger.debug('Building unified dataset...');
-      reconciler.buildUnifiedDataset();
-      if (reconciler.unified?.metadata?.healthChecks?.warningsCount > 0) {
-        Logger.warn('Health check warnings:', reconciler.unified.metadata.warnings);
+      store.unified = buildUnifiedDataset(store);
+      if (store.unified?.metadata?.healthChecks?.warningsCount > 0) {
+        Logger.warn('Health check warnings:', store.unified.metadata.warnings);
       }
-      Logger.info('Unified dataset ready:', { scouts: reconciler.unified.scouts.size, siteOrders: reconciler.unified.siteOrders });
+      Logger.info('Unified dataset ready:', { scouts: store.unified.scouts.size, siteOrders: store.unified.siteOrders });
 
       await saveUnifiedDatasetToDisk();
       enableReportButtons();
@@ -569,79 +569,89 @@ function isSmartCookieAPIFormat(data: Record<string, any>): boolean {
 // REPORT GENERATION
 // ============================================================================
 
-const REPORT_CONFIG = {
-  troop: { button: () => dom.buttons.troopSummaryBtn, generator: () => generateTroopSummaryReport(reconciler) },
-  inventory: { button: () => dom.buttons.inventoryReportBtn, generator: () => generateInventoryReport(reconciler) },
-  summary: { button: () => dom.buttons.summaryReportBtn, generator: () => generateSummaryReport(reconciler) },
-  variety: { button: () => dom.buttons.varietyReportBtn, generator: () => generateVarietyReport(reconciler) },
-  'donation-alert': { button: () => dom.buttons.donationAlertBtn, generator: () => generateDonationAlertReport(reconciler) },
-  booth: { button: () => dom.buttons.boothReportBtn, generator: () => generateBoothReport(reconciler) },
+const REPORT_CONFIG: Record<string, { button: () => HTMLElement | null; renderReport: () => void }> = {
+  troop: {
+    button: () => dom.buttons.troopSummaryBtn,
+    renderReport: () => render(h(TroopSummaryReport, { data: store.unified }), dom.reportContainer!)
+  },
+  inventory: {
+    button: () => dom.buttons.inventoryReportBtn,
+    renderReport: () => render(h(InventoryReport, { data: store.unified, transfers: store.transfers }), dom.reportContainer!)
+  },
+  summary: {
+    button: () => dom.buttons.summaryReportBtn,
+    renderReport: () => render(h(ScoutSummaryReport, { data: store.unified }), dom.reportContainer!)
+  },
+  variety: {
+    button: () => dom.buttons.varietyReportBtn,
+    renderReport: () => render(h(VarietyReport, { data: store.unified }), dom.reportContainer!)
+  },
+  'donation-alert': {
+    button: () => dom.buttons.donationAlertBtn,
+    renderReport: () => render(h(DonationAlertReport, {
+      data: store.unified,
+      virtualCSAllocations: store.virtualCookieShareAllocations
+    }), dom.reportContainer!)
+  },
+  booth: {
+    button: () => dom.buttons.boothReportBtn,
+    renderReport: () => render(h(BoothReport, { data: store.unified }), dom.reportContainer!)
+  },
   'available-booths': {
     button: () => dom.buttons.availableBoothsBtn,
-    generator: () =>
-      generateAvailableBoothsReport(reconciler, {
+    renderReport: () => render(h(AvailableBoothsReport, {
+      data: store.unified,
+      config: {
         filters: appConfig?.boothDayFilters || [],
         ignoredTimeSlots: appConfig?.ignoredTimeSlots || []
-      })
+      },
+      onIgnoreSlot: handleIgnoreSlot,
+      onRefresh: handleRefreshBoothAvailability
+    }), dom.reportContainer!)
   }
 };
 
-async function handleRefreshBoothAvailability(): Promise<void> {
-  const btn = document.getElementById('refreshBoothAvailability') as HTMLButtonElement | null;
-  if (btn) {
-    btn.disabled = true;
-    btn.textContent = 'Refreshing...';
-  }
+async function handleIgnoreSlot(boothId: number, date: string, startTime: string): Promise<void> {
+  const ignored = appConfig?.ignoredTimeSlots || [];
+  ignored.push({ boothId, date, startTime });
+  if (appConfig) appConfig.ignoredTimeSlots = ignored;
+  await ipcRenderer.invoke('update-config', { ignoredTimeSlots: ignored });
+  generateReport('available-booths');
+  if (dom.buttons.availableBoothsBtn) dom.buttons.availableBoothsBtn.textContent = getAvailableBoothsWarningLabel();
+}
 
+async function handleRefreshBoothAvailability(): Promise<void> {
   try {
     const result = await ipcRenderer.invoke('refresh-booth-locations');
-
     if (!result?.success) {
-      const errMsg = result?.error || 'Unknown error';
-      if (btn) {
-        btn.textContent = errMsg;
-        setTimeout(() => {
-          btn.textContent = 'Refresh Availability';
-          btn.disabled = false;
-        }, 3000);
-      }
+      Logger.error('Booth availability refresh failed:', result?.error);
       return;
     }
 
-    // Map raw API data to BoothLocation[]
     const rawLocations: any[] = result.data || [];
     const updated = rawLocations.map(normalizeBoothLocation);
 
-    // Merge into reconciler
-    reconciler.boothLocations = updated;
-    if (reconciler.unified) {
-      reconciler.unified.boothLocations = updated;
+    store.boothLocations = updated;
+    if (store.unified) {
+      store.unified.boothLocations = updated;
     }
 
-    // Re-render available booths report
     generateReport('available-booths');
   } catch (error) {
     Logger.error('Booth availability refresh failed:', error);
-    if (btn) {
-      btn.textContent = 'Refresh failed';
-      setTimeout(() => {
-        btn.textContent = 'Refresh Availability';
-        btn.disabled = false;
-      }, 3000);
-    }
   }
 }
 
 function generateReport(type: string): void {
   if (!dom.reportContainer) return;
 
-  const unknownTypes = reconciler.unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
+  const unknownTypes = store.unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
   if (unknownTypes > 0) {
     renderHealthBanner({
       level: 'error',
       title: 'Blocked: Unknown Order Types Detected',
       message: `Found ${unknownTypes} unknown Digital Cookie order type(s). Update classification rules before viewing reports.`,
-      details: reconciler.unified?.metadata?.warnings || []
+      details: store.unified?.metadata?.warnings || []
     });
     return;
   }
@@ -653,46 +663,16 @@ function generateReport(type: string): void {
 
   const config = REPORT_CONFIG[type];
   if (config) {
-    dom.reportContainer.innerHTML = config.generator();
+    render(null, dom.reportContainer);
+    config.renderReport();
     const btn = config.button();
     if (btn) btn.classList.add('active');
     dom.reportContainer.classList.add('show');
-
-    // Wire up booth availability refresh button and ignore buttons if present
-    if (type === 'available-booths') {
-      const refreshBtn = document.getElementById('refreshBoothAvailability');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', handleRefreshBoothAvailability);
-      }
-
-      // Wire ignore (×) buttons on time slot chips
-      dom.reportContainer.querySelectorAll('.booth-slot-ignore').forEach((btn) => {
-        btn.addEventListener('click', async (e: Event) => {
-          e.stopPropagation();
-          const target = e.currentTarget as HTMLElement;
-          const boothId = Number(target.dataset.boothId);
-          const date = target.dataset.date || '';
-          const startTime = target.dataset.startTime || '';
-          if (!boothId || !date || !startTime) return;
-
-          const ignored = appConfig?.ignoredTimeSlots || [];
-          ignored.push({ boothId, date, startTime });
-          if (appConfig) appConfig.ignoredTimeSlots = ignored;
-          await ipcRenderer.invoke('update-config', { ignoredTimeSlots: ignored });
-
-          // Re-render the report with updated ignore list
-          generateReport('available-booths');
-
-          // Update warning badge on the button
-          if (dom.buttons.availableBoothsBtn) dom.buttons.availableBoothsBtn.textContent = getAvailableBoothsWarningLabel();
-        });
-      });
-    }
   }
 }
 
-function getBoothWarningLabel(rec: DataReconciler): string {
-  const boothReservations = rec.unified?.boothReservations || [];
+function getBoothWarningLabel(): string {
+  const boothReservations = store.unified?.boothReservations || [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -708,20 +688,20 @@ function getBoothWarningLabel(rec: DataReconciler): string {
 }
 
 function getScoutWarningLabel(): string {
-  const hasNegativeInventory = reconciler.unified?.troopTotals?.scouts?.withNegativeInventory > 0;
+  const hasNegativeInventory = store.unified?.troopTotals?.scouts?.withNegativeInventory > 0;
   const hasUnallocated =
-    reconciler.unified?.siteOrders?.directShip?.hasWarning ||
-    reconciler.unified?.siteOrders?.girlDelivery?.hasWarning ||
-    reconciler.unified?.siteOrders?.boothSale?.hasWarning;
+    store.unified?.siteOrders?.directShip?.hasWarning ||
+    store.unified?.siteOrders?.girlDelivery?.hasWarning ||
+    store.unified?.siteOrders?.boothSale?.hasWarning;
   return hasNegativeInventory || hasUnallocated ? '⚠️ Scouts' : 'Scouts';
 }
 
 function getDonationWarningLabel(): string {
-  return reconciler.unified?.cookieShare?.reconciled ? 'Donations' : '⚠️ Donations';
+  return store.unified?.cookieShare?.reconciled ? 'Donations' : '⚠️ Donations';
 }
 
 function getAvailableBoothsWarningLabel(): string {
-  const boothLocations = reconciler.unified?.boothLocations || [];
+  const boothLocations = store.unified?.boothLocations || [];
   const filters = appConfig?.boothDayFilters || [];
   const ignored = appConfig?.ignoredTimeSlots || [];
   const count = countAvailableSlots(boothLocations, filters, ignored);
@@ -729,7 +709,7 @@ function getAvailableBoothsWarningLabel(): string {
 }
 
 function enableReportButtons(): void {
-  const unknownTypes = reconciler.unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
+  const unknownTypes = store.unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
 
   // All report buttons (viewUnifiedDataBtn always enabled even when blocked)
   const reportButtons = [
@@ -749,7 +729,7 @@ function enableReportButtons(): void {
       level: 'error',
       title: 'Blocked: Unknown Order Types Detected',
       message: `Found ${unknownTypes} unknown Digital Cookie order type(s). Update classification rules before viewing reports.`,
-      details: reconciler.unified?.metadata?.warnings || []
+      details: store.unified?.metadata?.warnings || []
     });
     return;
   }
@@ -761,7 +741,7 @@ function enableReportButtons(): void {
   // Apply warning labels
   if (dom.buttons.summaryReportBtn) dom.buttons.summaryReportBtn.textContent = getScoutWarningLabel();
   if (dom.buttons.donationAlertBtn) dom.buttons.donationAlertBtn.textContent = getDonationWarningLabel();
-  if (dom.buttons.boothReportBtn) dom.buttons.boothReportBtn.textContent = getBoothWarningLabel(reconciler);
+  if (dom.buttons.boothReportBtn) dom.buttons.boothReportBtn.textContent = getBoothWarningLabel();
   if (dom.buttons.availableBoothsBtn) dom.buttons.availableBoothsBtn.textContent = getAvailableBoothsWarningLabel();
 
   generateReport('troop');
@@ -772,7 +752,7 @@ function enableReportButtons(): void {
 // ============================================================================
 
 function exportUnifiedDataset(): void {
-  if (!reconciler.unified) {
+  if (!store.unified) {
     alert('No unified dataset available to export.');
     return;
   }
@@ -808,44 +788,49 @@ function renderHealthBanner({
   details?: Array<{ type: string; message?: string }>;
 }): void {
   if (!dom.reportContainer) return;
-  const bannerStyle =
-    level === 'error'
-      ? 'background:#FFEBEE;border-left:4px solid #C62828;color:#B71C1C;'
-      : 'background:#FFF8E1;border-left:4px solid #F57F17;color:#E65100;';
+  const isError = level === 'error';
+  const bannerStyle = {
+    padding: '15px',
+    borderRadius: '8px',
+    background: isError ? '#FFEBEE' : '#FFF8E1',
+    borderLeft: isError ? '4px solid #C62828' : '4px solid #F57F17',
+    color: isError ? '#B71C1C' : '#E65100'
+  };
 
-  const detailList = details.length
-    ? `<pre style="margin:10px 0 0;white-space:pre-wrap;">${JSON.stringify(details.slice(0, 20), null, 2)}</pre>
-       ${details.length > 20 ? `<p style="margin:8px 0 0;">…and ${details.length - 20} more</p>` : ''}`
-    : '';
-
-  dom.reportContainer.innerHTML = `
-    <div class="report-visual">
-      <div style="padding:15px;border-radius:8px;${bannerStyle}">
-        <strong>${title}</strong>
-        <p style="margin:8px 0 0;">${message}</p>
-        ${detailList}
-      </div>
-    </div>
-  `;
+  render(
+    h('div', { class: 'report-visual' },
+      h('div', { style: bannerStyle },
+        h('strong', null, title),
+        h('p', { style: { margin: '8px 0 0' } }, message),
+        details.length > 0 && h('pre', { style: { margin: '10px 0 0', whiteSpace: 'pre-wrap' } },
+          JSON.stringify(details.slice(0, 20), null, 2)
+        ),
+        details.length > 20 && h('p', { style: { margin: '8px 0 0' } },
+          `…and ${details.length - 20} more`
+        )
+      )
+    ),
+    dom.reportContainer
+  );
 }
 
 function serializeUnifiedDataset(): Record<string, any> {
   return {
-    scouts: Array.from(reconciler.unified.scouts.entries()).map(([name, scout]) => ({
+    scouts: Array.from(store.unified.scouts.entries()).map(([name, scout]) => ({
       name,
       ...scout
     })),
-    siteOrders: reconciler.unified.siteOrders,
-    troopTotals: reconciler.unified.troopTotals,
-    transferBreakdowns: reconciler.unified.transferBreakdowns,
-    varieties: reconciler.unified.varieties,
-    cookieShare: reconciler.unified.cookieShare,
-    metadata: reconciler.unified.metadata
+    siteOrders: store.unified.siteOrders,
+    troopTotals: store.unified.troopTotals,
+    transferBreakdowns: store.unified.transferBreakdowns,
+    varieties: store.unified.varieties,
+    cookieShare: store.unified.cookieShare,
+    metadata: store.unified.metadata
   };
 }
 
 async function saveUnifiedDatasetToDisk(): Promise<void> {
-  if (!reconciler.unified) {
+  if (!store.unified) {
     Logger.debug('No unified dataset to save');
     return;
   }

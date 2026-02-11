@@ -3,7 +3,8 @@
 
 import { ORDER_TYPE, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
-import type { IDataReconciler, Scout, Transfer, Varieties, VarietiesResult } from '../../types';
+import type { Scout, Transfer, Varieties, VarietiesResult } from '../../types';
+import type { DataStore } from '../../data-store';
 
 /** Add physical varieties (excluding Cookie Share) to accumulator */
 function addVarieties(source: Varieties, target: Varieties): void {
@@ -28,7 +29,7 @@ function addVarieties(source: Varieties, target: Varieties): void {
  * - Subtract ALL T2G varieties (physical + virtual booth + booth divider)
  * - Cookie Share excluded (virtual, never in physical inventory)
  */
-export function buildVarieties(reconciler: IDataReconciler, scouts: Map<string, Scout>): VarietiesResult {
+export function buildVarieties(reconciler: DataStore, scouts: Map<string, Scout>): VarietiesResult {
   const byCookie: Varieties = {};
   const inventory: Varieties = {};
 

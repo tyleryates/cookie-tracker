@@ -30,6 +30,10 @@
     "noImplicitReturns": false,
     "noFallthroughCasesInSwitch": false,
 
+    // JSX support (Preact)
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+
     // Other options
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -37,7 +41,8 @@
     "checkJs": false  // Don't type-check JS files yet
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/**/*.tsx"
   ],
   "exclude": [
     "node_modules",

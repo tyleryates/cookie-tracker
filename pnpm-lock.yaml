@@ -23,6 +23,9 @@ importers:
       electron-updater:
         specifier: ^6.1.7
         version: 6.7.3
+      preact:
+        specifier: ^10.28.3
+        version: 10.28.3
       tippy.js:
         specifier: ^6.3.7
         version: 6.3.7
@@ -1397,6 +1400,9 @@ packages:
     resolution: {integrity: sha512-b9Eb8h2eVqNE8edvKdwqkrY6O7kAwmI8kcnBv1NScolYJbo59XUF0noFq+lxbC1yN20bmC0WBEbDC5H/7ASb0A==}
     engines: {node: '>=14.0.0'}
     hasBin: true
+
+  preact@10.28.3:
+    resolution: {integrity: sha512-tCmoRkPQLpBeWzpmbhryairGnhW9tKV6c6gr/w+RhoRoKEJwsjzipwp//1oCpGPOchvSLaAPlpcJi9MwMmoPyA==}
 
   proc-log@5.0.0:
     resolution: {integrity: sha512-Azwzvl90HaF0aCz1JrDdXQykFakSSNPaPoiZ9fm5qJIMHioDZEi7OAdRwSm6rSoPtY3Qutnm3L7ogmg3dc+wbQ==}
@@ -3345,6 +3351,8 @@ snapshots:
     dependencies:
       commander: 9.5.0
     optional: true
+
+  preact@10.28.3: {}
 
   proc-log@5.0.0: {}
 

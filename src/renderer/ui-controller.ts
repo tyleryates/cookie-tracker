@@ -4,11 +4,9 @@
  */
 
 import { ipcRenderer } from 'electron';
-import tippy, { type ReferenceElement } from 'tippy.js';
-import { UI_TIMING } from '../constants';
 import Logger from '../logger';
 import type { Credentials } from '../types';
-import { DateFormatter } from './html-builder';
+import { DateFormatter } from './format-utils';
 
 // Progress update from scrape events
 interface ScrapeProgress {
@@ -45,9 +43,6 @@ interface RefreshFromWebOptions {
 const TIMEOUTS = {
   STATUS_MESSAGE_HIDE: 5000 // Hide success message after 5 seconds
 };
-
-// Global observer for cleanup
-let reportObserver: MutationObserver | null = null;
 
 // ============================================================================
 // WEB REFRESH HANDLER
@@ -310,62 +305,6 @@ async function checkLoginStatus(): Promise<void> {
 }
 
 // ============================================================================
-// TOOLTIP MANAGEMENT
-// ============================================================================
-
-// Initialize Tippy.js tooltips for dynamically created elements
-function initializeTooltips(): void {
-  const tooltipElements = document.querySelectorAll('.tooltip-cell[data-tooltip]');
-  tooltipElements.forEach((element: Element) => {
-    // Skip if already initialized
-    if ((element as ReferenceElement)._tippy) return;
-
-    tippy(element, {
-      content: element.getAttribute('data-tooltip'),
-      allowHTML: false,
-      interactive: true, // Allow hovering over tooltip to select text
-      delay: [UI_TIMING.TOOLTIP_DELAY_SHOW, UI_TIMING.TOOLTIP_DELAY_HIDE],
-      placement: 'top',
-      arrow: false,
-      theme: 'dark',
-      maxWidth: 'none', // Allow tooltip to expand to content width
-      popperOptions: {
-        modifiers: [
-          {
-            name: 'preventOverflow',
-            options: {
-              boundary: 'viewport'
-            }
-          }
-        ]
-      }
-    });
-  });
-}
-
-function setupReportObserver(reportContainer: HTMLElement | null): void {
-  // Disconnect existing observer if any
-  if (reportObserver) {
-    reportObserver.disconnect();
-  }
-
-  // Call initializeTooltips whenever report container changes
-  if (reportContainer) {
-    reportObserver = new MutationObserver(() => {
-      initializeTooltips();
-    });
-    reportObserver.observe(reportContainer, { childList: true, subtree: true });
-  }
-}
-
-function cleanup(): void {
-  if (reportObserver) {
-    reportObserver.disconnect();
-    reportObserver = null;
-  }
-}
-
-// ============================================================================
 // EVENT SETUP
 // ============================================================================
 
@@ -436,29 +375,6 @@ function setupModalHandlers(
   return openModalFn as any;
 }
 
-/** Wire up expandable row toggles via event delegation */
-function setupRowToggleDelegation(reportContainer: HTMLElement): void {
-  reportContainer.addEventListener('click', (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-
-    const scoutRow = target.closest('.scout-row') as HTMLElement | null;
-    if (scoutRow) {
-      const detailRow = reportContainer.querySelector(
-        `.scout-detail[data-scout-index="${scoutRow.dataset.scoutIndex}"]`
-      ) as HTMLElement | null;
-      toggleDetailRow(detailRow, scoutRow.querySelector('.expand-icon'));
-    }
-
-    const boothRow = target.closest('.booth-row') as HTMLElement | null;
-    if (boothRow) {
-      const detailRow = boothRow.nextElementSibling as HTMLElement | null;
-      if (detailRow?.classList.contains('detail-row')) {
-        toggleDetailRow(detailRow, boothRow.querySelector('.expand-icon'));
-      }
-    }
-  });
-}
-
 function setupEventListeners(config: Record<string, any>): void {
   const { buttons, modal, fields, progress, status, reportContainer, actions } = config;
   const { dcProgress, dcProgressFill, dcProgressText, scProgress, scProgressFill, scProgressText } = progress;
@@ -525,25 +441,6 @@ function setupEventListeners(config: Record<string, any>): void {
     }
   });
 
-  // Row toggle delegation
-  if (reportContainer) setupRowToggleDelegation(reportContainer);
-
-  window.addEventListener('beforeunload', cleanup);
-}
-
-// ============================================================================
-// ROW TOGGLE HELPER
-// ============================================================================
-
-function toggleDetailRow(detailRow: HTMLElement | null, icon: Element | null): void {
-  if (!detailRow) return;
-  if (detailRow.style.display === 'none') {
-    detailRow.style.display = 'table-row';
-    if (icon) icon.textContent = '▼';
-  } else {
-    detailRow.style.display = 'none';
-    if (icon) icon.textContent = '▶';
-  }
 }
 
 // ============================================================================
@@ -556,7 +453,6 @@ export {
   updateSyncStatus,
   showStatus,
   checkLoginStatus,
-  setupReportObserver,
   setupEventListeners
 };
 export type { RefreshFromWebOptions };
