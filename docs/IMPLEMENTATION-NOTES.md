@@ -33,9 +33,9 @@ src/
 ├── data-processing/
 │   ├── utils.ts                 # Shared helpers (sumPhysicalPackages, isC2TTransfer, etc.)
 │   ├── data-importers.ts        # Import & parsing functions
-│   ├── data-calculators.ts      # Orchestrator: calls calculators/ in order
+│   ├── data-calculators.ts      # Re-exports buildUnifiedDataset from calculators/
 │   └── calculators/             # Individual calculation modules
-│       ├── index.ts             # Re-exports buildScoutDataset, buildUnifiedDataset
+│       ├── index.ts             # Orchestrator: builds scout dataset & unified dataset
 │       ├── scout-initialization.ts  # Phase 1: Create scout objects from all sources
 │       ├── order-processing.ts      # Phase 2: Classify & add DC orders to scouts
 │       ├── allocation-processing.ts # Phase 3-4: T2G inventory + divider allocations
@@ -52,13 +52,13 @@ src/
     ├── index.ts                 # Scraper orchestration
     ├── digital-cookie.ts        # Digital Cookie API client
     ├── smart-cookie.ts          # Smart Cookie API client
-    └── request-utils.ts         # Retry logic & rate limiting
+    └── request-utils.ts         # Shared HTTP helpers (retry logic, rate limiting)
 ```
 
 ### Module Boundaries
 
 - **renderer.ts** coordinates data loading and report generation; **ui-controller.ts** handles UI interactions; **html-builder.ts** provides HTML utilities; **reports/** contains focused report generators.
-- **data-reconciler.ts** manages state and transfer creation (including `classifyTransferCategory()`); **data-importers.ts** handles parsing; **data-calculators.ts** orchestrates the calculator modules; **calculators/** contains individual computation modules for each aspect of the unified dataset.
+- **data-reconciler.ts** manages state and transfer creation (including `classifyTransferCategory()`); **data-importers.ts** handles parsing; **calculators/index.ts** orchestrates the calculator modules to build the unified dataset; **calculators/** contains individual computation modules for each aspect of the unified dataset.
 - Modules have clear boundaries with no circular dependencies.
 
 ### Extensibility
@@ -93,10 +93,7 @@ Pre-calculated and derived fields use a `$` prefix to distinguish them from raw 
 
 **Scout-level $ fields:**
 - `$issues` — Data quality flags: negativeInventory array
-- `totals.$orderRevenue` — Revenue from DC orders only (before credited revenue)
-- `totals.$creditedRevenue` — Revenue from credited allocations (booth, virtual booth, direct ship)
-- `totals.$troopProceeds` — Troop proceeds for this scout ($0.90/pkg after first 50 exempt)
-- `totals.$proceedsDeduction` — Amount deducted from proceeds for exempt packages
+- `$hasUnallocatedSiteOrders` — Whether site scout has unallocated orders (set by site-orders calculator)
 - `totals.$financials` — Cash collected, electronic payments, inventory value, unsold value, cash owed
 - `totals.$inventoryDisplay` — Per-variety inventory for display (positive values only)
 
@@ -144,8 +141,8 @@ Per-scout summaries containing:
 - **Orders** — Classified with owner, orderType, needsInventory, physicalPackages, donations
 - **Inventory** — From physical T2G transfers: total and per-variety breakdown
 - **Credited** — Three allocation types: virtualBooth, directShip, boothSales (each with packages, varieties, allocations[])
-- **Totals** — Pre-calculated: sales, shipped, credited, donations, totalSold, inventory
-- **$ Fields** — Derived: $issues, totals.$orderRevenue, $creditedRevenue, $troopProceeds, $proceedsDeduction, $financials, $inventoryDisplay
+- **Totals** — Pre-calculated: delivered, shipped, credited, donations, totalSold, inventory
+- **$ Fields** — Derived: $issues, $hasUnallocatedSiteOrders, $financials, $inventoryDisplay
 
 ---
 
@@ -179,7 +176,7 @@ Orders are deduplicated by order number (normalized: strip prefixes, convert to 
 
 `buildUnifiedDataset()` returns:
 - **scouts** — Complete scout data with all calculated fields
-- **troopTotals** — Troop-level aggregates (sold, revenue, inventory, proceeds, `packagesSoldFromStock`)
+- **troopTotals** — Troop-level aggregates (sold, revenue, inventory, proceeds)
 - **transferBreakdowns** — Pre-classified transfer lists (c2t, t2g, g2t)
 - **varieties** — Per-variety totals and inventory
 - **cookieShare** — DC vs SC Cookie Share tracking

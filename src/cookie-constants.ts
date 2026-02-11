@@ -193,7 +193,6 @@ const COOKIE_PRICES = {
 
 // Troop proceeds per package (what the troop gets to keep)
 // Rate depends on Per Girl Average (PGA = packages credited / active girls)
-export const TROOP_PROCEEDS_PER_PACKAGE = 0.9; // Default, used for per-scout estimates before PGA is known
 
 /** Get troop proceeds rate based on Per Girl Average */
 export function getTroopProceedsRate(pga: number): number {

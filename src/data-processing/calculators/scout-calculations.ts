@@ -5,9 +5,7 @@ import { ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
 import {
   COOKIE_TYPE,
   calculateRevenue,
-  PHYSICAL_COOKIE_TYPES,
-  PROCEEDS_EXEMPT_PACKAGES,
-  TROOP_PROCEEDS_PER_PACKAGE
+  PHYSICAL_COOKIE_TYPES
 } from '../../cookie-constants';
 import type { CookieType, Order, Scout, Varieties } from '../../types';
 import { calculateSalesByVariety, totalCredited } from './helpers';
@@ -69,28 +67,12 @@ function calculateOrderTotals(scout: Scout): void {
 /** Calculate credited totals from allocations */
 function calculateCreditedTotals(scout: Scout): void {
   scout.totals.credited = totalCredited(scout.credited);
-
-  scout.totals.$creditedRevenue =
-    calculateRevenue(scout.credited.virtualBooth.varieties) +
-    calculateRevenue(scout.credited.directShip.varieties) +
-    calculateRevenue(scout.credited.boothSales.varieties);
 }
 
-/** Calculate sold totals and proceeds */
+/** Calculate sold totals */
 function calculateRevenueTotals(scout: Scout): void {
   // Total sold across all channels
   scout.totals.totalSold = scout.totals.delivered + scout.totals.shipped + scout.totals.donations + scout.totals.credited;
-
-  // Troop proceeds (first 50 packages per active girl are exempt)
-  const grossProceeds = scout.totals.totalSold * TROOP_PROCEEDS_PER_PACKAGE;
-  if (!scout.isSiteOrder && scout.totals.totalSold > 0) {
-    const exemptPackages = Math.min(scout.totals.totalSold, PROCEEDS_EXEMPT_PACKAGES);
-    scout.totals.$proceedsDeduction = exemptPackages * TROOP_PROCEEDS_PER_PACKAGE;
-    scout.totals.$troopProceeds = grossProceeds - scout.totals.$proceedsDeduction;
-  } else {
-    scout.totals.$proceedsDeduction = 0;
-    scout.totals.$troopProceeds = grossProceeds;
-  }
 }
 
 /** Calculate physical revenue from order varieties (excludes Cookie Share) */

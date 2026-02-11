@@ -32,30 +32,29 @@ function buildInventoryCell(netInventory: number, negativeVarieties: any[] | und
   return `<span class="">—</span>`;
 }
 
+type OrderStatusClass = 'NEEDS_APPROVAL' | 'COMPLETED' | 'PENDING' | 'UNKNOWN';
+
+function classifyOrderStatus(status: string | undefined): OrderStatusClass {
+  if (!status) return 'UNKNOWN';
+  if (status.includes('Needs Approval')) return 'NEEDS_APPROVAL';
+  if (status === 'Status Delivered' || status.includes('Completed') || status.includes('Delivered') || status.includes('Shipped'))
+    return 'COMPLETED';
+  if (status.includes('Pending') || status.includes('Approved for Delivery')) return 'PENDING';
+  return 'UNKNOWN';
+}
+
 function getStatusStyle(status: string | undefined): { style: string; text: string } {
-  if (!status) {
-    return { style: '', text: status || '' };
+  const text = status === 'Status Delivered' ? 'Completed' : status || '';
+  switch (classifyOrderStatus(status)) {
+    case 'NEEDS_APPROVAL':
+      return { style: 'color: #f44336; font-weight: 600;', text: `${text} ⚠️` };
+    case 'COMPLETED':
+      return { style: 'color: #4CAF50;', text };
+    case 'PENDING':
+      return { style: 'color: #ff9800; font-weight: 600;', text };
+    default:
+      return { style: '', text };
   }
-
-  const needsApproval = status.includes('Needs Approval');
-  const text = status === 'Status Delivered' ? 'Completed' : status;
-
-  if (needsApproval) {
-    return { style: 'color: #f44336; font-weight: 600;', text: `${text} ⚠️` };
-  }
-
-  const isCompleted =
-    status === 'Status Delivered' || status.includes('Completed') || status.includes('Delivered') || status.includes('Shipped');
-  if (isCompleted) {
-    return { style: 'color: #4CAF50;', text };
-  }
-
-  const isPending = status.includes('Pending') || status.includes('Approved for Delivery');
-  if (isPending) {
-    return { style: 'color: #ff9800; font-weight: 600;', text };
-  }
-
-  return { style: '', text };
 }
 
 // Build tooltip lines for a single allocation source
@@ -367,24 +366,29 @@ function buildScoutDetailBreakdown(scout: Scout): string {
 }
 
 function getOrderStatusStyle(scout: Scout): { color: string; icon: string; tooltip: string } {
-  const ordersNeedingApproval = scout.orders.filter((order: Order) => order.status?.includes('Needs Approval'));
-  const ordersPending = scout.orders.filter(
-    (order: Order) => order.status && (order.status.includes('Pending') || order.status.includes('Approved for Delivery'))
-  );
-  const ordersCompleted = scout.orders.filter(
-    (order: Order) =>
-      order.status &&
-      (order.status === 'Status Delivered' ||
-        order.status.includes('Completed') ||
-        order.status.includes('Delivered') ||
-        order.status.includes('Shipped'))
-  );
+  let needsApproval = 0;
+  let pending = 0;
+  let completed = 0;
 
-  if (ordersNeedingApproval.length > 0) {
+  scout.orders.forEach((order: Order) => {
+    switch (classifyOrderStatus(order.status)) {
+      case 'NEEDS_APPROVAL':
+        needsApproval++;
+        break;
+      case 'PENDING':
+        pending++;
+        break;
+      case 'COMPLETED':
+        completed++;
+        break;
+    }
+  });
+
+  if (needsApproval > 0) {
     const tooltipParts = [];
-    tooltipParts.push(`${ordersNeedingApproval.length} need${ordersNeedingApproval.length === 1 ? 's' : ''} approval`);
-    if (ordersPending.length > 0) {
-      tooltipParts.push(`${ordersPending.length} pending deliver${ordersPending.length === 1 ? 'y' : 'ies'}`);
+    tooltipParts.push(`${needsApproval} need${needsApproval === 1 ? 's' : ''} approval`);
+    if (pending > 0) {
+      tooltipParts.push(`${pending} pending deliver${pending === 1 ? 'y' : 'ies'}`);
     }
     return {
       color: 'color: #f44336; font-weight: 600;',
@@ -393,15 +397,15 @@ function getOrderStatusStyle(scout: Scout): { color: string; icon: string; toolt
     };
   }
 
-  if (ordersPending.length > 0) {
+  if (pending > 0) {
     return {
       color: 'color: #ff9800; font-weight: 600;',
       icon: '',
-      tooltip: ` data-tooltip="${ordersPending.length} pending deliver${ordersPending.length === 1 ? 'y' : 'ies'}"`
+      tooltip: ` data-tooltip="${pending} pending deliver${pending === 1 ? 'y' : 'ies'}"`
     };
   }
 
-  if (ordersCompleted.length === scout.orders.length && scout.orders.length > 0) {
+  if (completed === scout.orders.length && scout.orders.length > 0) {
     return { color: 'color: #4CAF50; font-weight: 600;', icon: '', tooltip: '' };
   }
 
@@ -425,14 +429,18 @@ function buildDeliveredCell(sales: number, isSiteRow: boolean, scout: Scout, sit
 
 function buildProceedsCell(isSiteRow: boolean, totals: Scout['totals'], proceedsRate: number): string {
   if (isSiteRow) return '<td>-</td>';
-  const proceeds = Math.round(totals.$troopProceeds || 0);
-  const deduction = Math.round(totals.$proceedsDeduction || 0);
-  const style = proceeds > 0 ? 'color: #4CAF50; font-weight: 600;' : '';
-  if (deduction > 0) {
-    const tooltip = `First ${PROCEEDS_EXEMPT_PACKAGES} pkg exempt: -$${deduction}\nGross: $${Math.round((totals.totalSold || 0) * proceedsRate)}`;
-    return `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltip)}" style="${style}">$${proceeds}</td>`;
+  const totalSold = totals.totalSold || 0;
+  const exemptPackages = totalSold > 0 ? Math.min(totalSold, PROCEEDS_EXEMPT_PACKAGES) : 0;
+  const deduction = exemptPackages * proceedsRate;
+  const proceeds = (totalSold * proceedsRate) - deduction;
+  const proceedsRounded = Math.round(proceeds);
+  const deductionRounded = Math.round(deduction);
+  const style = proceedsRounded > 0 ? 'color: #4CAF50; font-weight: 600;' : '';
+  if (deductionRounded > 0) {
+    const tooltip = `First ${PROCEEDS_EXEMPT_PACKAGES} pkg exempt: -$${deductionRounded}\nGross: $${Math.round(totalSold * proceedsRate)}`;
+    return `<td class="tooltip-cell" data-tooltip="${escapeHtml(tooltip)}" style="${style}">$${proceedsRounded}</td>`;
   }
-  return `<td style="${style}">${proceeds > 0 ? `$${proceeds}` : '$0'}</td>`;
+  return `<td style="${style}">${proceedsRounded > 0 ? `$${proceedsRounded}` : '$0'}</td>`;
 }
 
 function buildCashOwedCell(isSiteRow: boolean, totals: Scout['totals']): string {

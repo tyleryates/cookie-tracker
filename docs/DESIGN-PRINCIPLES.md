@@ -117,8 +117,8 @@ transfer.physicalVarieties = { /* varieties without Cookie Share */ };
 // Explicit category from raw type + API flags — no remainder logic
 function classifyTransferCategory(type, virtualBooth, boothDivider, directShipDivider) {
   if (isIncomingInventory(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
-  if (type === 'G2T') return TRANSFER_CATEGORY.GIRL_RETURN;
-  if (type === 'T2G') {
+  if (type === TRANSFER_TYPE.G2T) return TRANSFER_CATEGORY.GIRL_RETURN;
+  if (type === TRANSFER_TYPE.T2G) {
     if (virtualBooth) return TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION;
     if (boothDivider) return TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION;
     if (directShipDivider) return TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION;
@@ -232,7 +232,7 @@ scout.breakdown           // Ambiguous: breakdown of what?
 
 - **Regular fields:** `packages`, `varieties`, `amount`
 - **Computed fields:** `physicalPackages`, `category`, `needsInventory`
-- **Derived aggregates:** `$issues`, `$orderRevenue`, `$creditedRevenue` ($ prefix)
+- **Derived aggregates:** `$issues`, `$financials`, `$inventoryDisplay` ($ prefix)
 
 ---
 

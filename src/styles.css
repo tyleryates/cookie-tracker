@@ -411,6 +411,30 @@ h2 {
   margin-bottom: 0;
 }
 
+/* Dataset Selector */
+.dataset-selector {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dataset-selector label {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--gray-700);
+  white-space: nowrap;
+}
+
+.dataset-selector .form-input {
+  width: auto;
+  display: inline-block;
+  padding: 6px 10px;
+  font-size: 0.9em;
+}
+
 /* Toggle Switch */
 .toggle-switch {
   display: inline-flex;

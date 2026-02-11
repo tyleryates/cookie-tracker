@@ -43,8 +43,8 @@ function generateTroopSummaryReport(reconciler: IDataReconciler): string {
   html += createHorizontalStats(inventoryStats);
 
   // Financial stats
-  const packagesCredited = troopTotals.ordered + troopTotals.directShip + troopTotals.donations;
-  const grossProceeds = troopTotals.troopProceeds + troopTotals.proceedsDeduction;
+  const packagesCredited = troopTotals.packagesCredited;
+  const grossProceeds = troopTotals.grossProceeds;
   const financialStats: { label: string; value: string; description: string; color: string }[] = [
     { label: 'Packages Credited', value: `${packagesCredited}`, description: 'Received + direct ship + donations', color: '#1565C0' },
     {

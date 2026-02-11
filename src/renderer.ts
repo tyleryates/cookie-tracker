@@ -28,6 +28,16 @@ import type { AppConfig, BoothReservationImported, DataFileInfo } from './types'
 let reconciler = new DataReconciler();
 let appConfig: AppConfig | null = null;
 
+interface DatasetEntry {
+  label: string;
+  scFile: DataFileInfo | null;
+  dcFile: DataFileInfo | null;
+  timestamp: Date;
+}
+
+let datasetList: DatasetEntry[] = [];
+let currentDatasetIndex = 0;
+
 const dom = {
   buttons: {
     configureLoginsBtn: document.getElementById('configureLoginsBtn'),
@@ -70,7 +80,8 @@ const dom = {
     scLastSync: document.getElementById('scLastSync'),
     importStatus: document.getElementById('importStatus')
   },
-  reportContainer: document.getElementById('reportContainer')
+  reportContainer: document.getElementById('reportContainer'),
+  datasetSelect: document.getElementById('datasetSelect') as HTMLSelectElement | null
 };
 
 // ============================================================================
@@ -239,6 +250,141 @@ function setButtonDisabled(btn: HTMLElement | null, disabled: boolean): void {
 }
 
 // ============================================================================
+// DATASET HISTORY
+// ============================================================================
+
+function parseTimestampFromFilename(name: string, prefix: string, ext: string): Date | null {
+  // e.g. "SC-2026-02-10-15-45-30.json" → "2026-02-10T15:45:30"
+  const stripped = name.replace(prefix, '').replace(ext, '');
+  const match = stripped.match(/^(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const [, y, mo, d, h, mi, s] = match;
+  return new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}`);
+}
+
+function buildDatasetList(files: DataFileInfo[]): DatasetEntry[] {
+  const scFiles = files
+    .filter((f) => f.name.startsWith('SC-') && f.extension === '.json')
+    .sort((a, b) => b.name.localeCompare(a.name));
+  const dcFiles = files
+    .filter((f) => f.name.startsWith('DC-') && f.extension === '.xlsx')
+    .sort((a, b) => b.name.localeCompare(a.name));
+
+  const pairedDc = new Set<string>();
+  const entries: DatasetEntry[] = [];
+
+  for (const sc of scFiles) {
+    const scTs = parseTimestampFromFilename(sc.name, 'SC-', '.json');
+    if (!scTs) continue;
+
+    // Find closest DC file within 5 minutes
+    let bestDc: DataFileInfo | null = null;
+    let bestDiff = Infinity;
+    for (const dc of dcFiles) {
+      if (pairedDc.has(dc.name)) continue;
+      const dcTs = parseTimestampFromFilename(dc.name, 'DC-', '.xlsx');
+      if (!dcTs) continue;
+      const diff = Math.abs(scTs.getTime() - dcTs.getTime());
+      if (diff < 5 * 60 * 1000 && diff < bestDiff) {
+        bestDiff = diff;
+        bestDc = dc;
+      }
+    }
+
+    if (bestDc) pairedDc.add(bestDc.name);
+    entries.push({
+      label: DateFormatter.toFullTimestamp(scTs),
+      scFile: sc,
+      dcFile: bestDc,
+      timestamp: scTs
+    });
+  }
+
+  // Standalone DC files (unpaired)
+  for (const dc of dcFiles) {
+    if (pairedDc.has(dc.name)) continue;
+    const dcTs = parseTimestampFromFilename(dc.name, 'DC-', '.xlsx');
+    if (!dcTs) continue;
+    entries.push({
+      label: DateFormatter.toFullTimestamp(dcTs),
+      scFile: null,
+      dcFile: dc,
+      timestamp: dcTs
+    });
+  }
+
+  // Sort newest first
+  entries.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+  // Mark latest
+  if (entries.length > 0) {
+    entries[0].label += ' (Latest)';
+  }
+
+  return entries;
+}
+
+function populateDatasetDropdown(datasets: DatasetEntry[]): void {
+  const select = dom.datasetSelect;
+  if (!select) return;
+
+  select.innerHTML = '';
+
+  if (datasets.length === 0) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No data';
+    select.appendChild(opt);
+    return;
+  }
+
+  datasets.forEach((ds, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    const parts: string[] = [];
+    if (ds.scFile) parts.push('SC');
+    if (ds.dcFile) parts.push('DC');
+    opt.textContent = `${ds.label} [${parts.join('+')}]`;
+    select.appendChild(opt);
+  });
+
+  select.selectedIndex = 0;
+  currentDatasetIndex = 0;
+}
+
+async function onDatasetChange(): Promise<void> {
+  const select = dom.datasetSelect;
+  if (!select || datasetList.length === 0) return;
+
+  const idx = parseInt(select.value, 10);
+  if (isNaN(idx) || idx === currentDatasetIndex) return;
+  currentDatasetIndex = idx;
+
+  const dataset = datasetList[idx];
+  showStatus('Loading dataset...', 'success');
+
+  // Reload from disk with specific SC/DC files
+  reconciler = new DataReconciler();
+  const result = await ipcRenderer.invoke('scan-in-directory');
+  if (!result.success || !result.files?.length) return;
+
+  const loaded = loadSourceFiles(result.files, reconciler, false, dataset.scFile, dataset.dcFile);
+  const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;
+
+  if (anyLoaded) {
+    reconciler.buildUnifiedDataset();
+    await saveUnifiedDatasetToDisk();
+    enableReportButtons();
+    showStatus(`Loaded dataset: ${dataset.label}`, 'success');
+  }
+}
+
+// Wire up dataset change listener
+if (dom.datasetSelect) {
+  dom.datasetSelect.addEventListener('change', onDatasetChange);
+}
+
+// ============================================================================
 // DATA LOADING
 // ============================================================================
 
@@ -275,10 +421,10 @@ interface LoadedSources {
 }
 
 /** Find and load all data source files, updating UI status indicators */
-function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: boolean): LoadedSources {
+function loadSourceFiles(files: DataFileInfo[], rec: DataReconciler, updateTs: boolean, specificSc?: DataFileInfo | null, specificDc?: DataFileInfo | null): LoadedSources {
   const issues: string[] = [];
-  const scFile = findLatestFile(files, 'SC-', '.json');
-  const dcFile = findLatestFile(files, 'DC-', '.xlsx');
+  const scFile = specificSc !== undefined ? specificSc : findLatestFile(files, 'SC-', '.json');
+  const dcFile = specificDc !== undefined ? specificDc : findLatestFile(files, 'DC-', '.xlsx');
   const scReportFile = findLatestFile(files, '', '.xlsx', 'ReportExport');
   const scTransferFile = findLatestFile(files, '', '.xlsx', 'CookieOrders');
 
@@ -339,6 +485,10 @@ async function loadDataFromDisk(showMessages: boolean = true, updateTimestamps: 
     reconciler = new DataReconciler();
     const result = await ipcRenderer.invoke('scan-in-directory');
     if (!result.success || !result.files?.length) return false;
+
+    // Build dataset list and populate dropdown
+    datasetList = buildDatasetList(result.files);
+    populateDatasetDropdown(datasetList);
 
     const loaded = loadSourceFiles(result.files, reconciler, updateTimestamps);
     const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;

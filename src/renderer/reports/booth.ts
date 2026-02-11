@@ -1,4 +1,5 @@
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
+import { sumPhysicalPackages } from '../../data-processing/utils';
 import type { BoothReservationImported, IDataReconciler, Scout } from '../../types';
 import {
   buildVarietyTooltipAttr,
@@ -156,7 +157,7 @@ function generateBoothReport(reconciler: IDataReconciler): string {
 
       // Split packages vs donations
       const donations = r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
-      const physicalPackages = (r.totalPackages || 0) - donations;
+      const physicalPackages = sumPhysicalPackages(r.cookies);
 
       // Build tooltip for physical packages only (exclude Cookie Share)
       const physicalCookies = { ...r.cookies };

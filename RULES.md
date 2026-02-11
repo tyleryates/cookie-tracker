@@ -101,16 +101,28 @@ Cash Owed = Inventory Value − Electronic Payments Collected
 
 ### Troop Proceeds
 
-Troops earn $0.90 per package on all packages they are financially responsible for.
+Troops earn a per-package rate based on their Per Girl Average (PGA):
 
-**Formula:** Troop Proceeds = (C2T Received + Cookie Share + Direct Ship) × $0.90
+| PGA | Rate |
+|-----|------|
+| < 200 | $0.85/pkg |
+| 200–349 | $0.90/pkg |
+| 350+ | $0.95/pkg |
 
-**Components:**
+PGA = Total Packages Credited / Active Girls (girls with at least 1 package sold).
+
+**Formula:** Troop Proceeds = (Packages Credited × Rate) − (Exempt Packages × Rate)
+
+**Packages Credited** = C2T Received + Cookie Share + Direct Ship:
 - **C2T Received** — Physical packages picked up from council (includes packages still in troop inventory, not yet allocated to scouts)
 - **Cookie Share** — Virtual donations (not physical inventory, but counts for proceeds)
 - **Direct Ship** — Orders shipped from supplier (troop never handles, but gets proceeds)
 
+**Exempt Packages** = First 50 packages per active girl are exempt from proceeds (50 × active girls).
+
 **Why this formula:** The troop is financially responsible for ALL packages received from council, regardless of whether they've been allocated to scouts yet. Packages sitting in troop inventory still count.
+
+**Per-Scout Proceeds Estimate:** Scout-level totals use a flat $0.90/pkg estimate because scout totals are computed before troop totals (where PGA determines the actual rate). This is intentional — changing it would require a two-pass approach, and the estimate is close enough for per-scout display.
 
 **Verification:** Compare against Smart Cookie CSV export fields: `ProceedInitialQty × InitialMultiplier = TroopProceed`
 

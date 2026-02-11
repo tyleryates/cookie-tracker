@@ -101,6 +101,8 @@ export function buildTroopTotals(
     pendingPickup: scoutAgg.pendingPickup,
     boothSalesPackages: scoutAgg.boothSalesPackages,
     boothSalesDonations: scoutAgg.boothSalesDonations,
+    packagesCredited,
+    grossProceeds,
     scouts: scoutCounts
   };
 }

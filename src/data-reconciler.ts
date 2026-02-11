@@ -54,7 +54,7 @@ function classifyTransferCategory(
  *
  * IMPORTANT CONVENTION: Properties prefixed with $ are calculated/derived fields
  * - These are computed from raw imported data during buildUnifiedDataset()
- * - Examples: $issues, $creditedRevenue
+ * - Examples: $issues, $financials, $inventoryDisplay
  * - Do not import these directly - they are rebuilt on each reconciliation
  * - This convention helps distinguish between source data and computed values
  */

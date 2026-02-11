@@ -77,6 +77,6 @@ All data stays on your computer. Nothing is sent anywhere except to the Girl Sco
 
 ---
 
-**Version:** 1.2.0
+**Version:** 1.3.1
 
 This is an unofficial volunteer tool not affiliated with Girl Scouts of the USA.

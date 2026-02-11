@@ -97,7 +97,7 @@ npm run build           # Build for current platform
 - Creates transfers with explicit `TRANSFER_CATEGORY` via `classifyTransferCategory()`
 - Deduplicates orders by order number (handles DC "229584475" vs SC "D229584475")
 
-**src/data-processing/calculators/** - Unified dataset computation (13 modules)
+**src/data-processing/calculators/** - Unified dataset computation (modular)
 - Scout processing (5 phases): initialize → orders → inventory → allocations → totals
 - Troop-level: package totals, troop totals, varieties, transfer breakdowns
 - Reconciliation: cookie share tracking, site orders, metadata/health checks
@@ -170,11 +170,13 @@ When matching orders, strip the `D` prefix from SC transfer order numbers.
 - Type includes "with Donation" or just "Donation"
 
 ### Transfer Types (Smart Cookie)
-- `C2T(P)` - Council to Troop (warehouse pickup) - inventory IN
+- `C2T` / `C2T(P)` / `T2T` - Council/Troop to Troop (inventory IN)
 - `T2G` - Troop to Girl (scout pickup) - inventory OUT
-- `COOKIE_SHARE` - Donation package sale
-- `COOKIE_SHARE(D)` - Digital Cookie donation order (has D prefix)
+- `G2T` - Girl to Troop (return) - inventory IN
+- `D` - DC order synced to SC (sync record)
+- `COOKIE_SHARE` / `COOKIE_SHARE_D` - Donation package sale (manual or DC-synced)
 - `DIRECT_SHIP` - Shipped order (may have S prefix)
+- `PLANNED` - Future/uncommitted order
 
 All OUT transactions have negative quantities in SC data - use `Math.abs()` for display.
 

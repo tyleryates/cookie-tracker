@@ -149,9 +149,6 @@ export interface ScoutTotals {
   credited: number;
   totalSold: number;
   inventory: number;
-  $creditedRevenue: number;
-  $troopProceeds: number;
-  $proceedsDeduction: number;
   $financials: {
     cashCollected: number;
     electronicPayments: number;
@@ -444,6 +441,8 @@ export interface TroopTotals {
   pendingPickup: number;
   boothSalesPackages: number;
   boothSalesDonations: number;
+  packagesCredited: number;
+  grossProceeds: number;
   scouts: ScoutCounts;
 }
 
