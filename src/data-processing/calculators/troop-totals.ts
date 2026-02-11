@@ -3,9 +3,7 @@
 
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import { PROCEEDS_EXEMPT_PACKAGES, getTroopProceedsRate } from '../../cookie-constants';
-import type { IDataReconciler, Scout, SiteOrdersDataset, TroopTotals } from '../../types';
-import { calculatePackageTotals } from './package-totals';
-import { calculateScoutCounts } from './scout-calculations';
+import type { IDataReconciler, Scout, ScoutCounts, SiteOrdersDataset, TroopTotals } from '../../types';
 
 /** Aggregate scout-level totals: delivery, inventory, shipping, and proceeds */
 function aggregateScoutTotals(scouts: Map<string, Scout>) {
@@ -16,6 +14,8 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
   let girlDelivery = 0;
   let girlInventory = 0;
   let pendingPickup = 0;
+  let boothSalesPackages = 0;
+  let boothSalesDonations = 0;
 
   scouts.forEach((scout) => {
     if (!scout.isSiteOrder) {
@@ -25,6 +25,9 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
       creditedDonations += scout.credited.virtualBooth.donations || 0;
       creditedDonations += scout.credited.directShip.donations || 0;
       creditedDonations += scout.credited.boothSales.donations || 0;
+      // Booth sales totals (used by booth and donation-alert reports)
+      boothSalesPackages += scout.credited.boothSales.packages || 0;
+      boothSalesDonations += scout.credited.boothSales.donations || 0;
       // Shortfalls: orders approved for delivery but scout hasn't picked up inventory yet
       if (scout.$issues?.negativeInventory) {
         scout.$issues.negativeInventory.forEach((issue) => {
@@ -39,7 +42,7 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
     }
   });
 
-  return { directShip, creditedDonations, proceedsDeduction, exemptPackages, girlDelivery, girlInventory, pendingPickup };
+  return { directShip, creditedDonations, proceedsDeduction, exemptPackages, girlDelivery, girlInventory, pendingPickup, boothSalesPackages, boothSalesDonations };
 }
 
 /** Count Cookie Share donations from DC raw data (non-site orders only).
@@ -56,15 +59,18 @@ function countDCDonations(rawDCData: Record<string, any>[]): number {
 }
 
 /** Build troop-level aggregate totals */
-export function buildTroopTotals(reconciler: IDataReconciler, scouts: Map<string, Scout>, _siteOrders: SiteOrdersDataset): TroopTotals {
+export function buildTroopTotals(
+  reconciler: IDataReconciler,
+  scouts: Map<string, Scout>,
+  _siteOrders: SiteOrdersDataset,
+  packageTotals: { ordered: number; allocated: number; virtualBoothT2G: number; boothDividerT2G: number; donations: number; directShip: number; g2t: number },
+  scoutCounts: ScoutCounts
+): TroopTotals {
   const rawDCData = reconciler.metadata.rawDCData || [];
-  const packageTotals = calculatePackageTotals(reconciler.transfers, rawDCData);
 
   // Net troop inventory: received from council minus all outflows, plus returns
   const totalInventory =
     packageTotals.ordered - packageTotals.allocated - packageTotals.virtualBoothT2G - packageTotals.boothDividerT2G + packageTotals.g2t;
-
-  const scoutCounts = calculateScoutCounts(scouts);
   const scoutAgg = aggregateScoutTotals(scouts);
   // Total donations = DC non-site (individual girl orders) + credited allocations (site orders distributed to scouts)
   const donations = countDCDonations(rawDCData) + scoutAgg.creditedDonations;
@@ -79,9 +85,6 @@ export function buildTroopTotals(reconciler: IDataReconciler, scouts: Map<string
   const troopProceeds = grossProceeds - proceedsDeduction;
 
   return {
-    orders: rawDCData.length,
-    sold: packageTotals.sold,
-    revenue: packageTotals.revenue,
     troopProceeds,
     proceedsRate,
     proceedsDeduction,
@@ -89,14 +92,14 @@ export function buildTroopTotals(reconciler: IDataReconciler, scouts: Map<string
     inventory: totalInventory,
     donations,
     ordered: packageTotals.ordered,
-    allocated: packageTotals.allocated,
-    siteOrdersPhysical: packageTotals.siteOrdersPhysical,
     directShip: packageTotals.directShip,
     boothDividerT2G: packageTotals.boothDividerT2G,
     virtualBoothT2G: packageTotals.virtualBoothT2G,
     girlDelivery: scoutAgg.girlDelivery,
     girlInventory: scoutAgg.girlInventory,
     pendingPickup: scoutAgg.pendingPickup,
+    boothSalesPackages: scoutAgg.boothSalesPackages,
+    boothSalesDonations: scoutAgg.boothSalesDonations,
     scouts: scoutCounts
   };
 }

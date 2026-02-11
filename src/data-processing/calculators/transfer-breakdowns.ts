@@ -1,7 +1,7 @@
 // Transfer Breakdowns
-// Pre-classifies transfers into categories (C2T, T2G, sold) with totals
+// Pre-classifies transfers into categories (C2T, T2G, G2T) with totals
 
-import { SALE_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
+import { TRANSFER_CATEGORY } from '../../constants';
 import Logger from '../../logger';
 import type { IDataReconciler, Transfer, TransferBreakdowns, Warning } from '../../types';
 import { isKnownTransferType } from '../utils';
@@ -12,12 +12,10 @@ export function buildTransferBreakdowns(reconciler: IDataReconciler, warnings: W
   const c2t: Transfer[] = [];
   const t2g: Transfer[] = [];
   const g2t: Transfer[] = [];
-  const sold: Transfer[] = [];
 
   let c2tTotal = 0;
   let t2gPhysicalTotal = 0;
   let g2tTotal = 0;
-  let soldTotal = 0;
 
   reconciler.transfers.forEach((transfer: Transfer) => {
     const packages = transfer.packages || 0;
@@ -46,10 +44,6 @@ export function buildTransferBreakdowns(reconciler: IDataReconciler, warnings: W
       t2g.push(transfer);
       t2gPhysicalTotal += transfer.physicalPackages || 0;
     }
-    if (SALE_CATEGORIES.has(transfer.category)) {
-      sold.push(transfer);
-      soldTotal += transfer.physicalPackages || 0;
-    }
   });
 
   // Sort transfers by date (newest first)
@@ -62,18 +56,15 @@ export function buildTransferBreakdowns(reconciler: IDataReconciler, warnings: W
   c2t.sort(sortByDate);
   t2g.sort(sortByDate);
   g2t.sort(sortByDate);
-  sold.sort(sortByDate);
 
   return {
     c2t,
     t2g,
     g2t,
-    sold,
     totals: {
       c2t: c2tTotal,
       t2gPhysical: t2gPhysicalTotal,
-      g2t: g2tTotal,
-      sold: soldTotal
+      g2t: g2tTotal
     }
   };
 }

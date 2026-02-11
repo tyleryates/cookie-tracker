@@ -255,11 +255,9 @@ The SC API returns all record types through `/orders/search`. Each transfer is a
 
 ### What Counts as "Sold"
 
-Use `SALE_CATEGORIES.has(transfer.category)` — includes: `GIRL_PICKUP`, `VIRTUAL_BOOTH_ALLOCATION`, `BOOTH_SALES_ALLOCATION`, `DIRECT_SHIP_ALLOCATION`, `DIRECT_SHIP`.
+Sold counting is done by individual calculators per-category rather than a central set. Categories that count as "sold": `GIRL_PICKUP`, `VIRTUAL_BOOTH_ALLOCATION`, `BOOTH_SALES_ALLOCATION`, `DIRECT_SHIP_ALLOCATION`, `DIRECT_SHIP`.
 
 Excludes: `COUNCIL_TO_TROOP` (inventory in), `GIRL_RETURN` (returns), `DC_ORDER_RECORD` (sync record — counting it would double-count with the T2G allocation), `COOKIE_SHARE_RECORD` / `BOOTH_COOKIE_SHARE` (sync/allocation records), `PLANNED` (future).
-
-**Verification:** Compare the sum of SALE_CATEGORIES transfers against the Smart Cookie Dashboard "Packages Sold" number. They should match.
 
 ### BOOTH_COOKIE_SHARE vs COOKIE_SHARE_RECORD
 

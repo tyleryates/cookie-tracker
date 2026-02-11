@@ -18,18 +18,16 @@ function generateVarietyReport(reconciler: IDataReconciler): string {
 
   const varieties = reconciler.unified.varieties;
   const varietyStats = varieties.byCookie;
-  const totalPhysicalPackages = varieties.totalPhysical;
-  const totalPackages = varieties.totalAll;
 
   let html = '<div class="report-visual"><h3>Cookie Popularity Report</h3>';
-  html += `<p style="margin-bottom: 15px;">Total: ${totalPhysicalPackages} packages sold</p>`;
+  html += `<p style="margin-bottom: 15px;">Total: ${varieties.total} packages sold</p>`;
   html += startTable('table-normal');
   html += createTableHeader(['Variety', 'Packages', '% of Physical Sales']);
 
   sortVarietiesByOrder(Object.entries(getCompleteVarieties(varietyStats)))
     .filter(([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE)
     .forEach(([variety, count]) => {
-      const percent = totalPhysicalPackages > 0 ? `${((count / totalPhysicalPackages) * 100).toFixed(1)}%` : '0%';
+      const percent = varieties.total > 0 ? `${((count / varieties.total) * 100).toFixed(1)}%` : '0%';
 
       html += createTableRow([
         `<td><strong>${escapeHtml(getCookieDisplayName(variety))}</strong></td>`,

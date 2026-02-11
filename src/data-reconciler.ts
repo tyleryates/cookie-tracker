@@ -54,7 +54,7 @@ function classifyTransferCategory(
  *
  * IMPORTANT CONVENTION: Properties prefixed with $ are calculated/derived fields
  * - These are computed from raw imported data during buildUnifiedDataset()
- * - Examples: $issues, $orderRevenue, $creditedRevenue
+ * - Examples: $issues, $creditedRevenue
  * - Do not import these directly - they are rebuilt on each reconciliation
  * - This convention helps distinguish between source data and computed values
  */
@@ -95,14 +95,12 @@ class DataReconciler implements IDataReconciler {
 
   createOrder(data: Partial<Order>, source: string): Order {
     return {
-      id: data.orderNumber || `${source}-${Date.now()}`,
       orderNumber: data.orderNumber || '',
       scout: data.scout || '',
       scoutId: data.scoutId || null,
       gsusaId: data.gsusaId || null,
       gradeLevel: data.gradeLevel || null,
       date: data.date || '',
-      type: data.type || '',
       orderType: data.orderType || null,
       owner: data.owner || 'TROOP',
       needsInventory: data.needsInventory || false,
@@ -113,9 +111,6 @@ class DataReconciler implements IDataReconciler {
       amount: data.amount || 0,
       status: data.status,
       paymentStatus: data.paymentStatus,
-      shipStatus: data.shipStatus,
-      includedInIO: data.includedInIO || null,
-      isVirtual: data.isVirtual || null,
       varieties: data.varieties || {},
       organization: {
         troopId: data.organization?.troopId || null,
@@ -156,7 +151,6 @@ class DataReconciler implements IDataReconciler {
     }
 
     return {
-      id: `${data.type}-${data.date}-${data.orderNumber}`,
       date: data.date,
       type: data.type,
       category: category,
@@ -170,8 +164,7 @@ class DataReconciler implements IDataReconciler {
       physicalVarieties: physicalVarieties,
       amount: data.amount,
       status: data.status || '',
-      actions: data.actions || {},
-      source: data.source
+      actions: data.actions || {}
     };
   }
 

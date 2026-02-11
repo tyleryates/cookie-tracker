@@ -66,17 +66,11 @@ export function buildVarieties(reconciler: IDataReconciler, scouts: Map<string, 
     });
   });
 
-  // Calculate totals
-  const totalPhysical = Object.entries(byCookie)
-    .filter(([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE)
-    .reduce((sum, [, count]) => sum + (count || 0), 0);
-
-  const totalAll = Object.values(byCookie).reduce((sum, count) => sum + (count || 0), 0);
+  const total = Object.values(byCookie).reduce((sum, count) => sum + (count || 0), 0);
 
   return {
     byCookie,
     inventory,
-    totalPhysical,
-    totalAll
+    total
   };
 }

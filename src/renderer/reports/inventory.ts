@@ -1,4 +1,4 @@
-import { PACKAGES_PER_CASE } from '../../constants';
+import { PACKAGES_PER_CASE, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
 import type { IDataReconciler, Transfer, Varieties } from '../../types';
 import {
@@ -138,7 +138,7 @@ function generateInventoryReport(reconciler: IDataReconciler): string {
     html += createTableHeader(['Date', 'Scout', 'Packages', 'Amount']);
 
     allScoutTransfers.forEach((transfer: Transfer) => {
-      const isReturn = transfer.type === 'G2T';
+      const isReturn = transfer.category === TRANSFER_CATEGORY.GIRL_RETURN;
       const scoutName = isReturn ? transfer.from : transfer.to;
       const packages = transfer.packages || 0;
       const displayPackages = isReturn ? -packages : packages;

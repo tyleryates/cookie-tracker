@@ -47,17 +47,18 @@ export interface OrderMetadata {
  * Order data structure
  */
 export interface Order {
-  id?: string;
   orderNumber: string;
   scout: string;
   scoutId?: string;
   gsusaId?: string;
   gradeLevel?: string;
   date: string;
-  type: string;
+  /** Raw DC order type string for display (e.g. "Shipped with Donation", "In-Person Delivery") */
   dcOrderType?: string;
+  /** Classified order type enum — used for logic/dispatch (from classifyDCOrder) */
   orderType: OrderType | null;
   owner: Owner;
+  /** Whether this order draws from the scout's physical inventory (GIRL + DELIVERY/IN_HAND only) */
   needsInventory: boolean;
   packages: number;
   physicalPackages: number;
@@ -66,11 +67,8 @@ export interface Order {
   status?: string;
   paymentStatus?: string;
   paymentMethod?: PaymentMethod | null;
-  shipStatus?: string;
   varieties: Varieties;
   cases?: number;
-  includedInIO?: string;
-  isVirtual?: boolean;
   organization?: {
     troopId?: string;
     serviceUnit?: string;
@@ -78,9 +76,7 @@ export interface Order {
     district?: string | null;
   };
   sources: string[];
-  rawData?: Record<string, any>;
   metadata?: OrderMetadata;
-  source?: string;
 }
 
 // ============================================================================
@@ -114,7 +110,6 @@ export interface TransferActions {
  * Transfer data structure (Smart Cookie inventory movements)
  */
 export interface Transfer {
-  id?: string;
   type: TransferType;
   category: TransferCategory;
   date: string;
@@ -129,7 +124,6 @@ export interface Transfer {
   amount?: number;
   status?: string;
   actions?: TransferActions;
-  source?: string;
 }
 
 /**
@@ -151,11 +145,10 @@ export interface ScoutTotals {
   sales: number;
   shipped: number;
   donations: number;
+  /** Total credited packages (booth + virtual booth + direct ship). Used by totalSold calculation — reports use totalCredited() helper for display. */
   credited: number;
   totalSold: number;
   inventory: number;
-  revenue: number;
-  $orderRevenue: number;
   $creditedRevenue: number;
   $troopProceeds: number;
   $proceedsDeduction: number;
@@ -263,13 +256,6 @@ export interface ReconcilerMetadata {
 
 export interface RawScoutData {
   name: string;
-  pickedUp: number;
-  soldDC: number;
-  soldSC: number;
-  revenueDC: number;
-  ordersDC: number;
-  ordersSCReport: number;
-  remaining: number;
   scoutId: number | null;
   gsusaId: string | null;
   gradeLevel: string | null;
@@ -342,18 +328,6 @@ export interface Credentials {
 // BOOTH & RESERVATION TYPES
 // ============================================================================
 
-export interface BoothReservation {
-  id: string;
-  storeName: string;
-  address: string;
-  date: string;
-  startTime: string;
-  endTime: string;
-  status: string;
-  packages: number;
-  varieties: Varieties;
-}
-
 export interface BoothSalesAllocation {
   girlId: number;
   packages: number;
@@ -381,12 +355,6 @@ export interface DirectShipAllocation {
   trackedCookieShare?: number;
   orderId?: string;
   source: string;
-}
-
-export interface VirtualCookieShareAllocation {
-  girlId: string;
-  quantity: number;
-  scoutName: string;
 }
 
 export interface BoothReservationImported {
@@ -459,24 +427,7 @@ export interface ScoutCounts {
   withNegativeInventory: number;
 }
 
-export interface PackageTotals {
-  sold: number;
-  revenue: number;
-  ordered: number;
-  allocated: number;
-  virtualBoothT2G: number;
-  boothDividerT2G: number;
-  directShipDividerT2G: number;
-  donations: number;
-  directShip: number;
-  siteOrdersPhysical: number;
-  g2t: number;
-}
-
 export interface TroopTotals {
-  orders: number;
-  sold: number;
-  revenue: number;
   troopProceeds: number;
   proceedsRate: number;
   proceedsDeduction: number;
@@ -484,14 +435,14 @@ export interface TroopTotals {
   inventory: number;
   donations: number;
   ordered: number;
-  allocated: number;
-  siteOrdersPhysical: number;
   directShip: number;
   boothDividerT2G: number;
   virtualBoothT2G: number;
   girlDelivery: number;
   girlInventory: number;
   pendingPickup: number;
+  boothSalesPackages: number;
+  boothSalesDonations: number;
   scouts: ScoutCounts;
 }
 
@@ -499,30 +450,25 @@ export interface TransferBreakdowns {
   c2t: Transfer[];
   t2g: Transfer[];
   g2t: Transfer[];
-  sold: Transfer[];
   totals: {
     c2t: number;
     t2gPhysical: number;
     g2t: number;
-    sold: number;
   };
 }
 
 export interface VarietiesResult {
   byCookie: Varieties;
   inventory: Varieties;
-  totalPhysical: number;
-  totalAll: number;
+  total: number;
 }
 
 export interface CookieShareTracking {
   digitalCookie: {
     total: number;
-    autoSync: number;
     manualEntry: number;
   };
   smartCookie: {
-    total: number;
     manualEntries: number;
   };
   reconciled: boolean;
@@ -546,8 +492,6 @@ export interface UnifiedMetadata extends ReconcilerMetadata {
 export interface UnifiedDataset {
   scouts: Map<string, Scout>;
   siteOrders: SiteOrdersDataset;
-  scoutCounts: ScoutCounts;
-  packageTotals: PackageTotals;
   troopTotals: TroopTotals;
   transferBreakdowns: TransferBreakdowns;
   varieties: VarietiesResult;
@@ -597,46 +541,3 @@ export interface DataFileInfo {
   data?: any;
 }
 
-// ============================================================================
-// API RESPONSE TYPES
-// ============================================================================
-
-export interface SmartCookieAPIOrder {
-  id: string;
-  order_id?: string;
-  transfer_type: string;
-  transaction_date: string;
-  from_name?: string;
-  to_name?: string;
-  cookies: Array<{
-    id: number;
-    cookieId?: number;
-    quantity: number;
-  }>;
-  amount?: number;
-}
-
-export interface DigitalCookieRow {
-  'Order Number': string;
-  'Girl First Name': string;
-  'Girl Last Name': string;
-  'Order Date': number; // Excel serial date
-  'Order Type': string;
-  'Total Packages (Includes Donate & Gift)': string;
-  'Refunded Packages': string;
-  'Current Sale Amount': string;
-  'Order Status': string;
-  'Payment Status': string;
-  'Ship Status': string;
-  Donation: string;
-  // Cookie varieties as column names
-  'Thin Mints'?: string;
-  'Caramel deLites'?: string;
-  'Peanut Butter Patties'?: string;
-  'Peanut Butter Sandwich'?: string;
-  Trefoils?: string;
-  Adventurefuls?: string;
-  Lemonades?: string;
-  Exploremores?: string;
-  'Caramel Chocolate Chip'?: string;
-}

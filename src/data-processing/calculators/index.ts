@@ -15,7 +15,7 @@ import { buildTroopTotals } from './troop-totals';
 import { buildVarieties } from './varieties';
 
 /** Build complete scout dataset with all calculations */
-export function buildScoutDataset(reconciler: IDataReconciler, warnings: Warning[]): Map<string, Scout> {
+function buildScoutDataset(reconciler: IDataReconciler, warnings: Warning[]): Map<string, Scout> {
   const rawDCData = reconciler.metadata.rawDCData || [];
   const scoutDataset = initializeScouts(reconciler, rawDCData);
 
@@ -48,10 +48,10 @@ export function buildUnifiedDataset(reconciler: IDataReconciler): UnifiedDataset
   const scoutCounts = calculateScoutCounts(scouts);
 
   // Build package totals
-  const packageTotals = calculatePackageTotals(reconciler.transfers, reconciler.metadata.rawDCData);
+  const packageTotals = calculatePackageTotals(reconciler.transfers);
 
   // Build troop totals
-  const troopTotals = buildTroopTotals(reconciler, scouts, siteOrders);
+  const troopTotals = buildTroopTotals(reconciler, scouts, siteOrders, packageTotals, scoutCounts);
 
   // Build transfer breakdowns
   const transferBreakdowns = buildTransferBreakdowns(reconciler, warnings);
@@ -63,13 +63,11 @@ export function buildUnifiedDataset(reconciler: IDataReconciler): UnifiedDataset
   const cookieShareTracking = buildCookieShareTracking(reconciler);
 
   // Build metadata
-  const metadata = buildUnifiedMetadata(reconciler, warnings);
+  const metadata = buildUnifiedMetadata(reconciler, warnings, scouts);
 
   return {
     scouts,
     siteOrders,
-    scoutCounts,
-    packageTotals,
     troopTotals,
     transferBreakdowns,
     varieties,

@@ -44,7 +44,7 @@ src/
 │       ├── package-totals.ts        # Transfer-level totals by category
 │       ├── troop-totals.ts          # Troop-level aggregates
 │       ├── varieties.ts             # Per-variety sold/inventory totals
-│       ├── transfer-breakdowns.ts   # Classified transfer lists (c2t, t2g, sold)
+│       ├── transfer-breakdowns.ts   # Classified transfer lists (c2t, t2g, g2t)
 │       ├── cookie-share-tracking.ts # DC vs SC Cookie Share reconciliation
 │       ├── site-orders.ts           # Site order allocation tracking
 │       └── metadata.ts             # Health checks & warnings
@@ -92,11 +92,12 @@ Defined in `types.ts`:
 Pre-calculated and derived fields use a `$` prefix to distinguish them from raw source data. These are computed in `data-processing/data-calculators.ts` and consumed by reports.
 
 **Scout-level $ fields:**
-- `$varietyBreakdowns` — Per-variety counts split by source: fromSales, fromShipped, fromVirtualBooth, fromDirectShip, fromBoothSales
-- `$issues` — Data quality flags: negativeInventory array, hasNegativeInventory boolean
-- `$cookieShare` — DC donation breakdown: dcTotal, dcAutoSync, dcManualEntry
-- `totals.$breakdown` — Splits totalSold into "direct" vs "credited"
+- `$issues` — Data quality flags: negativeInventory array
 - `totals.$orderRevenue` — Revenue from DC orders only (before credited revenue)
+- `totals.$creditedRevenue` — Revenue from credited allocations (booth, virtual booth, direct ship)
+- `totals.$troopProceeds` — Troop proceeds for this scout ($0.90/pkg after first 50 exempt)
+- `totals.$proceedsDeduction` — Amount deducted from proceeds for exempt packages
+- `totals.$financials` — Cash collected, electronic payments, inventory value, unsold value, cash owed
 - `totals.$inventoryDisplay` — Per-variety inventory for display (positive values only)
 
 ---
@@ -107,7 +108,7 @@ All "magic numbers" and string literals are centralized in `constants.ts`:
 
 - `PACKAGES_PER_CASE` (12), `DEFAULT_COUNCIL_ID` ('623'), Excel epoch/ms-per-day for date conversion
 - `OWNER`, `ORDER_TYPE`, `PAYMENT_METHOD`, `TRANSFER_TYPE`, `TRANSFER_CATEGORY`, `ALLOCATION_METHOD` — Classification dimensions
-- `SALE_CATEGORIES`, `T2G_CATEGORIES`, `TROOP_INVENTORY_IN_CATEGORIES`, `SCOUT_PHYSICAL_CATEGORIES` — Central category group sets (see below)
+- `T2G_CATEGORIES`, `TROOP_INVENTORY_IN_CATEGORIES`, `SCOUT_PHYSICAL_CATEGORIES` — Central category group sets (see below)
 - `DC_COLUMNS`, `SC_REPORT_COLUMNS`, `SC_API_COLUMNS` — Field name constants for imported data
 - `DISPLAY_STRINGS` — UI tooltip/label strings keyed by allocation method
 - `HTTP_STATUS`, `UI_TIMING` — HTTP codes and animation durations
@@ -130,15 +131,11 @@ Functions following this principle: `getCookiePrice()`, `classifyPaymentMethod()
 
 ### Order Object
 
-All orders from all sources are normalized into a common shape with fields for order number, scout name/ID, date, type, packages (net and physical), varieties, revenue, payment/ship status, and organizational data. Each order tracks which sources contributed data (DC, SC-Report, SC-API, SC-Transfer) and preserves raw metadata from each source for debugging.
+All orders from all sources are normalized into a common shape with fields for order number, scout name/ID, date, packages (net and physical), varieties, revenue, payment/ship status, and organizational data. Each order has `dcOrderType` (raw DC string for display) and `orderType` (classified enum for logic). Each order tracks which sources contributed data (DC, SC-Report, SC-API, SC-Transfer) and preserves raw metadata from each source for debugging.
 
 ### Transfer Object
 
 SC transfer records stored separately from orders. Key fields: type (from `transfer_type`), category (from `TRANSFER_CATEGORY`), order number, from/to, packages (absolute value), physicalPackages (sum of non-Cookie-Share varieties), physicalVarieties, and amount. The `category` field is assigned at creation time by `classifyTransferCategory()` based on the raw type string and API flags — reports dispatch on category instead of boolean flags.
-
-### Troop Totals — `packagesSoldFromStock`
-
-`troopTotals.packagesSoldFromStock` is computed directly from component T2G totals: `allocated + virtualBoothT2G + boothDividerT2G - g2t`. This avoids the anti-pattern of computing a displayed value from other derived values (e.g., `ordered - inventory`). The G2T subtraction is acceptable because returns are a fundamentally different flow, not an edge case being stripped.
 
 ### Scout Aggregate
 
@@ -147,8 +144,8 @@ Per-scout summaries containing:
 - **Orders** — Classified with owner, orderType, needsInventory, physicalPackages, donations
 - **Inventory** — From physical T2G transfers: total and per-variety breakdown
 - **Credited** — Three allocation types: virtualBooth, directShip, boothSales (each with packages, varieties, allocations[])
-- **Totals** — Pre-calculated: sales, shipped, credited, donations, totalSold, inventory, revenue
-- **$ Fields** — Derived: $varietyBreakdowns, $issues, $cookieShare, totals.$breakdown
+- **Totals** — Pre-calculated: sales, shipped, credited, donations, totalSold, inventory
+- **$ Fields** — Derived: $issues, totals.$orderRevenue, $creditedRevenue, $troopProceeds, $proceedsDeduction, $financials, $inventoryDisplay
 
 ---
 
@@ -183,7 +180,7 @@ Orders are deduplicated by order number (normalized: strip prefixes, convert to 
 `buildUnifiedDataset()` returns:
 - **scouts** — Complete scout data with all calculated fields
 - **troopTotals** — Troop-level aggregates (sold, revenue, inventory, proceeds, `packagesSoldFromStock`)
-- **transferBreakdowns** — Pre-classified transfer lists (c2t, t2g, sold)
+- **transferBreakdowns** — Pre-classified transfer lists (c2t, t2g, g2t)
 - **varieties** — Per-variety totals and inventory
 - **cookieShare** — DC vs SC Cookie Share tracking
 - **boothReservations** — Booth reservation data
@@ -260,7 +257,6 @@ Central `ReadonlySet<TransferCategory>` constants in `constants.ts` that group r
 
 | Set | Categories | Purpose |
 |-----|-----------|---------|
-| `SALE_CATEGORIES` | GIRL_PICKUP, VIRTUAL_BOOTH_ALLOCATION, BOOTH_SALES_ALLOCATION, DIRECT_SHIP_ALLOCATION, DIRECT_SHIP | Transfers that count as "sold" (contribute to total sold / revenue) |
 | `T2G_CATEGORIES` | GIRL_PICKUP, VIRTUAL_BOOTH_ALLOCATION, BOOTH_SALES_ALLOCATION, DIRECT_SHIP_ALLOCATION | All T2G sub-types (troop inventory out to scout) |
 | `TROOP_INVENTORY_IN_CATEGORIES` | COUNCIL_TO_TROOP, GIRL_RETURN | Transfers that add to troop stock |
 | `SCOUT_PHYSICAL_CATEGORIES` | GIRL_PICKUP, GIRL_RETURN | Transfers where physical cookies change hands at scout level |
@@ -268,10 +264,6 @@ Central `ReadonlySet<TransferCategory>` constants in `constants.ts` that group r
 ### Transfer Type Matching
 
 C2T types have suffix variants. Always use `isC2TTransfer()` from `utils.ts` or startsWith check. Never exact equality.
-
-### Sold Package Counting
-
-Use `SALE_CATEGORIES.has(transfer.category)` to check if a transfer counts as sold. This includes T2G physical + virtual + booth + direct ship allocations, plus standalone direct ship orders. Excludes: C2T (incoming inventory), G2T (returns), D/COOKIE_SHARE records (sync records, not sales), and PLANNED (future orders).
 
 ### Physical Package Counting
 

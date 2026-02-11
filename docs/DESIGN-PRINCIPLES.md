@@ -412,14 +412,14 @@ When multiple reports need to check "is this transfer a sale?" or "is this a T2G
 ```typescript
 // ✅ GOOD: Central set, imported by all consumers
 // constants.ts
-export const SALE_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
+export const T2G_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.GIRL_PICKUP,
   TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
   // ...
 ]);
 
-// package-totals.ts, varieties.ts, transfer-breakdowns.ts, etc.
-if (SALE_CATEGORIES.has(transfer.category)) { ... }
+// package-totals.ts, varieties.ts, troop-totals.ts, etc.
+if (T2G_CATEGORIES.has(transfer.category)) { ... }
 ```
 
 ```typescript

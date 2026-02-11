@@ -220,7 +220,7 @@ Key principles (see that file for examples, decision tree, and code review check
 2. **Classify once, use everywhere** — `classifyTransferCategory()` assigns a `TRANSFER_CATEGORY` at creation time. Reports dispatch on `transfer.category`, never re-derive from raw fields.
 3. **Reports calculate their own needs** — Simple loops over classified data, co-located with display code.
 4. **Classify granularly, report with simple sums** — `report.value = sum(items.where(category == X).field)`. No subtraction patterns, no remainder classification, no derived-from-derived.
-5. **Central category group sets** — `SALE_CATEGORIES`, `T2G_CATEGORIES`, etc. in `constants.ts`. Update once, all consumers pick up the change.
+5. **Central category group sets** — `T2G_CATEGORIES`, `TROOP_INVENTORY_IN_CATEGORIES`, `SCOUT_PHYSICAL_CATEGORIES` in `constants.ts`. Update once, all consumers pick up the change.
 
 ---
 

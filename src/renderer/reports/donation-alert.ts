@@ -1,4 +1,4 @@
-import { PAYMENT_METHOD } from '../../constants';
+import { isDCAutoSync } from '../../constants';
 import type { IDataReconciler, Order, Scout } from '../../types';
 import { createHorizontalStats, createTableHeader, createTableRow, endTable, escapeHtml, startTable } from '../html-builder';
 
@@ -41,9 +41,7 @@ function computeScoutDonations(scout: Scout): { dcTotal: number; dcAutoSync: num
   scout.orders.forEach((order: Order) => {
     if (order.donations > 0) {
       dcTotal += order.donations;
-      const isCreditCard = order.paymentMethod === PAYMENT_METHOD.CREDIT_CARD;
-      const dcOrderType = order.dcOrderType || '';
-      if ((dcOrderType.includes('Shipped') || dcOrderType === 'Donation') && isCreditCard) {
+      if (isDCAutoSync(order.dcOrderType || '', order.paymentStatus || '')) {
         dcAutoSync += order.donations;
       }
     }
@@ -113,10 +111,7 @@ function generateDonationAlertReport(reconciler: IDataReconciler): string {
   const manualEntryDonations = cookieShare.digitalCookie.manualEntry;
   const manualCookieShareEntries = cookieShare.smartCookie.manualEntries;
 
-  let totalBoothCookieShare = 0;
-  scouts.forEach((scout: Scout) => {
-    if (!scout.isSiteOrder) totalBoothCookieShare += scout.credited.boothSales.donations || 0;
-  });
+  const totalBoothCookieShare = reconciler.unified.troopTotals.boothSalesDonations;
 
   const totalCookieShare = totalDCDonations + totalBoothCookieShare;
   const adjustmentNeeded = manualEntryDonations - manualCookieShareEntries;

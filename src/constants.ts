@@ -19,7 +19,7 @@ export const DATA_SOURCES = {
   SMART_COOKIE_API: 'SC-API'
 } as const;
 
-export type DataSource = (typeof DATA_SOURCES)[keyof typeof DATA_SOURCES];
+type DataSource = (typeof DATA_SOURCES)[keyof typeof DATA_SOURCES];
 
 // ============================================================================
 // ORDER CLASSIFICATION — Multi-dimensional type system (see RULES.md)
@@ -95,14 +95,8 @@ export type TransferCategory = (typeof TRANSFER_CATEGORY)[keyof typeof TRANSFER_
 
 // Category groups — define once, use everywhere.
 // When adding a new TRANSFER_CATEGORY, update the relevant groups here.
-export const SALE_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
-  TRANSFER_CATEGORY.GIRL_PICKUP,
-  TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
-  TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION,
-  TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION,
-  TRANSFER_CATEGORY.DIRECT_SHIP
-]);
 
+// Used by: package-totals.ts (troop inventory out), troop-totals.ts (net inventory)
 export const T2G_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.GIRL_PICKUP,
   TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
@@ -110,15 +104,13 @@ export const T2G_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION
 ]);
 
-// Troop inventory out = T2G_CATEGORIES (packages leaving troop stock)
-// Troop inventory in: packages entering troop stock
+// Used by: troop-totals.ts (troop inventory in)
 export const TROOP_INVENTORY_IN_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.COUNCIL_TO_TROOP,
   TRANSFER_CATEGORY.GIRL_RETURN
 ]);
 
-// Scout physical inventory: categories where physical cookies change hands at the scout level
-// GIRL_PICKUP adds to scout inventory, GIRL_RETURN subtracts
+// Used by: scout-inventory.ts (scout physical inventory in/out)
 export const SCOUT_PHYSICAL_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.GIRL_PICKUP,
   TRANSFER_CATEGORY.GIRL_RETURN
@@ -132,7 +124,7 @@ export const ALLOCATION_METHOD = {
   MANUAL: 'MANUAL' // For manual allocation (fallback)
 } as const;
 
-export type AllocationMethod = (typeof ALLOCATION_METHOD)[keyof typeof ALLOCATION_METHOD];
+type AllocationMethod = (typeof ALLOCATION_METHOD)[keyof typeof ALLOCATION_METHOD];
 
 // ============================================================================
 // DATA SOURCE COLUMN NAMES
@@ -231,11 +223,13 @@ export const DC_ORDER_TYPE_STRINGS = {
   SHIPPED: 'Shipped' // Used in .includes() checks for shipped orders
 } as const;
 
-// Smart Cookie boolean string values
-export const SC_BOOLEAN = {
-  TRUE: 'TRUE',
-  FALSE: 'FALSE'
-} as const;
+/** Detect DC orders that auto-sync to Smart Cookie (no manual entry needed) */
+export function isDCAutoSync(dcOrderType: string, paymentStatus: string): boolean {
+  return (
+    (dcOrderType.includes(DC_ORDER_TYPE_STRINGS.SHIPPED) || dcOrderType === DC_ORDER_TYPE_STRINGS.DONATION) &&
+    paymentStatus === DC_PAYMENT_STATUS.CAPTURED
+  );
+}
 
 // ============================================================================
 // CONFIGURATION

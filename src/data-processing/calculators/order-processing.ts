@@ -123,7 +123,6 @@ function buildOrderObject(
     orderNumber: basicInfo.orderNumber,
     scout: '',
     date: basicInfo.date,
-    type: basicInfo.dcOrderType,
     owner: classification.owner,
     orderType: classification.orderType,
     dcOrderType: basicInfo.dcOrderType,
@@ -136,8 +135,7 @@ function buildOrderObject(
     paymentStatus: basicInfo.paymentStatus,
     paymentMethod: paymentMethod,
     needsInventory: needsInventory,
-    sources: [DATA_SOURCES.DIGITAL_COOKIE],
-    source: DATA_SOURCES.DIGITAL_COOKIE
+    sources: [DATA_SOURCES.DIGITAL_COOKIE]
   };
 }
 
@@ -201,5 +199,4 @@ function addDCOrders(scoutDataset: Map<string, Scout>, rawDCData: Record<string,
   });
 }
 
-export { classifyDCOrder };
 export { addDCOrders };

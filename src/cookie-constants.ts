@@ -21,7 +21,7 @@ export const COOKIE_TYPE: Record<CookieType, CookieType> = {
 };
 
 // Display names for cookie types (for UI rendering)
-export const COOKIE_DISPLAY_NAMES = {
+const COOKIE_DISPLAY_NAMES = {
   [COOKIE_TYPE.THIN_MINTS]: 'Thin Mints',
   [COOKIE_TYPE.CARAMEL_DELITES]: 'Caramel deLites',
   [COOKIE_TYPE.PEANUT_BUTTER_PATTIES]: 'Peanut Butter Patties',
@@ -131,7 +131,7 @@ export const COOKIE_ABBR_MAP: Record<string, CookieType> = {
 // Cookie variety name normalization map
 // Maps all known variations from data sources to COOKIE_TYPE constants
 // New variations should be added here when discovered
-export const COOKIE_NAME_NORMALIZATION: Record<string, CookieType> = {
+const COOKIE_NAME_NORMALIZATION: Record<string, CookieType> = {
   // Thin Mints
   'Thin Mint': COOKIE_TYPE.THIN_MINTS,
   'Thin Mints': COOKIE_TYPE.THIN_MINTS,
@@ -178,7 +178,7 @@ export const COOKIE_NAME_NORMALIZATION: Record<string, CookieType> = {
 
 // Cookie prices (per package)
 // Most cookies are $6, but Caramel Chocolate Chip is $7
-export const COOKIE_PRICES = {
+const COOKIE_PRICES = {
   [COOKIE_TYPE.THIN_MINTS]: 6,
   [COOKIE_TYPE.CARAMEL_DELITES]: 6,
   [COOKIE_TYPE.PEANUT_BUTTER_PATTIES]: 6,
@@ -241,7 +241,7 @@ export function getCookieDisplayName(cookieType: string): string {
  * @param cookieType - COOKIE_TYPE constant
  * @returns Price per package or null if unknown
  */
-export function getCookiePrice(cookieType: string): number | null {
+function getCookiePrice(cookieType: string): number | null {
   if (!Object.prototype.hasOwnProperty.call(COOKIE_PRICES, cookieType)) {
     // Unknown variety - caller must handle warning
     // Do NOT assume $6 - financial tracking requires accuracy

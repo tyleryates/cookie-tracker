@@ -1,7 +1,7 @@
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, OWNER } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName, PROCEEDS_EXEMPT_PACKAGES } from '../../cookie-constants';
 import type { IDataReconciler, Order, Scout, ScoutCredited, SiteOrdersDataset } from '../../types';
-import { totalCredited } from '../../data-processing/calculators/helpers';
+import { calculateSalesByVariety, totalCredited } from '../../data-processing/calculators/helpers';
 import {
   buildVarietyTooltipAttr,
   createTableHeader,
@@ -119,32 +119,24 @@ function buildCreditedCell(isSiteRow: boolean, credited: ScoutCredited, siteOrde
   return `<span class="tooltip-cell" data-tooltip="${escapeHtml(sources.join('\n'))}">${totalCreditedCount}</span>`;
 }
 
-// Calculate variety breakdowns from scout orders (simple inline calculation)
+// Calculate variety breakdowns from scout orders
 function calculateVarietyBreakdowns(scout: Scout): {
   salesVarieties: Record<string, number>;
   shippedVarieties: Record<string, number>;
   totalDonations: number;
 } {
-  const salesVarieties: Record<string, number> = {};
+  // Reuse existing helper for inventory-based sales by variety
+  const salesVarieties = calculateSalesByVariety(scout) as Record<string, number>;
+
+  // Compute shipped varieties and donations in a single pass
   const shippedVarieties: Record<string, number> = {};
   let totalDonations = 0;
 
   scout.orders.forEach((order: Order) => {
-    // Count Cookie Share donations
     if (order.donations > 0) {
       totalDonations += order.donations;
     }
-
-    // Classify by order type
-    if (order.needsInventory) {
-      // Girl delivery/in-hand orders
-      (Object.entries(order.varieties) as [string, number][]).forEach(([variety, count]: [string, number]) => {
-        if (variety !== COOKIE_TYPE.COOKIE_SHARE) {
-          salesVarieties[variety] = (salesVarieties[variety] || 0) + count;
-        }
-      });
-    } else if (order.owner === OWNER.GIRL && order.orderType === ORDER_TYPE.DIRECT_SHIP) {
-      // Girl direct ship orders
+    if (order.owner === OWNER.GIRL && order.orderType === ORDER_TYPE.DIRECT_SHIP) {
       (Object.entries(order.varieties) as [string, number][]).forEach(([variety, count]: [string, number]) => {
         if (variety !== COOKIE_TYPE.COOKIE_SHARE) {
           shippedVarieties[variety] = (shippedVarieties[variety] || 0) + count;
@@ -328,13 +320,15 @@ function buildOrdersTable(scout: Scout): string {
   scout.orders.forEach((order: Order) => {
     const tooltipAttr = buildVarietyTooltipAttr(order.varieties);
 
-    const PAYMENT_LABELS: Record<string, string> = { CAPTURED: 'Credit Card', AUTHORIZED: 'Credit Card', CASH: 'Cash' };
-    const paymentDisplay = PAYMENT_LABELS[order.paymentStatus] || order.paymentStatus || '-';
+    const PAYMENT_LABELS: Record<string, string> = { CREDIT_CARD: 'Credit Card', VENMO: 'Venmo', CASH: 'Cash' };
+    const paymentDisplay = order.paymentMethod ? PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod : (order.paymentStatus || '-');
 
     const { style: statusStyle, text: statusText } = getStatusStyle(order.status);
 
-    // Determine if order needs inventory based on owner + orderType
-    const needsInventory = order.orderType !== ORDER_TYPE.DIRECT_SHIP && order.orderType !== ORDER_TYPE.DONATION;
+    // Whether this order involves physical cookies at all (for display label).
+    // Different from order.needsInventory — this is "involves physical cookies at all",
+    // not "draws from scout's stock" (e.g. troop booth orders involve physical cookies but needsInventory is false)
+    const involvesPhysicalCookies = order.orderType !== ORDER_TYPE.DIRECT_SHIP && order.orderType !== ORDER_TYPE.DONATION;
 
     // Calculate total packages including donations
     const totalPackages = order.physicalPackages + order.donations;
@@ -342,9 +336,9 @@ function buildOrdersTable(scout: Scout): string {
     html += '<tr>';
     html += `<td>${escapeHtml(String(order.orderNumber))}</td>`;
     html += `<td>${escapeHtml(formatDate(order.date))}</td>`;
-    html += `<td class="tooltip-cell"${tooltipAttr}>${totalPackages}${!needsInventory ? ' <span style="color: #999; font-size: 0.85em;">(no inv)</span>' : ''}</td>`;
+    html += `<td class="tooltip-cell"${tooltipAttr}>${totalPackages}${!involvesPhysicalCookies ? ' <span style="color: #999; font-size: 0.85em;">(no inv)</span>' : ''}</td>`;
     html += `<td>$${Math.round(order.amount)}</td>`;
-    html += `<td>${escapeHtml(String((order as any).dcOrderType || '-'))}</td>`;
+    html += `<td>${escapeHtml(String(order.dcOrderType || '-'))}</td>`;
     html += `<td>${escapeHtml(paymentDisplay)}</td>`;
     html += `<td style="${statusStyle}">${escapeHtml(String(statusText))}</td>`;
     html += '</tr>';
@@ -461,7 +455,7 @@ function buildScoutRow(name: string, scout: Scout, idx: number, isSiteRow: boole
   const { totals, credited } = scout;
   const sales = totals.sales || 0;
 
-  const netInventory = Object.values(totals.$inventoryDisplay || {}).reduce((sum, count) => sum + Math.max(0, count || 0), 0);
+  const netInventory = totals.inventory;
   const inventoryCell = buildInventoryCell(netInventory, scout.$issues?.negativeInventory, totals.inventory || 0);
 
   const totalCreditedCount = totalCredited(credited);

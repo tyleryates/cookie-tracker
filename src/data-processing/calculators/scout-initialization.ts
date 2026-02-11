@@ -90,8 +90,6 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
       donations: 0, // Cookie Share
       totalSold: 0, // All packages sold
       inventory: 0, // Net inventory
-      revenue: 0,
-      $orderRevenue: 0, // Revenue from DC orders only (before credited)
       $creditedRevenue: 0, // Revenue from credited allocations
       $troopProceeds: 0,
       $proceedsDeduction: 0,

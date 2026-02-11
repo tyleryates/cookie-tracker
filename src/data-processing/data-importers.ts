@@ -7,7 +7,6 @@ import {
   MS_PER_DAY,
   PACKAGES_PER_CASE,
   SC_API_COLUMNS,
-  SC_BOOLEAN,
   SC_REPORT_COLUMNS,
   TRANSFER_TYPE
 } from '../constants';
@@ -153,7 +152,6 @@ function mergeDCOrderFromSC(
       orderNumber: dcOrderNum,
       scout,
       date: transferData.date,
-      type,
       packages: Math.abs(transferData.packages),
       amount: Math.abs(transferData.amount),
       status: 'In SC Only',
@@ -164,16 +162,16 @@ function mergeDCOrderFromSC(
   );
 }
 
-/** Track scout inventory changes from an API transfer (T2G pickup, G2T return, Cookie Share) */
-function trackScoutFromAPITransfer(reconciler: IDataReconciler, type: string, to: string, from: string, packages: number): void {
+/** Register scouts from an API transfer (T2G pickup, G2T return, Cookie Share) */
+function trackScoutFromAPITransfer(reconciler: IDataReconciler, type: string, to: string, from: string, _packages: number): void {
   if (type === TRANSFER_TYPE.T2G && to !== from) {
-    updateScoutData(reconciler, to, { pickedUp: Math.abs(packages) });
+    updateScoutData(reconciler, to, {});
   }
   if (type === TRANSFER_TYPE.G2T && to !== from) {
-    updateScoutData(reconciler, from, { pickedUp: -Math.abs(packages) });
+    updateScoutData(reconciler, from, {});
   }
   if (type.includes('COOKIE_SHARE')) {
-    updateScoutData(reconciler, to, { soldSC: Math.abs(packages) });
+    updateScoutData(reconciler, to, {});
   }
 }
 
@@ -214,14 +212,6 @@ function updateScoutData(
   if (!reconciler.scouts.has(scoutName)) {
     reconciler.scouts.set(scoutName, {
       name: scoutName,
-      pickedUp: 0,
-      soldDC: 0,
-      soldSC: 0,
-      revenueDC: 0,
-      ordersDC: 0,
-      ordersSCReport: 0,
-      remaining: 0,
-      // Metadata fields
       scoutId: null,
       gsusaId: null,
       gradeLevel: null,
@@ -234,16 +224,12 @@ function updateScoutData(
 
   const scout = reconciler.scouts.get(scoutName);
 
-  // Handle numeric updates (additive)
+  // Handle metadata updates (set directly if not null)
   Object.keys(updates).forEach((key) => {
     if (metadataFields.includes(key)) {
-      // Metadata: set directly if not null
       if (updates[key] !== null && updates[key] !== undefined) {
         scout[key] = updates[key];
       }
-    } else {
-      // Numeric: add to existing value
-      scout[key] = (scout[key] || 0) + updates[key];
     }
   });
 
@@ -253,8 +239,6 @@ function updateScoutData(
       scout[key] = metadata[key];
     }
   });
-
-  scout.remaining = scout.pickedUp - scout.soldDC;
 }
 
 /** Import Digital Cookie order data from Excel export */
@@ -271,24 +255,18 @@ function importDigitalCookie(reconciler: IDataReconciler, dcData: Record<string,
       orderNumber: orderNum,
       scout: scout,
       date: parseExcelDate(row[DC_COLUMNS.ORDER_DATE]),
-      type: row[DC_COLUMNS.ORDER_TYPE],
       packages: (parseInt(row[DC_COLUMNS.TOTAL_PACKAGES], 10) || 0) - (parseInt(row[DC_COLUMNS.REFUNDED_PACKAGES], 10) || 0),
       amount: parseFloat(row[DC_COLUMNS.CURRENT_SALE_AMOUNT]) || 0,
       status: row[DC_COLUMNS.ORDER_STATUS],
       paymentStatus: row[DC_COLUMNS.PAYMENT_STATUS],
-      shipStatus: row[DC_COLUMNS.SHIP_STATUS],
       varieties: varieties
     };
 
     // Merge or create order (DC is source of truth for order details)
     reconciler.mergeOrCreateOrder(orderNum, orderData, DATA_SOURCES.DIGITAL_COOKIE, row);
 
-    // Update scout data
-    updateScoutData(reconciler, scout, {
-      soldDC: orderData.packages,
-      revenueDC: orderData.amount,
-      ordersDC: 1
-    });
+    // Register scout
+    updateScoutData(reconciler, scout, {});
   });
 
   reconciler.metadata.lastImportDC = new Date().toISOString();
@@ -321,11 +299,8 @@ function importSmartCookieReport(reconciler: IDataReconciler, reportData: Record
       gsusaId: row[SC_REPORT_COLUMNS.GSUSA_ID],
       gradeLevel: row[SC_REPORT_COLUMNS.GRADE_LEVEL],
       date: row[SC_REPORT_COLUMNS.ORDER_DATE],
-      type: row[SC_REPORT_COLUMNS.ORDER_TYPE_DESC],
       packages: totalFromField,
       cases: totalCases,
-      includedInIO: row[SC_REPORT_COLUMNS.INCLUDED_IN_IO],
-      isVirtual: row[SC_REPORT_COLUMNS.CSHARE_VIRTUAL] === SC_BOOLEAN.TRUE,
       varieties: varieties,
       organization: {
         troopId: row[SC_REPORT_COLUMNS.TROOP_ID],
@@ -345,8 +320,6 @@ function importSmartCookieReport(reconciler: IDataReconciler, reportData: Record
         existing.scoutId = newData.scoutId;
         existing.gsusaId = newData.gsusaId;
         existing.gradeLevel = newData.gradeLevel;
-        existing.includedInIO = newData.includedInIO;
-        existing.isVirtual = newData.isVirtual;
         existing.cases = newData.cases;
         existing.organization = {
           troopId: newData.organization?.troopId,
@@ -357,9 +330,8 @@ function importSmartCookieReport(reconciler: IDataReconciler, reportData: Record
       }
     );
 
-    // Update scout data with metadata (updateScoutData now handles metadata directly)
+    // Register scout with metadata
     updateScoutData(reconciler, scout, {
-      ordersSCReport: 1,
       scoutId: orderData.scoutId,
       gsusaId: orderData.gsusaId,
       gradeLevel: orderData.gradeLevel,
@@ -432,8 +404,7 @@ function importSmartCookieAPI(reconciler: IDataReconciler, apiData: Record<strin
       virtualBooth: order.virtual_booth || false,
       boothDivider: !!(order.smart_divider_id && !order.virtual_booth),
       status: order.status || '',
-      actions: order.actions || {},
-      source: DATA_SOURCES.SMART_COOKIE_API
+      actions: order.actions || {}
     };
 
     reconciler.transfers.push(reconciler.createTransfer(transferData));
@@ -651,8 +622,7 @@ function importSmartCookie(reconciler: IDataReconciler, scData: Record<string, a
       to: to,
       packages: parseInt(row[SC_API_COLUMNS.TOTAL], 10) || 0,
       varieties: varieties,
-      amount: parseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT]) || 0,
-      source: DATA_SOURCES.SMART_COOKIE
+      amount: parseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT]) || 0
     };
 
     reconciler.transfers.push(reconciler.createTransfer(transferData));
@@ -667,26 +637,20 @@ function importSmartCookie(reconciler: IDataReconciler, scData: Record<string, a
       reconciler.troopNumber = to;
     }
 
-    // Track scout pickups (T2G - Troop to Girl)
+    // Register scout pickups (T2G - Troop to Girl)
     // Check if transfer is FROM troop TO scout (not troop-to-troop)
     if (type === TRANSFER_TYPE.T2G && reconciler.troopNumber && from === reconciler.troopNumber && to !== reconciler.troopNumber) {
-      updateScoutData(reconciler, to, {
-        pickedUp: Math.abs(transferData.packages)
-      });
+      updateScoutData(reconciler, to, {});
     }
 
-    // Track scout returns (G2T - Girl to Troop) — reduce scout's pickedUp
+    // Register scout returns (G2T - Girl to Troop)
     if (type === TRANSFER_TYPE.G2T && reconciler.troopNumber && to === reconciler.troopNumber && from !== reconciler.troopNumber) {
-      updateScoutData(reconciler, from, {
-        pickedUp: -Math.abs(transferData.packages)
-      });
+      updateScoutData(reconciler, from, {});
     }
 
-    // Track Digital Cookie sales in SC
+    // Register scouts from Cookie Share transfers
     if (type.includes('COOKIE_SHARE') && reconciler.troopNumber && from === reconciler.troopNumber) {
-      updateScoutData(reconciler, to, {
-        soldSC: Math.abs(transferData.packages)
-      });
+      updateScoutData(reconciler, to, {});
     }
   });
 

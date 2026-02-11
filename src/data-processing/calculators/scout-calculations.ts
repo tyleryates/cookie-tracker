@@ -1,7 +1,7 @@
 // Scout-Level Calculations
 // Handles all per-scout totals, variety calculations, and financial tracking
 
-import { DC_PAYMENT_STATUS, ORDER_TYPE, OWNER } from '../../constants';
+import { ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
 import {
   COOKIE_TYPE,
   calculateRevenue,
@@ -61,9 +61,8 @@ function calculateOrderTotals(scout: Scout): void {
       scout.totals.shipped += order.physicalPackages;
     }
 
-    // Donations and revenue
+    // Donations
     scout.totals.donations += order.donations;
-    scout.totals.$orderRevenue += order.amount;
   });
 }
 
@@ -77,15 +76,8 @@ function calculateCreditedTotals(scout: Scout): void {
     calculateRevenue(scout.credited.boothSales.varieties);
 }
 
-/** Calculate revenue and proceeds totals */
+/** Calculate sold totals and proceeds */
 function calculateRevenueTotals(scout: Scout): void {
-  // Total revenue (site scouts don't get credited revenue — belongs to girls)
-  if (!scout.isSiteOrder) {
-    scout.totals.revenue = scout.totals.$orderRevenue + scout.totals.$creditedRevenue;
-  } else {
-    scout.totals.revenue = scout.totals.$orderRevenue;
-  }
-
   // Total sold across all channels
   scout.totals.totalSold = scout.totals.sales + scout.totals.shipped + scout.totals.donations + scout.totals.credited;
 
@@ -121,8 +113,7 @@ function calculateFinancialTracking(scout: Scout): void {
   scout.orders.forEach((order: Order) => {
     if (order.owner !== OWNER.GIRL) return;
 
-    const ps = (order.paymentStatus || '').toUpperCase();
-    const isElectronic = ps === DC_PAYMENT_STATUS.CAPTURED || ps === DC_PAYMENT_STATUS.AUTHORIZED || ps.includes(DC_PAYMENT_STATUS.VENMO);
+    const isElectronic = order.paymentMethod != null && order.paymentMethod !== PAYMENT_METHOD.CASH;
 
     if (isElectronic) {
       // Only inventory orders reduce what's owed for physical cookies
@@ -232,7 +223,5 @@ function calculateScoutCounts(scouts: Map<string, Scout>): {
   };
 }
 
-export { calculateVarietyTotals };
 export { calculateScoutTotals };
 export { calculateScoutCounts };
-export { detectNegativeInventory };

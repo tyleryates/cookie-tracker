@@ -4,7 +4,7 @@
 import type { BoothAvailableDate, BoothLocation, BoothTimeSlot, DayFilter, IDataReconciler, IgnoredTimeSlot } from '../../types';
 import { escapeHtml } from '../html-builder';
 
-export interface AvailableBoothsConfig {
+interface AvailableBoothsConfig {
   filters: DayFilter[];
   ignoredTimeSlots: IgnoredTimeSlot[];
 }

@@ -88,15 +88,9 @@ function generateBoothReport(reconciler: IDataReconciler): string {
     return !d || d < today;
   }).length;
 
-  // Calculate total booth sales from scout allocations
-  let totalBoothPackages = 0;
-  let totalBoothDonations = 0;
-  if (scouts) {
-    scouts.forEach((scout: Scout) => {
-      totalBoothPackages += scout.credited.boothSales.packages || 0;
-      totalBoothDonations += scout.credited.boothSales.donations || 0;
-    });
-  }
+  // Pre-computed booth sales totals from troop totals
+  const totalBoothPackages = reconciler.unified.troopTotals.boothSalesPackages;
+  const totalBoothDonations = reconciler.unified.troopTotals.boothSalesDonations;
 
   if (totalReservations === 0 && totalBoothPackages === 0 && totalBoothDonations === 0) {
     html +=

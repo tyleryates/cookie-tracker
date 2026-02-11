@@ -48,7 +48,7 @@ function buildSiteOrdersDataset(reconciler: IDataReconciler, scoutDataset: Map<s
   const totalGirlDelivery = siteOrdersByType.girlDelivery.reduce((sum: number, o: SiteOrderEntry) => sum + o.packages, 0);
   const totalBoothSale = siteOrdersByType.boothSale.reduce((sum: number, o: SiteOrderEntry) => sum + o.packages, 0);
 
-  return {
+  const result: SiteOrdersDataset = {
     directShip: {
       orders: siteOrdersByType.directShip,
       total: totalDirectShip,
@@ -71,6 +71,14 @@ function buildSiteOrdersDataset(reconciler: IDataReconciler, scoutDataset: Map<s
       hasWarning: totalBoothSale - allocations.boothSales > 0
     }
   };
+
+  // Set flag for scout-summary to control site row display and warning
+  if (siteScout) {
+    (siteScout as any).$hasUnallocatedSiteOrders =
+      result.directShip.hasWarning || result.girlDelivery.hasWarning || result.boothSale.hasWarning;
+  }
+
+  return result;
 }
 
 /** Calculate total allocated packages by type */
