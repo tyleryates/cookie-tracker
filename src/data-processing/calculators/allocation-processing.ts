@@ -4,9 +4,9 @@
 import { SCOUT_PHYSICAL_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
-import type { BoothSalesAllocation, DirectShipAllocation, Scout, Transfer } from '../../types';
-import { sumPhysicalPackages } from '../utils';
-import { addVarietiesToTarget, buildGirlIdToNameMap, findScoutByGirlId } from './helpers';
+import type { Allocation, Scout, Transfer } from '../../types';
+
+import { buildGirlIdToNameMap, findScoutByGirlId } from './helpers';
 
 /** Process virtual booth T2G transfers (Troop girl delivery) */
 function processVirtualBoothAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>): void {
@@ -16,68 +16,28 @@ function processVirtualBoothAllocations(reconciler: DataStore, scoutDataset: Map
     const scout = scoutDataset.get(transfer.to);
     if (!scout) return;
 
-    scout.credited.virtualBooth.packages += transfer.physicalPackages || 0;
-    scout.credited.virtualBooth.donations += transfer.varieties?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
-    addVarietiesToTarget(scout.credited.virtualBooth.varieties, transfer.varieties);
-
-    // Preserve individual allocation record for traceability
-    scout.credited.virtualBooth.allocations.push({
-      orderNumber: transfer.orderNumber,
-      date: transfer.date,
-      from: transfer.from,
+    scout.allocations.push({
+      channel: 'virtualBooth',
+      girlId: scout.girlId || 0,
       packages: transfer.physicalPackages || 0,
+      donations: transfer.varieties?.[COOKIE_TYPE.COOKIE_SHARE] || 0,
       varieties: { ...transfer.varieties },
+      source: 'VirtualBoothTransfer',
+      date: transfer.date,
+      orderNumber: transfer.orderNumber,
+      from: transfer.from,
       amount: transfer.amount || 0
     });
   });
 }
 
-/** Process direct ship divider allocations */
-function processDirectShipAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): void {
-  reconciler.directShipAllocations.forEach((allocation: DirectShipAllocation) => {
+/** Process imported allocations (direct ship + booth) from reconciler → scout */
+function processImportedAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): void {
+  reconciler.allocations.forEach((allocation: Allocation) => {
     const scout = findScoutByGirlId(allocation.girlId, scoutDataset, girlIdToName);
     if (!scout) return;
 
-    const physicalPkgs = sumPhysicalPackages(allocation.varieties);
-    const donationCount = allocation.trackedCookieShare || allocation.varieties?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
-    scout.credited.directShip.packages += physicalPkgs;
-    scout.credited.directShip.donations += donationCount;
-    addVarietiesToTarget(scout.credited.directShip.varieties, allocation.varieties);
-
-    // Preserve individual allocation record
-    scout.credited.directShip.allocations.push({
-      packages: physicalPkgs,
-      varieties: { ...allocation.varieties },
-      source: 'DirectShipDivider'
-    });
-  });
-}
-
-/** Process booth sales divider allocations */
-function processBoothSalesAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): void {
-  reconciler.boothSalesAllocations.forEach((allocation: BoothSalesAllocation) => {
-    const scout = findScoutByGirlId(allocation.girlId, scoutDataset, girlIdToName);
-    if (!scout) return;
-
-    const cookieShareCount = allocation.trackedCookieShare || allocation.varieties?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
-    const physicalPackages = sumPhysicalPackages(allocation.varieties);
-
-    scout.credited.boothSales.packages += physicalPackages;
-    scout.credited.boothSales.donations += cookieShareCount;
-    addVarietiesToTarget(scout.credited.boothSales.varieties, allocation.varieties);
-
-    // Preserve individual allocation record with booth details
-    scout.credited.boothSales.allocations.push({
-      reservationId: allocation.reservationId,
-      storeName: allocation.booth?.storeName || '',
-      date: allocation.timeslot?.date || '',
-      startTime: allocation.timeslot?.startTime || '',
-      endTime: allocation.timeslot?.endTime || '',
-      packages: physicalPackages,
-      donations: cookieShareCount,
-      varieties: { ...allocation.varieties },
-      source: 'SmartBoothDivider'
-    });
+    scout.allocations.push(allocation);
   });
 }
 
@@ -107,11 +67,8 @@ function addAllocations(reconciler: DataStore, scoutDataset: Map<string, Scout>)
   // Build girl ID to name mapping (shared by direct ship and booth sales)
   const girlIdToName = buildGirlIdToNameMap(scoutDataset);
 
-  // Process direct ship allocations (Type 3: Troop direct ship)
-  processDirectShipAllocations(reconciler, scoutDataset, girlIdToName);
-
-  // Process booth sales allocations (from Smart Booth Divider API)
-  processBoothSalesAllocations(reconciler, scoutDataset, girlIdToName);
+  // Process imported allocations (booth + direct ship from divider APIs)
+  processImportedAllocations(reconciler, scoutDataset, girlIdToName);
 }
 
 export { addInventory };

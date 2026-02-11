@@ -1,16 +1,16 @@
 // App — Root Preact component. Owns all state, effects, and callbacks.
 
 import { ipcRenderer } from 'electron';
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
 import { normalizeBoothLocation } from '../data-processing/data-importers';
-import { createDataStore, type DataStore } from '../data-store';
 import Logger from '../logger';
-import type { AppConfig, Credentials, ScrapeProgress } from '../types';
+import type { Credentials, ScrapeProgress } from '../types';
+import { type AppState, appReducer } from './app-reducer';
 import { LoginModal } from './components/login-modal';
 import { ReportsSection } from './components/reports-section';
-import { createInitialSyncState, SyncSection, type SyncState } from './components/sync-section';
-import { type DatasetEntry, exportUnifiedDataset, loadAppConfig, loadDataFromDisk, saveUnifiedDatasetToDisk } from './data-loader';
+import { createInitialSyncState, SyncSection } from './components/sync-section';
+import { exportUnifiedDataset, loadAppConfig, loadDataFromDisk, saveUnifiedDatasetToDisk } from './data-loader';
 
 // ============================================================================
 // CONSTANTS
@@ -20,32 +20,33 @@ const AUTO_SYNC_INTERVAL_MS = 3600000; // 1 hour
 const BOOTH_REFRESH_INTERVAL_MS = 900000; // 15 minutes
 const STATUS_MESSAGE_TIMEOUT_MS = 5000;
 
+const initialState: AppState = {
+  unified: null,
+  appConfig: null,
+  datasetList: [],
+  currentDatasetIndex: 0,
+  autoSyncEnabled: true,
+  activeReport: null,
+  modalOpen: false,
+  statusMessage: null,
+  syncState: createInitialSyncState(),
+  showSetupHint: false
+};
+
 // ============================================================================
 // APP COMPONENT
 // ============================================================================
 
 export function App() {
-  // --- State ---
-  const [store, setStore] = useState<DataStore>(() => createDataStore());
-  const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
-  const [datasetList, setDatasetList] = useState<DatasetEntry[]>([]);
-  const [currentDatasetIndex, setCurrentDatasetIndex] = useState(0);
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
-  const [activeReport, setActiveReport] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ msg: string; type: string } | null>(null);
-  const [syncState, setSyncState] = useState<SyncState>(createInitialSyncState);
-  const [showSetupHint, setShowSetupHint] = useState(false);
+  const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // Refs for stable callback references
-  const storeRef = useRef(store);
-  storeRef.current = store;
-  const appConfigRef = useRef(appConfig);
-  appConfigRef.current = appConfig;
+  // Refs for stable access in callbacks that don't re-render
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // --- Helpers ---
-  const showStatus = useCallback((msg: string, type: string) => {
-    setStatusMessage({ msg, type });
+  const showStatus = useCallback((msg: string, type: 'success' | 'warning' | 'error') => {
+    dispatch({ type: 'SET_STATUS', msg, statusType: type });
   }, []);
 
   const checkLoginStatus = useCallback(async () => {
@@ -54,9 +55,9 @@ export function App() {
       if (result.success && result.credentials) {
         const dc = result.credentials.digitalCookie;
         const sc = result.credentials.smartCookie;
-        setShowSetupHint(!(dc.username && dc.password && sc.username && sc.password));
+        dispatch({ type: 'SET_SETUP_HINT', show: !(dc.username && dc.password && sc.username && sc.password) });
       } else {
-        setShowSetupHint(true);
+        dispatch({ type: 'SET_SETUP_HINT', show: true });
       }
     } catch {
       // Non-fatal
@@ -65,7 +66,7 @@ export function App() {
 
   // --- Core data operations ---
   const doLoadDataFromDisk = useCallback(
-    async (opts?: { specificSc?: any; specificDc?: any; showMessages?: boolean }) => {
+    async (opts?: { specificSc?: any; specificDc?: any; showMessages?: boolean; updateSyncTimestamps?: boolean }) => {
       const showMessages = opts?.showMessages ?? true;
       try {
         if (showMessages) showStatus('Loading data...', 'success');
@@ -79,32 +80,27 @@ export function App() {
           return false;
         }
 
-        setStore(result.store);
-        setDatasetList(result.datasetList);
+        dispatch({ type: 'SET_UNIFIED', unified: result.unified, datasetList: result.datasetList });
         if (!opts?.specificSc && !opts?.specificDc) {
-          setCurrentDatasetIndex(0);
+          dispatch({ type: 'SET_DATASET_INDEX', index: 0 });
         }
 
-        // Update sync timestamps from loaded files
-        if (result.loaded.scTimestamp) {
-          setSyncState((prev) => ({
-            ...prev,
-            sc: { ...prev.sc, status: 'synced', lastSync: result.loaded.scTimestamp }
-          }));
-        }
-        if (result.loaded.dcTimestamp) {
-          setSyncState((prev) => ({
-            ...prev,
-            dc: { ...prev.dc, status: 'synced', lastSync: result.loaded.dcTimestamp }
-          }));
+        // Only update sync timestamps on initial load / dataset change — not after
+        // a sync, where the sync handler already set the correct status (including errors).
+        if (opts?.updateSyncTimestamps) {
+          if (result.loaded.scTimestamp) {
+            dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'sc', patch: { status: 'synced', lastSync: result.loaded.scTimestamp } });
+          }
+          if (result.loaded.dcTimestamp) {
+            dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'dc', patch: { status: 'synced', lastSync: result.loaded.dcTimestamp } });
+          }
         }
 
         const anyLoaded = result.loaded.sc || result.loaded.dc || result.loaded.scReport || result.loaded.scTransfer;
 
         if (anyLoaded) {
-          await saveUnifiedDatasetToDisk(result.store);
-          // Auto-select troop report on first load if no report active
-          setActiveReport((prev) => prev || 'troop');
+          await saveUnifiedDatasetToDisk(result.unified);
+          dispatch({ type: 'DEFAULT_REPORT' });
           if (showMessages) showStatus(`✅ Loaded ${result.datasetList.length} dataset(s)`, 'success');
           return true;
         }
@@ -125,13 +121,7 @@ export function App() {
   // --- Sync handler ---
   const handleSync = useCallback(async () => {
     try {
-      setSyncState((prev) => ({
-        ...prev,
-        syncing: true,
-        dc: { ...prev.dc, status: 'syncing', progress: 0, progressText: 'Starting...' },
-        sc: { ...prev.sc, status: 'syncing', progress: 0, progressText: 'Starting...' }
-      }));
-
+      dispatch({ type: 'SYNC_STARTED' });
       showStatus('Starting API sync for both platforms...', 'success');
 
       const result = await ipcRenderer.invoke('scrape-websites');
@@ -148,19 +138,25 @@ export function App() {
         const sourceResult = result[sourceKey];
         if (!sourceResult) continue;
         if (sourceResult.success) {
-          setSyncState((prev) => ({ ...prev, [key]: { ...prev[key], status: 'synced', lastSync: now, progress: 100 } }));
+          dispatch({ type: 'SYNC_SOURCE_UPDATE', source: key, patch: { status: 'synced', lastSync: now, progress: 100 } });
           parts.push(`${label} downloaded`);
         } else {
-          setSyncState((prev) => ({ ...prev, [key]: { ...prev[key], status: 'error', errorMessage: sourceResult.error } }));
+          dispatch({ type: 'SYNC_SOURCE_UPDATE', source: key, patch: { status: 'error', errorMessage: sourceResult.error } });
           if (sourceResult.error) errors.push(`${label}: ${sourceResult.error}`);
         }
       }
 
       if (result.error) errors.push(result.error);
 
-      if (result.success && parts.length > 0) {
-        showStatus(`✅ Sync complete! ${parts.join(', ')}`, 'success');
+      // Reload data if anything succeeded (even partial — e.g. SC ok, DC failed)
+      if (parts.length > 0) {
         await doLoadDataFromDisk({ showMessages: false });
+      }
+
+      if (parts.length > 0 && errors.length === 0) {
+        showStatus(`✅ Sync complete! ${parts.join(', ')}`, 'success');
+      } else if (parts.length > 0 && errors.length > 0) {
+        showStatus(`Partial sync: ${parts.join(', ')}. Errors: ${errors.join('; ')}`, 'warning');
       } else if (errors.length > 0) {
         showStatus(`Sync failed: ${errors.join('; ')}`, 'error');
       } else {
@@ -170,7 +166,7 @@ export function App() {
       showStatus(`Error: ${(error as Error).message}`, 'error');
       Logger.error(error);
     } finally {
-      setSyncState((prev) => ({ ...prev, syncing: false }));
+      dispatch({ type: 'SYNC_FINISHED' });
     }
   }, [showStatus, doLoadDataFromDisk]);
 
@@ -178,54 +174,35 @@ export function App() {
   const handleRefreshBoothAvailability = useCallback(async () => {
     try {
       showStatus('Refreshing booth availability...', 'success');
-      setSyncState((prev) => ({
-        ...prev,
-        booth: { ...prev.booth, status: 'syncing' }
-      }));
+      dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'booth', patch: { status: 'syncing' } });
 
       const result = await ipcRenderer.invoke('refresh-booth-locations');
       if (!result?.success) {
         Logger.error('Booth availability refresh failed:', result?.error);
         showStatus(`Booth refresh failed: ${result?.error || 'Unknown error'}`, 'error');
-        setSyncState((prev) => ({
-          ...prev,
-          booth: { ...prev.booth, status: 'error', errorMessage: result?.error }
-        }));
+        dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'booth', patch: { status: 'error', errorMessage: result?.error } });
         return;
       }
 
       const rawLocations: any[] = result.data || [];
       const updated = rawLocations.map(normalizeBoothLocation);
-
-      setStore((prev) => {
-        const next = { ...prev, boothLocations: updated };
-        if (next.unified) {
-          next.unified = { ...next.unified, boothLocations: updated };
-        }
-        return next;
-      });
+      dispatch({ type: 'UPDATE_BOOTH_LOCATIONS', boothLocations: updated });
 
       const now = new Date().toISOString();
-      setSyncState((prev) => ({
-        ...prev,
-        booth: { ...prev.booth, status: 'synced', lastSync: now }
-      }));
+      dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'booth', patch: { status: 'synced', lastSync: now } });
       ipcRenderer.invoke('update-config', { lastBoothSync: now });
       showStatus(`✅ Booth availability refreshed (${updated.length} locations)`, 'success');
     } catch (error) {
       Logger.error('Booth availability refresh failed:', error);
       showStatus(`Booth refresh error: ${(error as Error).message}`, 'error');
-      setSyncState((prev) => ({
-        ...prev,
-        booth: { ...prev.booth, status: 'error' }
-      }));
+      dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'booth', patch: { status: 'error' } });
     }
   }, [showStatus]);
 
   // --- Callbacks ---
   const handleToggleAutoSync = useCallback(
     (enabled: boolean) => {
-      setAutoSyncEnabled(enabled);
+      dispatch({ type: 'TOGGLE_AUTO_SYNC', enabled });
       ipcRenderer.invoke('update-config', { autoSyncEnabled: enabled });
       showStatus(enabled ? 'Auto-sync enabled (syncs every hour)' : 'Auto-sync disabled', 'success');
     },
@@ -234,8 +211,9 @@ export function App() {
 
   const handleDatasetChange = useCallback(
     async (index: number) => {
+      const { currentDatasetIndex, datasetList } = stateRef.current;
       if (index === currentDatasetIndex || !datasetList[index]) return;
-      setCurrentDatasetIndex(index);
+      dispatch({ type: 'SET_DATASET_INDEX', index });
       const dataset = datasetList[index];
       showStatus('Loading dataset...', 'success');
 
@@ -249,19 +227,20 @@ export function App() {
         showStatus(`Loaded dataset: ${dataset.label}`, 'success');
       }
     },
-    [currentDatasetIndex, datasetList, showStatus, doLoadDataFromDisk]
+    [showStatus, doLoadDataFromDisk]
   );
 
   const handleSelectReport = useCallback((type: string) => {
-    setActiveReport(type);
+    dispatch({ type: 'SET_ACTIVE_REPORT', report: type });
   }, []);
 
   const handleExport = useCallback(() => {
-    if (!storeRef.current.unified) {
+    const { unified } = stateRef.current;
+    if (!unified) {
       alert('No unified dataset available to export.');
       return;
     }
-    exportUnifiedDataset(storeRef.current);
+    exportUnifiedDataset(unified);
   }, []);
 
   const handleRecalculate = useCallback(() => {
@@ -270,21 +249,19 @@ export function App() {
 
   const handleSaveCredentials = useCallback(
     async (_credentials: Credentials) => {
-      setModalOpen(false);
+      dispatch({ type: 'CLOSE_MODAL' });
       await checkLoginStatus();
     },
     [checkLoginStatus]
   );
 
   const handleIgnoreSlot = useCallback(async (boothId: number, date: string, startTime: string) => {
-    const config = appConfigRef.current;
+    const config = stateRef.current.appConfig;
     const ignored = [...(config?.ignoredTimeSlots || []), { boothId, date, startTime }];
     if (config) {
-      const updated = { ...config, ignoredTimeSlots: ignored };
-      setAppConfig(updated);
+      dispatch({ type: 'IGNORE_SLOT', config: { ...config, ignoredTimeSlots: ignored } });
     }
     await ipcRenderer.invoke('update-config', { ignoredTimeSlots: ignored });
-    // Re-render available-booths report happens automatically via state change
   }, []);
 
   // --- Effects ---
@@ -293,22 +270,15 @@ export function App() {
   useEffect(() => {
     (async () => {
       const config = await loadAppConfig();
-      setAppConfig(config);
-      setAutoSyncEnabled(config.autoSyncEnabled ?? true);
-      if (config.lastBoothSync) {
-        setSyncState((prev) => ({
-          ...prev,
-          booth: { ...prev.booth, status: 'synced', lastSync: config.lastBoothSync }
-        }));
-      }
-      await doLoadDataFromDisk({ showMessages: false });
+      dispatch({ type: 'LOAD_CONFIG', config });
+      await doLoadDataFromDisk({ showMessages: false, updateSyncTimestamps: true });
       await checkLoginStatus();
     })();
   }, []);
 
   // Auto-sync effect
   useEffect(() => {
-    if (!autoSyncEnabled) return;
+    if (!state.autoSyncEnabled) return;
 
     const syncInterval = setInterval(async () => {
       Logger.debug('Auto-sync: Starting hourly sync...');
@@ -339,20 +309,20 @@ export function App() {
       Logger.debug('Auto-sync: Stopped');
       Logger.debug('Booth refresh: Stopped');
     };
-  }, [autoSyncEnabled, handleSync, handleRefreshBoothAvailability]);
+  }, [state.autoSyncEnabled, handleSync, handleRefreshBoothAvailability]);
 
   // IPC progress listener
   useEffect(() => {
     const onProgress = (_event: any, progress: ScrapeProgress) => {
-      setSyncState((prev) => ({
-        ...prev,
-        [progress.source]: {
-          ...prev[progress.source],
+      dispatch({
+        type: 'SYNC_SOURCE_UPDATE',
+        source: progress.source,
+        patch: {
           progress: progress.progress,
           progressText: progress.status,
           status: progress.progress >= 100 ? 'synced' : 'syncing'
         }
-      }));
+      });
     };
 
     const onUpdateAvailable = (_event: any, info: { version: string }) => {
@@ -378,14 +348,14 @@ export function App() {
 
   // Status message auto-hide effect
   useEffect(() => {
-    if (!statusMessage || statusMessage.type !== 'success') return;
+    if (!state.statusMessage || state.statusMessage.type !== 'success') return;
 
     const timeout = setTimeout(() => {
-      setStatusMessage(null);
+      dispatch({ type: 'CLEAR_STATUS' });
     }, STATUS_MESSAGE_TIMEOUT_MS);
 
     return () => clearTimeout(timeout);
-  }, [statusMessage]);
+  }, [state.statusMessage]);
 
   // --- Render ---
   return (
@@ -399,33 +369,36 @@ export function App() {
         <section class="import-section">
           <h2>Data Sync & Status</h2>
           <SyncSection
-            syncState={syncState}
-            datasets={datasetList}
-            currentDatasetIndex={currentDatasetIndex}
-            autoSyncEnabled={autoSyncEnabled}
-            statusMessage={statusMessage}
-            showSetupHint={showSetupHint}
+            syncState={state.syncState}
+            datasets={state.datasetList}
+            currentDatasetIndex={state.currentDatasetIndex}
+            autoSyncEnabled={state.autoSyncEnabled}
+            statusMessage={state.statusMessage}
+            showSetupHint={state.showSetupHint}
             onSync={handleSync}
             onToggleAutoSync={handleToggleAutoSync}
             onDatasetChange={handleDatasetChange}
-            onConfigureLogins={() => setModalOpen(true)}
+            onConfigureLogins={() => dispatch({ type: 'OPEN_MODAL' })}
             onRecalculate={handleRecalculate}
             onExport={handleExport}
-            hasData={!!store.unified}
+            hasData={!!state.unified}
           />
         </section>
 
         <ReportsSection
-          activeReport={activeReport}
-          store={store}
-          appConfig={appConfig}
+          activeReport={state.activeReport}
+          unified={state.unified}
+          appConfig={state.appConfig}
+          boothSyncing={state.syncState.booth.status === 'syncing'}
           onSelectReport={handleSelectReport}
           onIgnoreSlot={handleIgnoreSlot}
           onRefreshBooths={handleRefreshBoothAvailability}
         />
       </main>
 
-      {modalOpen && <LoginModal onClose={() => setModalOpen(false)} onSave={handleSaveCredentials} showStatus={showStatus} />}
+      {state.modalOpen && (
+        <LoginModal onClose={() => dispatch({ type: 'CLOSE_MODAL' })} onSave={handleSaveCredentials} showStatus={showStatus} />
+      )}
 
       <footer class="app-footer">
         <span>v{packageJson.version}</span>

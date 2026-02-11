@@ -60,27 +60,8 @@ function createScoutStructure(name: string, firstName: string, lastName: string,
       varieties: {}
     },
 
-    // Allocations
-    credited: {
-      virtualBooth: {
-        packages: 0,
-        donations: 0,
-        varieties: {},
-        allocations: []
-      },
-      directShip: {
-        packages: 0,
-        donations: 0,
-        varieties: {},
-        allocations: []
-      },
-      boothSales: {
-        packages: 0,
-        donations: 0,
-        varieties: {},
-        allocations: []
-      }
-    },
+    // Flat allocation list (booth, directShip, virtualBooth)
+    allocations: [],
 
     // Totals (calculated later)
     totals: {

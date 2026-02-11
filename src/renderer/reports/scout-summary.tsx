@@ -1,7 +1,7 @@
 import { ALLOCATION_METHOD, DISPLAY_STRINGS } from '../../constants';
 import { getCookieDisplayName, PROCEEDS_EXEMPT_PACKAGES } from '../../cookie-constants';
-import { totalCredited } from '../../data-processing/calculators/helpers';
-import type { Order, Scout, ScoutCredited, SiteOrdersDataset, UnifiedDataset } from '../../types';
+import { allocationsByChannel, channelTotals, totalCredited } from '../../data-processing/calculators/helpers';
+import type { Allocation, Order, Scout, SiteOrdersDataset, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { classifyOrderStatus, ScoutDetailBreakdown } from '../components/scout-detail';
@@ -66,36 +66,42 @@ function InventoryCell({
   return <span>—</span>;
 }
 
-function CreditedCell({ isSiteRow, credited, siteOrders }: { isSiteRow: boolean; credited: ScoutCredited; siteOrders: SiteOrdersDataset }) {
-  const total = totalCredited(credited);
+function CreditedCell({
+  isSiteRow,
+  allocations,
+  siteOrders
+}: {
+  isSiteRow: boolean;
+  allocations: Allocation[];
+  siteOrders: SiteOrdersDataset;
+}) {
+  const total = totalCredited(allocations);
   if (total === 0) return <>{'—'}</>;
+
+  const vb = channelTotals(allocations, 'virtualBooth');
+  const ds = channelTotals(allocations, 'directShip');
+  const bs = channelTotals(allocations, 'booth');
 
   const sources: string[] = [];
   // Virtual booth
-  const vbPkg = credited.virtualBooth.packages || 0;
-  const vbDon = credited.virtualBooth.donations || 0;
-  if (vbPkg + vbDon > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vbPkg + vbDon}`);
-    credited.virtualBooth.allocations.forEach((a) => {
+  if (vb.packages + vb.donations > 0) {
+    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vb.packages + vb.donations}`);
+    allocationsByChannel(allocations, 'virtualBooth').forEach((a) => {
       const order = a.orderNumber ? `#${a.orderNumber}` : 'Unknown';
       const date = a.date ? ` (${a.date})` : '';
       sources.push(`  ${order}${date}: ${a.packages} pkg`);
     });
   }
   // Direct ship
-  const dsPkg = credited.directShip.packages || 0;
-  const dsDon = credited.directShip.donations || 0;
-  if (dsPkg + dsDon > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${dsPkg + dsDon}`);
-    const n = credited.directShip.allocations.length;
+  if (ds.packages + ds.donations > 0) {
+    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${ds.packages + ds.donations}`);
+    const n = allocationsByChannel(allocations, 'directShip').length;
     if (n > 0) sources.push(`  (${n} allocation${n === 1 ? '' : 's'} from SC divider)`);
   }
   // Booth sales
-  const bsPkg = credited.boothSales.packages || 0;
-  const bsDon = credited.boothSales.donations || 0;
-  if (bsPkg + bsDon > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bsPkg + bsDon}`);
-    credited.boothSales.allocations.forEach((a) => {
+  if (bs.packages + bs.donations > 0) {
+    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bs.packages + bs.donations}`);
+    allocationsByChannel(allocations, 'booth').forEach((a) => {
       const store = a.storeName || 'Booth';
       const date = a.date ? ` (${a.date})` : '';
       const parts = [`${a.packages} pkg`];
@@ -226,9 +232,9 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
       >
         {sortedScouts.map(([name, scout]) => {
           const isSiteRow = name.endsWith(' Site');
-          const { totals, credited } = scout;
+          const { totals, allocations } = scout;
           const sales = totals.delivered || 0;
-          const totalCreditedCount = totalCredited(credited);
+          const totalCreditedCount = totalCredited(allocations);
           const { className: orderClass, icon: orderIcon, tooltip: orderTooltip } = getOrderStatusStyle(scout);
           const totalSold = totals.totalSold || 0;
           const directSales = sales + (totals.shipped || 0) + (totals.donations || 0);
@@ -261,7 +267,7 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
                 <DeliveredCell sales={sales} isSiteRow={isSiteRow} scout={scout} siteOrders={siteOrders} />,
                 totals.shipped || 0,
                 totals.donations || 0,
-                <CreditedCell isSiteRow={isSiteRow} credited={credited} siteOrders={siteOrders} />,
+                <CreditedCell isSiteRow={isSiteRow} allocations={allocations} siteOrders={siteOrders} />,
                 <TooltipCell tooltip={soldTooltip} tag="span">
                   {totalSold}
                 </TooltipCell>,

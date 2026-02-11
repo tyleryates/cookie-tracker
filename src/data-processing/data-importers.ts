@@ -22,7 +22,7 @@ import type { DataStore } from '../data-store';
 import { createTransfer, mergeOrCreateOrder } from '../data-store-operations';
 import Logger from '../logger';
 import type { BoothAvailableDate, BoothLocation, CookieType, Order, Varieties } from '../types';
-import { isC2TTransfer } from './utils';
+import { isC2TTransfer, sumPhysicalPackages } from './utils';
 
 // ============================================================================
 // PURE PARSING FUNCTIONS
@@ -434,16 +434,16 @@ function importDirectShipDivider(reconciler: DataStore, dividerData: Record<stri
     const cookies = girl.cookies || [];
 
     // Parse varieties from cookies array
-    const { varieties, totalPackages } = parseVarietiesFromAPI(cookies);
+    const { varieties } = parseVarietiesFromAPI(cookies);
 
-    const allocation = {
+    reconciler.allocations.push({
+      channel: 'directShip',
       girlId: girlId,
-      packages: totalPackages,
+      packages: sumPhysicalPackages(varieties),
+      donations: varieties[COOKIE_TYPE.COOKIE_SHARE] || 0,
       varieties: varieties,
       source: 'DirectShipDivider'
-    };
-
-    reconciler.directShipAllocations.push(allocation);
+    });
   });
 }
 
@@ -518,8 +518,6 @@ function importBoothDividers(
 ): void {
   if (!Array.isArray(boothDividers) || boothDividers.length === 0) return;
 
-  reconciler.boothSalesAllocations = [];
-
   // Track seen (reservationId, girlId) pairs to prevent duplicates
   const seen = new Set<string>();
 
@@ -535,24 +533,19 @@ function importBoothDividers(
       const alloc = parseGirlAllocation(girl, entry.reservationId, seen, reconciler, dynamicCookieIdMap);
       if (!alloc) return;
 
-      reconciler.boothSalesAllocations.push({
+      reconciler.allocations.push({
+        channel: 'booth',
         girlId: alloc.girlId,
-        packages: alloc.totalPackages,
+        packages: sumPhysicalPackages(alloc.varieties),
+        donations: alloc.trackedCookieShare,
         varieties: alloc.varieties,
-        trackedCookieShare: alloc.trackedCookieShare,
+        source: 'SmartBoothDivider',
         reservationId: entry.reservationId,
-        booth: {
-          boothId: booth.booth_id || booth.id,
-          storeName: booth.store_name || booth.booth_name || booth.location || '',
-          address: booth.address || ''
-        },
-        timeslot: {
-          date: timeslot.date || '',
-          startTime: timeslot.start_time || timeslot.startTime || '',
-          endTime: timeslot.end_time || timeslot.endTime || ''
-        },
-        reservationType: booth.reservation_type || booth.type || '',
-        source: 'SmartBoothDivider'
+        storeName: booth.store_name || booth.booth_name || booth.location || '',
+        date: timeslot.date || '',
+        startTime: timeslot.start_time || timeslot.startTime || '',
+        endTime: timeslot.end_time || timeslot.endTime || '',
+        reservationType: booth.reservation_type || booth.type || ''
       });
     });
   });
@@ -578,13 +571,14 @@ function importDirectShipDividers(
       const alloc = parseGirlAllocation(girl, orderId, seen, reconciler, dynamicCookieIdMap);
       if (!alloc) return;
 
-      reconciler.directShipAllocations.push({
+      reconciler.allocations.push({
+        channel: 'directShip',
         girlId: alloc.girlId,
-        packages: alloc.totalPackages,
+        packages: sumPhysicalPackages(alloc.varieties),
+        donations: alloc.trackedCookieShare,
         varieties: alloc.varieties,
-        trackedCookieShare: alloc.trackedCookieShare,
-        orderId: orderId,
-        source: 'SmartDirectShipDivider'
+        source: 'SmartDirectShipDivider',
+        orderId: orderId
       });
     });
   });

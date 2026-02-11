@@ -5,6 +5,7 @@ import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import { getTroopProceedsRate, PROCEEDS_EXEMPT_PACKAGES } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
 import type { Scout, ScoutCounts, TroopTotals } from '../../types';
+import { channelTotals } from './helpers';
 
 /** Aggregate scout-level totals: delivery, inventory, shipping, and proceeds */
 function aggregateScoutTotals(scouts: Map<string, Scout>) {
@@ -18,15 +19,17 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
 
   scouts.forEach((scout) => {
     if (!scout.isSiteOrder) {
-      girlDelivery += (scout.totals.delivered || 0) + (scout.credited.virtualBooth.packages || 0);
+      const vb = channelTotals(scout.allocations, 'virtualBooth');
+      const ds = channelTotals(scout.allocations, 'directShip');
+      const bs = channelTotals(scout.allocations, 'booth');
+
+      girlDelivery += (scout.totals.delivered || 0) + vb.packages;
       girlInventory += Math.max(0, scout.totals.inventory || 0);
       // Credited Cookie Share from divider allocations (site orders distributed to scouts)
-      creditedDonations += scout.credited.virtualBooth.donations || 0;
-      creditedDonations += scout.credited.directShip.donations || 0;
-      creditedDonations += scout.credited.boothSales.donations || 0;
+      creditedDonations += vb.donations + ds.donations + bs.donations;
       // Booth sales totals (used by booth and donation-alert reports)
-      boothSalesPackages += scout.credited.boothSales.packages || 0;
-      boothSalesDonations += scout.credited.boothSales.donations || 0;
+      boothSalesPackages += bs.packages;
+      boothSalesDonations += bs.donations;
       // Shortfalls: orders approved for delivery but scout hasn't picked up inventory yet
       if (scout.$issues?.negativeInventory) {
         scout.$issues.negativeInventory.forEach((issue) => {

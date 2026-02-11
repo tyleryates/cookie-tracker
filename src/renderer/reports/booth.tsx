@@ -1,4 +1,5 @@
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
+import { allocationsByChannel } from '../../data-processing/calculators/helpers';
 import { sumPhysicalPackages } from '../../data-processing/utils';
 import type { BoothReservationImported, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
@@ -13,8 +14,8 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
   const scoutsForBooth: Array<{ name: string; packages: number; donations: number }> = [];
   scouts.forEach((scout: Scout, name: string) => {
     if (scout.isSiteOrder) return;
-    const allocations = scout.credited.boothSales.allocations || [];
-    const matchingAllocations = allocations.filter((a) => {
+    const boothAllocations = allocationsByChannel(scout.allocations, 'booth');
+    const matchingAllocations = boothAllocations.filter((a) => {
       const storeMatch = (a.storeName || '').toLowerCase() === (booth.booth.storeName || '').toLowerCase();
       const dateMatch = a.date === booth.timeslot.date;
       return storeMatch && dateMatch;

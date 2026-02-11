@@ -76,6 +76,8 @@ export function buildUnifiedDataset(reconciler: DataStore): UnifiedDataset {
     boothReservations: reconciler.boothReservations,
     boothLocations: reconciler.boothLocations,
     metadata,
-    warnings
+    warnings,
+    virtualCookieShareAllocations: reconciler.virtualCookieShareAllocations,
+    hasTransferData: reconciler.transfers.length > 0
   };
 }

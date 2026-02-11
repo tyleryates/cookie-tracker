@@ -1,4 +1,5 @@
 import { isDCAutoSync } from '../../constants';
+import { channelTotals } from '../../data-processing/calculators/helpers';
 import type { Order, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { StatCards } from '../components/stat-cards';
@@ -67,7 +68,7 @@ function buildScoutDonationRows(scouts: Map<string, Scout>, virtualCSAllocations
     if (scout.isSiteOrder) return;
     const { dcTotal, dcAutoSync } = computeScoutDonations(scout);
     const manualNeeded = dcTotal - dcAutoSync;
-    const boothCS = scout.credited.boothSales.donations || 0;
+    const boothCS = channelTotals(scout.allocations, 'booth').donations;
     const totalCS = dcTotal + boothCS;
     if (totalCS === 0) return;
 

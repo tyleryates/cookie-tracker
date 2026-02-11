@@ -44,9 +44,9 @@ export function buildVarieties(reconciler: DataStore, scouts: Map<string, Scout>
     });
     // Credited allocations (booth sales, virtual booth, direct ship)
     if (!scout.isSiteOrder) {
-      addVarieties(scout.credited.boothSales.varieties, byCookie);
-      addVarieties(scout.credited.virtualBooth.varieties, byCookie);
-      addVarieties(scout.credited.directShip.varieties, byCookie);
+      scout.allocations.forEach((alloc) => {
+        addVarieties(alloc.varieties, byCookie);
+      });
     }
   });
 

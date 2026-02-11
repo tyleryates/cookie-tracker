@@ -114,11 +114,12 @@ export function countAvailableSlots(boothLocations: BoothLocation[], filters: Da
 interface AvailableBoothsProps {
   data: UnifiedDataset;
   config: AvailableBoothsConfig;
+  refreshing: boolean;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
   onRefresh: () => void;
 }
 
-export function AvailableBoothsReport({ data, config, onIgnoreSlot, onRefresh }: AvailableBoothsProps) {
+export function AvailableBoothsReport({ data, config, refreshing, onIgnoreSlot, onRefresh }: AvailableBoothsProps) {
   if (!data) {
     return (
       <div class="report-visual">
@@ -139,8 +140,8 @@ export function AvailableBoothsReport({ data, config, onIgnoreSlot, onRefresh }:
     <div class="report-visual">
       <h3>Available Booths</h3>
       <div class="report-toolbar">
-        <button type="button" class="btn btn-secondary" onClick={onRefresh}>
-          Refresh Availability
+        <button type="button" class="btn btn-secondary" disabled={refreshing} onClick={onRefresh}>
+          {refreshing ? 'Refreshing...' : 'Refresh Availability'}
         </button>
       </div>
 

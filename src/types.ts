@@ -7,10 +7,6 @@ import type { OrderType, Owner, PaymentMethod, TransferCategory, TransferType } 
 // COOKIE TYPES
 // ============================================================================
 
-/**
- * Cookie variety type - string literal union
- * Use this instead of arbitrary strings for type safety
- */
 export type CookieType =
   | 'THIN_MINTS'
   | 'CARAMEL_DELITES'
@@ -23,19 +19,12 @@ export type CookieType =
   | 'CARAMEL_CHOCOLATE_CHIP'
   | 'COOKIE_SHARE';
 
-/**
- * Varieties object - maps cookie types to package counts
- * Keys must be valid CookieType constants
- */
 export type Varieties = Partial<Record<CookieType, number>>;
 
 // ============================================================================
 // ORDER TYPES
 // ============================================================================
 
-/**
- * Metadata attached to each order, keyed by data source
- */
 export interface OrderMetadata {
   dc: Record<string, any> | null;
   sc: Record<string, any> | null;
@@ -43,9 +32,6 @@ export interface OrderMetadata {
   scApi: Record<string, any> | null;
 }
 
-/**
- * Order data structure
- */
 export interface Order {
   orderNumber: string;
   scout: string;
@@ -53,9 +39,7 @@ export interface Order {
   gsusaId?: string;
   gradeLevel?: string;
   date: string;
-  /** Raw DC order type string for display (e.g. "Shipped with Donation", "In-Person Delivery") */
   dcOrderType?: string;
-  /** Classified order type enum — used for logic/dispatch (from classifyDCOrder) */
   orderType: OrderType | null;
   owner: Owner;
   packages: number;
@@ -81,32 +65,12 @@ export interface Order {
 // TRANSFER TYPES
 // ============================================================================
 
-/**
- * Transfer data structure (Smart Cookie records from /orders/search API)
- *
- * Stored in reconciler.transfers[]. Includes both actual inventory transfers
- * (C2T, T2G, G2T) and order/sales records (D, COOKIE_SHARE, DIRECT_SHIP) that
- * the SC API returns through the same endpoint. The `category` field distinguishes
- * these — see TRANSFER_CATEGORY and its category groups in constants.ts.
- *
- * Separate from reconciler.orders (Order type), which holds customer-facing sale
- * data enriched from DC + SC Report with payment info, ship status, etc.
- * Some records exist in both collections (e.g., D-prefixed SC records also
- * create/enrich an Order).
- */
-
-/**
- * Actions available on a Smart Cookie transfer
- */
 export interface TransferActions {
   submittable?: boolean;
   approvable?: boolean;
   saveable?: boolean;
 }
 
-/**
- * Transfer data structure (Smart Cookie inventory movements)
- */
 export interface Transfer {
   type: TransferType;
   category: TransferCategory;
@@ -124,15 +88,50 @@ export interface Transfer {
   actions?: TransferActions;
 }
 
-/**
- * Input type for createTransfer() — includes classification flags from raw API data
- * that are used to determine the transfer category but not stored on the final Transfer.
- */
 export type TransferInput = Partial<Transfer> & {
   virtualBooth?: boolean;
   boothDivider?: boolean;
   directShipDivider?: boolean;
 };
+
+// ============================================================================
+// ALLOCATION TYPES — Normalized single type replacing BoothSalesAllocation,
+// DirectShipAllocation, and virtual booth transfer processing.
+// ============================================================================
+
+export type AllocationChannel = 'booth' | 'directShip' | 'virtualBooth';
+
+/**
+ * Unified allocation record. Every credited allocation across all channels
+ * (booth sales, direct ship, virtual booth) uses this single type.
+ * Channel-specific fields are optional.
+ */
+export interface Allocation {
+  channel: AllocationChannel;
+  girlId: number;
+  packages: number;
+  donations: number;
+  varieties: Varieties;
+  source: string;
+
+  // Booth-specific
+  reservationId?: string;
+  storeName?: string;
+  startTime?: string;
+  endTime?: string;
+  reservationType?: string;
+
+  // Booth + virtualBooth shared
+  date?: string;
+
+  // Virtual booth specific
+  orderNumber?: string;
+  from?: string;
+  amount?: number;
+
+  // Direct ship specific
+  orderId?: string;
+}
 
 // ============================================================================
 // SCOUT TYPES
@@ -143,7 +142,6 @@ export interface ScoutTotals {
   delivered: number;
   shipped: number;
   donations: number;
-  /** Total credited packages (booth + virtual booth + direct ship). Used by totalSold calculation — reports use totalCredited() helper for display. */
   credited: number;
   totalSold: number;
   inventory: number;
@@ -162,48 +160,6 @@ export interface ScoutInventory {
   varieties: Varieties;
 }
 
-export interface ScoutCredited {
-  virtualBooth: {
-    packages: number;
-    donations: number;
-    varieties: Varieties;
-    allocations: Array<{
-      orderNumber?: string;
-      date: string;
-      from: string;
-      packages: number;
-      varieties: Varieties;
-      amount: number;
-    }>;
-  };
-  directShip: {
-    packages: number;
-    donations: number;
-    varieties: Varieties;
-    allocations: Array<{
-      packages: number;
-      varieties: Varieties;
-      source: string;
-    }>;
-  };
-  boothSales: {
-    packages: number;
-    donations: number;
-    varieties: Varieties;
-    allocations: Array<{
-      reservationId?: string;
-      storeName: string;
-      date: string;
-      startTime: string;
-      endTime: string;
-      packages: number;
-      donations: number;
-      varieties: Varieties;
-      source: string;
-    }>;
-  };
-}
-
 export interface Scout {
   name: string;
   firstName?: string;
@@ -215,7 +171,8 @@ export interface Scout {
   isSiteOrder: boolean;
   totals: ScoutTotals;
   inventory: ScoutInventory;
-  credited: ScoutCredited;
+  /** Flat list of all credited allocations (booth, directShip, virtualBooth) */
+  allocations: Allocation[];
   orders: Order[];
   $hasUnallocatedSiteOrders?: boolean;
   $issues?: {
@@ -262,7 +219,7 @@ export interface RawScoutData {
 }
 
 // ============================================================================
-// WARNING TYPE (used across calculator modules)
+// WARNING TYPE
 // ============================================================================
 
 export interface Warning {
@@ -300,35 +257,6 @@ export interface Credentials {
 // ============================================================================
 // BOOTH & RESERVATION TYPES
 // ============================================================================
-
-export interface BoothSalesAllocation {
-  girlId: number;
-  packages: number;
-  varieties: Varieties;
-  trackedCookieShare: number;
-  reservationId?: string;
-  booth: {
-    boothId?: string;
-    storeName: string;
-    address: string;
-  };
-  timeslot: {
-    date: string;
-    startTime: string;
-    endTime: string;
-  };
-  reservationType: string;
-  source: string;
-}
-
-export interface DirectShipAllocation {
-  girlId: number;
-  packages: number;
-  varieties: Varieties;
-  trackedCookieShare?: number;
-  orderId?: string;
-  source: string;
-}
 
 export interface BoothReservationImported {
   id: string;
@@ -369,8 +297,6 @@ export interface BoothLocation {
 // ============================================================================
 // UNIFIED DATASET
 // ============================================================================
-
-// Sub-types for unified dataset components
 
 export interface SiteOrderEntry {
   orderNumber: string;
@@ -479,6 +405,9 @@ export interface UnifiedDataset {
   boothLocations: BoothLocation[];
   metadata: UnifiedMetadata;
   warnings: Warning[];
+  // Surfaced from DataStore so renderer doesn't need it
+  virtualCookieShareAllocations: Map<number, number>;
+  hasTransferData: boolean;
 }
 
 // ============================================================================
@@ -486,20 +415,17 @@ export interface UnifiedDataset {
 // ============================================================================
 
 export interface DayFilter {
-  /** 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat */
   day: number;
-  /** If set, only show time slots starting within this range (24h, e.g. "16:00") */
   timeAfter?: string;
   timeBefore?: string;
-  /** If set, exclude time slots starting within this range (24h) */
   excludeAfter?: string;
   excludeBefore?: string;
 }
 
 export interface IgnoredTimeSlot {
   boothId: number;
-  date: string; // YYYY-MM-DD
-  startTime: string; // "16:00" or "4:00 PM"
+  date: string;
+  startTime: string;
 }
 
 export interface AppConfig {
@@ -511,7 +437,7 @@ export interface AppConfig {
 }
 
 // ============================================================================
-// DATA FILE INFO (for file listing in renderer)
+// DATA FILE INFO
 // ============================================================================
 
 export interface DataFileInfo {

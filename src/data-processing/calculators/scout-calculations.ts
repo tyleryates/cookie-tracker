@@ -62,7 +62,7 @@ function calculateOrderTotals(scout: Scout): void {
 
 /** Calculate credited totals from allocations */
 function calculateCreditedTotals(scout: Scout): void {
-  scout.totals.credited = totalCredited(scout.credited);
+  scout.totals.credited = totalCredited(scout.allocations);
 }
 
 /** Calculate sold totals */

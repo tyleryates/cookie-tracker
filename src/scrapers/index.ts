@@ -1,49 +1,64 @@
 import type { Credentials, ProgressCallback } from '../types';
 import DigitalCookieScraper from './digital-cookie';
+import type { SmartCookieSession } from './sc-session';
 import SmartCookieScraper from './smart-cookie';
 
 /**
  * Scraper Orchestrator - Coordinates both scrapers (API-only)
+ * Owns the AbortController for cancellation.
  */
 class ScraperOrchestrator {
   dataDir: string;
   progressCallback: ProgressCallback;
-  digitalCookieScraper: DigitalCookieScraper | null;
-  smartCookieScraper: SmartCookieScraper | null;
+  private digitalCookieScraper: DigitalCookieScraper | null = null;
+  private smartCookieScraper: SmartCookieScraper | null = null;
+  private abortController: AbortController | null = null;
 
   constructor(dataDir: string) {
     this.dataDir = dataDir;
     this.progressCallback = null;
-    this.digitalCookieScraper = null;
-    this.smartCookieScraper = null;
   }
 
   setProgressCallback(callback: ProgressCallback): void {
     this.progressCallback = callback;
   }
 
-  /** Get the Smart Cookie scraper instance (for on-demand API calls after sync) */
+  /** Get the Smart Cookie session (for on-demand API calls after sync) */
+  getSmartCookieSession(): SmartCookieSession | null {
+    return this.smartCookieScraper?.session || null;
+  }
+
+  /** Get the Smart Cookie scraper instance (for booth location fetches after sync) */
   getSmartCookieScraper(): SmartCookieScraper | null {
     return this.smartCookieScraper;
   }
 
+  /** Cancel any in-flight sync */
+  cancel(): void {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+  }
+
   /** Scrape both Digital Cookie and Smart Cookie in parallel */
   async scrapeAll(credentials: Credentials, boothIds: number[] = []): Promise<Record<string, any>> {
-    const results = {
+    const results: Record<string, any> = {
       digitalCookie: null,
       smartCookie: null,
       success: false
     };
 
     try {
-      // Create both API scrapers
+      this.abortController = new AbortController();
+      const { signal } = this.abortController;
+
       this.digitalCookieScraper = new DigitalCookieScraper(this.dataDir, this.progressCallback);
       this.smartCookieScraper = new SmartCookieScraper(this.dataDir, this.progressCallback);
 
-      // Run both scrapers in parallel for maximum speed
       const [digitalCookieResult, smartCookieResult] = await Promise.all([
-        this.digitalCookieScraper.scrape(credentials.digitalCookie),
-        this.smartCookieScraper.scrape(credentials.smartCookie, boothIds)
+        this.digitalCookieScraper.scrape(credentials.digitalCookie, signal),
+        this.smartCookieScraper.scrape(credentials.smartCookie, boothIds, signal)
       ]);
 
       results.digitalCookie = digitalCookieResult;
@@ -57,6 +72,8 @@ class ScraperOrchestrator {
         success: false,
         error: error.message
       };
+    } finally {
+      this.abortController = null;
     }
   }
 }

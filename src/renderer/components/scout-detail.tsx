@@ -3,8 +3,8 @@
 import type preact from 'preact';
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, OWNER } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
-import { calculateSalesByVariety } from '../../data-processing/calculators/helpers';
-import type { Order, Scout, ScoutCredited } from '../../types';
+import { allocationsByChannel, calculateSalesByVariety, channelTotals } from '../../data-processing/calculators/helpers';
+import type { Allocation, Order, Scout } from '../../types';
 import { buildVarietyTooltip, formatDate, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
@@ -65,17 +65,20 @@ function formatNetInventory(net: number, isCookieShare: boolean) {
   return { html: <>{'—'}</>, className: '' };
 }
 
-function formatCreditedVariety(variety: string, credited: ScoutCredited) {
-  const vb = credited.virtualBooth.varieties[variety] || 0;
-  const ds = credited.directShip.varieties[variety] || 0;
-  const bs = credited.boothSales.varieties[variety] || 0;
-  const total = vb + ds + bs;
+function formatCreditedVariety(variety: string, allocations: Allocation[]) {
+  const vb = channelTotals(allocations, 'virtualBooth');
+  const ds = channelTotals(allocations, 'directShip');
+  const bs = channelTotals(allocations, 'booth');
+  const vbCount = vb.varieties[variety] || 0;
+  const dsCount = ds.varieties[variety] || 0;
+  const bsCount = bs.varieties[variety] || 0;
+  const total = vbCount + dsCount + bsCount;
   if (total === 0) return <>{'—'}</>;
 
   const sources: string[] = [];
-  if (vb > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vb}`);
-  if (ds > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${ds}`);
-  if (bs > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bs}`);
+  if (vbCount > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vbCount}`);
+  if (dsCount > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${dsCount}`);
+  if (bsCount > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bsCount}`);
   return sources.length > 0 ? (
     <TooltipCell tooltip={sources.join('\n')} tag="span">
       {total}
@@ -90,12 +93,15 @@ function formatCreditedVariety(variety: string, credited: ScoutCredited) {
 // ============================================================================
 
 function CookieBreakdownTable({ scout }: { scout: Scout }) {
-  const { inventory, credited } = scout;
+  const { inventory, allocations } = scout;
   const { salesVarieties, shippedVarieties, totalDonations } = calculateVarietyBreakdowns(scout);
 
+  const vb = channelTotals(allocations, 'virtualBooth');
+  const ds = channelTotals(allocations, 'directShip');
+  const bs = channelTotals(allocations, 'booth');
+
   const salesWithDonations = { ...salesVarieties };
-  const allCreditedDonations =
-    (credited.virtualBooth.donations || 0) + (credited.directShip.donations || 0) + (credited.boothSales.donations || 0);
+  const allCreditedDonations = vb.donations + ds.donations + bs.donations;
   if (totalDonations > 0 || allCreditedDonations > 0) {
     salesWithDonations[COOKIE_TYPE.COOKIE_SHARE] = totalDonations + allCreditedDonations;
   }
@@ -104,9 +110,9 @@ function CookieBreakdownTable({ scout }: { scout: Scout }) {
     ...salesWithDonations,
     ...shippedVarieties,
     ...inventory.varieties,
-    ...credited.virtualBooth.varieties,
-    ...credited.directShip.varieties,
-    ...credited.boothSales.varieties
+    ...vb.varieties,
+    ...ds.varieties,
+    ...bs.varieties
   });
 
   return (
@@ -130,12 +136,12 @@ function CookieBreakdownTable({ scout }: { scout: Scout }) {
               <td class={netClass}>{netHtml}</td>
               <td>{sold}</td>
               <td>{shipped > 0 ? shipped : '—'}</td>
-              <td>{formatCreditedVariety(variety, credited)}</td>
+              <td>{formatCreditedVariety(variety, allocations)}</td>
             </tr>
           );
         })}
       </DataTable>
-      <AllocationDetails credited={credited} />
+      <AllocationDetails allocations={allocations} />
     </>
   );
 }
@@ -146,17 +152,19 @@ function PackagesCell({ varieties, packages }: { varieties: Record<string, numbe
   return tip ? <TooltipCell tooltip={tip}>{packages}</TooltipCell> : <td>{packages}</td>;
 }
 
-function AllocationDetails({ credited }: { credited: ScoutCredited }) {
+function AllocationDetails({ allocations }: { allocations: Allocation[] }) {
   const sections: preact.JSX.Element[] = [];
 
   // Virtual booth allocations
-  const vbAllocs = credited.virtualBooth.allocations || [];
+  const vbAllocs = allocationsByChannel(allocations, 'virtualBooth');
   if (vbAllocs.length > 0) {
+    const vbTotals = channelTotals(allocations, 'virtualBooth');
     sections.push(
       <AllocationSection
         key="vb"
         method={ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER}
-        credited={credited.virtualBooth}
+        packages={vbTotals.packages}
+        donations={vbTotals.donations}
         columns={['Order #', 'Date', 'From', 'Packages', 'Amount']}
       >
         {vbAllocs.map((a, i) => (
@@ -164,7 +172,7 @@ function AllocationDetails({ credited }: { credited: ScoutCredited }) {
             <td>{String(a.orderNumber || '-')}</td>
             <td>{formatDate(a.date)}</td>
             <td>{String(a.from || '-')}</td>
-            <PackagesCell varieties={a.varieties} packages={a.packages} />
+            <PackagesCell varieties={a.varieties as Record<string, number>} packages={a.packages} />
             <td>${Math.round(a.amount || 0)}</td>
           </tr>
         ))}
@@ -173,19 +181,21 @@ function AllocationDetails({ credited }: { credited: ScoutCredited }) {
   }
 
   // Direct ship allocations
-  const dsAllocs = credited.directShip.allocations || [];
+  const dsAllocs = allocationsByChannel(allocations, 'directShip');
   if (dsAllocs.length > 0) {
+    const dsTotals = channelTotals(allocations, 'directShip');
     sections.push(
       <AllocationSection
         key="ds"
         method={ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER}
-        credited={credited.directShip}
+        packages={dsTotals.packages}
+        donations={dsTotals.donations}
         columns={['Source', 'Packages']}
       >
         {dsAllocs.map((a, i) => (
           <tr key={i}>
             <td>SC Direct Ship Divider</td>
-            <PackagesCell varieties={a.varieties} packages={a.packages} />
+            <PackagesCell varieties={a.varieties as Record<string, number>} packages={a.packages} />
           </tr>
         ))}
         <p class="note-text">Note: The Smart Cookie Direct Ship Divider API does not provide per-order breakdowns.</p>
@@ -194,13 +204,15 @@ function AllocationDetails({ credited }: { credited: ScoutCredited }) {
   }
 
   // Booth sales allocations
-  const bsAllocs = credited.boothSales.allocations || [];
+  const bsAllocs = allocationsByChannel(allocations, 'booth');
   if (bsAllocs.length > 0) {
+    const bsTotals = channelTotals(allocations, 'booth');
     sections.push(
       <AllocationSection
         key="bs"
         method={ALLOCATION_METHOD.BOOTH_SALES_DIVIDER}
-        credited={credited.boothSales}
+        packages={bsTotals.packages}
+        donations={bsTotals.donations}
         columns={['Store', 'Date', 'Time', 'Packages', 'Donations']}
       >
         {bsAllocs.map((a, i) => {
@@ -210,7 +222,7 @@ function AllocationDetails({ credited }: { credited: ScoutCredited }) {
               <td>{String(a.storeName || '-')}</td>
               <td>{formatDate(a.date)}</td>
               <td>{time}</td>
-              <PackagesCell varieties={a.varieties} packages={a.packages} />
+              <PackagesCell varieties={a.varieties as Record<string, number>} packages={a.packages} />
               <td>{a.donations || '—'}</td>
             </tr>
           );
@@ -231,17 +243,19 @@ function AllocationDetails({ credited }: { credited: ScoutCredited }) {
 /** Shared wrapper for allocation sections — renders header with package/donation counts and a DataTable */
 function AllocationSection({
   method,
-  credited,
+  packages,
+  donations,
   columns,
   children
 }: {
   method: string;
-  credited: { packages: number; donations: number };
+  packages: number;
+  donations: number;
   columns: string[];
   children: preact.ComponentChildren;
 }) {
-  const pkg = credited.packages || 0;
-  const don = credited.donations || 0;
+  const pkg = packages || 0;
+  const don = donations || 0;
   const label = don > 0 ? `${pkg} pkg, ${don} Donations` : `${pkg} pkg`;
   return (
     <div class="section-break-sm">

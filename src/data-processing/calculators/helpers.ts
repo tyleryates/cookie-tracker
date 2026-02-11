@@ -3,7 +3,7 @@
 
 import { ORDER_TYPE, OWNER } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
-import type { Order, Scout, ScoutCredited, Varieties } from '../../types';
+import type { Allocation, AllocationChannel, Order, Scout, Varieties } from '../../types';
 
 /**
  * Whether an order draws from the scout's physical inventory.
@@ -14,35 +14,46 @@ export function needsInventory(order: Pick<Order, 'owner' | 'orderType'>): boole
 }
 
 /**
- * Calculate total credited packages (all 6 fields) for a scout.
- * Single source of truth for the credited total.
+ * Total credited packages + donations across all allocation channels.
  */
-export function totalCredited(credited: ScoutCredited): number {
-  return (
-    credited.virtualBooth.packages +
-    credited.virtualBooth.donations +
-    credited.directShip.packages +
-    credited.directShip.donations +
-    credited.boothSales.packages +
-    credited.boothSales.donations
-  );
+export function totalCredited(allocations: Allocation[]): number {
+  let total = 0;
+  for (const a of allocations) {
+    total += a.packages + a.donations;
+  }
+  return total;
 }
 
 /**
- * Add varieties from source to target object
- * Eliminates duplicate variety accumulation logic
- *
- * @param target - Target varieties object to update
- * @param sourceVarieties - Source varieties to add
+ * Get aggregate totals for a specific allocation channel.
  */
-export function addVarietiesToTarget(target: Varieties, sourceVarieties?: Varieties): void {
-  if (!sourceVarieties) return;
-
-  Object.entries(sourceVarieties).forEach(([variety, count]) => {
-    if (count !== undefined) {
-      target[variety as keyof Varieties] = (target[variety as keyof Varieties] || 0) + count;
+export function channelTotals(
+  allocations: Allocation[],
+  channel: AllocationChannel
+): { packages: number; donations: number; varieties: Varieties } {
+  let packages = 0;
+  let donations = 0;
+  const varieties: Varieties = {};
+  for (const a of allocations) {
+    if (a.channel !== channel) continue;
+    packages += a.packages;
+    donations += a.donations;
+    if (a.varieties) {
+      Object.entries(a.varieties).forEach(([variety, count]) => {
+        if (count !== undefined) {
+          varieties[variety as keyof Varieties] = (varieties[variety as keyof Varieties] || 0) + count;
+        }
+      });
     }
-  });
+  }
+  return { packages, donations, varieties };
+}
+
+/**
+ * Filter allocations by channel.
+ */
+export function allocationsByChannel(allocations: Allocation[], channel: AllocationChannel): Allocation[] {
+  return allocations.filter((a) => a.channel === channel);
 }
 
 /**

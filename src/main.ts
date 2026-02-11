@@ -4,6 +4,7 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import ConfigManager from './config-manager';
 import CredentialsManager from './credentials-manager';
+import { loadData } from './data-pipeline';
 import Logger from './logger';
 import ScraperOrchestrator from './scrapers';
 import SmartCookieScraper from './scrapers/smart-cookie';
@@ -226,6 +227,16 @@ ipcMain.handle(
   })
 );
 
+// Handle load-data: full data pipeline (scan → parse → build → return UnifiedDataset)
+ipcMain.handle(
+  'load-data',
+  handleIpcError(async (_event, options?: { specificSc?: any; specificDc?: any }) => {
+    const inDir = path.join(dataDir, 'in');
+    const result = loadData(inDir, options);
+    return result;
+  })
+);
+
 // Handle save file (for unified dataset caching)
 ipcMain.handle(
   'save-file',
@@ -334,31 +345,41 @@ ipcMain.handle(
     const config = configManager.loadConfig();
     const results = await scraper.scrapeAll(auth.credentials, config.boothIds);
 
-    // Persist scraper for on-demand booth API calls
-    if (results.success) {
-      lastScraper = scraper;
-    }
+    // Persist scraper for on-demand booth API calls and cancellation
+    lastScraper = scraper;
 
     return results;
   })
 );
 
+// Handle cancel sync
+ipcMain.handle(
+  'cancel-sync',
+  handleIpcError(async () => {
+    if (lastScraper) {
+      lastScraper.cancel();
+    }
+    return { success: true };
+  })
+);
+
 // Handle booth locations refresh (re-fetch just booth availability without full sync)
-// If no active session, logs in fresh using saved credentials
+// Uses existing SC session if available, otherwise logs in fresh
 ipcMain.handle(
   'refresh-booth-locations',
   handleIpcError(async () => {
+    // Try to reuse existing session from last scrape
     let scraper = lastScraper?.getSmartCookieScraper();
 
-    if (!scraper) {
-      // No active session — try to login with saved credentials
+    if (!scraper || !scraper.session.isAuthenticated) {
+      // No active session — create fresh scraper and login
       const credentials = credentialsManager.loadCredentials();
       if (!credentials?.smartCookie?.username || !credentials?.smartCookie?.password) {
         return { success: false, error: 'No Smart Cookie credentials configured. Please set up logins first.' };
       }
 
       scraper = new SmartCookieScraper(dataDir);
-      await scraper.login(credentials.smartCookie.username, credentials.smartCookie.password);
+      await scraper.session.login(credentials.smartCookie.username, credentials.smartCookie.password);
     }
 
     const config = configManager.loadConfig();

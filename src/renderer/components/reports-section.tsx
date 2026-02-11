@@ -1,6 +1,5 @@
 // ReportsSection — Report button bar, report container, and health banner
 
-import type { DataStore } from '../../data-store';
 import type { AppConfig, BoothReservationImported, UnifiedDataset } from '../../types';
 import { AvailableBoothsReport, countAvailableSlots } from '../reports/available-booths';
 import { BoothReport } from '../reports/booth';
@@ -16,8 +15,9 @@ import { VarietyReport } from '../reports/variety';
 
 interface ReportsSectionProps {
   activeReport: string | null;
-  store: DataStore;
+  unified: UnifiedDataset | null;
   appConfig: AppConfig | null;
+  boothSyncing: boolean;
   onSelectReport: (type: string) => void;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
   onRefreshBooths: () => void;
@@ -128,25 +128,23 @@ function HealthBanner({
 
 function renderReport(
   type: string,
-  store: DataStore,
+  unified: UnifiedDataset,
   appConfig: AppConfig | null,
+  boothSyncing: boolean,
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void,
   onRefreshBooths: () => void
 ) {
-  const unified = store.unified;
-  if (!unified) return null;
-
   switch (type) {
     case 'troop':
       return <TroopSummaryReport data={unified} />;
     case 'inventory':
-      return <InventoryReport data={unified} transfers={store.transfers} />;
+      return <InventoryReport data={unified} />;
     case 'summary':
       return <ScoutSummaryReport data={unified} />;
     case 'variety':
       return <VarietyReport data={unified} />;
     case 'donation-alert':
-      return <DonationAlertReport data={unified} virtualCSAllocations={store.virtualCookieShareAllocations} />;
+      return <DonationAlertReport data={unified} virtualCSAllocations={unified.virtualCookieShareAllocations} />;
     case 'booth':
       return <BoothReport data={unified} />;
     case 'available-booths':
@@ -157,6 +155,7 @@ function renderReport(
             filters: appConfig?.boothDayFilters || [],
             ignoredTimeSlots: appConfig?.ignoredTimeSlots || []
           }}
+          refreshing={boothSyncing}
           onIgnoreSlot={onIgnoreSlot}
           onRefresh={onRefreshBooths}
         />
@@ -170,8 +169,15 @@ function renderReport(
 // MAIN COMPONENT
 // ============================================================================
 
-export function ReportsSection({ activeReport, store, appConfig, onSelectReport, onIgnoreSlot, onRefreshBooths }: ReportsSectionProps) {
-  const unified = store.unified;
+export function ReportsSection({
+  activeReport,
+  unified,
+  appConfig,
+  boothSyncing,
+  onSelectReport,
+  onIgnoreSlot,
+  onRefreshBooths
+}: ReportsSectionProps) {
   const unknownTypes = unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
   const hasData = !!unified;
   const isBlocked = unknownTypes > 0;
@@ -206,7 +212,7 @@ export function ReportsSection({ activeReport, store, appConfig, onSelectReport,
             details={unified?.warnings || []}
           />
         ) : (
-          activeReport && renderReport(activeReport, store, appConfig, onIgnoreSlot, onRefreshBooths)
+          activeReport && unified && renderReport(activeReport, unified, appConfig, boothSyncing, onIgnoreSlot, onRefreshBooths)
         )}
       </div>
     </section>

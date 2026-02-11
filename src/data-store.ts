@@ -2,10 +2,9 @@
 // No methods, no behavior — just typed state.
 
 import type {
+  Allocation,
   BoothLocation,
   BoothReservationImported,
-  BoothSalesAllocation,
-  DirectShipAllocation,
   Order,
   RawScoutData,
   ReconcilerMetadata,
@@ -18,10 +17,9 @@ export interface DataStore {
   transfers: Transfer[];
   scouts: Map<string, RawScoutData>;
   troopNumber: string | null;
-  boothSalesAllocations: BoothSalesAllocation[];
+  allocations: Allocation[];
   boothReservations: BoothReservationImported[];
   boothLocations: BoothLocation[];
-  directShipAllocations: DirectShipAllocation[];
   virtualCookieShareAllocations: Map<number, number>;
   boothCookieShareAllocations: Map<number, number>;
   metadata: ReconcilerMetadata;
@@ -34,10 +32,9 @@ export function createDataStore(): DataStore {
     transfers: [],
     scouts: new Map(),
     troopNumber: null,
-    boothSalesAllocations: [],
+    allocations: [],
     boothReservations: [],
     boothLocations: [],
-    directShipAllocations: [],
     virtualCookieShareAllocations: new Map(),
     boothCookieShareAllocations: new Map(),
     metadata: {

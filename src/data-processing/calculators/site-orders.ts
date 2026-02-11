@@ -90,9 +90,13 @@ function calculateAllocations(reconciler: DataStore): { directShip: number; virt
   let virtualBooth = 0;
   let boothSales = 0;
 
-  // Direct ship allocations
-  reconciler.directShipAllocations.forEach((allocation) => {
-    directShip += allocation.packages || 0;
+  // Imported allocations (booth + direct ship from divider APIs)
+  reconciler.allocations.forEach((allocation) => {
+    if (allocation.channel === 'directShip') {
+      directShip += allocation.packages || 0;
+    } else if (allocation.channel === 'booth') {
+      boothSales += allocation.packages || 0;
+    }
   });
 
   // Virtual booth allocations (T2G transfers)
@@ -100,11 +104,6 @@ function calculateAllocations(reconciler: DataStore): { directShip: number; virt
     if (transfer.category === TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) {
       virtualBooth += transfer.packages || 0;
     }
-  });
-
-  // Booth sales allocations
-  reconciler.boothSalesAllocations.forEach((allocation) => {
-    boothSales += allocation.packages || 0;
   });
 
   return { directShip, virtualBooth, boothSales };

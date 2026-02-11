@@ -15,7 +15,7 @@ function transferTooltip(varieties: Varieties | undefined, transform?: (count: n
   return buildVarietyTooltip(transformed);
 }
 
-export function InventoryReport({ data, transfers }: { data: UnifiedDataset; transfers?: Transfer[] }) {
+export function InventoryReport({ data }: { data: UnifiedDataset }) {
   if (!data?.transferBreakdowns) {
     return (
       <div class="report-visual">
@@ -56,7 +56,7 @@ export function InventoryReport({ data, transfers }: { data: UnifiedDataset; tra
     (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
   );
 
-  const hasTransferData = transfers && transfers.length > 0;
+  const hasTransferData = data.hasTransferData;
 
   return (
     <div class="report-visual">
