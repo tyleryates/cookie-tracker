@@ -44,6 +44,15 @@ function handleIpcError(handler: (...args: any[]) => Promise<any>): (...args: an
   };
 }
 
+function loadAndValidateCredentials(): { credentials: Credentials; error?: undefined } | { credentials?: undefined; error: string } {
+  const credentials = credentialsManager.loadCredentials();
+  const validation = credentialsManager.validateCredentials(credentials);
+  if (!validation.valid) {
+    return { error: validation.error || 'Invalid credentials' };
+  }
+  return { credentials };
+}
+
 /**
  * Clean up old data files, keeping only the most recent N files of each type
  */
@@ -193,6 +202,7 @@ ipcMain.handle(
     for (const file of files) {
       const filePath = path.join(inDir, file);
       const ext = path.extname(file).toLowerCase();
+      const stats = fs.statSync(filePath);
 
       // Read JSON files as parsed objects, binary files as buffers
       let data: any;
@@ -219,8 +229,9 @@ ipcMain.handle(
 );
 
 // Handle save file (for unified dataset caching)
-ipcMain.handle('save-file', async (_event, { filename, content, type: _type }) => {
-  try {
+ipcMain.handle(
+  'save-file',
+  handleIpcError(async (_event, { filename, content, type: _type }) => {
     const inDir = path.join(dataDir, 'in');
 
     // Create directory if it doesn't exist
@@ -252,17 +263,10 @@ ipcMain.handle('save-file', async (_event, { filename, content, type: _type }) =
     cleanupOldDataFiles(inDir, 10);
 
     return {
-      success: true,
       path: filePath
     };
-  } catch (error) {
-    Logger.error('Save file error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-});
+  })
+);
 
 // Handle load credentials
 ipcMain.handle(
@@ -309,15 +313,12 @@ ipcMain.handle(
 );
 
 // Handle scrape websites
-ipcMain.handle('scrape-websites', async (event) => {
-  try {
-    const credentials = credentialsManager.loadCredentials();
-    const validation = credentialsManager.validateCredentials(credentials);
-    if (!validation.valid) {
-      return {
-        success: false,
-        error: validation.error
-      };
+ipcMain.handle(
+  'scrape-websites',
+  handleIpcError(async (event) => {
+    const auth = loadAndValidateCredentials();
+    if (auth.error) {
+      return { success: false, error: auth.error };
     }
 
     // Initialize scraper orchestrator (use userData path)
@@ -333,7 +334,7 @@ ipcMain.handle('scrape-websites', async (event) => {
 
     // Run scraping (pass configured booth IDs)
     const config = configManager.loadConfig();
-    const results = await scraper.scrapeAll(credentials, config.boothIds);
+    const results = await scraper.scrapeAll(auth.credentials, config.boothIds);
 
     // Persist scraper for on-demand booth API calls
     if (results.success) {
@@ -341,14 +342,8 @@ ipcMain.handle('scrape-websites', async (event) => {
     }
 
     return results;
-  } catch (error) {
-    Logger.error('Scrape websites error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-});
+  })
+);
 
 // Handle booth locations refresh (re-fetch just booth availability without full sync)
 // If no active session, logs in fresh using saved credentials

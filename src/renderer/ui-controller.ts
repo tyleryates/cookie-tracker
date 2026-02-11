@@ -71,10 +71,14 @@ async function handleRefreshFromWeb(opts: RefreshFromWebOptions): Promise<void> 
     loadDataFromDisk
   } = opts;
 
+  const refreshBtn = refreshFromWebBtn as HTMLButtonElement | null;
+  let progressInitialized = false;
+
   try {
     // Show progress UI for both scrapers
     initializeProgressBar(dcProgress, dcProgressFill, dcProgressText);
     initializeProgressBar(scProgress, scProgressFill, scProgressText);
+    progressInitialized = true;
 
     // Set initial status
     dcStatusEl.textContent = 'Syncing...';
@@ -85,17 +89,10 @@ async function handleRefreshFromWeb(opts: RefreshFromWebOptions): Promise<void> 
     showStatus('Starting API sync for both platforms...', 'success');
 
     // Disable button during scraping
-    (refreshFromWebBtn as HTMLButtonElement).disabled = true;
+    if (refreshBtn) refreshBtn.disabled = true;
 
     // Start API scraping (both run in parallel)
     const result = await ipcRenderer.invoke('scrape-websites');
-
-    // Hide progress UI
-    hideProgressBar(dcProgress);
-    hideProgressBar(scProgress);
-
-    // Re-enable button
-    (refreshFromWebBtn as HTMLButtonElement).disabled = false;
 
     const now = new Date();
     const errors: string[] = [];
@@ -120,11 +117,14 @@ async function handleRefreshFromWeb(opts: RefreshFromWebOptions): Promise<void> 
       showStatus('Sync completed with warnings', 'warning');
     }
   } catch (error) {
-    hideProgressBar(dcProgress);
-    hideProgressBar(scProgress);
-    (refreshFromWebBtn as HTMLButtonElement).disabled = false;
     showStatus(`Error: ${(error as Error).message}`, 'error');
     Logger.error(error);
+  } finally {
+    if (progressInitialized) {
+      hideProgressBar(dcProgress);
+      hideProgressBar(scProgress);
+    }
+    if (refreshBtn) refreshBtn.disabled = false;
   }
 }
 
