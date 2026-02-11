@@ -61,19 +61,20 @@ function computeScoutDonations(scout: Scout): { dcTotal: number; dcAutoSync: num
   return { dcTotal, dcAutoSync };
 }
 
-function buildScoutDonationRows(scouts: Map<string, Scout>, virtualCSAllocations: Map<number, number> | null): ScoutDonationRow[] {
+function buildScoutDonationRows(scouts: Record<string, Scout>, virtualCSAllocations: Record<string, number> | null): ScoutDonationRow[] {
   const rows: ScoutDonationRow[] = [];
-  scouts.forEach((scout: Scout, scoutName: string) => {
-    if (scout.isSiteOrder) return;
+  for (const [scoutName, scout] of Object.entries(scouts)) {
+    if (scout.isSiteOrder) continue;
     const { dcTotal, dcAutoSync } = computeScoutDonations(scout);
     const manualNeeded = dcTotal - dcAutoSync;
     const boothCS = scout.totals.$allocationSummary.booth.donations;
     const totalCS = dcTotal + boothCS;
-    if (totalCS === 0) return;
+    if (totalCS === 0) continue;
 
     let manualEntered = 0;
-    if (virtualCSAllocations && scout.girlId && virtualCSAllocations.has(scout.girlId)) {
-      manualEntered = virtualCSAllocations.get(scout.girlId) ?? 0;
+    const girlIdKey = scout.girlId != null ? String(scout.girlId) : null;
+    if (virtualCSAllocations && girlIdKey && girlIdKey in virtualCSAllocations) {
+      manualEntered = virtualCSAllocations[girlIdKey] ?? 0;
     }
 
     rows.push({
@@ -86,7 +87,7 @@ function buildScoutDonationRows(scouts: Map<string, Scout>, virtualCSAllocations
       totalCS,
       adjustment: manualNeeded - manualEntered
     });
-  });
+  }
   return rows.sort((a, b) => a.name.localeCompare(b.name));
 }
 

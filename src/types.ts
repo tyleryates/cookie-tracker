@@ -411,7 +411,7 @@ export interface UnifiedMetadata extends ImportMetadata {
 }
 
 export interface UnifiedDataset {
-  scouts: Map<string, Scout>;
+  scouts: Record<string, Scout>;
   siteOrders: SiteOrdersDataset;
   troopTotals: TroopTotals;
   transferBreakdowns: TransferBreakdowns;
@@ -422,7 +422,7 @@ export interface UnifiedDataset {
   metadata: UnifiedMetadata;
   warnings: Warning[];
   // Surfaced from DataStore so renderer doesn't need it
-  virtualCookieShareAllocations: Map<number, number>;
+  virtualCookieShareAllocations: Record<string, number>;
   hasTransferData: boolean;
 }
 

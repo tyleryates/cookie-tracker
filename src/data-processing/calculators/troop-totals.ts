@@ -8,7 +8,7 @@ import type { Scout, ScoutCounts, TroopTotals } from '../../types';
 import type { PackageTotals } from './package-totals';
 
 /** Aggregate scout-level totals: delivery, inventory, shipping, and proceeds */
-function aggregateScoutTotals(scouts: Map<string, Scout>) {
+function aggregateScoutTotals(scouts: Record<string, Scout>) {
   let directShip = 0;
   let creditedDonations = 0;
   let girlDelivery = 0;
@@ -17,7 +17,7 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
   let boothSalesPackages = 0;
   let boothSalesDonations = 0;
 
-  scouts.forEach((scout) => {
+  for (const scout of Object.values(scouts)) {
     if (!scout.isSiteOrder) {
       const { booth: bs, directShip: ds, virtualBooth: vb } = scout.totals.$allocationSummary;
 
@@ -36,7 +36,7 @@ function aggregateScoutTotals(scouts: Map<string, Scout>) {
       }
     }
     directShip += scout.totals.shipped || 0;
-  });
+  }
 
   return { directShip, creditedDonations, girlDelivery, girlInventory, pendingPickup, boothSalesPackages, boothSalesDonations };
 }
@@ -57,7 +57,7 @@ function countDCDonations(rawDCData: Record<string, any>[]): number {
 /** Build troop-level aggregate totals */
 export function buildTroopTotals(
   reconciler: ReadonlyDataStore,
-  scouts: Map<string, Scout>,
+  scouts: Record<string, Scout>,
   packageTotals: PackageTotals,
   scoutCounts: ScoutCounts
 ): TroopTotals {

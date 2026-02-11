@@ -7,12 +7,12 @@ import { StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
 import { buildVarietyTooltip, formatDate, formatTimeRange } from '../format-utils';
 
-function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImported; scouts: Map<string, Scout> }) {
+function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImported; scouts: Record<string, Scout> }) {
   if (!scouts) return null;
 
   const scoutsForBooth: Array<{ name: string; packages: number; donations: number }> = [];
-  scouts.forEach((scout: Scout, name: string) => {
-    if (scout.isSiteOrder) return;
+  for (const [name, scout] of Object.entries(scouts)) {
+    if (scout.isSiteOrder) continue;
     const boothAllocations = scout.$allocationsByChannel.booth;
     const matchingAllocations = boothAllocations.filter((a) => {
       const storeMatch = (a.storeName || '').toLowerCase() === (booth.booth.storeName || '').toLowerCase();
@@ -25,7 +25,7 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
       const totalDonations = matchingAllocations.reduce((sum: number, a) => sum + (a.donations || 0), 0);
       scoutsForBooth.push({ name, packages: totalPackages, donations: totalDonations });
     }
-  });
+  }
 
   if (scoutsForBooth.length === 0) {
     return (

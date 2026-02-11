@@ -13,8 +13,17 @@ export default defineConfig([
     clean: true,
     onSuccess: 'cp src/index.html src/styles.css dist/ && cp -r src/styles dist/',
   },
-  // Renderer — CJS bundle (inlines preact + local code), electron external
-  // Loaded via <script> tag with module.exports polyfill (nodeIntegration: true)
+  // Preload — CJS, runs in isolated preload context with access to electron APIs
+  {
+    name: 'preload',
+    entry: { preload: 'src/preload.ts' },
+    format: ['cjs'],
+    platform: 'node',
+    target: 'node20',
+    outDir: 'dist',
+    external: [/^[^./]/],
+  },
+  // Renderer — CJS bundle (inlines preact + local code), pure browser JS
   {
     name: 'renderer',
     entry: { renderer: 'src/renderer.ts' },

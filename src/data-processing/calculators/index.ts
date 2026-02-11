@@ -16,7 +16,7 @@ import { buildTroopTotals } from './troop-totals';
 import { buildVarieties } from './varieties';
 
 /** Build complete scout dataset with all calculations */
-function buildScoutDataset(reconciler: ReadonlyDataStore, warnings: Warning[]): Map<string, Scout> {
+function buildScoutDataset(reconciler: ReadonlyDataStore, warnings: Warning[]): Record<string, Scout> {
   const rawDCData = reconciler.metadata.rawDCData || [];
   const scoutDataset = initializeScouts(reconciler, rawDCData);
 
@@ -32,7 +32,7 @@ function buildScoutDataset(reconciler: ReadonlyDataStore, warnings: Warning[]): 
   // Phase 4: Calculate all scout-level totals
   calculateScoutTotals(scoutDataset);
 
-  return scoutDataset;
+  return Object.fromEntries(scoutDataset);
 }
 
 /** Build unified dataset from reconciled data */
@@ -77,7 +77,9 @@ export function buildUnifiedDataset(reconciler: ReadonlyDataStore): UnifiedDatas
     boothLocations: reconciler.boothLocations,
     metadata,
     warnings,
-    virtualCookieShareAllocations: reconciler.virtualCookieShareAllocations,
+    virtualCookieShareAllocations: Object.fromEntries(
+      Array.from(reconciler.virtualCookieShareAllocations.entries()).map(([k, v]) => [String(k), v])
+    ),
     hasTransferData: reconciler.transfers.length > 0
   };
 }

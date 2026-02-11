@@ -156,7 +156,7 @@ describe('buildUnifiedDataset — integration', () => {
   // Scout-level: Jane Doe
   // -------------------------------------------------------------------------
   describe('Jane Doe', () => {
-    const jane = result.scouts.get('Jane Doe')!;
+    const jane = result.scouts['Jane Doe'];
 
     it('exists with correct identity', () => {
       expect(jane).toBeDefined();
@@ -221,7 +221,7 @@ describe('buildUnifiedDataset — integration', () => {
   // Scout-level: Bob Smith
   // -------------------------------------------------------------------------
   describe('Bob Smith', () => {
-    const bob = result.scouts.get('Bob Smith')!;
+    const bob = result.scouts['Bob Smith'];
 
     it('exists with correct identity', () => {
       expect(bob).toBeDefined();
@@ -280,7 +280,7 @@ describe('buildUnifiedDataset — integration', () => {
   // Scout-level: Site orders
   // -------------------------------------------------------------------------
   describe('Site orders scout', () => {
-    const site = result.scouts.get('Troop3990 Site')!;
+    const site = result.scouts['Troop3990 Site'];
 
     it('exists and is flagged as site order', () => {
       expect(site).toBeDefined();

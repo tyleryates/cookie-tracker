@@ -206,7 +206,7 @@ function calculateScoutTotals(scoutDataset: Map<string, Scout>): void {
 }
 
 /** Calculate aggregate scout counts */
-function calculateScoutCounts(scouts: Map<string, Scout>): {
+function calculateScoutCounts(scouts: Record<string, Scout>): {
   total: number;
   active: number;
   inactive: number;
@@ -217,8 +217,8 @@ function calculateScoutCounts(scouts: Map<string, Scout>): {
   let inactiveScouts = 0;
   let scoutsWithNegativeInventory = 0;
 
-  scouts.forEach((scout: Scout) => {
-    if (scout.isSiteOrder) return; // Exclude site orders from scout counts
+  for (const scout of Object.values(scouts)) {
+    if (scout.isSiteOrder) continue; // Exclude site orders from scout counts
 
     totalScouts++;
 
@@ -231,7 +231,7 @@ function calculateScoutCounts(scouts: Map<string, Scout>): {
     if (scout.$issues?.negativeInventory) {
       scoutsWithNegativeInventory++;
     }
-  });
+  }
 
   return {
     total: totalScouts,

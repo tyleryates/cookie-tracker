@@ -23,15 +23,6 @@ export async function loadDataFromDisk(options?: {
   const data = result.data;
   if (!data) return null;
 
-  // Rehydrate Maps (IPC serializes Map as plain object)
-  if (data.unified?.scouts && !(data.unified.scouts instanceof Map)) {
-    data.unified.scouts = new Map(Object.entries(data.unified.scouts));
-  }
-  if (data.unified?.virtualCookieShareAllocations && !(data.unified.virtualCookieShareAllocations instanceof Map)) {
-    const raw = data.unified.virtualCookieShareAllocations;
-    data.unified.virtualCookieShareAllocations = new Map(Object.entries(raw).map(([k, v]) => [Number(k), v as number]));
-  }
-
   return data;
 }
 
@@ -41,7 +32,7 @@ export async function loadDataFromDisk(options?: {
 
 function serializeUnifiedDataset(unified: UnifiedDataset): Record<string, any> {
   return {
-    scouts: Array.from(unified.scouts.entries()).map(([name, scout]) => {
+    scouts: Object.entries(unified.scouts).map(([name, scout]) => {
       const { name: _existingName, ...rest } = scout;
       return { name, ...rest };
     }),

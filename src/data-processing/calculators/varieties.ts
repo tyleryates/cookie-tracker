@@ -20,12 +20,12 @@ import { needsInventory } from './helpers';
  * - Subtract ALL T2G varieties (physical + virtual booth + booth divider)
  * - Cookie Share excluded (virtual, never in physical inventory)
  */
-export function buildVarieties(reconciler: ReadonlyDataStore, scouts: Map<string, Scout>): VarietiesResult {
+export function buildVarieties(reconciler: ReadonlyDataStore, scouts: Record<string, Scout>): VarietiesResult {
   const byCookie: Varieties = {};
   const inventory: Varieties = {};
 
   // Aggregate varieties from actual customer sales (scout orders + credited allocations)
-  scouts.forEach((scout) => {
+  for (const scout of Object.values(scouts)) {
     // Girl delivery + direct ship orders
     scout.orders.forEach((order) => {
       if (needsInventory(order) || order.orderType === ORDER_TYPE.DIRECT_SHIP) {
@@ -38,7 +38,7 @@ export function buildVarieties(reconciler: ReadonlyDataStore, scouts: Map<string
         accumulateVarieties(alloc.varieties, byCookie, { excludeCookieShare: true });
       });
     }
-  });
+  }
 
   // Calculate net troop inventory by variety (SC transfer data)
   // C2T/G2T add to troop stock, all T2G categories subtract from troop stock

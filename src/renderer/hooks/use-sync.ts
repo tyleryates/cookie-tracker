@@ -1,6 +1,5 @@
 // useSync — sync handler, booth refresh, IPC event listeners
 
-import { shell } from 'electron';
 import { useCallback, useEffect } from 'preact/hooks';
 import * as packageJson from '../../../package.json';
 import Logger from '../../logger';
@@ -117,7 +116,7 @@ export function useSync(
           'Click OK to download the latest version from GitHub.'
       );
       if (response) {
-        shell.openExternal('https://github.com/tyleryates/cookie-tracker/releases/latest');
+        window.electronAPI.openExternal('https://github.com/tyleryates/cookie-tracker/releases/latest');
         showStatus('Opening download page...', 'success');
       }
     });

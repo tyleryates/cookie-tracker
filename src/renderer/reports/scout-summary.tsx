@@ -188,7 +188,7 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
   const siteOrders = data.siteOrders;
   const proceedsRate = data.troopTotals.proceedsRate;
 
-  const sortedScouts = Array.from(scouts.entries())
+  const sortedScouts = Object.entries(scouts)
     .filter(([_name, scout]) => (scout.isSiteOrder ? scout.$hasUnallocatedSiteOrders : (scout.totals.totalSold || 0) > 0))
     .sort((a, b) => a[0].localeCompare(b[0]));
 

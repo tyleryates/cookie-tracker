@@ -6,10 +6,10 @@ import type { ReadonlyDataStore } from '../../data-store';
 import type { Order, Scout, SiteOrderCategory, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
 
 /** Build site orders dataset with allocation tracking */
-function buildSiteOrdersDataset(reconciler: ReadonlyDataStore, scoutDataset: Map<string, Scout>): SiteOrdersDataset {
+function buildSiteOrdersDataset(reconciler: ReadonlyDataStore, scoutDataset: Record<string, Scout>): SiteOrdersDataset {
   // Find site scout from pre-classified scout data
   let siteScout: Scout | null = null;
-  for (const s of scoutDataset.values()) {
+  for (const s of Object.values(scoutDataset)) {
     if (s.isSiteOrder) {
       siteScout = s;
       break;

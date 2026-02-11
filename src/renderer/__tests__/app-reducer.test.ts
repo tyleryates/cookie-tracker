@@ -52,7 +52,7 @@ function makeAppConfig(overrides?: Partial<AppConfig>): AppConfig {
 
 function makeUnifiedDataset(overrides?: Partial<UnifiedDataset>): UnifiedDataset {
   return {
-    scouts: new Map(),
+    scouts: {},
     siteOrders: {
       directShip: { orders: [], total: 0, allocated: 0, unallocated: 0, hasWarning: false },
       girlDelivery: { orders: [], total: 0, allocated: 0, unallocated: 0, hasWarning: false },
@@ -98,7 +98,7 @@ function makeUnifiedDataset(overrides?: Partial<UnifiedDataset>): UnifiedDataset
       healthChecks: { warningsCount: 0, unknownOrderTypes: 0, unknownPaymentMethods: 0, unknownTransferTypes: 0 }
     },
     warnings: [],
-    virtualCookieShareAllocations: new Map(),
+    virtualCookieShareAllocations: {},
     hasTransferData: false,
     ...overrides
   };

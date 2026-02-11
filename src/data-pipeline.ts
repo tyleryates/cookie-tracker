@@ -10,6 +10,7 @@ import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSma
 import { createDataStore, type DataStore, type ReadonlyDataStore } from './data-store';
 import Logger from './logger';
 import type { DataFileInfo, DatasetEntry, LoadDataResult, LoadedSources } from './types';
+import { validateDCData, validateSCData } from './validators';
 
 // ============================================================================
 // EXCEL PARSING
@@ -203,6 +204,10 @@ type FileLoadResult = { loaded: boolean; issue?: string };
 
 function loadJsonFile(file: DataFileInfo, rec: DataStore): FileLoadResult {
   if (isSmartCookieAPIFormat(file.data)) {
+    const validation = validateSCData(file.data);
+    if (!validation.valid) {
+      Logger.warn('SC data validation issues:', validation.issues);
+    }
     importSmartCookieAPI(rec, file.data);
     return { loaded: true };
   }
@@ -253,7 +258,13 @@ async function loadSourceFiles(
     const r = await loadExcelFile(
       dcFile,
       isDigitalCookieFormat,
-      (data) => importDigitalCookie(rec, data),
+      (data) => {
+        const validation = validateDCData(data);
+        if (!validation.valid) {
+          Logger.warn('DC data validation issues:', validation.issues);
+        }
+        importDigitalCookie(rec, data);
+      },
       'Digital Cookie XLSX not recognized'
     );
     dc = r.loaded;
@@ -322,7 +333,7 @@ export async function loadData(
   if (unified.metadata?.healthChecks?.warningsCount > 0) {
     Logger.warn('Health check warnings:', unified.warnings);
   }
-  Logger.info('Unified dataset ready:', { scouts: unified.scouts.size });
+  Logger.info('Unified dataset ready:', { scouts: Object.keys(unified.scouts).length });
 
   return { unified, datasetList, loaded };
 }
