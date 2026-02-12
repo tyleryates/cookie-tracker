@@ -1,6 +1,6 @@
 // ReportsSection — Report button bar, report container, and health banner
 
-import type { AppConfig, BoothReservationImported, UnifiedDataset } from '../../types';
+import type { AppConfig, BoothReservationImported, DayFilter, UnifiedDataset } from '../../types';
 import { AvailableBoothsReport, countAvailableSlots } from '../reports/available-booths';
 import { BoothReport } from '../reports/booth';
 import { DonationAlertReport } from '../reports/donation-alert';
@@ -23,6 +23,7 @@ interface ReportsSectionProps {
   onResetIgnored: () => void;
   onRefreshBooths: () => void;
   onSaveBoothIds: (ids: number[]) => void;
+  onSaveDayFilters: (filters: DayFilter[]) => void;
 }
 
 interface ReportButton {
@@ -136,7 +137,8 @@ function renderReport(
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void,
   onResetIgnored: () => void,
   onRefreshBooths: () => void,
-  onSaveBoothIds: (ids: number[]) => void
+  onSaveBoothIds: (ids: number[]) => void,
+  onSaveDayFilters: (filters: DayFilter[]) => void
 ) {
   switch (type) {
     case 'troop':
@@ -165,6 +167,7 @@ function renderReport(
           onResetIgnored={onResetIgnored}
           onRefresh={onRefreshBooths}
           onSaveBoothIds={onSaveBoothIds}
+          onSaveDayFilters={onSaveDayFilters}
         />
       );
     default:
@@ -185,7 +188,8 @@ export function ReportsSection({
   onIgnoreSlot,
   onResetIgnored,
   onRefreshBooths,
-  onSaveBoothIds
+  onSaveBoothIds,
+  onSaveDayFilters
 }: ReportsSectionProps) {
   const unknownTypes = unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
   const hasData = !!unified;
@@ -223,7 +227,17 @@ export function ReportsSection({
         ) : (
           activeReport &&
           unified &&
-          renderReport(activeReport, unified, appConfig, boothSyncing, onIgnoreSlot, onResetIgnored, onRefreshBooths, onSaveBoothIds)
+          renderReport(
+            activeReport,
+            unified,
+            appConfig,
+            boothSyncing,
+            onIgnoreSlot,
+            onResetIgnored,
+            onRefreshBooths,
+            onSaveBoothIds,
+            onSaveDayFilters
+          )
         )}
       </div>
     </section>

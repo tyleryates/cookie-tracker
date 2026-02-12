@@ -3,7 +3,8 @@
 
 import { useState } from 'preact/hooks';
 import { BOOTH_RESERVATION_TYPE } from '../../constants';
-import type { AppConfig, BoothAvailableDate, BoothLocation, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
+import type { AppConfig, BoothAvailableDate, BoothLocation, BoothTimeSlot, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
+import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
 import { formatBoothDate, formatTime12h, parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
 
@@ -30,16 +31,27 @@ function filterAvailableDates(dates: BoothAvailableDate[], filters: DayFilter[])
 
     const dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
     const dayOfWeek = dateObj.getDay();
-    const matchingFilter = filters.find((f) => f.day === dayOfWeek);
-    if (!matchingFilter) continue;
+    const matchingFilters = filters.filter((f) => f.day === dayOfWeek);
+    if (matchingFilters.length === 0) continue;
 
-    let slots = d.timeSlots;
-    if (matchingFilter.timeAfter && matchingFilter.timeBefore) {
-      slots = slots.filter((s) => slotOverlapsRange(s, matchingFilter.timeAfter!, matchingFilter.timeBefore!));
+    let slots: BoothTimeSlot[] = [];
+    for (const mf of matchingFilters) {
+      let filtered = d.timeSlots;
+      if (mf.timeAfter && mf.timeBefore) {
+        filtered = filtered.filter((s) => slotOverlapsRange(s, mf.timeAfter!, mf.timeBefore!));
+      }
+      if (mf.excludeAfter && mf.excludeBefore) {
+        filtered = filtered.filter((s) => !slotOverlapsRange(s, mf.excludeAfter!, mf.excludeBefore!));
+      }
+      for (const s of filtered) slots.push(s);
     }
-    if (matchingFilter.excludeAfter && matchingFilter.excludeBefore) {
-      slots = slots.filter((s) => !slotOverlapsRange(s, matchingFilter.excludeAfter!, matchingFilter.excludeBefore!));
-    }
+    // Deduplicate by startTime
+    const seen = new Set<string>();
+    slots = slots.filter((s) => {
+      if (seen.has(s.startTime)) return false;
+      seen.add(s.startTime);
+      return true;
+    });
     if (slots.length > 0) result.push({ date: d.date, timeSlots: slots });
   }
   return result;
@@ -75,6 +87,7 @@ interface AvailableBoothsProps {
   onResetIgnored: () => void;
   onRefresh: () => void;
   onSaveBoothIds: (ids: number[]) => void;
+  onSaveDayFilters: (filters: DayFilter[]) => void;
 }
 
 export function AvailableBoothsReport({
@@ -85,9 +98,11 @@ export function AvailableBoothsReport({
   onIgnoreSlot,
   onResetIgnored,
   onRefresh,
-  onSaveBoothIds
+  onSaveBoothIds,
+  onSaveDayFilters
 }: AvailableBoothsProps) {
   const [selecting, setSelecting] = useState(false);
+  const [filtering, setFiltering] = useState(false);
   if (!data) {
     return (
       <div class="report-visual">
@@ -112,6 +127,19 @@ export function AvailableBoothsReport({
     );
   }
 
+  if (filtering) {
+    return (
+      <BoothDayFilter
+        currentFilters={filters}
+        onSave={(newFilters) => {
+          setFiltering(false);
+          onSaveDayFilters(newFilters);
+        }}
+        onCancel={() => setFiltering(false)}
+      />
+    );
+  }
+
   const boothsWithDates = boothLocations.filter((loc) => {
     const filtered = filterAvailableDates(loc.availableDates || [], filters);
     return removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots).length > 0;
@@ -121,11 +149,14 @@ export function AvailableBoothsReport({
     <div class="report-visual">
       <h3>Available Booths</h3>
       <div class="report-toolbar">
+        <button type="button" class="btn btn-primary" disabled={refreshing} onClick={onRefresh}>
+          {refreshing ? 'Refreshing...' : 'Refresh Availability'}
+        </button>
         <button type="button" class="btn btn-secondary" onClick={() => setSelecting(true)}>
           Select Booths
         </button>
-        <button type="button" class="btn btn-secondary" disabled={refreshing} onClick={onRefresh}>
-          {refreshing ? 'Refreshing...' : 'Refresh Availability'}
+        <button type="button" class="btn btn-secondary" onClick={() => setFiltering(true)}>
+          Filter Days
         </button>
         {ignoredTimeSlots.length > 0 && (
           <button type="button" class="btn btn-secondary" onClick={onResetIgnored}>

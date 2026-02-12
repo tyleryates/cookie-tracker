@@ -260,6 +260,31 @@ tr:hover {
   margin-left: auto;
 }
 
+/* Day filter grid */
+.day-filter-grid {
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 0.95em;
+}
+.day-filter-grid th,
+.day-filter-grid td {
+  text-align: center;
+  padding: 6px 8px;
+}
+.day-filter-grid th {
+  background: var(--surface-raised);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+.day-filter-grid input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
 /* Detail areas */
 .detail-placeholder {
   padding: 12px;

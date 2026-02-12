@@ -2,7 +2,7 @@
 
 import { useCallback, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
-import type { Credentials } from '../types';
+import type { Credentials, DayFilter } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { LoginModal } from './components/login-modal';
 import { ReportsSection } from './components/reports-section';
@@ -68,6 +68,15 @@ export function App() {
     [showStatus, refreshBooths]
   );
 
+  const handleSaveDayFilters = useCallback(
+    async (filters: DayFilter[]) => {
+      const updatedConfig = await ipcInvoke('update-config', { boothDayFilters: filters });
+      dispatch({ type: 'LOAD_CONFIG', config: updatedConfig });
+      showStatus('Booth day filters saved', 'success');
+    },
+    [showStatus]
+  );
+
   const handleResetIgnored = useCallback(async () => {
     const config = stateRef.current.appConfig;
     if (config) {
@@ -123,6 +132,7 @@ export function App() {
           onResetIgnored={handleResetIgnored}
           onRefreshBooths={refreshBooths}
           onSaveBoothIds={handleSaveBoothIds}
+          onSaveDayFilters={handleSaveDayFilters}
         />
       </main>
 

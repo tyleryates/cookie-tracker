@@ -213,6 +213,18 @@ export const DISPLAY_STRINGS: Record<string, string> = {
 export const EXCEL_EPOCH = new Date(1899, 11, 30); // Excel date serialization epoch
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Booth day/time filter UI
+export const BOOTH_TIME_SLOTS = [
+  { start: '08:00', end: '10:00', label: '8–10a' },
+  { start: '10:00', end: '12:00', label: '10a–12p' },
+  { start: '12:00', end: '14:00', label: '12–2p' },
+  { start: '14:00', end: '16:00', label: '2–4p' },
+  { start: '16:00', end: '18:00', label: '4–6p' },
+  { start: '18:00', end: '20:00', label: '6–8p' }
+] as const;
+
+export const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
 // ============================================================================
 // SPECIAL IDENTIFIERS
 // ============================================================================
