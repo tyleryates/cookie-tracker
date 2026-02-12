@@ -3,7 +3,7 @@
 import { DATA_SOURCES, PACKAGES_PER_CASE, SC_API_COLUMNS, SC_REPORT_COLUMNS, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../../constants';
 import type { DataStore } from '../../data-store';
 import { createTransfer, mergeOrCreateOrder } from '../../data-store-operations';
-import type { SCCombinedData, SCOrder } from '../../scrapers/sc-types';
+import type { SCCombinedData } from '../../scrapers/sc-types';
 import type { Order, TransferInput } from '../../types';
 import { isC2TTransfer } from '../utils';
 import { importAllocations } from './allocations';
@@ -11,8 +11,8 @@ import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSC
 import { mergeDCOrderFromSC, recordImportMetadata, trackScoutFromAPITransfer, updateScoutData } from './scout-helpers';
 
 /** Import Smart Cookie Report data (ReportExport.xlsx) */
-export function importSmartCookieReport(reconciler: DataStore, reportData: Record<string, any>[]): void {
-  reportData.forEach((row: Record<string, any>) => {
+export function importSmartCookieReport(store: DataStore, reportData: Record<string, any>[]): void {
+  for (const row of reportData) {
     const orderNum = String(row[SC_REPORT_COLUMNS.ORDER_ID] || row[SC_REPORT_COLUMNS.REF_NUMBER]);
     const scout = row[SC_REPORT_COLUMNS.GIRL_NAME] || '';
 
@@ -44,43 +44,36 @@ export function importSmartCookieReport(reconciler: DataStore, reportData: Recor
     };
 
     // Merge or create order with enrichment
-    mergeOrCreateOrder(
-      reconciler,
-      orderNum,
-      orderData,
-      DATA_SOURCES.SMART_COOKIE_REPORT,
-      row,
-      (existing: Order, newData: Partial<Order>) => {
-        existing.scoutId = newData.scoutId;
-        existing.gsusaId = newData.gsusaId;
-        existing.gradeLevel = newData.gradeLevel;
-        existing.cases = newData.cases;
-        existing.organization = {
-          troopId: newData.organization?.troopId,
-          serviceUnit: newData.organization?.serviceUnit,
-          council: newData.organization?.council,
-          district: newData.organization?.district
-        };
-      }
-    );
+    mergeOrCreateOrder(store, orderNum, orderData, DATA_SOURCES.SMART_COOKIE_REPORT, row, (existing: Order, newData: Partial<Order>) => {
+      existing.scoutId = newData.scoutId;
+      existing.gsusaId = newData.gsusaId;
+      existing.gradeLevel = newData.gradeLevel;
+      existing.cases = newData.cases;
+      existing.organization = {
+        troopId: newData.organization?.troopId,
+        serviceUnit: newData.organization?.serviceUnit,
+        council: newData.organization?.council,
+        district: newData.organization?.district
+      };
+    });
 
     // Register scout with metadata
-    updateScoutData(reconciler, scout, {
+    updateScoutData(store, scout, {
       scoutId: orderData.scoutId,
       gsusaId: orderData.gsusaId,
       gradeLevel: orderData.gradeLevel,
       serviceUnit: orderData.organization?.serviceUnit
     });
-  });
+  }
 
-  recordImportMetadata(reconciler, 'lastImportSCReport', DATA_SOURCES.SMART_COOKIE_REPORT, reportData.length);
+  recordImportMetadata(store, 'lastImportSCReport', DATA_SOURCES.SMART_COOKIE_REPORT, reportData.length);
 }
 
 /** Import Smart Cookie API data from API endpoints */
-export function importSmartCookieAPI(reconciler: DataStore, apiData: SCCombinedData): void {
+export function importSmartCookieAPI(store: DataStore, apiData: SCCombinedData): void {
   const orders = apiData.orders || [];
 
-  orders.forEach((order: SCOrder) => {
+  for (const order of orders) {
     // Handle both old format and new /orders/search API format
     // Use transfer_type for actual transfer type (C2T(P), T2G, D, etc.)
     // order.type is just "TRANSFER" for all transfers
@@ -112,23 +105,23 @@ export function importSmartCookieAPI(reconciler: DataStore, apiData: SCCombinedD
       actions: order.actions || {}
     };
 
-    reconciler.transfers.push(createTransfer(transferData as TransferInput));
+    store.transfers.push(createTransfer(transferData as TransferInput));
 
     if (orderNum.startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX)) {
-      mergeDCOrderFromSC(reconciler, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE_API, order as Record<string, any>);
+      mergeDCOrderFromSC(store, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE_API, order as Record<string, any>);
     }
 
-    trackScoutFromAPITransfer(reconciler, type, to, from);
-  });
+    trackScoutFromAPITransfer(store, type, to, from);
+  }
 
-  importAllocations(reconciler, apiData);
+  importAllocations(store, apiData);
 
-  recordImportMetadata(reconciler, 'lastImportSC', DATA_SOURCES.SMART_COOKIE_API, orders.length);
+  recordImportMetadata(store, 'lastImportSC', DATA_SOURCES.SMART_COOKIE_API, orders.length);
 }
 
 /** Import Smart Cookie data */
-export function importSmartCookie(reconciler: DataStore, scData: Record<string, any>[]): void {
-  scData.forEach((row: Record<string, any>) => {
+export function importSmartCookie(store: DataStore, scData: Record<string, any>[]): void {
+  for (const row of scData) {
     const type = row[SC_API_COLUMNS.TYPE] || '';
     const orderNum = String(row[SC_API_COLUMNS.ORDER_NUM] || '');
     const to = row[SC_API_COLUMNS.TO] || '';
@@ -147,34 +140,34 @@ export function importSmartCookie(reconciler: DataStore, scData: Record<string, 
       amount: parseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT]) || 0
     };
 
-    reconciler.transfers.push(createTransfer(transferData));
+    store.transfers.push(createTransfer(transferData));
 
     // Handle Digital Cookie orders in Smart Cookie (COOKIE_SHARE with D prefix)
     if (type.includes(TRANSFER_TYPE.COOKIE_SHARE) && orderNum.startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX)) {
-      mergeDCOrderFromSC(reconciler, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE, row);
+      mergeDCOrderFromSC(store, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE, row);
     }
 
     // Extract troop number from C2T transfers (Council to Troop)
-    if (isC2TTransfer(type) && to && !reconciler.troopNumber) {
-      reconciler.troopNumber = to;
+    if (isC2TTransfer(type) && to && !store.troopNumber) {
+      store.troopNumber = to;
     }
 
     // Register scout pickups (T2G - Troop to Girl)
     // Check if transfer is FROM troop TO scout (not troop-to-troop)
-    if (type === TRANSFER_TYPE.T2G && reconciler.troopNumber && from === reconciler.troopNumber && to !== reconciler.troopNumber) {
-      updateScoutData(reconciler, to, {});
+    if (type === TRANSFER_TYPE.T2G && store.troopNumber && from === store.troopNumber && to !== store.troopNumber) {
+      updateScoutData(store, to, {});
     }
 
     // Register scout returns (G2T - Girl to Troop)
-    if (type === TRANSFER_TYPE.G2T && reconciler.troopNumber && to === reconciler.troopNumber && from !== reconciler.troopNumber) {
-      updateScoutData(reconciler, from, {});
+    if (type === TRANSFER_TYPE.G2T && store.troopNumber && to === store.troopNumber && from !== store.troopNumber) {
+      updateScoutData(store, from, {});
     }
 
     // Register scouts from Cookie Share transfers
-    if (type.includes(TRANSFER_TYPE.COOKIE_SHARE) && reconciler.troopNumber && from === reconciler.troopNumber) {
-      updateScoutData(reconciler, to, {});
+    if (type.includes(TRANSFER_TYPE.COOKIE_SHARE) && store.troopNumber && from === store.troopNumber) {
+      updateScoutData(store, to, {});
     }
-  });
+  }
 
-  recordImportMetadata(reconciler, 'lastImportSC', DATA_SOURCES.SMART_COOKIE, scData.length);
+  recordImportMetadata(store, 'lastImportSC', DATA_SOURCES.SMART_COOKIE, scData.length);
 }

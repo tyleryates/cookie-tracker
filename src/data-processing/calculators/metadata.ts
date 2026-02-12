@@ -5,11 +5,7 @@ import type { ReadonlyDataStore } from '../../data-store';
 import type { HealthChecks, Scout, UnifiedMetadata, Warning } from '../../types';
 
 /** Build unified metadata with health checks */
-export function buildUnifiedMetadata(
-  reconciler: ReadonlyDataStore,
-  warnings: Warning[] = [],
-  scouts: Record<string, Scout>
-): UnifiedMetadata {
+function buildUnifiedMetadata(store: ReadonlyDataStore, warnings: Warning[] = [], scouts: Record<string, Scout>): UnifiedMetadata {
   const healthChecks: HealthChecks = {
     warningsCount: warnings.length,
     unknownOrderTypes: warnings.filter((w) => w.type === 'UNKNOWN_ORDER_TYPE').length,
@@ -18,14 +14,16 @@ export function buildUnifiedMetadata(
   };
 
   return {
-    lastImportDC: reconciler.metadata.lastImportDC,
-    lastImportSC: reconciler.metadata.lastImportSC,
-    lastImportSCReport: reconciler.metadata.lastImportSCReport,
-    cookieIdMap: reconciler.metadata.cookieIdMap,
-    sources: reconciler.metadata.sources,
+    lastImportDC: store.metadata.lastImportDC,
+    lastImportSC: store.metadata.lastImportSC,
+    lastImportSCReport: store.metadata.lastImportSCReport,
+    cookieIdMap: store.metadata.cookieIdMap,
+    sources: store.metadata.sources,
     unifiedBuildTime: new Date().toISOString(),
     scoutCount: Object.keys(scouts).length,
     orderCount: Object.values(scouts).reduce((sum: number, s: Scout) => sum + s.orders.length, 0),
     healthChecks
   };
 }
+
+export { buildUnifiedMetadata };

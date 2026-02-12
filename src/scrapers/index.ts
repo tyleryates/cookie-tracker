@@ -1,4 +1,4 @@
-import type { Credentials, ProgressCallback } from '../types';
+import type { Credentials, ProgressCallback, ScrapeResults } from '../types';
 import DigitalCookieScraper from './digital-cookie';
 import SmartCookieScraper from './smart-cookie';
 
@@ -36,8 +36,8 @@ class ScraperOrchestrator {
   }
 
   /** Scrape both Digital Cookie and Smart Cookie in parallel */
-  async scrapeAll(credentials: Credentials, boothIds: number[] = []): Promise<Record<string, any>> {
-    const results: Record<string, any> = {
+  async scrapeAll(credentials: Credentials, boothIds: number[] = []): Promise<ScrapeResults> {
+    const results: ScrapeResults = {
       digitalCookie: null,
       smartCookie: null,
       success: false

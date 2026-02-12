@@ -3,10 +3,10 @@
 
 import { ALLOCATION_CHANNEL, ORDER_TYPE, OWNER, TRANSFER_CATEGORY } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
-import type { Order, Scout, SiteOrderCategory, SiteOrderEntry, SiteOrdersDataset, Transfer } from '../../types';
+import type { Scout, SiteOrderCategory, SiteOrderEntry, SiteOrdersDataset } from '../../types';
 
 /** Build site orders dataset with allocation tracking */
-function buildSiteOrdersDataset(reconciler: ReadonlyDataStore, scoutDataset: Record<string, Scout>): SiteOrdersDataset {
+function buildSiteOrdersDataset(store: ReadonlyDataStore, scoutDataset: Record<string, Scout>): SiteOrdersDataset {
   // Find site scout from pre-classified scout data
   let siteScout: Scout | null = null;
   for (const s of Object.values(scoutDataset)) {
@@ -24,8 +24,8 @@ function buildSiteOrdersDataset(reconciler: ReadonlyDataStore, scoutDataset: Rec
 
   // Classify site orders by type
   if (siteScout) {
-    siteScout.orders.forEach((order: Order) => {
-      if (order.orderType === ORDER_TYPE.DONATION) return;
+    for (const order of siteScout.orders) {
+      if (order.orderType === ORDER_TYPE.DONATION) continue;
 
       const entry = {
         orderNumber: order.orderNumber,
@@ -41,11 +41,11 @@ function buildSiteOrdersDataset(reconciler: ReadonlyDataStore, scoutDataset: Rec
       } else {
         siteOrdersByType.girlDelivery.push(entry);
       }
-    });
+    }
   }
 
   // Calculate allocation totals
-  const allocations = calculateAllocations(reconciler);
+  const allocations = calculateAllocations(store);
 
   // Build site order summary with allocation tracking
   const result: SiteOrdersDataset = {
@@ -74,26 +74,26 @@ function buildCategory(orders: SiteOrderEntry[], allocated: number): SiteOrderCa
 }
 
 /** Calculate total allocated packages by type */
-function calculateAllocations(reconciler: ReadonlyDataStore): { directShip: number; virtualBooth: number; boothSales: number } {
+function calculateAllocations(store: ReadonlyDataStore): { directShip: number; virtualBooth: number; boothSales: number } {
   let directShip = 0;
   let virtualBooth = 0;
   let boothSales = 0;
 
   // Imported allocations (booth + direct ship from divider APIs)
-  reconciler.allocations.forEach((allocation) => {
+  for (const allocation of store.allocations) {
     if (allocation.channel === ALLOCATION_CHANNEL.DIRECT_SHIP) {
       directShip += allocation.packages || 0;
     } else if (allocation.channel === ALLOCATION_CHANNEL.BOOTH) {
       boothSales += allocation.packages || 0;
     }
-  });
+  }
 
   // Virtual booth allocations (T2G transfers)
-  reconciler.transfers.forEach((transfer: Transfer) => {
+  for (const transfer of store.transfers) {
     if (transfer.category === TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) {
       virtualBooth += transfer.packages || 0;
     }
-  });
+  }
 
   return { directShip, virtualBooth, boothSales };
 }

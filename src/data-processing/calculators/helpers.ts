@@ -9,14 +9,14 @@ import { accumulateVarieties } from '../utils';
  * Whether an order draws from the scout's physical inventory.
  * True only for GIRL-owned DELIVERY or IN_HAND orders.
  */
-export function needsInventory(order: Pick<Order, 'owner' | 'orderType'>): boolean {
+function needsInventory(order: Pick<Order, 'owner' | 'orderType'>): boolean {
   return order.owner === OWNER.GIRL && (order.orderType === ORDER_TYPE.DELIVERY || order.orderType === ORDER_TYPE.IN_HAND);
 }
 
 /**
  * Total credited packages + donations across all allocation channels.
  */
-export function totalCredited(allocations: Allocation[]): number {
+function totalCredited(allocations: Allocation[]): number {
   let total = 0;
   for (const a of allocations) {
     total += a.packages + a.donations;
@@ -27,7 +27,7 @@ export function totalCredited(allocations: Allocation[]): number {
 /**
  * Get aggregate totals for a list of allocations.
  */
-export function channelTotals(allocations: Allocation[]): { packages: number; donations: number; varieties: Varieties } {
+function channelTotals(allocations: Allocation[]): { packages: number; donations: number; varieties: Varieties } {
   let packages = 0;
   let donations = 0;
   const varieties: Varieties = {};
@@ -46,15 +46,15 @@ export function channelTotals(allocations: Allocation[]): { packages: number; do
  * @param scout - Scout object
  * @returns Sales by variety (excludes Cookie Share)
  */
-export function calculateSalesByVariety(scout: Scout): Varieties {
+function calculateSalesByVariety(scout: Scout): Varieties {
   const salesByVariety: Varieties = {};
 
   // Only process orders that need inventory
   const inventoryOrders = scout.orders.filter((order) => needsInventory(order));
 
-  inventoryOrders.forEach((order) => {
+  for (const order of inventoryOrders) {
     accumulateVarieties(order.varieties, salesByVariety, { excludeCookieShare: true });
-  });
+  }
 
   return salesByVariety;
 }
@@ -66,7 +66,7 @@ export function calculateSalesByVariety(scout: Scout): Varieties {
  * @param girlIdToName - Girl ID to name mapping
  * @returns Scout object or null
  */
-export function findScoutByGirlId(girlId: number, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): Scout | null {
+function findScoutByGirlId(girlId: number, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): Scout | null {
   const scoutName = girlIdToName.get(girlId);
   if (!scoutName) return null;
   return scoutDataset.get(scoutName) || null;
@@ -77,12 +77,14 @@ export function findScoutByGirlId(girlId: number, scoutDataset: Map<string, Scou
  * @param scoutDataset - Scout dataset
  * @returns Girl ID to name mapping
  */
-export function buildGirlIdToNameMap(scoutDataset: Map<string, Scout>): Map<number, string> {
+function buildGirlIdToNameMap(scoutDataset: Map<string, Scout>): Map<number, string> {
   const girlIdToName = new Map<number, string>();
-  scoutDataset.forEach((scout) => {
+  for (const [, scout] of scoutDataset) {
     if (scout.girlId) {
       girlIdToName.set(scout.girlId, scout.name);
     }
-  });
+  }
   return girlIdToName;
 }
+
+export { needsInventory, totalCredited, channelTotals, calculateSalesByVariety, findScoutByGirlId, buildGirlIdToNameMap };

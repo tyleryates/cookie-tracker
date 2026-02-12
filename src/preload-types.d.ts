@@ -1,9 +1,16 @@
+import type { IpcChannelMap, IpcEventMap, IpcResponse } from './types';
+
 interface ElectronAPI {
-  invoke(channel: string, ...args: any[]): Promise<any>;
-  on(channel: string, callback: (...args: any[]) => void): () => void;
+  invoke<K extends keyof IpcChannelMap>(
+    channel: K,
+    ...args: IpcChannelMap[K]['request'] extends undefined ? [] : [IpcChannelMap[K]['request']]
+  ): Promise<IpcResponse<IpcChannelMap[K]['response']>>;
+  on<K extends keyof IpcEventMap>(channel: K, callback: (data: IpcEventMap[K]) => void): () => void;
   openExternal(url: string): Promise<void>;
 }
 
-interface Window {
-  electronAPI: ElectronAPI;
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
 }

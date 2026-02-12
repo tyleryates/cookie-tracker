@@ -4,7 +4,7 @@ import { isAxiosError } from 'axios';
 import { SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../constants';
 import { normalizeCookieName } from '../cookie-constants';
 import Logger from '../logger';
-import type { ProgressCallback } from '../types';
+import type { ProgressCallback, ScrapeSourceResult } from '../types';
 import { BaseScraper, getTimestamp } from './base-scraper';
 import { requestWithRetry } from './request-utils';
 import { SmartCookieSession } from './sc-session';
@@ -12,6 +12,7 @@ import type {
   SaveOrdersParams,
   SCBoothDividerResult,
   SCBoothLocationRaw,
+  SCBoothTimeSlot,
   SCCookieMapEntry,
   SCDirectShipDivider,
   SCDividerGirl,
@@ -220,11 +221,11 @@ class SmartCookieScraper extends BaseScraper {
     return filtered;
   }
 
-  async fetchBoothAvailability(boothId: number): Promise<{ date: string; timeSlots: any[] }[]> {
+  async fetchBoothAvailability(boothId: number): Promise<{ date: string; timeSlots: SCBoothTimeSlot[] }[]> {
     try {
       const datesData = await this.fetchBoothDates(boothId);
       const dates = Array.isArray(datesData) ? datesData : datesData?.dates || [];
-      const result: { date: string; timeSlots: any[] }[] = [];
+      const result: { date: string; timeSlots: SCBoothTimeSlot[] }[] = [];
 
       for (const d of dates) {
         const dateStr = typeof d === 'string' ? d : d.date || '';
@@ -239,11 +240,11 @@ class SmartCookieScraper extends BaseScraper {
     }
   }
 
-  async fetchBoothTimeSlots(boothId: number, date: string): Promise<any[]> {
+  async fetchBoothTimeSlots(boothId: number, date: string): Promise<SCBoothTimeSlot[]> {
     try {
       const timesData = await this.fetchBoothTimes(boothId, date);
       const slots = Array.isArray(timesData) ? timesData : timesData?.times || timesData?.slots || [];
-      return slots.map((s: any) => ({
+      return slots.map((s: SCBoothTimeSlot) => ({
         start_time: s.start_time || s.startTime || s.start || '',
         end_time: s.end_time || s.endTime || s.end || ''
       }));
@@ -253,12 +254,15 @@ class SmartCookieScraper extends BaseScraper {
     }
   }
 
-  async fetchBoothDates(boothId: number): Promise<any> {
+  async fetchBoothDates(boothId: number): Promise<{ dates?: Array<string | { date: string }> } | Array<string | { date: string }>> {
     if (!this.session.troopId) throw new Error('No troopId available. Must sync first.');
     return this.session.apiGet(`/webapi/api/booths/availability?booth_id=${boothId}&troop_id=${this.session.troopId}`, 'Booth dates fetch');
   }
 
-  async fetchBoothTimes(boothId: number, date: string): Promise<any> {
+  async fetchBoothTimes(
+    boothId: number,
+    date: string
+  ): Promise<{ times?: SCBoothTimeSlot[]; slots?: SCBoothTimeSlot[] } | SCBoothTimeSlot[]> {
     if (!this.session.troopId) throw new Error('No troopId available. Must sync first.');
     return this.session.apiGet(
       `/webapi/api/booths/availability/times?booth_id=${boothId}&date=${date}&troop_id=${this.session.troopId}`,
@@ -334,7 +338,7 @@ class SmartCookieScraper extends BaseScraper {
     credentials: { username: string; password: string },
     boothIds: number[] = [],
     signal?: AbortSignal
-  ): Promise<Record<string, any>> {
+  ): Promise<ScrapeSourceResult> {
     if (!credentials?.username || !credentials?.password) {
       return { success: false, source: 'Smart Cookie', error: 'Username and password are required' };
     }

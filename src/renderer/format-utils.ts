@@ -1,6 +1,5 @@
 // HTML Builder Utilities
 
-import { classifyOrderStatus } from '../constants';
 import { COOKIE_ORDER, getCookieDisplayName } from '../cookie-constants';
 import type { BoothTimeSlot, CookieType, Varieties } from '../types';
 
@@ -197,7 +196,6 @@ function formatBoothDate(dateStr: string): string {
 
 export {
   buildVarietyTooltip,
-  classifyOrderStatus,
   sortVarietiesByOrder,
   getCompleteVarieties,
   DateFormatter,

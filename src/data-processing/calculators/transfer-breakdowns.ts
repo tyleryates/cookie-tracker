@@ -8,7 +8,7 @@ import type { Transfer, TransferBreakdowns, Warning } from '../../types';
 import { isKnownTransferType } from '../utils';
 
 /** Build pre-classified transfer lists with totals */
-export function buildTransferBreakdowns(reconciler: ReadonlyDataStore, warnings: Warning[]): TransferBreakdowns {
+function buildTransferBreakdowns(store: ReadonlyDataStore, warnings: Warning[]): TransferBreakdowns {
   const seenUnknownTypes = new Set<string>();
   const c2t: Transfer[] = [];
   const t2g: Transfer[] = [];
@@ -18,7 +18,7 @@ export function buildTransferBreakdowns(reconciler: ReadonlyDataStore, warnings:
   let t2gPhysicalTotal = 0;
   let g2tTotal = 0;
 
-  reconciler.transfers.forEach((transfer: Transfer) => {
+  for (const transfer of store.transfers) {
     // Warn on unknown transfer types (deduplicated by type string)
     if (transfer.type && !isKnownTransferType(transfer.type) && !seenUnknownTypes.has(transfer.type)) {
       seenUnknownTypes.add(transfer.type);
@@ -38,12 +38,11 @@ export function buildTransferBreakdowns(reconciler: ReadonlyDataStore, warnings:
     } else if (transfer.category === TRANSFER_CATEGORY.GIRL_RETURN) {
       g2t.push(transfer);
       g2tTotal += transfer.physicalPackages || 0;
-    }
-    if (transfer.category === TRANSFER_CATEGORY.GIRL_PICKUP) {
+    } else if (transfer.category === TRANSFER_CATEGORY.GIRL_PICKUP) {
       t2g.push(transfer);
       t2gPhysicalTotal += transfer.physicalPackages || 0;
     }
-  });
+  }
 
   // Sort transfers by date (newest first)
   const sortByDate = (a: Transfer, b: Transfer) => {
@@ -67,3 +66,5 @@ export function buildTransferBreakdowns(reconciler: ReadonlyDataStore, warnings:
     }
   };
 }
+
+export { buildTransferBreakdowns };

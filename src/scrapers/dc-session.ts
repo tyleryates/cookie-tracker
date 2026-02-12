@@ -92,7 +92,7 @@ export class DigitalCookieSession {
   }
 
   /** Login to Digital Cookie. Stores credentials for re-login. */
-  async login(username: string, password: string, roleName: string | null, _silent = false): Promise<boolean> {
+  async login(username: string, password: string, roleName: string | null): Promise<boolean> {
     this.credentials = { username, password, role: roleName || undefined };
 
     // Get CSRF token
@@ -130,6 +130,6 @@ export class DigitalCookieSession {
   /** Re-login using stored credentials (silent). */
   async relogin(): Promise<boolean> {
     if (!this.credentials) throw new Error('No stored credentials for re-login');
-    return this.login(this.credentials.username, this.credentials.password, this.credentials.role || null, true);
+    return this.login(this.credentials.username, this.credentials.password, this.credentials.role || null);
   }
 }

@@ -205,24 +205,24 @@ export interface Scout {
 }
 
 // ============================================================================
-// RECONCILER METADATA
+// DATA STORE METADATA
 // ============================================================================
 
 interface ImportMetadata {
   lastImportDC: string | null;
   lastImportSC: string | null;
   lastImportSCReport?: string;
-  cookieIdMap: Record<number, CookieType> | null;
+  cookieIdMap: Record<string, CookieType> | null;
   sources: Array<{ type: string; date: string; records: number }>;
 }
 
-export interface ReconcilerMetadata extends ImportMetadata {
+export interface DataStoreMetadata extends ImportMetadata {
   rawDCData?: Record<string, any>[];
   warnings: Warning[];
 }
 
 // ============================================================================
-// RAW SCOUT DATA (pre-unified, stored in reconciler.scouts)
+// RAW SCOUT DATA (pre-unified, stored in DataStore.scouts)
 // ============================================================================
 
 export interface RawScoutData {
@@ -462,9 +462,18 @@ export type IpcResponse<T = unknown> = { success: true; data: T } | { success: f
 // IPC CONTRACT TYPES
 // ============================================================================
 
+export interface ScrapeSourceResult {
+  success: boolean;
+  source: string;
+  filePath?: string;
+  error?: string;
+  orderCount?: number;
+  totalCases?: number;
+}
+
 export interface ScrapeResults {
-  digitalCookie?: { success: boolean; error?: string; filePath?: string };
-  smartCookie?: { success: boolean; error?: string; filePath?: string };
+  digitalCookie: ScrapeSourceResult | null;
+  smartCookie: ScrapeSourceResult | null;
   success: boolean;
   error?: string;
 }

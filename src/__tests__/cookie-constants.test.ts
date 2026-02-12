@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isDCAutoSync } from '../constants';
 import { COOKIE_ID_MAP, calculateRevenue, getCookieDisplayName, getTroopProceedsRate, normalizeCookieName } from '../cookie-constants';
+import { isDCAutoSync } from '../order-classification';
 
 describe('normalizeCookieName', () => {
   it('normalizes singular and plural forms', () => {

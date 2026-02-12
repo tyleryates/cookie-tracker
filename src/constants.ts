@@ -69,7 +69,7 @@ export type TransferType = (typeof TRANSFER_TYPE)[keyof typeof TRANSFER_TYPE];
 
 // Explicit transfer category — every transfer gets exactly one category at creation time.
 //
-// NOTE: The SC API returns ALL record types through /orders/search, so reconciler.transfers[]
+// NOTE: The SC API returns ALL record types through /orders/search, so DataStore.transfers[]
 // contains both actual inventory transfers (C2T, T2G, G2T) AND order/sales records (D,
 // COOKIE_SHARE, DIRECT_SHIP) that aren't really "transfers." The category documents which is
 // which. See category groups below for how reports distinguish them.
@@ -248,36 +248,11 @@ export const DC_ORDER_STATUS = {
   APPROVED_FOR_DELIVERY: 'Approved for Delivery'
 } as const;
 
-type OrderStatusClass = 'NEEDS_APPROVAL' | 'COMPLETED' | 'PENDING' | 'UNKNOWN';
-
-/** Classify a raw DC order status string into a status category */
-export function classifyOrderStatus(status: string | undefined): OrderStatusClass {
-  if (!status) return 'UNKNOWN';
-  if (status.includes(DC_ORDER_STATUS.NEEDS_APPROVAL)) return 'NEEDS_APPROVAL';
-  if (
-    status === DC_ORDER_STATUS.STATUS_DELIVERED ||
-    status.includes(DC_ORDER_STATUS.COMPLETED) ||
-    status.includes(DC_ORDER_STATUS.DELIVERED) ||
-    status.includes(DC_ORDER_STATUS.SHIPPED)
-  )
-    return 'COMPLETED';
-  if (status.includes(DC_ORDER_STATUS.PENDING) || status.includes(DC_ORDER_STATUS.APPROVED_FOR_DELIVERY)) return 'PENDING';
-  return 'UNKNOWN';
-}
-
 // Digital Cookie order type strings (for pattern matching)
 export const DC_ORDER_TYPE_STRINGS = {
   DONATION: 'Donation', // Pure donation order
   SHIPPED: 'Shipped' // Used in .includes() checks for shipped orders
 } as const;
-
-/** Detect DC orders that auto-sync to Smart Cookie (no manual entry needed) */
-export function isDCAutoSync(dcOrderType: string, paymentStatus: string): boolean {
-  return (
-    (dcOrderType.includes(DC_ORDER_TYPE_STRINGS.SHIPPED) || dcOrderType === DC_ORDER_TYPE_STRINGS.DONATION) &&
-    paymentStatus === DC_PAYMENT_STATUS.CAPTURED
-  );
-}
 
 // ============================================================================
 // CONFIGURATION

@@ -9,42 +9,9 @@ import {
   PAYMENT_METHOD,
   SPECIAL_IDENTIFIERS
 } from '../../constants';
-import type { Scout, Warning } from '../../types';
+import type { Warning } from '../../types';
 import { addDCOrders } from '../calculators/order-processing';
-
-// ---------------------------------------------------------------------------
-// Test Helpers
-// ---------------------------------------------------------------------------
-
-function makeScout(name: string, girlId?: number): Scout {
-  return {
-    name,
-    girlId,
-    isSiteOrder: false,
-    orders: [],
-    inventory: { total: 0, varieties: {} },
-    allocations: [],
-    $allocationsByChannel: { booth: [], directShip: [], virtualBooth: [] },
-    totals: {
-      orders: 0,
-      delivered: 0,
-      shipped: 0,
-      donations: 0,
-      credited: 0,
-      totalSold: 0,
-      inventory: 0,
-      $financials: { cashCollected: 0, electronicPayments: 0, inventoryValue: 0, unsoldValue: 0, cashOwed: 0 },
-      $inventoryDisplay: {},
-      $salesByVariety: {},
-      $shippedByVariety: {},
-      $allocationSummary: {
-        booth: { packages: 0, donations: 0, varieties: {} },
-        directShip: { packages: 0, donations: 0, varieties: {} },
-        virtualBooth: { packages: 0, donations: 0, varieties: {} }
-      }
-    }
-  };
-}
+import { makeScout } from './test-utils';
 
 function makeDCRow(overrides: Partial<Record<string, any>> = {}): Record<string, any> {
   return {

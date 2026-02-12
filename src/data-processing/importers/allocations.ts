@@ -8,7 +8,6 @@ import type {
   SCBoothLocationRaw,
   SCCombinedData,
   SCDirectShipDivider,
-  SCDividerGirl,
   SCReservationsResponse,
   SCVirtualCookieShare
 } from '../../scrapers/sc-types';
@@ -18,17 +17,17 @@ import { parseVarietiesFromAPI } from './parsers';
 import { parseGirlAllocation, registerScout } from './scout-helpers';
 
 /** Import Smart Direct Ship Divider allocations */
-function importDirectShipDivider(reconciler: DataStore, dividerData: SCDirectShipDivider): void {
+function importDirectShipDivider(store: DataStore, dividerData: SCDirectShipDivider): void {
   const girls = dividerData.girls || [];
 
-  girls.forEach((girl: SCDividerGirl) => {
+  for (const girl of girls) {
     const girlId = girl.id;
     const cookies = girl.cookies || [];
 
     // Parse varieties from cookies array
     const { varieties } = parseVarietiesFromAPI(cookies);
 
-    reconciler.allocations.push({
+    store.allocations.push({
       channel: ALLOCATION_CHANNEL.DIRECT_SHIP,
       girlId: girlId,
       packages: sumPhysicalPackages(varieties),
@@ -36,47 +35,47 @@ function importDirectShipDivider(reconciler: DataStore, dividerData: SCDirectShi
       varieties: varieties,
       source: ALLOCATION_SOURCE.DIRECT_SHIP_DIVIDER
     });
-  });
+  }
 }
 
 /** Import Virtual Cookie Share allocations */
-function importVirtualCookieShares(reconciler: DataStore, virtualCookieShares: SCVirtualCookieShare[]): void {
-  virtualCookieShares.forEach((cookieShare) => {
+function importVirtualCookieShares(store: DataStore, virtualCookieShares: SCVirtualCookieShare[]): void {
+  for (const cookieShare of virtualCookieShares) {
     const girls = cookieShare.girls || [];
     const isBoothDivider = !!cookieShare.smart_divider_id;
-    if (isBoothDivider) return; // Booth cookie share tracked via booth divider allocations
-    const targetMap = reconciler.virtualCookieShareAllocations;
+    if (isBoothDivider) continue; // Booth cookie share tracked via booth divider allocations
+    const targetMap = store.virtualCookieShareAllocations;
 
-    girls.forEach((girl: SCDividerGirl) => {
+    for (const girl of girls) {
       const girlId = girl.id;
       const quantity = girl.quantity || 0;
 
-      registerScout(reconciler, girlId, girl);
+      registerScout(store, girlId, girl);
 
-      // Accumulate into appropriate map (manual vs booth divider)
+      // Accumulate manual Cookie Share entries per girl
       const current = targetMap.get(girlId) || 0;
       targetMap.set(girlId, current + quantity);
-    });
-  });
+    }
+  }
 }
 
 /** Import booth reservation data from Smart Cookie reservations API */
 function importReservations(
-  reconciler: DataStore,
+  store: DataStore,
   reservationsData: SCReservationsResponse,
-  dynamicCookieIdMap: Record<number, CookieType> | null
+  dynamicCookieIdMap: Record<string, CookieType> | null
 ): void {
   const reservations = reservationsData?.reservations || [];
   if (!Array.isArray(reservations) || reservations.length === 0) return;
 
-  reconciler.boothReservations = [];
+  store.boothReservations = [];
 
-  reservations.forEach((r) => {
+  for (const r of reservations) {
     const booth = r.booth || {};
     const timeslot = r.timeslot || {};
     const { varieties, totalPackages } = parseVarietiesFromAPI(r.cookies, dynamicCookieIdMap);
 
-    reconciler.boothReservations.push({
+    store.boothReservations.push({
       id: r.id || r.reservation_id || '',
       troopId: r.troop_id || '',
       booth: {
@@ -97,7 +96,7 @@ function importReservations(
       physicalPackages: sumPhysicalPackages(varieties),
       trackedCookieShare: varieties[COOKIE_TYPE.COOKIE_SHARE] || 0
     });
-  });
+  }
 }
 
 /**
@@ -106,16 +105,16 @@ function importReservations(
  * so that allocations aren't silently dropped for girls without SC Report data.
  */
 function importBoothDividers(
-  reconciler: DataStore,
+  store: DataStore,
   boothDividers: SCBoothDividerResult[],
-  dynamicCookieIdMap: Record<number, CookieType> | null
+  dynamicCookieIdMap: Record<string, CookieType> | null
 ): void {
   if (!Array.isArray(boothDividers) || boothDividers.length === 0) return;
 
   // Track seen (reservationId, girlId) pairs to prevent duplicates
   const seen = new Set<string>();
 
-  boothDividers.forEach((entry) => {
+  for (const entry of boothDividers) {
     const divider = entry.divider || {};
     const girls = divider.girls || [];
     // Handle both formats: booth can be the nested sub-object or the full reservation
@@ -123,11 +122,11 @@ function importBoothDividers(
     const booth = rawBooth.booth_id ? rawBooth : rawBooth.booth || rawBooth;
     const timeslot = rawBooth.timeslot || entry.timeslot || {};
 
-    girls.forEach((girl: SCDividerGirl) => {
-      const alloc = parseGirlAllocation(girl, entry.reservationId, seen, reconciler, dynamicCookieIdMap);
-      if (!alloc) return;
+    for (const girl of girls) {
+      const alloc = parseGirlAllocation(girl, entry.reservationId, seen, store, dynamicCookieIdMap);
+      if (!alloc) continue;
 
-      reconciler.allocations.push({
+      store.allocations.push({
         channel: ALLOCATION_CHANNEL.BOOTH,
         girlId: alloc.girlId,
         packages: sumPhysicalPackages(alloc.varieties),
@@ -141,31 +140,31 @@ function importBoothDividers(
         endTime: timeslot.end_time || timeslot.endTime || '',
         reservationType: booth.reservation_type || booth.type || ''
       });
-    });
-  });
+    }
+  }
 }
 
 /** Import Direct Ship Divider allocations from Smart Cookie API (legacy array format) */
 function importDirectShipDividers(
-  reconciler: DataStore,
+  store: DataStore,
   directShipDividers: Record<string, any>[],
-  dynamicCookieIdMap: Record<number, CookieType> | null
+  dynamicCookieIdMap: Record<string, CookieType> | null
 ): void {
   if (!Array.isArray(directShipDividers) || directShipDividers.length === 0) return;
 
   // Track seen (orderId, girlId) pairs to prevent duplicates
   const seen = new Set<string>();
 
-  directShipDividers.forEach((entry) => {
+  for (const entry of directShipDividers) {
     const divider = entry.divider || entry;
     const girls = divider.girls || [];
 
-    girls.forEach((girl: SCDividerGirl) => {
+    for (const girl of girls) {
       const orderId = entry.orderId || entry.id || '';
-      const alloc = parseGirlAllocation(girl, orderId, seen, reconciler, dynamicCookieIdMap);
-      if (!alloc) return;
+      const alloc = parseGirlAllocation(girl, orderId, seen, store, dynamicCookieIdMap);
+      if (!alloc) continue;
 
-      reconciler.allocations.push({
+      store.allocations.push({
         channel: ALLOCATION_CHANNEL.DIRECT_SHIP,
         girlId: alloc.girlId,
         packages: sumPhysicalPackages(alloc.varieties),
@@ -174,8 +173,8 @@ function importDirectShipDividers(
         source: ALLOCATION_SOURCE.SMART_DIRECT_SHIP_DIVIDER,
         orderId: orderId
       });
-    });
-  });
+    }
+  }
 }
 
 /** Normalize a raw booth location from the API to a BoothLocation */
@@ -209,36 +208,36 @@ export function normalizeBoothLocation(loc: SCBoothLocationRaw): BoothLocation {
 }
 
 /** Import booth locations from Smart Cookie booths/search API */
-function importBoothLocations(reconciler: DataStore, locationsData: SCBoothLocationRaw[]): void {
+function importBoothLocations(store: DataStore, locationsData: SCBoothLocationRaw[]): void {
   if (!Array.isArray(locationsData) || locationsData.length === 0) return;
-  reconciler.boothLocations = locationsData.map(normalizeBoothLocation);
+  store.boothLocations = locationsData.map(normalizeBoothLocation);
 }
 
 /** Import optional supplemental data from Smart Cookie API (dividers, booths, cookie shares) */
-export function importAllocations(reconciler: DataStore, apiData: SCCombinedData): void {
-  const cookieIdMap = (apiData.cookieIdMap as Record<number, CookieType>) ?? null;
+export function importAllocations(store: DataStore, apiData: SCCombinedData): void {
+  const cookieIdMap = (apiData.cookieIdMap as Record<string, CookieType>) ?? null;
 
-  if (apiData.directShipDivider?.girls) {
-    importDirectShipDivider(reconciler, apiData.directShipDivider);
+  if (apiData.directShipDivider && !Array.isArray(apiData.directShipDivider) && apiData.directShipDivider.girls) {
+    importDirectShipDivider(store, apiData.directShipDivider);
   }
 
   if (apiData.virtualCookieShares && apiData.virtualCookieShares.length > 0) {
-    importVirtualCookieShares(reconciler, apiData.virtualCookieShares);
+    importVirtualCookieShares(store, apiData.virtualCookieShares);
   }
 
   if (cookieIdMap) {
-    reconciler.metadata.cookieIdMap = cookieIdMap;
+    store.metadata.cookieIdMap = cookieIdMap;
   }
   if (apiData.reservations) {
-    importReservations(reconciler, apiData.reservations, cookieIdMap);
+    importReservations(store, apiData.reservations, cookieIdMap);
   }
   if (apiData.boothDividers && apiData.boothDividers.length > 0) {
-    importBoothDividers(reconciler, apiData.boothDividers, cookieIdMap);
+    importBoothDividers(store, apiData.boothDividers, cookieIdMap);
   }
-  if (apiData.directShipDivider && 'length' in apiData.directShipDivider && (apiData.directShipDivider as any).length > 0) {
-    importDirectShipDividers(reconciler, apiData.directShipDivider as any, cookieIdMap);
+  if (Array.isArray(apiData.directShipDivider) && apiData.directShipDivider.length > 0) {
+    importDirectShipDividers(store, apiData.directShipDivider, cookieIdMap);
   }
   if (apiData.boothLocations && apiData.boothLocations.length > 0) {
-    importBoothLocations(reconciler, apiData.boothLocations);
+    importBoothLocations(store, apiData.boothLocations);
   }
 }

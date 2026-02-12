@@ -1,4 +1,4 @@
-import { isDCAutoSync } from '../../constants';
+import { isDCAutoSync } from '../../order-classification';
 import type { Order, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { StatCards } from '../components/stat-cards';

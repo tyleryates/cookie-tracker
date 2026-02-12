@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { DEFAULT_COUNCIL_ID } from '../constants';
 import Logger from '../logger';
-import type { ProgressCallback } from '../types';
+import type { ProgressCallback, ScrapeSourceResult } from '../types';
 import { BaseScraper, getTimestamp } from './base-scraper';
 import { DigitalCookieSession } from './dc-session';
 import { requestWithRetry } from './request-utils';
@@ -77,7 +77,7 @@ class DigitalCookieScraper extends BaseScraper {
   async scrape(
     credentials: { username: string; password: string; role?: string; councilId?: string },
     signal?: AbortSignal
-  ): Promise<Record<string, any>> {
+  ): Promise<ScrapeSourceResult> {
     if (!credentials?.username || !credentials?.password) {
       return { success: false, source: 'Digital Cookie', error: 'Username and password are required' };
     }

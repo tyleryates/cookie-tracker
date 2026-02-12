@@ -169,9 +169,9 @@ export const DC_COOKIE_COLUMNS: readonly string[] = COOKIE_REGISTRY.filter((e) =
   .map((e) => e.dcColumnName!);
 
 // Smart Cookie API numeric ID to cookie type
-export const COOKIE_ID_MAP: Record<number, CookieType> = Object.fromEntries(
-  COOKIE_REGISTRY.filter((e) => e.scApiId !== null).map((e) => [e.scApiId!, e.type])
-) as Record<number, CookieType>;
+export const COOKIE_ID_MAP: Record<string, CookieType> = Object.fromEntries(
+  COOKIE_REGISTRY.filter((e) => e.scApiId !== null).map((e) => [String(e.scApiId!), e.type])
+) as Record<string, CookieType>;
 
 // Smart Cookie Report column mapping (C1-C11)
 export const COOKIE_COLUMN_MAP: Record<string, CookieType> = Object.fromEntries(

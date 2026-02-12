@@ -8,7 +8,7 @@ import type { CookieType, Varieties } from '../../types';
 /** Parse cookie varieties from Digital Cookie row */
 export function parseVarietiesFromDC(row: Record<string, any>): Varieties {
   const varieties: Record<string, number> = {};
-  DC_COOKIE_COLUMNS.forEach((columnName) => {
+  for (const columnName of DC_COOKIE_COLUMNS) {
     const count = parseInt(row[columnName], 10) || 0;
     if (count > 0) {
       const cookieType = normalizeCookieName(columnName);
@@ -20,7 +20,7 @@ export function parseVarietiesFromDC(row: Record<string, any>): Varieties {
         varieties[cookieType] = count;
       }
     }
-  });
+  }
   return varieties as Varieties;
 }
 
@@ -30,7 +30,7 @@ export function parseVarietiesFromSCReport(row: Record<string, any>): { varietie
   let totalCases = 0;
   let totalPackages = 0;
 
-  Object.entries(COOKIE_COLUMN_MAP).forEach(([col, cookieType]) => {
+  for (const [col, cookieType] of Object.entries(COOKIE_COLUMN_MAP)) {
     const value = row[col] || '0/0';
     const parts = String(value).split('/');
     const cases = parseInt(parts[0], 10) || 0;
@@ -42,7 +42,7 @@ export function parseVarietiesFromSCReport(row: Record<string, any>): { varietie
     }
     totalCases += Math.abs(cases);
     totalPackages += Math.abs(total);
-  });
+  }
 
   return { varieties: varieties as Varieties, totalCases, totalPackages };
 }
@@ -50,15 +50,15 @@ export function parseVarietiesFromSCReport(row: Record<string, any>): { varietie
 /** Parse cookie varieties from Smart Cookie API cookies array */
 export function parseVarietiesFromAPI(
   cookiesArray: Array<{ id?: number; cookieId?: number; quantity: number }> | null | undefined,
-  dynamicCookieIdMap: Record<number, CookieType> | null | undefined = null
+  dynamicCookieIdMap: Record<string, CookieType> | null | undefined = null
 ): { varieties: Varieties; totalPackages: number } {
   const varieties: Record<string, number> = {};
   let totalPackages = 0;
   const idMap = dynamicCookieIdMap || COOKIE_ID_MAP;
 
-  (cookiesArray || []).forEach((cookie) => {
+  for (const cookie of cookiesArray || []) {
     const cookieId = cookie.id || cookie.cookieId;
-    if (cookieId === undefined) return;
+    if (cookieId === undefined) continue;
     const cookieName = idMap[cookieId];
 
     if (!cookieName && cookieId && cookie.quantity !== 0) {
@@ -70,7 +70,7 @@ export function parseVarietiesFromAPI(
       varieties[cookieName] = Math.abs(cookie.quantity);
       totalPackages += Math.abs(cookie.quantity);
     }
-  });
+  }
 
   return { varieties: varieties as Varieties, totalPackages };
 }
@@ -79,12 +79,12 @@ export function parseVarietiesFromAPI(
 export function parseVarietiesFromSCTransfer(row: Record<string, any>): Varieties {
   const varieties: Record<string, number> = {};
 
-  Object.entries(COOKIE_ABBR_MAP).forEach(([abbr, cookieType]) => {
+  for (const [abbr, cookieType] of Object.entries(COOKIE_ABBR_MAP)) {
     const count = parseInt(row[abbr], 10) || 0;
     if (count !== 0) {
       varieties[cookieType] = count;
     }
-  });
+  }
 
   return varieties as Varieties;
 }

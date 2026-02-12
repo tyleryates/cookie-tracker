@@ -4,18 +4,18 @@
 import { ALLOCATION_CHANNEL, ALLOCATION_SOURCE, SCOUT_PHYSICAL_CATEGORIES, TRANSFER_CATEGORY } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { ReadonlyDataStore } from '../../data-store';
-import type { Allocation, Scout, Transfer } from '../../types';
+import type { Scout } from '../../types';
 import { accumulateVarieties } from '../utils';
 
 import { buildGirlIdToNameMap, findScoutByGirlId } from './helpers';
 
 /** Process virtual booth T2G transfers (Troop girl delivery) */
-function processVirtualBoothAllocations(reconciler: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
-  reconciler.transfers.forEach((transfer: Transfer) => {
-    if (transfer.category !== TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) return;
+function processVirtualBoothAllocations(store: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
+  for (const transfer of store.transfers) {
+    if (transfer.category !== TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) continue;
 
     const scout = scoutDataset.get(transfer.to);
-    if (!scout) return;
+    if (!scout) continue;
 
     scout.allocations.push({
       channel: ALLOCATION_CHANNEL.VIRTUAL_BOOTH,
@@ -29,50 +29,45 @@ function processVirtualBoothAllocations(reconciler: ReadonlyDataStore, scoutData
       from: transfer.from,
       amount: transfer.amount || 0
     });
-  });
+  }
 }
 
-/** Process imported allocations (direct ship + booth) from reconciler → scout */
-function processImportedAllocations(
-  reconciler: ReadonlyDataStore,
-  scoutDataset: Map<string, Scout>,
-  girlIdToName: Map<number, string>
-): void {
-  reconciler.allocations.forEach((allocation: Allocation) => {
+/** Process imported allocations (direct ship + booth) from store → scout */
+function processImportedAllocations(store: ReadonlyDataStore, scoutDataset: Map<string, Scout>, girlIdToName: Map<number, string>): void {
+  for (const allocation of store.allocations) {
     const scout = findScoutByGirlId(allocation.girlId, scoutDataset, girlIdToName);
-    if (!scout) return;
+    if (!scout) continue;
 
     scout.allocations.push(allocation);
-  });
+  }
 }
 
 /** Add inventory from Smart Cookie physical transfers (T2G pickup adds, G2T subtracts) */
-function addInventory(reconciler: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
-  reconciler.transfers.forEach((transfer: Transfer) => {
-    if (!SCOUT_PHYSICAL_CATEGORIES.has(transfer.category)) return;
+function addInventory(store: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
+  for (const transfer of store.transfers) {
+    if (!SCOUT_PHYSICAL_CATEGORIES.has(transfer.category)) continue;
 
     // GIRL_PICKUP: scout picks up from troop (+), GIRL_RETURN: scout returns to troop (-)
     const isPickup = transfer.category === TRANSFER_CATEGORY.GIRL_PICKUP;
     const scout = scoutDataset.get(isPickup ? transfer.to : transfer.from);
-    if (!scout) return;
+    if (!scout) continue;
 
     const sign = isPickup ? 1 : -1;
     scout.inventory.total += sign * (transfer.physicalPackages || 0);
     accumulateVarieties(transfer.physicalVarieties, scout.inventory.varieties, { sign });
-  });
+  }
 }
 
 /** Add all allocations to scout dataset */
-function addAllocations(reconciler: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
+function addAllocations(store: ReadonlyDataStore, scoutDataset: Map<string, Scout>): void {
   // Process virtual booth allocations (Type 4: Troop girl delivery)
-  processVirtualBoothAllocations(reconciler, scoutDataset);
+  processVirtualBoothAllocations(store, scoutDataset);
 
   // Build girl ID to name mapping (shared by direct ship and booth sales)
   const girlIdToName = buildGirlIdToNameMap(scoutDataset);
 
   // Process imported allocations (booth + direct ship from divider APIs)
-  processImportedAllocations(reconciler, scoutDataset, girlIdToName);
+  processImportedAllocations(store, scoutDataset, girlIdToName);
 }
 
-export { addInventory };
-export { addAllocations };
+export { addInventory, addAllocations };

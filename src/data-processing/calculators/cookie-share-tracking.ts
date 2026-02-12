@@ -1,22 +1,23 @@
 // Cookie Share Tracking
 // Tracks Cookie Share donations across DC and SC for reconciliation
 
-import { DC_COLUMNS, isDCAutoSync, SPECIAL_IDENTIFIERS, TRANSFER_CATEGORY } from '../../constants';
+import { DC_COLUMNS, SPECIAL_IDENTIFIERS, TRANSFER_CATEGORY } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
-import type { CookieShareTracking, Transfer } from '../../types';
+import { isDCAutoSync } from '../../order-classification';
+import type { CookieShareTracking } from '../../types';
 
 /** Build Cookie Share reconciliation tracking */
-export function buildCookieShareTracking(reconciler: ReadonlyDataStore): CookieShareTracking {
-  const rawDCData = reconciler.metadata.rawDCData || [];
+function buildCookieShareTracking(store: ReadonlyDataStore): CookieShareTracking {
+  const rawDCData = store.metadata.rawDCData || [];
 
   let dcTotal = 0;
   let dcManualEntry = 0;
 
   // Process Digital Cookie data
   // Skip site orders — booth sale donations are handled by the booth divider
-  rawDCData.forEach((row: Record<string, any>) => {
+  for (const row of rawDCData) {
     const lastName = row[DC_COLUMNS.GIRL_LAST_NAME] || '';
-    if (lastName === SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME) return;
+    if (lastName === SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME) continue;
 
     const orderType = row[DC_COLUMNS.ORDER_TYPE] || '';
     const paymentStatus = row[DC_COLUMNS.PAYMENT_STATUS] || '';
@@ -30,12 +31,12 @@ export function buildCookieShareTracking(reconciler: ReadonlyDataStore): CookieS
         dcManualEntry += donations;
       }
     }
-  });
+  }
 
   // Process Smart Cookie data — only track manually-entered COOKIE_SHARE (for reconciliation)
   let scManualEntries = 0;
 
-  reconciler.transfers.forEach((transfer: Transfer) => {
+  for (const transfer of store.transfers) {
     // Only count manually-entered COOKIE_SHARE records (exclude DC-synced and booth divider)
     if (
       transfer.category === TRANSFER_CATEGORY.COOKIE_SHARE_RECORD &&
@@ -43,7 +44,7 @@ export function buildCookieShareTracking(reconciler: ReadonlyDataStore): CookieS
     ) {
       scManualEntries += Math.abs(transfer.packages || 0);
     }
-  });
+  }
 
   return {
     digitalCookie: {
@@ -57,3 +58,5 @@ export function buildCookieShareTracking(reconciler: ReadonlyDataStore): CookieS
     reconciled: dcManualEntry === scManualEntries
   };
 }
+
+export { buildCookieShareTracking };

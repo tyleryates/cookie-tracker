@@ -3,7 +3,7 @@
 
 import { ORDER_TYPE, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
-import type { Scout, Transfer, Varieties, VarietiesResult } from '../../types';
+import type { Scout, Varieties, VarietiesResult } from '../../types';
 import { accumulateVarieties } from '../utils';
 import { needsInventory } from './helpers';
 
@@ -20,35 +20,35 @@ import { needsInventory } from './helpers';
  * - Subtract ALL T2G varieties (physical + virtual booth + booth divider)
  * - Cookie Share excluded (virtual, never in physical inventory)
  */
-export function buildVarieties(reconciler: ReadonlyDataStore, scouts: Record<string, Scout>): VarietiesResult {
+function buildVarieties(store: ReadonlyDataStore, scouts: Record<string, Scout>): VarietiesResult {
   const byCookie: Varieties = {};
   const inventory: Varieties = {};
 
   // Aggregate varieties from actual customer sales (scout orders + credited allocations)
   for (const scout of Object.values(scouts)) {
     // Girl delivery + direct ship orders
-    scout.orders.forEach((order) => {
+    for (const order of scout.orders) {
       if (needsInventory(order) || order.orderType === ORDER_TYPE.DIRECT_SHIP) {
         accumulateVarieties(order.varieties, byCookie, { excludeCookieShare: true });
       }
-    });
+    }
     // Credited allocations (booth sales, virtual booth, direct ship)
     if (!scout.isSiteOrder) {
-      scout.allocations.forEach((alloc) => {
+      for (const alloc of scout.allocations) {
         accumulateVarieties(alloc.varieties, byCookie, { excludeCookieShare: true });
-      });
+      }
     }
   }
 
   // Calculate net troop inventory by variety (SC transfer data)
   // C2T/G2T add to troop stock, all T2G categories subtract from troop stock
-  reconciler.transfers.forEach((transfer: Transfer) => {
+  for (const transfer of store.transfers) {
     if (TROOP_INVENTORY_IN_CATEGORIES.has(transfer.category)) {
       accumulateVarieties(transfer.physicalVarieties, inventory);
     } else if (T2G_CATEGORIES.has(transfer.category)) {
       accumulateVarieties(transfer.physicalVarieties, inventory, { sign: -1 });
     }
-  });
+  }
 
   const total = Object.values(byCookie).reduce((sum, count) => sum + (count || 0), 0);
 
@@ -58,3 +58,5 @@ export function buildVarieties(reconciler: ReadonlyDataStore, scouts: Record<str
     total
   };
 }
+
+export { buildVarieties };

@@ -10,20 +10,20 @@ import { parseVarietiesFromAPI } from './parsers';
 
 /** Record import metadata (timestamp + source entry) */
 export function recordImportMetadata(
-  reconciler: DataStore,
+  store: DataStore,
   timestampField: 'lastImportDC' | 'lastImportSC' | 'lastImportSCReport',
   sourceType: string,
   records: number
 ): void {
   const now = new Date().toISOString();
-  reconciler.metadata[timestampField] = now;
-  reconciler.metadata.sources.push({ type: sourceType, date: now, records });
+  store.metadata[timestampField] = now;
+  store.metadata.sources.push({ type: sourceType, date: now, records });
 }
 
 /** Register a scout by name, optionally setting metadata fields (non-null values only) */
-export function updateScoutData(reconciler: DataStore, scoutName: string, data: Partial<RawScoutData> = {}): void {
-  if (!reconciler.scouts.has(scoutName)) {
-    reconciler.scouts.set(scoutName, {
+export function updateScoutData(store: DataStore, scoutName: string, data: Partial<RawScoutData> = {}): void {
+  if (!store.scouts.has(scoutName)) {
+    store.scouts.set(scoutName, {
       name: scoutName,
       scoutId: null,
       gsusaId: null,
@@ -35,7 +35,7 @@ export function updateScoutData(reconciler: DataStore, scoutName: string, data: 
     });
   }
 
-  const scout = reconciler.scouts.get(scoutName);
+  const scout = store.scouts.get(scoutName);
   if (!scout) return;
 
   for (const key of Object.keys(data) as Array<keyof RawScoutData>) {
@@ -46,14 +46,14 @@ export function updateScoutData(reconciler: DataStore, scoutName: string, data: 
 }
 
 /** Register a scout by girlId, creating the scout entry if needed */
-export function registerScout(reconciler: DataStore, girlId: number, girl: SCDividerGirl): void {
+export function registerScout(store: DataStore, girlId: number, girl: SCDividerGirl): void {
   const scoutName = `${girl.first_name || ''} ${girl.last_name || ''}`.trim();
   if (!girlId || !scoutName) return;
 
-  if (!reconciler.scouts.has(scoutName)) {
-    updateScoutData(reconciler, scoutName, { scoutId: girlId });
+  if (!store.scouts.has(scoutName)) {
+    updateScoutData(store, scoutName, { scoutId: girlId });
   } else {
-    const scout = reconciler.scouts.get(scoutName);
+    const scout = store.scouts.get(scoutName);
     if (scout && !scout.scoutId) {
       scout.scoutId = girlId;
     }
@@ -61,21 +61,21 @@ export function registerScout(reconciler: DataStore, girlId: number, girl: SCDiv
 }
 
 /** Register scouts from an API transfer (T2G pickup, G2T return, Cookie Share) */
-export function trackScoutFromAPITransfer(reconciler: DataStore, type: string, to: string, from: string): void {
+export function trackScoutFromAPITransfer(store: DataStore, type: string, to: string, from: string): void {
   if (type === TRANSFER_TYPE.T2G && to !== from) {
-    updateScoutData(reconciler, to, {});
+    updateScoutData(store, to, {});
   }
   if (type === TRANSFER_TYPE.G2T && to !== from) {
-    updateScoutData(reconciler, from, {});
+    updateScoutData(store, from, {});
   }
   if (type.includes(TRANSFER_TYPE.COOKIE_SHARE)) {
-    updateScoutData(reconciler, to, {});
+    updateScoutData(store, to, {});
   }
 }
 
 /** Merge a Digital Cookie order found in Smart Cookie data (D-prefixed order numbers) */
 export function mergeDCOrderFromSC(
-  reconciler: DataStore,
+  store: DataStore,
   orderNum: string,
   scout: string,
   transferData: { date: string; packages: number; amount: number },
@@ -85,7 +85,7 @@ export function mergeDCOrderFromSC(
 ): void {
   const dcOrderNum = orderNum.substring(1);
   mergeOrCreateOrder(
-    reconciler,
+    store,
     dcOrderNum,
     {
       orderNumber: dcOrderNum,
@@ -106,8 +106,8 @@ export function parseGirlAllocation(
   girl: SCDividerGirl,
   dedupePrefix: string | number,
   seen: Set<string>,
-  reconciler: DataStore,
-  dynamicCookieIdMap: Record<number, CookieType> | null
+  store: DataStore,
+  dynamicCookieIdMap: Record<string, CookieType> | null
 ): { girlId: number; varieties: Varieties; totalPackages: number; trackedCookieShare: number } | null {
   const girlId = girl.id;
   const { varieties, totalPackages } = parseVarietiesFromAPI(girl.cookies, dynamicCookieIdMap);
@@ -117,6 +117,6 @@ export function parseGirlAllocation(
   if (seen.has(dedupeKey)) return null;
   seen.add(dedupeKey);
 
-  registerScout(reconciler, girlId, girl);
+  registerScout(store, girlId, girl);
   return { girlId, varieties, totalPackages, trackedCookieShare: varieties[COOKIE_TYPE.COOKIE_SHARE] || 0 };
 }

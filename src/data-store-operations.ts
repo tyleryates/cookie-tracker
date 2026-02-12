@@ -1,6 +1,6 @@
 // Data Store Operations — Factory functions for creating orders and transfers
 
-import { DATA_SOURCES, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory, type TransferType } from './constants';
+import { DATA_SOURCES, OWNER, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
 import { buildPhysicalVarieties, isIncomingInventory, sumPhysicalPackages } from './data-processing/utils';
 import type { DataStore } from './data-store';
 import Logger from './logger';
@@ -8,11 +8,15 @@ import type { Order, OrderMetadata, Transfer, TransferInput } from './types';
 
 /** Classify a transfer into an explicit category based on type + flags */
 function classifyTransferCategory(
-  type: string,
+  type: string | undefined,
   virtualBooth: boolean,
   boothDivider: boolean,
   directShipDivider: boolean
 ): TransferCategory {
+  if (!type) {
+    Logger.warn('Missing transfer type — defaulting to DC_ORDER_RECORD category');
+    return TRANSFER_CATEGORY.DC_ORDER_RECORD;
+  }
   if (isIncomingInventory(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
   if (type === TRANSFER_TYPE.G2T) return TRANSFER_CATEGORY.GIRL_RETURN;
   if (type === TRANSFER_TYPE.T2G) {
@@ -42,7 +46,7 @@ function createOrder(data: Partial<Order>, source: string): Order {
     gradeLevel: data.gradeLevel ?? undefined,
     date: data.date || '',
     orderType: data.orderType || null,
-    owner: data.owner || 'TROOP',
+    owner: data.owner || OWNER.TROOP,
     packages: data.packages || 0,
     physicalPackages: data.physicalPackages || 0,
     donations: data.donations || 0,
@@ -70,7 +74,7 @@ function createOrder(data: Partial<Order>, source: string): Order {
 /** Create a Transfer with explicit category classification */
 export function createTransfer(data: TransferInput): Transfer {
   const category = classifyTransferCategory(
-    data.type as string,
+    data.type,
     data.virtualBooth || false,
     data.boothDivider || false,
     data.directShipDivider || false
@@ -82,7 +86,7 @@ export function createTransfer(data: TransferInput): Transfer {
 
   return {
     date: data.date || '',
-    type: data.type || ('' as TransferType),
+    type: data.type || TRANSFER_TYPE.D,
     category: category,
     orderNumber: data.orderNumber,
     from: data.from || '',

@@ -7,10 +7,10 @@ import { parseExcelDate, parseVarietiesFromDC } from './parsers';
 import { recordImportMetadata, updateScoutData } from './scout-helpers';
 
 /** Import Digital Cookie order data from Excel export */
-export function importDigitalCookie(reconciler: DataStore, dcData: Record<string, any>[]): void {
-  reconciler.metadata.rawDCData = dcData;
+export function importDigitalCookie(store: DataStore, dcData: Record<string, any>[]): void {
+  store.metadata.rawDCData = dcData;
 
-  dcData.forEach((row: Record<string, any>) => {
+  for (const row of dcData) {
     const orderNum = String(row[DC_COLUMNS.ORDER_NUMBER]);
     const scout = `${row[DC_COLUMNS.GIRL_FIRST_NAME] || ''} ${row[DC_COLUMNS.GIRL_LAST_NAME] || ''}`.trim();
 
@@ -28,11 +28,11 @@ export function importDigitalCookie(reconciler: DataStore, dcData: Record<string
     };
 
     // Merge or create order (DC is source of truth for order details)
-    mergeOrCreateOrder(reconciler, orderNum, orderData, DATA_SOURCES.DIGITAL_COOKIE, row);
+    mergeOrCreateOrder(store, orderNum, orderData, DATA_SOURCES.DIGITAL_COOKIE, row);
 
     // Register scout
-    updateScoutData(reconciler, scout, {});
-  });
+    updateScoutData(store, scout, {});
+  }
 
-  recordImportMetadata(reconciler, 'lastImportDC', DATA_SOURCES.DIGITAL_COOKIE, dcData.length);
+  recordImportMetadata(store, 'lastImportDC', DATA_SOURCES.DIGITAL_COOKIE, dcData.length);
 }

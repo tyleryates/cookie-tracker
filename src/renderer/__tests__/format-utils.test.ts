@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { COOKIE_ORDER, getCookieDisplayName } from '../../cookie-constants';
+import { classifyOrderStatus } from '../../order-classification';
 import type { BoothTimeSlot } from '../../types';
 import {
   buildVarietyTooltip,
-  classifyOrderStatus,
   DateFormatter,
   formatBoothDate,
   formatCurrency,

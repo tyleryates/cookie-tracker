@@ -5,7 +5,7 @@
 import { TRANSFER_CATEGORY } from '../../constants';
 import type { Transfer } from '../../types';
 
-export interface PackageTotals {
+interface PackageTotals {
   c2tReceived: number;
   allocated: number;
   virtualBoothT2G: number;
@@ -23,7 +23,7 @@ function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
   let totalDirectShip = 0; // Direct ship orders (shipped from supplier, not troop inventory)
   let totalG2T = 0; // Girl to Troop returns (inventory back to troop)
 
-  transfers.forEach((transfer: Transfer) => {
+  for (const transfer of transfers) {
     switch (transfer.category) {
       case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
         totalC2TReceived += transfer.physicalPackages || 0;
@@ -44,7 +44,7 @@ function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
         totalDirectShip += transfer.physicalPackages || 0;
         break;
     }
-  });
+  }
 
   return {
     c2tReceived: totalC2TReceived,
@@ -57,3 +57,4 @@ function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
 }
 
 export { calculatePackageTotals };
+export type { PackageTotals };

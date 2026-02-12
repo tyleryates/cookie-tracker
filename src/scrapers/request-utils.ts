@@ -117,11 +117,11 @@ async function handleRequestError(
 /**
  * Execute request with automatic retry on session expiry
  */
-async function requestWithRetry(
-  requestFn: () => Promise<any>,
+async function requestWithRetry<T>(
+  requestFn: () => Promise<T>,
   reloginFn: (() => Promise<boolean>) | null,
   options: { maxRetries?: number; retryableStatuses?: number[]; logPrefix?: string; rateLimit?: boolean } = {}
-): Promise<any> {
+): Promise<T> {
   const maxRetries = options.maxRetries || RATE_LIMIT.MAX_RETRIES;
   const logPrefix = options.logPrefix || 'Request';
 

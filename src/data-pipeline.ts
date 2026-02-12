@@ -202,13 +202,13 @@ function buildDatasetList(files: DataFileInfo[]): DatasetEntry[] {
 
 type FileLoadResult = { loaded: boolean; issue?: string };
 
-function loadJsonFile(file: DataFileInfo, rec: DataStore): FileLoadResult {
+function loadJsonFile(file: DataFileInfo, store: DataStore): FileLoadResult {
   if (isSmartCookieAPIFormat(file.data)) {
     const validation = validateSCData(file.data);
     if (!validation.valid) {
       Logger.warn('SC data validation issues:', validation.issues);
     }
-    importSmartCookieAPI(rec, file.data);
+    importSmartCookieAPI(store, file.data);
     return { loaded: true };
   }
   return { loaded: false, issue: `Smart Cookie JSON not recognized: ${file.name}` };
@@ -230,7 +230,7 @@ async function loadExcelFile(
 
 async function loadSourceFiles(
   files: DataFileInfo[],
-  rec: DataStore,
+  store: DataStore,
   specificSc?: DataFileInfo | null,
   specificDc?: DataFileInfo | null
 ): Promise<LoadedSources> {
@@ -246,7 +246,7 @@ async function loadSourceFiles(
   // Smart Cookie API (JSON)
   let sc = false;
   if (scFile) {
-    const r = loadJsonFile(scFile, rec);
+    const r = loadJsonFile(scFile, store);
     sc = r.loaded;
     if (r.loaded) scTimestamp = parseTimestampFromFilename(scFile.name, 'SC-', '.json')?.toISOString() ?? null;
     else if (r.issue) issues.push(r.issue);
@@ -263,7 +263,7 @@ async function loadSourceFiles(
         if (!validation.valid) {
           Logger.warn('DC data validation issues:', validation.issues);
         }
-        importDigitalCookie(rec, data);
+        importDigitalCookie(store, data);
       },
       'Digital Cookie XLSX not recognized'
     );
@@ -278,7 +278,7 @@ async function loadSourceFiles(
     const r = await loadExcelFile(
       scReportFile,
       (data) => data?.length > 0,
-      (data) => importSmartCookieReport(rec, data),
+      (data) => importSmartCookieReport(store, data),
       'Smart Cookie Report empty/unreadable'
     );
     scReport = r.loaded;
@@ -291,13 +291,13 @@ async function loadSourceFiles(
     const r = await loadExcelFile(
       scTransferFile,
       (data) => data?.length > 0,
-      (data) => importSmartCookie(rec, data),
+      (data) => importSmartCookie(store, data),
       'Smart Cookie Transfer empty/unreadable'
     );
     scTransfer = r.loaded;
     if (r.issue) issues.push(r.issue);
   } else if (sc && scTransferFile) {
-    rec.metadata.warnings.push({ type: 'SC_TRANSFER_SKIPPED', reason: 'SC API data present', file: scTransferFile.name });
+    store.metadata.warnings.push({ type: 'SC_TRANSFER_SKIPPED', reason: 'SC API data present', file: scTransferFile.name });
     Logger.warn('Skipping CookieOrders.xlsx import because SC API data is present.');
   }
 

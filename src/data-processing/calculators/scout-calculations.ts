@@ -1,8 +1,9 @@
 // Scout-Level Calculations
 // Handles all per-scout totals, variety calculations, and financial tracking
 
-import { ALLOCATION_CHANNEL, classifyOrderStatus, ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
+import { ALLOCATION_CHANNEL, ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
 import { calculateRevenue, PHYSICAL_COOKIE_TYPES } from '../../cookie-constants';
+import { classifyOrderStatus } from '../../order-classification';
 import type { CookieType, Order, Scout, Varieties } from '../../types';
 import { accumulateVarieties, buildPhysicalVarieties } from '../utils';
 import { calculateSalesByVariety, channelTotals, needsInventory, totalCredited } from './helpers';
@@ -48,7 +49,7 @@ function detectNegativeInventory(scout: Scout, salesByVariety: Varieties): void 
 function calculateOrderTotals(scout: Scout): void {
   scout.totals.orders = scout.orders.length;
 
-  scout.orders.forEach((order: Order) => {
+  for (const order of scout.orders) {
     // Physical packages by delivery method
     if (needsInventory(order)) {
       scout.totals.delivered += order.physicalPackages;
@@ -58,7 +59,7 @@ function calculateOrderTotals(scout: Scout): void {
 
     // Donations
     scout.totals.donations += order.donations;
-  });
+  }
 }
 
 /** Calculate credited totals from allocations */
@@ -83,8 +84,8 @@ function calculateFinancialTracking(scout: Scout): void {
   let inventoryElectronic = 0; // Electronic payments for physical inventory orders
   let inventoryCashPhysical = 0; // Cash payments for physical inventory orders
 
-  scout.orders.forEach((order: Order) => {
-    if (order.owner !== OWNER.GIRL) return;
+  for (const order of scout.orders) {
+    if (order.owner !== OWNER.GIRL) continue;
 
     const isElectronic = order.paymentMethod != null && order.paymentMethod !== PAYMENT_METHOD.CASH;
 
@@ -101,7 +102,7 @@ function calculateFinancialTracking(scout: Scout): void {
         inventoryCashPhysical += physicalOrderRevenue(order);
       }
     }
-  });
+  }
 
   // Total value of all inventory picked up (scouts are financially responsible)
   const inventoryValue = calculateRevenue(scout.inventory.varieties);
@@ -126,7 +127,7 @@ function calculateInventoryDisplay(scout: Scout, salesByVariety: Varieties): voi
   // Net inventory by variety
   scout.totals.$inventoryDisplay = {};
   let inventoryTotal = 0;
-  PHYSICAL_COOKIE_TYPES.forEach((variety) => {
+  for (const variety of PHYSICAL_COOKIE_TYPES) {
     const inventoryCount = scout.inventory.varieties[variety] || 0;
     const salesCount = salesByVariety[variety] || 0;
     const net = inventoryCount - salesCount;
@@ -134,7 +135,7 @@ function calculateInventoryDisplay(scout: Scout, salesByVariety: Varieties): voi
     // Can't have negative boxes on hand — clamp per variety so one oversold
     // variety doesn't drag down the total (girl just needs more inventory)
     inventoryTotal += Math.max(0, net);
-  });
+  }
   scout.totals.inventory = inventoryTotal;
 
   // Detect negative inventory issues
@@ -200,9 +201,9 @@ function calculateVarietyTotals(scout: Scout): void {
 
 /** Calculate totals for all scouts in dataset */
 function calculateScoutTotals(scoutDataset: Map<string, Scout>): void {
-  scoutDataset.forEach((scout: Scout) => {
+  for (const [, scout] of scoutDataset) {
     calculateVarietyTotals(scout);
-  });
+  }
 }
 
 /** Calculate aggregate scout counts */
@@ -241,5 +242,4 @@ function calculateScoutCounts(scouts: Record<string, Scout>): {
   };
 }
 
-export { calculateScoutTotals };
-export { calculateScoutCounts };
+export { calculateScoutTotals, calculateScoutCounts };

@@ -16,18 +16,18 @@ import { buildTroopTotals } from './troop-totals';
 import { buildVarieties } from './varieties';
 
 /** Build complete scout dataset with all calculations */
-function buildScoutDataset(reconciler: ReadonlyDataStore, warnings: Warning[]): Record<string, Scout> {
-  const rawDCData = reconciler.metadata.rawDCData || [];
-  const scoutDataset = initializeScouts(reconciler, rawDCData);
+function buildScoutDataset(store: ReadonlyDataStore, warnings: Warning[]): Record<string, Scout> {
+  const rawDCData = store.metadata.rawDCData || [];
+  const scoutDataset = initializeScouts(store, rawDCData);
 
   // Phase 1: Add orders from Digital Cookie
   addDCOrders(scoutDataset, rawDCData, warnings);
 
   // Phase 2: Add inventory from Smart Cookie T2G transfers
-  addInventory(reconciler, scoutDataset);
+  addInventory(store, scoutDataset);
 
   // Phase 3: Add allocations (virtual booth, direct ship, booth sales)
-  addAllocations(reconciler, scoutDataset);
+  addAllocations(store, scoutDataset);
 
   // Phase 4: Calculate all scout-level totals
   calculateScoutTotals(scoutDataset);
@@ -36,35 +36,35 @@ function buildScoutDataset(reconciler: ReadonlyDataStore, warnings: Warning[]): 
 }
 
 /** Build unified dataset from reconciled data */
-export function buildUnifiedDataset(reconciler: ReadonlyDataStore): UnifiedDataset {
+function buildUnifiedDataset(store: ReadonlyDataStore): UnifiedDataset {
   const warnings: Warning[] = [];
 
   // Build complete scout dataset
-  const scouts = buildScoutDataset(reconciler, warnings);
+  const scouts = buildScoutDataset(store, warnings);
 
   // Build site orders dataset
-  const siteOrders = buildSiteOrdersDataset(reconciler, scouts);
+  const siteOrders = buildSiteOrdersDataset(store, scouts);
 
   // Calculate scout counts
   const scoutCounts = calculateScoutCounts(scouts);
 
   // Build package totals
-  const packageTotals = calculatePackageTotals(reconciler.transfers);
+  const packageTotals = calculatePackageTotals(store.transfers);
 
   // Build troop totals
-  const troopTotals = buildTroopTotals(reconciler, scouts, packageTotals, scoutCounts);
+  const troopTotals = buildTroopTotals(store, scouts, packageTotals, scoutCounts);
 
   // Build transfer breakdowns
-  const transferBreakdowns = buildTransferBreakdowns(reconciler, warnings);
+  const transferBreakdowns = buildTransferBreakdowns(store, warnings);
 
   // Build varieties
-  const varieties = buildVarieties(reconciler, scouts);
+  const varieties = buildVarieties(store, scouts);
 
   // Build Cookie Share tracking
-  const cookieShareTracking = buildCookieShareTracking(reconciler);
+  const cookieShareTracking = buildCookieShareTracking(store);
 
   // Build metadata
-  const metadata = buildUnifiedMetadata(reconciler, warnings, scouts);
+  const metadata = buildUnifiedMetadata(store, warnings, scouts);
 
   return {
     scouts,
@@ -73,13 +73,15 @@ export function buildUnifiedDataset(reconciler: ReadonlyDataStore): UnifiedDatas
     transferBreakdowns,
     varieties,
     cookieShare: cookieShareTracking,
-    boothReservations: reconciler.boothReservations,
-    boothLocations: reconciler.boothLocations,
+    boothReservations: store.boothReservations,
+    boothLocations: store.boothLocations,
     metadata,
     warnings,
     virtualCookieShareAllocations: Object.fromEntries(
-      Array.from(reconciler.virtualCookieShareAllocations.entries()).map(([k, v]) => [String(k), v])
+      Array.from(store.virtualCookieShareAllocations.entries()).map(([k, v]) => [String(k), v])
     ),
-    hasTransferData: reconciler.transfers.length > 0
+    hasTransferData: store.transfers.length > 0
   };
 }
+
+export { buildUnifiedDataset };

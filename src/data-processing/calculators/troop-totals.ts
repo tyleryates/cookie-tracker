@@ -30,9 +30,9 @@ function aggregateScoutTotals(scouts: Record<string, Scout>) {
       boothSalesDonations += bs.donations;
       // Shortfalls: orders approved for delivery but scout hasn't picked up inventory yet
       if (scout.$issues?.negativeInventory) {
-        scout.$issues.negativeInventory.forEach((issue) => {
+        for (const issue of scout.$issues.negativeInventory) {
           pendingPickup += issue.shortfall;
-        });
+        }
       }
     }
     directShip += scout.totals.shipped || 0;
@@ -46,22 +46,22 @@ function aggregateScoutTotals(scouts: Record<string, Scout>) {
  *  to avoid double-counting (site orders → booth/VB/DS dividers → scouts). */
 function countDCDonations(rawDCData: Record<string, any>[]): number {
   let total = 0;
-  rawDCData.forEach((row: Record<string, any>) => {
-    if (row[DC_COLUMNS.GIRL_LAST_NAME] === SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME) return;
+  for (const row of rawDCData) {
+    if (row[DC_COLUMNS.GIRL_LAST_NAME] === SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME) continue;
     const donations = parseInt(row[DC_COLUMNS.DONATION], 10) || 0;
     if (donations > 0) total += donations;
-  });
+  }
   return total;
 }
 
 /** Build troop-level aggregate totals */
-export function buildTroopTotals(
-  reconciler: ReadonlyDataStore,
+function buildTroopTotals(
+  store: ReadonlyDataStore,
   scouts: Record<string, Scout>,
   packageTotals: PackageTotals,
   scoutCounts: ScoutCounts
 ): TroopTotals {
-  const rawDCData = reconciler.metadata.rawDCData || [];
+  const rawDCData = store.metadata.rawDCData || [];
 
   // Net troop inventory: received from council minus all outflows, plus returns
   const totalInventory =
@@ -100,3 +100,5 @@ export function buildTroopTotals(
     scouts: scoutCounts
   };
 }
+
+export { buildTroopTotals };

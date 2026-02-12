@@ -3,15 +3,9 @@
 import type preact from 'preact';
 import { ALLOCATION_METHOD, DC_ORDER_STATUS, DISPLAY_STRINGS, ORDER_TYPE } from '../../constants';
 import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
+import { classifyOrderStatus } from '../../order-classification';
 import type { Order, Scout, Varieties } from '../../types';
-import {
-  buildVarietyTooltip,
-  classifyOrderStatus,
-  formatDate,
-  formatTimeRange,
-  getCompleteVarieties,
-  sortVarietiesByOrder
-} from '../format-utils';
+import { buildVarietyTooltip, formatDate, formatTimeRange, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
 

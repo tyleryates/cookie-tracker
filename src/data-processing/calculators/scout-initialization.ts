@@ -3,14 +3,14 @@
 
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
-import type { RawScoutData, Scout } from '../../types';
+import type { Scout } from '../../types';
 
 /** Initialize scouts from Digital Cookie and Smart Cookie data */
-function initializeScouts(reconciler: ReadonlyDataStore, rawDCData: Record<string, any>[]): Map<string, Scout> {
+function initializeScouts(store: ReadonlyDataStore, rawDCData: Record<string, any>[]): Map<string, Scout> {
   const scoutDataset = new Map<string, Scout>();
 
   // From Digital Cookie orders
-  rawDCData.forEach((row: Record<string, any>) => {
+  for (const row of rawDCData) {
     const firstName = row[DC_COLUMNS.GIRL_FIRST_NAME] || '';
     const lastName = row[DC_COLUMNS.GIRL_LAST_NAME] || '';
     const name = `${firstName} ${lastName}`.trim();
@@ -19,10 +19,10 @@ function initializeScouts(reconciler: ReadonlyDataStore, rawDCData: Record<strin
       const isSiteOrder = lastName === SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME;
       scoutDataset.set(name, createScoutStructure(name, null, isSiteOrder));
     }
-  });
+  }
 
   // Add scouts from Smart Cookie data (may have scouts without DC orders)
-  reconciler.scouts.forEach((scoutData: RawScoutData, scoutName: string) => {
+  for (const [scoutName, scoutData] of store.scouts) {
     if (!scoutDataset.has(scoutName)) {
       scoutDataset.set(scoutName, createScoutStructure(scoutName, scoutData.scoutId || null, false));
     } else {
@@ -32,7 +32,7 @@ function initializeScouts(reconciler: ReadonlyDataStore, rawDCData: Record<strin
         scout.girlId = scoutData.scoutId;
       }
     }
-  });
+  }
 
   return scoutDataset;
 }

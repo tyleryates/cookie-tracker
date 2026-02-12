@@ -100,6 +100,16 @@ export interface SCBoothDividerResult {
   divider: { girls?: SCDividerGirl[] } | null;
 }
 
+/** Time slot from booth availability API */
+export interface SCBoothTimeSlot {
+  start_time?: string;
+  startTime?: string;
+  start?: string;
+  end_time?: string;
+  endTime?: string;
+  end?: string;
+}
+
 /** Raw booth location from /booths/search */
 export interface SCBoothLocationRaw {
   id?: number;
@@ -128,10 +138,10 @@ export interface SaveOrdersParams {
 
 /** Shape of saved SC-*.json files (SCOrdersResponse + supplemental data) */
 export interface SCCombinedData extends SCOrdersResponse {
-  directShipDivider?: SCDirectShipDivider | null;
+  directShipDivider?: SCDirectShipDivider | Record<string, any>[] | null;
   virtualCookieShares?: SCVirtualCookieShare[];
   reservations?: SCReservationsResponse | null;
   boothDividers?: SCBoothDividerResult[];
   boothLocations?: SCBoothLocationRaw[];
-  cookieIdMap?: Record<number, string> | null;
+  cookieIdMap?: Record<string, string> | null;
 }

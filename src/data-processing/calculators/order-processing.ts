@@ -168,17 +168,17 @@ function parseAndClassifyOrder(row: Record<string, any>, lastName: string, warni
 
 /** Add and classify orders from Digital Cookie */
 function addDCOrders(scoutDataset: Map<string, Scout>, rawDCData: Record<string, any>[], warnings: Warning[] = []): void {
-  rawDCData.forEach((row: Record<string, any>) => {
+  for (const row of rawDCData) {
     const firstName = row[DC_COLUMNS.GIRL_FIRST_NAME] || '';
     const lastName = row[DC_COLUMNS.GIRL_LAST_NAME] || '';
     const name = `${firstName} ${lastName}`.trim();
 
     const scout = scoutDataset.get(name);
-    if (!scout) return;
+    if (!scout) continue;
 
     const order = parseAndClassifyOrder(row, lastName, warnings);
     scout.orders.push(order);
-  });
+  }
 }
 
 export { addDCOrders };
