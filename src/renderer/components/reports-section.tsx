@@ -20,7 +20,9 @@ interface ReportsSectionProps {
   boothSyncing: boolean;
   onSelectReport: (type: string) => void;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
+  onResetIgnored: () => void;
   onRefreshBooths: () => void;
+  onSaveBoothIds: (ids: number[]) => void;
 }
 
 interface ReportButton {
@@ -132,7 +134,9 @@ function renderReport(
   appConfig: AppConfig | null,
   boothSyncing: boolean,
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void,
-  onRefreshBooths: () => void
+  onResetIgnored: () => void,
+  onRefreshBooths: () => void,
+  onSaveBoothIds: (ids: number[]) => void
 ) {
   switch (type) {
     case 'troop':
@@ -155,9 +159,12 @@ function renderReport(
             filters: appConfig?.boothDayFilters || [],
             ignoredTimeSlots: appConfig?.ignoredTimeSlots || []
           }}
+          appConfig={appConfig}
           refreshing={boothSyncing}
           onIgnoreSlot={onIgnoreSlot}
+          onResetIgnored={onResetIgnored}
           onRefresh={onRefreshBooths}
+          onSaveBoothIds={onSaveBoothIds}
         />
       );
     default:
@@ -176,7 +183,9 @@ export function ReportsSection({
   boothSyncing,
   onSelectReport,
   onIgnoreSlot,
-  onRefreshBooths
+  onResetIgnored,
+  onRefreshBooths,
+  onSaveBoothIds
 }: ReportsSectionProps) {
   const unknownTypes = unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
   const hasData = !!unified;
@@ -212,7 +221,9 @@ export function ReportsSection({
             details={unified?.warnings || []}
           />
         ) : (
-          activeReport && unified && renderReport(activeReport, unified, appConfig, boothSyncing, onIgnoreSlot, onRefreshBooths)
+          activeReport &&
+          unified &&
+          renderReport(activeReport, unified, appConfig, boothSyncing, onIgnoreSlot, onResetIgnored, onRefreshBooths, onSaveBoothIds)
         )}
       </div>
     </section>

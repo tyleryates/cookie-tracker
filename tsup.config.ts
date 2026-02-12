@@ -31,9 +31,11 @@ export default defineConfig([
     platform: 'node',
     outDir: 'dist',
     external: ['electron'],
+    noExternal: [/preact/],
     esbuildOptions(options) {
       options.jsx = 'automatic';
       options.jsxImportSource = 'preact';
+      options.define = { 'process.env.NODE_ENV': '"production"' };
     },
   },
 ]);

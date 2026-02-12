@@ -326,3 +326,24 @@ ipcMain.handle(
     return boothLocations.map(normalizeBoothLocation);
   })
 );
+
+// Fetch ALL booth locations (no availability) for the booth selector UI
+ipcMain.handle(
+  'fetch-booth-catalog',
+  handleIpcError(async () => {
+    let scraper = lastScraper?.getSmartCookieScraper();
+
+    if (!scraper || !scraper.session.isAuthenticated) {
+      const credentials = credentialsManager.loadCredentials();
+      if (!credentials?.smartCookie?.username || !credentials?.smartCookie?.password) {
+        throw new Error('No Smart Cookie credentials configured. Please set up logins first.');
+      }
+
+      scraper = new SmartCookieScraper(dataDir);
+      await scraper.session.login(credentials.smartCookie.username, credentials.smartCookie.password);
+    }
+
+    const boothLocations = await scraper.fetchBoothLocations([]);
+    return boothLocations.map(normalizeBoothLocation);
+  })
+);

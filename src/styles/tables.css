@@ -230,6 +230,36 @@ tr:hover {
   line-height: 1;
 }
 
+.booth-selector-store-btn {
+  width: 100%;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.booth-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+  font-size: 0.95em;
+}
+.booth-selector-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+.booth-selector-row:hover {
+  background: var(--surface-raised);
+  border-radius: 4px;
+}
+.booth-selector-row .booth-type-badge {
+  margin-left: auto;
+}
+
 /* Detail areas */
 .detail-placeholder {
   padding: 12px;

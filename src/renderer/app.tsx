@@ -58,6 +58,25 @@ export function App() {
     [checkLoginStatus]
   );
 
+  const handleSaveBoothIds = useCallback(
+    async (boothIds: number[]) => {
+      const updatedConfig = await ipcInvoke('update-config', { boothIds });
+      dispatch({ type: 'LOAD_CONFIG', config: updatedConfig });
+      showStatus(`Booth selection saved (${boothIds.length} booth${boothIds.length === 1 ? '' : 's'})`, 'success');
+      refreshBooths();
+    },
+    [showStatus, refreshBooths]
+  );
+
+  const handleResetIgnored = useCallback(async () => {
+    const config = stateRef.current.appConfig;
+    if (config) {
+      dispatch({ type: 'IGNORE_SLOT', config: { ...config, ignoredTimeSlots: [] } });
+    }
+    await ipcInvoke('update-config', { ignoredTimeSlots: [] });
+    showStatus('Ignored time slots cleared', 'success');
+  }, [showStatus]);
+
   const handleIgnoreSlot = useCallback(async (boothId: number, date: string, startTime: string) => {
     const config = stateRef.current.appConfig;
     const ignored = [...(config?.ignoredTimeSlots || []), { boothId, date, startTime }];
@@ -101,7 +120,9 @@ export function App() {
           boothSyncing={state.syncState.booth.status === 'syncing'}
           onSelectReport={handleSelectReport}
           onIgnoreSlot={handleIgnoreSlot}
+          onResetIgnored={handleResetIgnored}
           onRefreshBooths={refreshBooths}
+          onSaveBoothIds={handleSaveBoothIds}
         />
       </main>
 

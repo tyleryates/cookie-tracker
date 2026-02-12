@@ -492,6 +492,7 @@ export interface IpcChannelMap {
   'scrape-websites': { request: undefined; response: ScrapeResults };
   'cancel-sync': { request: undefined; response: undefined };
   'refresh-booth-locations': { request: undefined; response: BoothLocation[] };
+  'fetch-booth-catalog': { request: undefined; response: BoothLocation[] };
 }
 
 export interface IpcEventMap {

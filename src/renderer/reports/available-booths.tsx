@@ -1,8 +1,10 @@
 // Available Booths Report — Preact component
 // Shows booth locations with filtered availability dates/times
 
+import { useState } from 'preact/hooks';
 import { BOOTH_RESERVATION_TYPE } from '../../constants';
-import type { BoothAvailableDate, BoothLocation, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
+import type { AppConfig, BoothAvailableDate, BoothLocation, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
+import { BoothSelector } from '../components/booth-selector';
 import { formatBoothDate, formatTime12h, parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
 
 interface AvailableBoothsConfig {
@@ -67,12 +69,25 @@ export function countAvailableSlots(boothLocations: BoothLocation[], filters: Da
 interface AvailableBoothsProps {
   data: UnifiedDataset;
   config: AvailableBoothsConfig;
+  appConfig: AppConfig | null;
   refreshing: boolean;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
+  onResetIgnored: () => void;
   onRefresh: () => void;
+  onSaveBoothIds: (ids: number[]) => void;
 }
 
-export function AvailableBoothsReport({ data, config, refreshing, onIgnoreSlot, onRefresh }: AvailableBoothsProps) {
+export function AvailableBoothsReport({
+  data,
+  config,
+  appConfig,
+  refreshing,
+  onIgnoreSlot,
+  onResetIgnored,
+  onRefresh,
+  onSaveBoothIds
+}: AvailableBoothsProps) {
+  const [selecting, setSelecting] = useState(false);
   if (!data) {
     return (
       <div class="report-visual">
@@ -84,6 +99,19 @@ export function AvailableBoothsReport({ data, config, refreshing, onIgnoreSlot, 
   const { filters, ignoredTimeSlots } = config;
   const boothLocations = data.boothLocations || [];
 
+  if (selecting) {
+    return (
+      <BoothSelector
+        currentBoothIds={appConfig?.boothIds || []}
+        onSave={(ids) => {
+          setSelecting(false);
+          onSaveBoothIds(ids);
+        }}
+        onCancel={() => setSelecting(false)}
+      />
+    );
+  }
+
   const boothsWithDates = boothLocations.filter((loc) => {
     const filtered = filterAvailableDates(loc.availableDates || [], filters);
     return removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots).length > 0;
@@ -93,9 +121,17 @@ export function AvailableBoothsReport({ data, config, refreshing, onIgnoreSlot, 
     <div class="report-visual">
       <h3>Available Booths</h3>
       <div class="report-toolbar">
+        <button type="button" class="btn btn-secondary" onClick={() => setSelecting(true)}>
+          Select Booths
+        </button>
         <button type="button" class="btn btn-secondary" disabled={refreshing} onClick={onRefresh}>
           {refreshing ? 'Refreshing...' : 'Refresh Availability'}
         </button>
+        {ignoredTimeSlots.length > 0 && (
+          <button type="button" class="btn btn-secondary" onClick={onResetIgnored}>
+            Reset Ignored ({ignoredTimeSlots.length})
+          </button>
+        )}
       </div>
 
       {boothsWithDates.length === 0 ? (
