@@ -3,13 +3,16 @@
 import { useCallback, useEffect } from 'preact/hooks';
 import * as packageJson from '../../../package.json';
 import Logger from '../../logger';
+import type { AppConfig } from '../../types';
 import type { Action } from '../app-reducer';
 import { ipcInvoke, ipcInvokeRaw, onIpcEvent } from '../ipc';
+import { countAvailableSlots } from '../reports/available-booths';
 
 export function useSync(
   dispatch: (action: Action) => void,
   showStatus: (msg: string, type: 'success' | 'warning' | 'error') => void,
-  loadData: (opts?: { showMessages?: boolean }) => Promise<boolean>
+  loadData: (opts?: { showMessages?: boolean }) => Promise<boolean>,
+  appConfig: AppConfig | null
 ) {
   const sync = useCallback(async () => {
     try {
@@ -88,12 +91,21 @@ export function useSync(
       dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'booth', patch: { status: 'synced', lastSync: now } });
       ipcInvoke('update-config', { lastBoothSync: now });
       showStatus(`✅ Booth availability refreshed (${updated.length} locations)`, 'success');
+
+      if (appConfig) {
+        const count = countAvailableSlots(updated, appConfig.boothDayFilters, appConfig.ignoredTimeSlots);
+        if (count > 0) {
+          new Notification('Booths Available', {
+            body: `${count} time slot${count === 1 ? '' : 's'} found`
+          });
+        }
+      }
     } catch (error) {
       Logger.error('Booth availability refresh failed:', error);
       showStatus(`Booth refresh error: ${(error as Error).message}`, 'error');
       dispatch({ type: 'SYNC_SOURCE_UPDATE', source: 'booth', patch: { status: 'error' } });
     }
-  }, [dispatch, showStatus]);
+  }, [dispatch, showStatus, appConfig]);
 
   // IPC event listeners
   useEffect(() => {

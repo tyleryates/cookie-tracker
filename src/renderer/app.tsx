@@ -32,7 +32,7 @@ export function App() {
   // Hook chain
   const { showStatus } = useStatusMessage(dispatch, state.statusMessage);
   const { loadData, recalculate, exportData, changeDataset } = useDataLoader(dispatch, showStatus, stateRef);
-  const { sync, refreshBooths } = useSync(dispatch, showStatus, loadData);
+  const { sync, refreshBooths } = useSync(dispatch, showStatus, loadData, state.appConfig);
   useAutoSync(state.autoSyncEnabled, sync, refreshBooths);
   const { checkLoginStatus } = useAppInit(dispatch, loadData);
 
