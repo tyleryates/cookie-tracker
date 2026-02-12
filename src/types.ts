@@ -26,10 +26,10 @@ export type Varieties = Partial<Record<CookieType, number>>;
 // ============================================================================
 
 export interface OrderMetadata {
-  dc: Record<string, any> | null;
-  sc: Record<string, any> | null;
-  scReport: Record<string, any> | null;
-  scApi: Record<string, any> | null;
+  dc: Record<string, unknown> | null;
+  sc: Record<string, unknown> | null;
+  scReport: Record<string, unknown> | null;
+  scApi: Record<string, unknown> | null;
 }
 
 export interface Order {

@@ -92,11 +92,25 @@ export interface SCReservationsResponse {
   reservations?: SCReservation[];
 }
 
-/** Result from fetchSmartBoothDivider — divider with girls */
+/** Booth info from divider responses (superset of reservation booth fields) */
+export interface SCBoothDividerBooth {
+  booth_id?: string;
+  store_name?: string;
+  booth_name?: string;
+  location?: string;
+  address?: string;
+  reservation_type?: string;
+  type?: string;
+  is_distributed?: boolean;
+  is_virtually_distributed?: boolean;
+  booth?: SCBoothDividerBooth;
+  timeslot?: { date?: string; start_time?: string; startTime?: string; end_time?: string; endTime?: string };
+}
+
 export interface SCBoothDividerResult {
   reservationId: string;
-  booth: Record<string, any>;
-  timeslot: Record<string, any>;
+  booth: SCBoothDividerBooth;
+  timeslot: { date?: string; start_time?: string; startTime?: string; end_time?: string; endTime?: string };
   divider: { girls?: SCDividerGirl[] } | null;
 }
 

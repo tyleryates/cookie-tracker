@@ -257,7 +257,7 @@ function getCookiePrice(cookieType: string): number | null {
  */
 export function calculateRevenue(varieties: Varieties): number {
   let total = 0;
-  Object.entries(varieties).forEach(([cookieType, count]) => {
+  for (const [cookieType, count] of Object.entries(varieties)) {
     const price = getCookiePrice(cookieType);
     if (price === null) {
       const displayName = getCookieDisplayName(cookieType);
@@ -266,6 +266,6 @@ export function calculateRevenue(varieties: Varieties): number {
       );
     }
     total += count! * price;
-  });
+  }
   return total;
 }

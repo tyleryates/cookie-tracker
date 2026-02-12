@@ -108,7 +108,7 @@ export function importSmartCookieAPI(store: DataStore, apiData: SCCombinedData):
     store.transfers.push(createTransfer(transferData as TransferInput));
 
     if (orderNum.startsWith(SPECIAL_IDENTIFIERS.DC_ORDER_PREFIX)) {
-      mergeDCOrderFromSC(store, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE_API, order as Record<string, any>);
+      mergeDCOrderFromSC(store, orderNum, to, transferData, varieties, DATA_SOURCES.SMART_COOKIE_API, order as Record<string, unknown>);
     }
 
     trackScoutFromAPITransfer(store, type, to, from);

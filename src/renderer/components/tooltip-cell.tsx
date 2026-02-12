@@ -14,7 +14,7 @@ interface TooltipCellProps {
 
 export function TooltipCell({ tooltip, children, style, tag, className }: TooltipCellProps) {
   const Tag = tag || 'td';
-  const ref = useRef<HTMLElement>(null) as any;
+  const ref = useRef<HTMLTableCellElement & HTMLSpanElement>(null);
   const tipRef = useRef<HTMLDivElement | null>(null);
 
   const removeTip = useCallback(() => {

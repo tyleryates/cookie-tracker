@@ -51,7 +51,7 @@ export function validateSCData(data: unknown): ValidationResult {
 const dcHeadersSchema = z
   .object({
     'Girl First Name': z.string(),
-    'Order #': z.string()
+    'Order Number': z.string()
   })
   .passthrough();
 

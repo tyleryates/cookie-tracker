@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ALLOCATION_CHANNEL, ORDER_TYPE, OWNER } from '../../constants';
-import type { Allocation } from '../../types';
+import type { Allocation, Order, Scout } from '../../types';
 import {
   buildGirlIdToNameMap,
   calculateSalesByVariety,
@@ -141,18 +141,19 @@ describe('calculateSalesByVariety', () => {
 
 // --- Test Helpers ---
 
-function makeOrder() {
+function makeOrder(): Order {
   return {
     orderNumber: '',
     scout: '',
     date: '',
-    owner: OWNER.GIRL as const,
-    orderType: ORDER_TYPE.DELIVERY as const,
+    owner: OWNER.GIRL,
+    orderType: ORDER_TYPE.DELIVERY,
     packages: 0,
     physicalPackages: 0,
     donations: 0,
     amount: 0,
     varieties: {},
-    sources: []
+    sources: [],
+    metadata: { dc: null, sc: null, scReport: null, scApi: null }
   };
 }

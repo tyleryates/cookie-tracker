@@ -98,7 +98,7 @@ function scanDataFiles(inDir: string): DataFileInfo[] {
   for (const name of fileNames) {
     const filePath = path.join(inDir, name);
     const ext = path.extname(name).toLowerCase();
-    let data: any;
+    let data: Record<string, unknown> | Buffer;
     if (ext === '.json') {
       const jsonStr = fs.readFileSync(filePath, 'utf8');
       data = JSON.parse(jsonStr);

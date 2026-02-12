@@ -125,7 +125,7 @@ export function mergeOrCreateOrder(
   orderNum: string,
   orderData: Partial<Order>,
   source: string,
-  rawData: Record<string, any>,
+  rawData: Record<string, unknown>,
   enrichmentFn?: ((existing: Order, newData: Partial<Order>) => void) | null
 ): Order {
   const metadataKey = getMetadataKey(source);

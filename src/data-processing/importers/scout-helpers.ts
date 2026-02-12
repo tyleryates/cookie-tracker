@@ -81,7 +81,7 @@ export function mergeDCOrderFromSC(
   transferData: { date: string; packages: number; amount: number },
   varieties: Varieties,
   source: string,
-  rawData: Record<string, any>
+  rawData: Record<string, unknown>
 ): void {
   const dcOrderNum = orderNum.substring(1);
   mergeOrCreateOrder(

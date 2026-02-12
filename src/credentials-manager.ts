@@ -17,7 +17,7 @@ class CredentialsManager {
   /**
    * Load credentials from encrypted file
    */
-  loadCredentials() {
+  loadCredentials(): Credentials {
     try {
       // Check if encryption is available first
       if (!safeStorage.isEncryptionAvailable()) {

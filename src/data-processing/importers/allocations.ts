@@ -6,6 +6,7 @@ import type { DataStore } from '../../data-store';
 import type {
   SCBoothDividerResult,
   SCBoothLocationRaw,
+  SCBoothTimeSlot,
   SCCombinedData,
   SCDirectShipDivider,
   SCReservationsResponse,
@@ -185,7 +186,7 @@ export function normalizeBoothLocation(loc: SCBoothLocationRaw): BoothLocation {
   if (loc.availableDates && loc.availableDates.length > 0) {
     availableDates = loc.availableDates.map((d) => ({
       date: d.date || '',
-      timeSlots: (d.timeSlots || []).map((s: any) => ({
+      timeSlots: (d.timeSlots || []).map((s: SCBoothTimeSlot) => ({
         startTime: s.start_time || s.startTime || '',
         endTime: s.end_time || s.endTime || ''
       }))

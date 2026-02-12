@@ -68,11 +68,11 @@ function cleanupOldDataFiles(directory: string, keepCount: number = 10): void {
       'DC-': []
     };
 
-    files.forEach((filename) => {
+    for (const filename of files) {
       const filePath = path.join(directory, filename);
       const stats = fs.statSync(filePath);
 
-      if (!stats.isFile()) return;
+      if (!stats.isFile()) continue;
 
       for (const prefix of Object.keys(fileGroups)) {
         if (filename.startsWith(prefix)) {
@@ -84,18 +84,18 @@ function cleanupOldDataFiles(directory: string, keepCount: number = 10): void {
           break;
         }
       }
-    });
+    }
 
     // For each file type, keep only the N most recent
     let totalDeleted = 0;
-    Object.entries(fileGroups).forEach(([_prefix, fileList]) => {
+    for (const [, fileList] of Object.entries(fileGroups)) {
       if (fileList.length <= keepCount) {
-        return;
+        continue;
       }
 
       fileList.sort((a, b) => b.mtime - a.mtime);
       const filesToDelete = fileList.slice(keepCount);
-      filesToDelete.forEach((file) => {
+      for (const file of filesToDelete) {
         try {
           fs.unlinkSync(file.path);
           totalDeleted++;
@@ -103,8 +103,8 @@ function cleanupOldDataFiles(directory: string, keepCount: number = 10): void {
         } catch (err) {
           Logger.error(`Failed to delete ${file.name}:`, (err as Error).message);
         }
-      });
-    });
+      }
+    }
 
     if (totalDeleted > 0) {
       Logger.info(`Cleaned up ${totalDeleted} old data file(s), keeping ${keepCount} most recent of each type`);

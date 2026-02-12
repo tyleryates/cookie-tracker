@@ -28,8 +28,8 @@ function getStatusStyle(status: string | undefined): { className: string; text: 
 }
 
 function calculateVarietyBreakdowns(scout: Scout) {
-  const salesVarieties = (scout.totals.$salesByVariety || {}) as Record<string, number>;
-  const shippedVarieties = (scout.totals.$shippedByVariety || {}) as Record<string, number>;
+  const salesVarieties = scout.totals.$salesByVariety || {};
+  const shippedVarieties = scout.totals.$shippedByVariety || {};
   let totalDonations = 0;
   scout.orders.forEach((order: Order) => {
     if (order.donations > 0) totalDonations += order.donations;
@@ -98,8 +98,8 @@ function CookieBreakdownTable({ scout }: { scout: Scout }) {
       <DataTable columns={['Variety', 'Inventory', 'Delivered', 'Shipped', 'Credited']} className="table-compact">
         {sortVarietiesByOrder(Object.entries(allVarieties)).map(([variety]) => {
           const pickedUp = inventory.varieties[variety as keyof Varieties] || 0;
-          const sold = salesVarieties[variety] || 0;
-          const shipped = shippedVarieties[variety] || 0;
+          const sold = salesVarieties[variety as keyof Varieties] || 0;
+          const shipped = shippedVarieties[variety as keyof Varieties] || 0;
           const isCookieShare = variety === COOKIE_TYPE.COOKIE_SHARE;
           const { html: netHtml, className: netClass } = formatNetInventory(pickedUp - sold, isCookieShare);
 
@@ -122,7 +122,7 @@ function CookieBreakdownTable({ scout }: { scout: Scout }) {
 }
 
 /** Render a packages cell with variety tooltip if available */
-function PackagesCell({ varieties, packages }: { varieties: Record<string, number>; packages: number }) {
+function PackagesCell({ varieties, packages }: { varieties: Varieties; packages: number }) {
   const tip = buildVarietyTooltip(varieties);
   return tip ? <TooltipCell tooltip={tip}>{packages}</TooltipCell> : <td>{packages}</td>;
 }
@@ -147,7 +147,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
             <td>{String(a.orderNumber || '-')}</td>
             <td>{formatDate(a.date)}</td>
             <td>{String(a.from || '-')}</td>
-            <PackagesCell varieties={a.varieties as Record<string, number>} packages={a.packages} />
+            <PackagesCell varieties={a.varieties} packages={a.packages} />
             <td>${Math.round(a.amount || 0)}</td>
           </tr>
         ))}
@@ -169,7 +169,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
         {dsAllocs.map((a, i) => (
           <tr key={i}>
             <td>SC Direct Ship Divider</td>
-            <PackagesCell varieties={a.varieties as Record<string, number>} packages={a.packages} />
+            <PackagesCell varieties={a.varieties} packages={a.packages} />
           </tr>
         ))}
         <p class="note-text">Note: The Smart Cookie Direct Ship Divider API does not provide per-order breakdowns.</p>
@@ -195,7 +195,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
               <td>{String(a.storeName || '-')}</td>
               <td>{formatDate(a.date)}</td>
               <td>{time}</td>
-              <PackagesCell varieties={a.varieties as Record<string, number>} packages={a.packages} />
+              <PackagesCell varieties={a.varieties} packages={a.packages} />
               <td>{a.donations || '—'}</td>
             </tr>
           );
