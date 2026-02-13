@@ -129,115 +129,73 @@ function PackagesCell({ varieties, packages }: { varieties: Varieties; packages:
 
 function AllocationDetails({ scout }: { scout: Scout }) {
   const { virtualBooth: vbTotals, directShip: dsTotals, booth: bsTotals } = scout.totals.$allocationSummary;
-  const sections: preact.JSX.Element[] = [];
-
-  // Virtual booth allocations
   const vbAllocs = scout.$allocationsByChannel.virtualBooth;
-  if (vbAllocs.length > 0) {
-    sections.push(
-      <AllocationSection
-        key="vb"
-        method={ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER}
-        packages={vbTotals.packages}
-        donations={vbTotals.donations}
-        columns={['Order #', 'Date', 'From', 'Packages', 'Amount']}
-      >
-        {vbAllocs.map((a, i) => (
-          <tr key={i}>
-            <td>{String(a.orderNumber || '-')}</td>
-            <td>{formatDate(a.date)}</td>
-            <td>{String(a.from || '-')}</td>
-            <PackagesCell varieties={a.varieties} packages={a.packages} />
-            <td>${Math.round(a.amount || 0)}</td>
-          </tr>
-        ))}
-      </AllocationSection>
-    );
-  }
-
-  // Direct ship allocations
   const dsAllocs = scout.$allocationsByChannel.directShip;
-  if (dsAllocs.length > 0) {
-    sections.push(
-      <AllocationSection
-        key="ds"
-        method={ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER}
-        packages={dsTotals.packages}
-        donations={dsTotals.donations}
-        columns={['Source', 'Packages']}
-      >
-        {dsAllocs.map((a, i) => (
-          <tr key={i}>
-            <td>SC Direct Ship Divider</td>
-            <PackagesCell varieties={a.varieties} packages={a.packages} />
-          </tr>
-        ))}
-        <p class="note-text">Note: The Smart Cookie Direct Ship Divider API does not provide per-order breakdowns.</p>
-      </AllocationSection>
-    );
-  }
-
-  // Booth sales allocations
   const bsAllocs = scout.$allocationsByChannel.booth;
-  if (bsAllocs.length > 0) {
-    sections.push(
-      <AllocationSection
-        key="bs"
-        method={ALLOCATION_METHOD.BOOTH_SALES_DIVIDER}
-        packages={bsTotals.packages}
-        donations={bsTotals.donations}
-        columns={['Store', 'Date', 'Time', 'Packages', 'Donations']}
-      >
-        {bsAllocs.map((a, i) => {
-          const time = formatTimeRange(a.startTime, a.endTime);
-          return (
-            <tr key={i}>
-              <td>{String(a.storeName || '-')}</td>
-              <td>{formatDate(a.date)}</td>
-              <td>{time}</td>
-              <PackagesCell varieties={a.varieties} packages={a.packages} />
-              <td>{a.donations || '—'}</td>
-            </tr>
-          );
-        })}
-      </AllocationSection>
-    );
+
+  if (vbAllocs.length === 0 && dsAllocs.length === 0 && bsAllocs.length === 0) return null;
+
+  // Collect dated rows (VB + Booth), sort newest first
+  const datedRows: Array<{ date: string; row: preact.JSX.Element }> = [];
+
+  for (const a of vbAllocs) {
+    const detail = a.orderNumber ? `#${a.orderNumber} from ${a.from || '-'}` : String(a.from || '-');
+    datedRows.push({
+      date: a.date || '',
+      row: (
+        <tr key={`vb-${datedRows.length}`}>
+          <td>{formatDate(a.date)}</td>
+          <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}</td>
+          <td>{detail}</td>
+          <PackagesCell varieties={a.varieties} packages={a.packages} />
+          <td>{'—'}</td>
+        </tr>
+      )
+    });
   }
 
-  if (sections.length === 0) return null;
+  for (const a of bsAllocs) {
+    const time = formatTimeRange(a.startTime, a.endTime);
+    const detail = a.storeName ? `${a.storeName} (${time})` : time;
+    datedRows.push({
+      date: a.date || '',
+      row: (
+        <tr key={`bs-${datedRows.length}`}>
+          <td>{formatDate(a.date)}</td>
+          <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}</td>
+          <td>{detail}</td>
+          <PackagesCell varieties={a.varieties} packages={a.packages} />
+          <td>{a.donations || '—'}</td>
+        </tr>
+      )
+    });
+  }
+
+  datedRows.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+
+  // DS rows first, then dated rows sorted newest-first
+  const rows: preact.JSX.Element[] = dsAllocs.map((a, i) => (
+    <tr key={`ds-${i}`}>
+      <td class="muted-text">—</td>
+      <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}</td>
+      <td>SC direct ship divider allocation</td>
+      <PackagesCell varieties={a.varieties} packages={a.packages} />
+      <td>{'—'}</td>
+    </tr>
+  ));
+  for (const { row } of datedRows) rows.push(row);
+
   return (
     <div class="section-break">
-      <h5>Allocation Details</h5>
-      {sections}
-    </div>
-  );
-}
-
-/** Shared wrapper for allocation sections — renders header with package/donation counts and a DataTable */
-function AllocationSection({
-  method,
-  packages,
-  donations,
-  columns,
-  children
-}: {
-  method: string;
-  packages: number;
-  donations: number;
-  columns: string[];
-  children: preact.ComponentChildren;
-}) {
-  const pkg = packages || 0;
-  const don = donations || 0;
-  const label = don > 0 ? `${pkg} pkg, ${don} Donations` : `${pkg} pkg`;
-  return (
-    <div class="section-break-sm">
-      <h6 class="section-subheader">
-        {DISPLAY_STRINGS[method as keyof typeof DISPLAY_STRINGS]} ({label})
-      </h6>
-      <DataTable columns={columns} className="table-compact">
-        {children}
-      </DataTable>
+      <h5>
+        Credit Details —{' '}
+        {vbTotals.packages + dsTotals.packages + bsTotals.packages + vbTotals.donations + dsTotals.donations + bsTotals.donations} Credits
+      </h5>
+      <div class="section-break-sm">
+        <DataTable columns={['Date', 'Type', 'Detail', 'Packages', 'Donations']} className="table-compact">
+          {rows}
+        </DataTable>
+      </div>
     </div>
   );
 }
@@ -247,9 +205,9 @@ const PAYMENT_LABELS: Record<string, string> = { CREDIT_CARD: 'Credit Card', VEN
 function OrdersTable({ scout }: { scout: Scout }) {
   return (
     <div class="section-break">
-      <h5>Orders ({scout.orders.length})</h5>
+      <h5>Order Details — {scout.orders.length} Orders</h5>
       <div class="section-break-sm">
-        <DataTable columns={['Order #', 'Date', 'Packages', 'Amount', 'Type', 'Payment', 'Status']} className="table-compact">
+        <DataTable columns={['Date', 'Order #', 'Packages', 'Amount', 'Type', 'Payment', 'Status']} className="table-compact">
           {scout.orders.map((order: Order) => {
             const tip = buildVarietyTooltip(order.varieties);
             const paymentDisplay = order.paymentMethod
@@ -261,8 +219,8 @@ function OrdersTable({ scout }: { scout: Scout }) {
 
             return (
               <tr key={order.orderNumber}>
-                <td>{String(order.orderNumber)}</td>
                 <td>{formatDate(order.date)}</td>
+                <td>{String(order.orderNumber)}</td>
                 {tip ? (
                   <TooltipCell tooltip={tip}>
                     {totalPackages}

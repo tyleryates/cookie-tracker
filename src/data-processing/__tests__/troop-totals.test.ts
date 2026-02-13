@@ -101,13 +101,13 @@ describe('buildTroopTotals', () => {
     expect(result.girlDelivery).toBe(15); // 10 + 5
   });
 
-  it('aggregates girl inventory (clamped to zero)', () => {
+  it('aggregates girl inventory (allows negative)', () => {
     const store = createDataStore();
     const jane = makeScout('Jane');
     jane.totals.inventory = -5;
     const scouts = { Jane: jane };
     const result = buildTroopTotals(store, scouts, emptyPackageTotals(), defaultScoutCounts());
-    expect(result.girlInventory).toBe(0); // Math.max(0, -5)
+    expect(result.girlInventory).toBe(-5);
   });
 
   it('aggregates credited donations from all allocation channels', () => {

@@ -35,10 +35,9 @@
   --radius-lg: 16px;
   --radius-xl: 20px;
 
-  /* Surfaces & text (for dark mode swap) */
+  /* Surfaces (for dark mode swap) */
   --surface: #ffffff;
   --surface-raised: #f8f9fa;
-  --text-primary: var(--gray-900);
 
   /* Status accent colors */
   --status-info: #2196f3;

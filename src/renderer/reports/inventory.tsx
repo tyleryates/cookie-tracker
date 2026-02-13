@@ -68,9 +68,7 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   const inventoryVarieties = varieties.inventory;
 
   // Split C2T vs T2T In for the description
-  const t2tInTotal = c2tTransfers
-    .filter((t) => t.type === TRANSFER_TYPE.T2T)
-    .reduce((sum, t) => sum + (t.physicalPackages || 0), 0);
+  const t2tInTotal = c2tTransfers.filter((t) => t.type === TRANSFER_TYPE.T2T).reduce((sum, t) => sum + (t.physicalPackages || 0), 0);
   const pureC2T = totalOrdered - t2tInTotal;
   const totalPackages = totalOrdered - totalT2TOut;
   const descParts = [`${pureC2T} C2T`];
@@ -84,11 +82,16 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
 
   const stats: Array<{ label: string; value: number; description: string; color: string }> = [
     { label: 'Total Packages', value: totalPackages, description: packagesDesc, color: '#1565C0' },
-    { label: 'Girl Transfers', value: netT2G, description: t2gDescription, color: '#4CAF50' }
+    { label: 'Girl Transfers', value: netT2G, description: t2gDescription, color: '#00838F' }
   ];
   stats.push(
-    { label: 'Troop Sales', value: troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G, description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`, color: '#7B1FA2' },
-    { label: 'Current Inventory', value: netInventory, description: 'Packages on hand', color: '#9C27B0' }
+    {
+      label: 'Troop Sales',
+      value: troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G,
+      description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
+      color: '#7B1FA2'
+    },
+    { label: 'Troop Inventory', value: netInventory, description: 'Packages on hand', color: '#E65100' }
   );
 
   const inventoryRows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(inventoryVarieties))).filter(

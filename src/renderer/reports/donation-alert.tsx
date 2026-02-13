@@ -134,7 +134,11 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
       if (order.donations <= 0 || order.owner !== OWNER.GIRL) continue;
       if (scout.isSiteOrder) {
         siteDonations += order.donations;
-      } else if (order.orderType === ORDER_TYPE.DELIVERY || order.orderType === ORDER_TYPE.DIRECT_SHIP || order.orderType === ORDER_TYPE.DONATION) {
+      } else if (
+        order.orderType === ORDER_TYPE.DELIVERY ||
+        order.orderType === ORDER_TYPE.DIRECT_SHIP ||
+        order.orderType === ORDER_TYPE.DONATION
+      ) {
         girlDC += order.donations;
       } else if (order.orderType === ORDER_TYPE.IN_HAND) {
         girlInPerson += order.donations;
@@ -146,12 +150,17 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
   const totalCookieShare = totalGirlDonations + totalTroopDonations;
 
   const stats: Array<{ label: string; value: string | number; description: string; color: string }> = [
-    { label: 'Girl Donations', value: totalGirlDonations, description: `${girlDC} DC + ${girlInPerson} in person`, color: '#2196F3' }
+    { label: 'Girl Donations', value: totalGirlDonations, description: `${girlDC} DC + ${girlInPerson} in person`, color: '#00838F' }
   ];
   if (totalTroopDonations > 0) {
-    stats.push({ label: 'Troop Donations', value: totalTroopDonations, description: `${totalBoothCookieShare} booth + ${siteDonations} site`, color: '#7B1FA2' });
+    stats.push({
+      label: 'Troop Donations',
+      value: totalTroopDonations,
+      description: `${totalBoothCookieShare} booth + ${siteDonations} site`,
+      color: '#7B1FA2'
+    });
   }
-  stats.push({ label: 'Total Donations', value: totalCookieShare, description: 'All Cookie Share', color: '#00897B' });
+  stats.push({ label: 'Total Donations', value: totalCookieShare, description: 'All Cookie Share', color: '#1565C0' });
   stats.push({
     label: 'Needs Entry',
     value: adjustmentNeeded === 0 ? '—' : adjustmentNeeded > 0 ? `+${adjustmentNeeded}` : `${adjustmentNeeded}`,

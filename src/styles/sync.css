@@ -87,8 +87,23 @@
   vertical-align: middle;
 }
 
-.endpoint-row:last-child td {
+.endpoint-row:last-child td,
+.endpoint-group-header + .endpoint-row:last-of-type td {
   border-bottom: none;
+}
+
+.endpoint-group-header td {
+  padding: 10px 8px 4px;
+  font-size: 0.75em;
+  font-weight: 600;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: none;
+}
+
+.endpoint-group-header:first-child td {
+  padding-top: 2px;
 }
 
 .endpoint-source {

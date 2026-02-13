@@ -128,21 +128,36 @@ function EndpointRow({
   );
 }
 
+const ENDPOINT_GROUPS = [
+  { key: 'reports', label: 'Reports' },
+  { key: 'booth-availability', label: 'Booth Availability' }
+] as const;
+
 function EndpointTable({ endpoints, autoSyncEnabled }: { endpoints: Record<string, EndpointSyncState>; autoSyncEnabled: boolean }) {
   return (
     <table class="endpoint-table">
       <tbody>
-        {SYNC_ENDPOINTS.map((ep) => {
-          const epState = endpoints[ep.id] || { status: 'idle', lastSync: null };
+        {ENDPOINT_GROUPS.map((group) => {
+          const groupEndpoints = SYNC_ENDPOINTS.filter((ep) => ep.group === group.key);
           return (
-            <EndpointRow
-              key={ep.id}
-              name={ep.name}
-              source={ep.source}
-              frequency={formatMaxAge(ep.maxAgeMs)}
-              epState={epState}
-              showFrequency={autoSyncEnabled}
-            />
+            <>
+              <tr class="endpoint-group-header">
+                <td colSpan={autoSyncEnabled ? 5 : 4}>{group.label}</td>
+              </tr>
+              {groupEndpoints.map((ep) => {
+                const epState = endpoints[ep.id] || { status: 'idle', lastSync: null };
+                return (
+                  <EndpointRow
+                    key={ep.id}
+                    name={ep.name}
+                    source={ep.source}
+                    frequency={formatMaxAge(ep.maxAgeMs)}
+                    epState={epState}
+                    showFrequency={autoSyncEnabled}
+                  />
+                );
+              })}
+            </>
           );
         })}
       </tbody>

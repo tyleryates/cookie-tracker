@@ -172,11 +172,11 @@ describe('classifyOrderStatus', () => {
 
 describe('formatTimeRange', () => {
   it('formats start and end into "start - end"', () => {
-    expect(formatTimeRange('4:00 PM', '6:00 PM')).toBe('4:00 PM - 6:00 PM');
+    expect(formatTimeRange('4:00 PM', '6:00 PM')).toBe('4:00 pm - 6:00 pm');
   });
 
   it('returns start time when end is undefined', () => {
-    expect(formatTimeRange('4:00 PM', undefined)).toBe('4:00 PM');
+    expect(formatTimeRange('4:00 PM', undefined)).toBe('4:00 pm');
   });
 
   it('returns "-" when both are undefined', () => {

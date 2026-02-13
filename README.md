@@ -2,81 +2,39 @@
 
 Desktop app for Girl Scout troops to sync and manage cookie sales from Digital Cookie and Smart Cookie.
 
-![Cookie Tracker Screenshot](screenshots/app-screenshot.png)
-
 ## Features
 
-- ✅ **One-Click Sync** - Automatically download data from both platforms
-- 🔄 **Auto-Sync** - Syncs every hour automatically
-- 📊 **7 Reports** - Troop, scouts, donations, booths, available booths, inventory, and cookies
-- 🔒 **Secure** - Credentials encrypted on your computer
-- 📦 **Inventory Tracking** - Track troop and scout inventory
+- **One-Click Sync** — Download data from both platforms automatically
+- **Auto-Sync** — Background sync every hour
+- **7 Reports** — Troop summary, scouts, donations, booths, available booths, inventory, and cookie popularity
+- **Inventory Tracking** — Track troop and per-scout inventory by variety
+- **Secure** — Credentials encrypted locally; data never leaves your computer
 
 ## Installation
 
-**Download the latest version from [Releases](https://github.com/tyleryates/cookie-tracker/releases/latest)**
+Download the latest version from [Releases](https://github.com/tyleryates/cookie-tracker/releases/latest).
 
 1. Download the `.zip` file
-2. Extract it
-3. Drag the app to your Applications folder
-4. Double-click to open
+2. Extract and drag the app to Applications
+3. Double-click to open
 
-The app will automatically check for updates and notify you when new versions are available.
+The app checks for updates automatically.
 
 ## Getting Started
 
-1. **Launch the app**
-
-2. **Click "Configure Logins"** and enter your credentials:
-   - Digital Cookie: Username and password
-   - Smart Cookie: Username and password
-
-3. **Click "Sync Now"** - Wait for your data to download
-
-4. **View Reports** - Click any report button to see your data
-
-That's it! The app will automatically sync every hour.
-
-## Reports
-
-- **Troop** - Total orders, packages sold, revenue, proceeds, and inventory
-- **Scouts** - Individual scout sales, inventory, credited allocations, and cash owed
-- **Donations** - Cookie Share reconciliation between Digital Cookie and Smart Cookie
-- **Booths** - Booth reservations, distribution status, and per-scout allocations
-- **Available Booths** - Upcoming booth locations with available time slots
-- **Inventory** - Troop inventory by cookie variety, council pickups, and scout allocations
-- **Cookies** - Sales breakdown by cookie type with percentages
-
-## Settings
-
-### Auto-Sync
-
-The app syncs every hour automatically. You can:
-- Turn it off by unchecking "Auto-sync hourly"
-- Sync manually anytime by clicking "Sync Now"
-
-### Council ID
-
-The app is set for **Girl Scouts San Diego (Council 623)**.
-
-If your troop is in a different council, you'll need to update the council ID in Configure Logins. Your council ID is in the URL when you log into Digital Cookie.
+1. Launch the app
+2. Click **Configure Logins** and enter your Digital Cookie and Smart Cookie credentials
+3. Click **Sync Now** to download your data
+4. View any of the 7 reports
 
 ## Privacy
 
-All data stays on your computer. Nothing is sent anywhere except to the Girl Scouts websites when you click Sync.
+All data stays on your computer. Nothing is sent anywhere except to the Girl Scouts websites during sync.
 
 ## Help
 
-**Having issues?**
-- Try clicking "Sync Now" again
-- Make sure your login credentials are correct
-- Check your internet connection
-
-**Still need help?**
 [Report an issue on GitHub](https://github.com/tyleryates/cookie-tracker/issues)
 
 ---
-
-**Version:** 1.3.1
 
 This is an unofficial volunteer tool not affiliated with Girl Scouts of the USA.

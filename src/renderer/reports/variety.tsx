@@ -23,7 +23,7 @@ export function VarietyReport({ data }: { data: UnifiedDataset }) {
     <div class="report-visual">
       <h3>Cookie Popularity Report</h3>
       <p class="meta-text">Total: {varieties.total} packages sold</p>
-      <DataTable columns={['Variety', 'Packages', '% of Physical Sales']}>
+      <DataTable columns={['Variety', 'Packages', '% of Sales']}>
         {rows.map(([variety, count]) => {
           const percent = varieties.total > 0 ? `${((count / varieties.total) * 100).toFixed(1)}%` : '0%';
           return (

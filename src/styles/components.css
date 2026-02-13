@@ -293,11 +293,6 @@
   margin: 0;
 }
 
-.section-subheader {
-  margin: 0 0 8px 0;
-  color: var(--gray-600);
-}
-
 .meta-text {
   font-size: 0.9em;
   color: var(--gray-600);

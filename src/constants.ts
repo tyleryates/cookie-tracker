@@ -316,12 +316,19 @@ export function formatMaxAge(ms: number): string {
 }
 
 export const SYNC_ENDPOINTS = [
-  { id: 'sc-orders', source: 'SC', name: 'Orders', maxAgeMs: 3_600_000, syncAction: 'sync' },
-  { id: 'sc-direct-ship', source: 'SC', name: 'Direct Ship Allocations', maxAgeMs: 3_600_000, syncAction: 'sync' },
-  { id: 'sc-cookie-shares', source: 'SC', name: 'Cookie Share Details', maxAgeMs: 3_600_000, syncAction: 'sync' },
-  { id: 'sc-reservations', source: 'SC', name: 'Reservations', maxAgeMs: 3_600_000, syncAction: 'sync' },
-  { id: 'sc-booth-allocations', source: 'SC', name: 'Booth Allocations', maxAgeMs: 3_600_000, syncAction: 'sync' },
-  { id: 'sc-booth-catalog', source: 'SC', name: 'Booth Catalog', maxAgeMs: 14_400_000, syncAction: 'sync' },
-  { id: 'sc-booth-availability', source: 'SC', name: 'Booth Availability', maxAgeMs: 900_000, syncAction: 'refreshBooths' },
-  { id: 'dc-troop-report', source: 'DC', name: 'Troop Report', maxAgeMs: 3_600_000, syncAction: 'sync' }
+  { id: 'sc-orders', source: 'SC', name: 'Orders', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
+  { id: 'sc-direct-ship', source: 'SC', name: 'Direct Ship Allocations', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
+  { id: 'sc-cookie-shares', source: 'SC', name: 'Cookie Share Details', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
+  { id: 'sc-reservations', source: 'SC', name: 'Reservations', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
+  { id: 'sc-booth-allocations', source: 'SC', name: 'Booth Allocations', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
+  { id: 'dc-troop-report', source: 'DC', name: 'Troop Report', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
+  { id: 'sc-booth-catalog', source: 'SC', name: 'Booth Catalog', maxAgeMs: 14_400_000, syncAction: 'sync', group: 'booth-availability' },
+  {
+    id: 'sc-booth-availability',
+    source: 'SC',
+    name: 'Booth Availability',
+    maxAgeMs: 900_000,
+    syncAction: 'refreshBooths',
+    group: 'booth-availability'
+  }
 ] as const;

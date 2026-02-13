@@ -371,18 +371,6 @@ tr:hover {
 }
 
 /* Detail areas */
-.detail-placeholder {
-  padding: 12px;
-  background: var(--gray-100);
-  border-radius: 4px;
-}
-
-.detail-content {
-  background: var(--surface-raised);
-  padding: 12px;
-  border-top: 1px solid var(--gray-200);
-}
-
 .scout-detail .table-compact td,
 .detail-row .table-compact td {
   padding: 5px 8px;
@@ -393,6 +381,12 @@ tr:hover {
 .detail-row .table-normal td {
   padding: 14px 16px;
   background: var(--surface);
+}
+
+.scout-breakdown .table-compact th:first-child,
+.scout-breakdown .table-compact td:first-child {
+  white-space: nowrap;
+  width: 1%;
 }
 
 .scout-breakdown {

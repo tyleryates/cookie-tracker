@@ -29,9 +29,7 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
 
   if (scoutsForBooth.length === 0) {
     return (
-      <div class="booth-detail-content muted-text">
-        No scout allocations yet. Distribute in Smart Cookie to see per-scout breakdown.
-      </div>
+      <div class="booth-detail-content muted-text">No scout allocations yet. Distribute in Smart Cookie to see per-scout breakdown.</div>
     );
   }
 
@@ -42,7 +40,9 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
       <table class="booth-allocation-table">
         {scoutsForBooth.map(({ name, packages, donations }) => (
           <tr key={name}>
-            <td class="booth-allocation-name"><strong>{name}</strong></td>
+            <td class="booth-allocation-name">
+              <strong>{name}</strong>
+            </td>
             <td class="booth-allocation-detail">{packages} packages</td>
             <td class="booth-allocation-detail">{donations > 0 ? `${donations} donations` : ''}</td>
           </tr>
@@ -105,20 +105,20 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
 
       <StatCards
         stats={[
-          { label: 'Reservations', value: totalReservations, description: 'Total booth slots', color: '#2196F3' },
-          { label: 'Distributed', value: distributed, description: 'Allocations complete', color: '#4CAF50' },
+          { label: 'Reservations', value: totalReservations, description: 'Total booth slots', color: '#1565C0' },
+          { label: 'Distributed', value: distributed, description: 'Allocations complete', color: '#2E7D32' },
           {
             label: 'Needs Distribution',
             value: pastNotDistributed,
             description: 'Past booths pending',
             color: pastNotDistributed > 0 ? '#ff9800' : '#999'
           },
-          { label: 'Booth Sales', value: totalBoothPackages, description: 'Physical cookies', color: '#9C27B0' },
+          { label: 'Booth Sales', value: totalBoothPackages, description: 'Physical cookies', color: '#7B1FA2' },
           {
             label: 'Booth Donations',
             value: totalBoothDonations,
             description: getCookieDisplayName(COOKIE_TYPE.COOKIE_SHARE),
-            color: totalBoothDonations > 0 ? '#7B1FA2' : '#999'
+            color: totalBoothDonations > 0 ? '#E91E63' : '#999'
           }
         ]}
       />
