@@ -1,18 +1,25 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import archiver from 'archiver';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import ConfigManager from './config-manager';
+import { PIPELINE_FILES } from './constants';
 import CredentialsManager from './credentials-manager';
 import { loadData } from './data-pipeline';
 import { normalizeBoothLocation } from './data-processing/importers';
 import Logger from './logger';
 import ScraperOrchestrator from './scrapers';
+import { savePipelineFile } from './scrapers/base-scraper';
+import BoothCache from './scrapers/booth-cache';
+import { DigitalCookieSession } from './scrapers/dc-session';
+import { SmartCookieSession } from './scrapers/sc-session';
 import SmartCookieScraper from './scrapers/smart-cookie';
-import type { AppConfig, Credentials, DataFileInfo, IpcResponse } from './types';
+import SeasonalData, { type SeasonalDataFiles } from './seasonal-data';
+import type { AppConfig, Credentials, IpcResponse, Timestamps } from './types';
 
 let mainWindow: BrowserWindow | null = null;
-let lastScraper: ScraperOrchestrator | null = null;
+let activeOrchestrator: ScraperOrchestrator | null = null;
 
 // Use app.getPath('userData') for data storage (works with packaged app)
 // Production (packaged): ~/Library/Application Support/Cookie Tracker on macOS (uses productName)
@@ -24,6 +31,29 @@ const dataDir = path.join(userDataPath, 'data');
 
 const credentialsManager = new CredentialsManager(dataDir);
 const configManager = new ConfigManager(dataDir);
+const boothCache = new BoothCache(dataDir);
+const seasonalData = new SeasonalData(dataDir);
+
+// Long-lived sessions — reused across syncs and booth API calls
+const scSession = new SmartCookieSession();
+const dcSession = new DigitalCookieSession();
+
+// Timestamps — persisted to disk so auto-sync knows what's fresh after restart
+const timestampsPath = path.join(dataDir, 'timestamps.json');
+
+function loadTimestamps(): Timestamps {
+  try {
+    const raw = JSON.parse(fs.readFileSync(timestampsPath, 'utf8'));
+    return { endpoints: raw.endpoints || {}, lastUnifiedBuild: raw.lastUnifiedBuild || null };
+  } catch {
+    return { endpoints: {}, lastUnifiedBuild: null };
+  }
+}
+
+function saveTimestamps(timestamps: Timestamps): void {
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(timestampsPath, JSON.stringify(timestamps, null, 2));
+}
 
 // Standardized IPC error handler wrapper — always wraps to { success, data/error }
 function handleIpcError<T>(handler: (...args: any[]) => Promise<T>): (...args: any[]) => Promise<IpcResponse<T>> {
@@ -50,68 +80,14 @@ function loadAndValidateCredentials(): { credentials: Credentials; error?: undef
   return { credentials };
 }
 
-/**
- * Clean up old data files, keeping only the most recent N files of each type
- */
-function cleanupOldDataFiles(directory: string, keepCount: number = 10): void {
-  try {
-    if (!fs.existsSync(directory)) {
-      return;
-    }
-
-    const files = fs.readdirSync(directory);
-
-    // Group files by type (prefix)
-    const fileGroups: Record<string, Array<{ name: string; path: string; mtime: number }>> = {
-      'unified-': [],
-      'SC-': [],
-      'DC-': []
-    };
-
-    for (const filename of files) {
-      const filePath = path.join(directory, filename);
-      const stats = fs.statSync(filePath);
-
-      if (!stats.isFile()) continue;
-
-      for (const prefix of Object.keys(fileGroups)) {
-        if (filename.startsWith(prefix)) {
-          fileGroups[prefix].push({
-            name: filename,
-            path: filePath,
-            mtime: stats.mtime.getTime()
-          });
-          break;
-        }
-      }
-    }
-
-    // For each file type, keep only the N most recent
-    let totalDeleted = 0;
-    for (const [, fileList] of Object.entries(fileGroups)) {
-      if (fileList.length <= keepCount) {
-        continue;
-      }
-
-      fileList.sort((a, b) => b.mtime - a.mtime);
-      const filesToDelete = fileList.slice(keepCount);
-      for (const file of filesToDelete) {
-        try {
-          fs.unlinkSync(file.path);
-          totalDeleted++;
-          Logger.debug(`Deleted old data file: ${file.name}`);
-        } catch (err) {
-          Logger.error(`Failed to delete ${file.name}:`, (err as Error).message);
-        }
-      }
-    }
-
-    if (totalDeleted > 0) {
-      Logger.info(`Cleaned up ${totalDeleted} old data file(s), keeping ${keepCount} most recent of each type`);
-    }
-  } catch (error) {
-    Logger.error('Error during data file cleanup:', error);
+/** Ensure the long-lived SC session is authenticated, logging in if needed */
+async function ensureSCSession(): Promise<void> {
+  if (scSession.isAuthenticated) return;
+  const credentials = credentialsManager.loadCredentials();
+  if (!credentials?.smartCookie?.username || !credentials?.smartCookie?.password) {
+    throw new Error('No Smart Cookie credentials configured. Please set up logins first.');
   }
+  await scSession.login(credentials.smartCookie.username, credentials.smartCookie.password);
 }
 
 function createWindow(): void {
@@ -127,8 +103,6 @@ function createWindow(): void {
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-  // Open DevTools for debugging (uncomment if needed)
-  // mainWindow.webContents.openDevTools();
 }
 
 // Auto-update configuration (notification-only, no auto-install)
@@ -145,10 +119,6 @@ autoUpdater.on('error', (err) => {
 
 app.whenReady().then(() => {
   createWindow();
-
-  // Clean up old data files on startup
-  const inDir = path.join(dataDir, 'in');
-  cleanupOldDataFiles(inDir, 10);
 
   // Check for updates on startup only (only in production)
   if (!app.isPackaged) {
@@ -175,50 +145,33 @@ app.on('activate', () => {
 // Handle load-data: full data pipeline (scan → parse → build → return UnifiedDataset)
 ipcMain.handle(
   'load-data',
-  handleIpcError(async (_event, options?: { specificSc?: DataFileInfo | null; specificDc?: DataFileInfo | null }) => {
-    const inDir = path.join(dataDir, 'in');
-    const result = await loadData(inDir, options);
-    return result;
+  handleIpcError(async () => {
+    return loadData(dataDir);
   })
 );
 
-// Handle save file (for unified dataset caching)
+// Handle save file (for unified dataset caching — saves to current/)
 ipcMain.handle(
   'save-file',
-  handleIpcError(async (_event, { filename, content }) => {
-    const inDir = path.join(dataDir, 'in');
-
-    // Create directory if it doesn't exist
-    if (!fs.existsSync(inDir)) {
-      fs.mkdirSync(inDir, { recursive: true });
-    }
+  handleIpcError(async (_event, { filename, content }: { filename: string; content: string }) => {
+    const currentDir = path.join(dataDir, 'current');
+    if (!fs.existsSync(currentDir)) fs.mkdirSync(currentDir, { recursive: true });
 
     // Sanitize filename to prevent path traversal
     const sanitizedFilename = path.basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_');
-
-    // Validate filename
     if (!sanitizedFilename || sanitizedFilename.startsWith('.')) {
       throw new Error('Invalid filename provided');
     }
 
-    const filePath = path.join(inDir, sanitizedFilename);
-
-    // Verify the resolved path is within the intended directory
+    const filePath = path.join(currentDir, sanitizedFilename);
     const resolvedPath = path.resolve(filePath);
-    const resolvedDir = path.resolve(inDir);
-    // Check works on both Unix (/) and Windows (\) path separators
+    const resolvedDir = path.resolve(currentDir);
     if (!resolvedPath.startsWith(resolvedDir + path.sep) && resolvedPath !== resolvedDir) {
       throw new Error('Path traversal attempt detected');
     }
 
     fs.writeFileSync(filePath, content, 'utf8');
-
-    // Clean up old files after saving (keep 10 most recent of each type)
-    cleanupOldDataFiles(inDir, 10);
-
-    return {
-      path: filePath
-    };
+    return { path: filePath };
   })
 );
 
@@ -270,8 +223,9 @@ ipcMain.handle(
       throw new Error(auth.error || 'No credentials available');
     }
 
-    // Initialize scraper orchestrator (use userData path)
-    const scraper = new ScraperOrchestrator(dataDir);
+    // Initialize scraper orchestrator with long-lived sessions
+    const scraper = new ScraperOrchestrator(dataDir, seasonalData, boothCache, scSession, dcSession);
+    activeOrchestrator = scraper;
 
     // Set up progress callback
     scraper.setProgressCallback((progress) => {
@@ -285,9 +239,14 @@ ipcMain.handle(
     const config = configManager.loadConfig();
     const results = await scraper.scrapeAll(auth.credentials, config.boothIds);
 
-    // Persist scraper for on-demand booth API calls and cancellation
-    lastScraper = scraper;
+    // Persist per-endpoint sync timestamps for restart survival
+    const ts = loadTimestamps();
+    for (const [ep, info] of Object.entries(results.endpointStatuses)) {
+      if (info.lastSync) ts.endpoints[ep] = info.lastSync;
+    }
+    saveTimestamps(ts);
 
+    activeOrchestrator = null;
     return results;
   })
 );
@@ -296,33 +255,34 @@ ipcMain.handle(
 ipcMain.handle(
   'cancel-sync',
   handleIpcError(async () => {
-    if (lastScraper) {
-      lastScraper.cancel();
+    if (activeOrchestrator) {
+      activeOrchestrator.cancel();
+      activeOrchestrator = null;
     }
   })
 );
 
 // Handle booth locations refresh (re-fetch just booth availability without full sync)
-// Uses existing SC session if available, otherwise logs in fresh
+// Uses long-lived SC session, logging in if needed
 ipcMain.handle(
   'refresh-booth-locations',
   handleIpcError(async () => {
-    // Try to reuse existing session from last scrape
-    let scraper = lastScraper?.getSmartCookieScraper();
+    await ensureSCSession();
+    const scraper = new SmartCookieScraper(dataDir, null, scSession);
+    const catalog = await scraper.fetchBoothCatalog(boothCache);
+    const config = configManager.loadConfig();
+    const boothLocations = await scraper.fetchBoothAvailability(config.boothIds, catalog, boothCache);
 
-    if (!scraper || !scraper.session.isAuthenticated) {
-      // No active session — create fresh scraper and login
-      const credentials = credentialsManager.loadCredentials();
-      if (!credentials?.smartCookie?.username || !credentials?.smartCookie?.password) {
-        throw new Error('No Smart Cookie credentials configured. Please set up logins first.');
-      }
-
-      scraper = new SmartCookieScraper(dataDir);
-      await scraper.session.login(credentials.smartCookie.username, credentials.smartCookie.password);
+    // Persist enriched booth locations to disk for the pipeline
+    if (boothLocations.length > 0 && config.boothIds.length > 0) {
+      savePipelineFile(dataDir, PIPELINE_FILES.SC_BOOTH_LOCATIONS, boothLocations);
     }
 
-    const config = configManager.loadConfig();
-    const boothLocations = await scraper.fetchBoothLocations(config.boothIds);
+    // Persist booth sync timestamp
+    const ts = loadTimestamps();
+    ts.endpoints['sc-booth-availability'] = new Date().toISOString();
+    saveTimestamps(ts);
+
     return boothLocations.map(normalizeBoothLocation);
   })
 );
@@ -331,19 +291,159 @@ ipcMain.handle(
 ipcMain.handle(
   'fetch-booth-catalog',
   handleIpcError(async () => {
-    let scraper = lastScraper?.getSmartCookieScraper();
+    await ensureSCSession();
+    const scraper = new SmartCookieScraper(dataDir, null, scSession);
+    const catalog = await scraper.fetchBoothCatalog(boothCache);
+    return catalog.map(normalizeBoothLocation);
+  })
+);
 
-    if (!scraper || !scraper.session.isAuthenticated) {
-      const credentials = credentialsManager.loadCredentials();
-      if (!credentials?.smartCookie?.username || !credentials?.smartCookie?.password) {
-        throw new Error('No Smart Cookie credentials configured. Please set up logins first.');
-      }
+// Handle verify Smart Cookie credentials
+ipcMain.handle(
+  'verify-sc',
+  handleIpcError(async (_event, { username, password }: { username: string; password: string }) => {
+    const session = new SmartCookieSession();
+    await session.login(username, password);
 
-      scraper = new SmartCookieScraper(dataDir);
-      await scraper.session.login(credentials.smartCookie.username, credentials.smartCookie.password);
+    const troop = await session.fetchMe();
+    if (!troop) throw new Error('Could not fetch troop info from /me');
+
+    const cookies = await session.apiGet('/webapi/api/me/cookies', 'Cookie map fetch');
+
+    return { troop, cookies: cookies || [] };
+  })
+);
+
+// Handle verify Digital Cookie credentials
+ipcMain.handle(
+  'verify-dc',
+  handleIpcError(async (_event, { username, password }: { username: string; password: string }) => {
+    const session = new DigitalCookieSession();
+    const roles = await session.fetchRoles(username, password);
+    return { roles };
+  })
+);
+
+// Handle save seasonal data
+ipcMain.handle(
+  'save-seasonal-data',
+  handleIpcError(async (_event, data: Partial<SeasonalDataFiles>) => {
+    seasonalData.saveAll(data);
+  })
+);
+
+// Handle load seasonal data
+ipcMain.handle(
+  'load-seasonal-data',
+  handleIpcError(async () => {
+    return seasonalData.loadAll();
+  })
+);
+
+// Load persisted timestamps (for restart survival + UI display)
+ipcMain.handle(
+  'load-timestamps',
+  handleIpcError(async () => {
+    return loadTimestamps();
+  })
+);
+
+// Record when unified dataset was last built
+ipcMain.handle(
+  'record-unified-build',
+  handleIpcError(async () => {
+    const ts = loadTimestamps();
+    ts.lastUnifiedBuild = new Date().toISOString();
+    saveTimestamps(ts);
+  })
+);
+
+// Wipe handlers (debug/testing utilities)
+ipcMain.handle(
+  'wipe-logins',
+  handleIpcError(async () => {
+    scSession.reset();
+    dcSession.reset();
+    const credPath = path.join(dataDir, 'credentials.enc');
+    if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
+  })
+);
+
+ipcMain.handle(
+  'wipe-config',
+  handleIpcError(async () => {
+    const configPath = path.join(dataDir, 'config.json');
+    if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+  })
+);
+
+ipcMain.handle(
+  'wipe-data',
+  handleIpcError(async () => {
+    const currentDir = path.join(dataDir, 'current');
+    const inDir = path.join(dataDir, 'in');
+    if (fs.existsSync(currentDir)) fs.rmSync(currentDir, { recursive: true, force: true });
+    if (fs.existsSync(inDir)) fs.rmSync(inDir, { recursive: true, force: true });
+    if (fs.existsSync(timestampsPath)) fs.unlinkSync(timestampsPath);
+    activeOrchestrator = null;
+  })
+);
+
+// Handle export diagnostics zip
+ipcMain.handle(
+  'export-diagnostics',
+  handleIpcError(async () => {
+    if (!mainWindow) throw new Error('No main window');
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    // biome-ignore lint/complexity/noBannedTypes: @types/electron is outdated; Electron 40 returns { canceled, filePath }
+    const showSave = dialog.showSaveDialog as Function;
+    const saveResult: { canceled: boolean; filePath?: string } = await showSave(mainWindow, {
+      defaultPath: `cookie-tracker-diagnostics-${timestamp}.zip`,
+      filters: [{ name: 'Zip Archives', extensions: ['zip'] }]
+    });
+
+    if (saveResult.canceled || !saveResult.filePath) return null;
+    const filePath = saveResult.filePath;
+
+    const currentDir = path.join(dataDir, 'current');
+    const inDir = path.join(dataDir, 'in');
+    const configPath = path.join(dataDir, 'config.json');
+
+    const output = fs.createWriteStream(filePath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    const done = new Promise<void>((resolve, reject) => {
+      output.on('close', resolve);
+      archive.on('error', reject);
+    });
+
+    archive.pipe(output);
+
+    // Add current/ directory (API responses, DC export, unified.json)
+    if (fs.existsSync(currentDir)) {
+      archive.directory(currentDir, 'current');
     }
 
-    const boothLocations = await scraper.fetchBoothLocations([]);
-    return boothLocations.map(normalizeBoothLocation);
+    // Add data/in/ legacy files (ReportExport-*, CookieOrders-*)
+    if (fs.existsSync(inDir)) {
+      const inFiles = fs.readdirSync(inDir);
+      for (const file of inFiles) {
+        const fullPath = path.join(inDir, file);
+        if (fs.statSync(fullPath).isFile()) {
+          archive.file(fullPath, { name: `in/${file}` });
+        }
+      }
+    }
+
+    // Add config.json (not credentials)
+    if (fs.existsSync(configPath)) {
+      archive.file(configPath, { name: 'config.json' });
+    }
+
+    await archive.finalize();
+    await done;
+
+    return { path: filePath };
   })
 );

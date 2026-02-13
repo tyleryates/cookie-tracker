@@ -40,7 +40,8 @@ Key reconciliation points (from GSSD official guidance):
 ### Smart Cookie Transfer Types
 | Type | Direction | Meaning |
 |------|-----------|---------|
-| `C2T` / `C2T(P)` / `T2T` | IN | Council/Troop to Troop (warehouse pickup) |
+| `C2T` / `C2T(P)` | IN | Council to Troop (warehouse pickup) |
+| `T2T` | IN or OUT | Troop to Troop (direction depends on from/to vs our troop number) |
 | `T2G` | OUT | Troop to Girl (scout pickup from troop inventory) |
 | `G2T` | IN | Girl to Troop (return) |
 | `D` | — | DC order synced to SC (sync record) |
@@ -108,7 +109,9 @@ These are the non-obvious data format issues that cause bugs if you don't know a
 
 **`transfer_type` vs `type`:** In SC API responses, the actual transfer type is in `transfer_type`, NOT `type` (which is always "TRANSFER").
 
-**C2T type variants:** C2T transfers have suffix variants (`C2T`, `C2T(P)`, `T2T`). Never match with exact equality — use startsWith or the `isC2TTransfer()` helper.
+**C2T type variants:** C2T transfers have suffix variants (`C2T`, `C2T(P)`, potentially others). Never match with exact equality — use startsWith or the `isC2TTransfer()` helper. **Note:** T2T is NOT a C2T variant — it's a separate transfer type with directional semantics (see below).
+
+**T2T direction detection:** T2T transfers are directional — outgoing (our troop sends) vs incoming (another troop sends to us). Direction is determined by comparing the transfer's `from` field against our `troopNumber`. The API `from`/`to` fields contain troop names (e.g., "Troop 3990") while `troopNumber` is a numeric ID (e.g., "3990") from `/me` `troop_id`. The `matchesTroopNumber()` helper in `data-store-operations.ts` handles this format mismatch by extracting the numeric part.
 
 **SC date formats vary:** SC Report uses strings like `"01/25/2026 11:20:42 AM"`. SC Transfers use short dates like `"01/28/2026"`.
 

@@ -7,6 +7,7 @@ import type { Transfer } from '../../types';
 
 interface PackageTotals {
   c2tReceived: number;
+  t2tOut: number;
   allocated: number;
   virtualBoothT2G: number;
   boothDividerT2G: number;
@@ -14,46 +15,37 @@ interface PackageTotals {
   g2t: number;
 }
 
+/** Maps transfer categories to the PackageTotals field they accumulate into */
+const CATEGORY_TO_FIELD: Partial<Record<string, keyof PackageTotals>> = {
+  [TRANSFER_CATEGORY.COUNCIL_TO_TROOP]: 'c2tReceived',
+  [TRANSFER_CATEGORY.TROOP_OUTGOING]: 't2tOut',
+  [TRANSFER_CATEGORY.GIRL_RETURN]: 'g2t',
+  [TRANSFER_CATEGORY.GIRL_PICKUP]: 'allocated',
+  [TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION]: 'virtualBoothT2G',
+  [TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION]: 'boothDividerT2G',
+  [TRANSFER_CATEGORY.DIRECT_SHIP]: 'directShip'
+};
+
 /** Calculate package totals across all transfers */
 function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
-  let totalC2TReceived = 0; // C2T pickups (excluding Cookie Share)
-  let totalAllocated = 0; // Physical T2G only (scouts physically picked up)
-  let totalVirtualBoothT2G = 0; // Virtual booth T2G (site orders allocated to scouts)
-  let totalBoothDividerT2G = 0; // Booth divider T2G (booth sales allocated to scouts)
-  let totalDirectShip = 0; // Direct ship orders (shipped from supplier, not troop inventory)
-  let totalG2T = 0; // Girl to Troop returns (inventory back to troop)
+  const totals: PackageTotals = {
+    c2tReceived: 0,
+    t2tOut: 0,
+    allocated: 0,
+    virtualBoothT2G: 0,
+    boothDividerT2G: 0,
+    directShip: 0,
+    g2t: 0
+  };
 
   for (const transfer of transfers) {
-    switch (transfer.category) {
-      case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
-        totalC2TReceived += transfer.physicalPackages || 0;
-        break;
-      case TRANSFER_CATEGORY.GIRL_RETURN:
-        totalG2T += transfer.physicalPackages || 0;
-        break;
-      case TRANSFER_CATEGORY.GIRL_PICKUP:
-        totalAllocated += transfer.physicalPackages || 0;
-        break;
-      case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
-        totalVirtualBoothT2G += transfer.physicalPackages || 0;
-        break;
-      case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
-        totalBoothDividerT2G += transfer.physicalPackages || 0;
-        break;
-      case TRANSFER_CATEGORY.DIRECT_SHIP:
-        totalDirectShip += transfer.physicalPackages || 0;
-        break;
+    const field = CATEGORY_TO_FIELD[transfer.category];
+    if (field) {
+      totals[field] += transfer.physicalPackages || 0;
     }
   }
 
-  return {
-    c2tReceived: totalC2TReceived,
-    allocated: totalAllocated,
-    virtualBoothT2G: totalVirtualBoothT2G,
-    boothDividerT2G: totalBoothDividerT2G,
-    directShip: totalDirectShip,
-    g2t: totalG2T
-  };
+  return totals;
 }
 
 export { calculatePackageTotals };

@@ -7,6 +7,7 @@ export interface DataStore {
   transfers: Transfer[];
   scouts: Map<string, RawScoutData>;
   troopNumber: string | null;
+  troopName: string | null;
   allocations: Allocation[];
   boothReservations: BoothReservationImported[];
   boothLocations: BoothLocation[];
@@ -22,6 +23,7 @@ export function createDataStore(): DataStore {
     transfers: [],
     scouts: new Map(),
     troopNumber: null,
+    troopName: null,
     allocations: [],
     boothReservations: [],
     boothLocations: [],

@@ -29,9 +29,11 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   const varieties = data.varieties;
 
   const c2tTransfers = transferBreakdowns.c2t;
+  const t2tOutTransfers = transferBreakdowns.t2tOut;
   const t2gTransfers = transferBreakdowns.t2g;
   const g2tTransfers = transferBreakdowns.g2t;
   const totalOrdered = transferBreakdowns.totals.c2t;
+  const totalT2TOut = transferBreakdowns.totals.t2tOut;
   const totalAllocated = transferBreakdowns.totals.t2gPhysical;
   const totalReturned = transferBreakdowns.totals.g2t;
   const netInventory = troopTotals.inventory;
@@ -39,10 +41,15 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   const troopSold = troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G;
 
   const stats: Array<{ label: string; value: number; description: string; color: string }> = [
-    { label: 'Total Received', value: totalOrdered, description: 'C2T and T2T pickups', color: '#2196F3' },
+    { label: 'Total Received', value: totalOrdered, description: 'C2T and incoming T2T pickups', color: '#2196F3' }
+  ];
+  if (totalT2TOut > 0) {
+    stats.push({ label: 'Sent to Troops (T2T)', value: totalT2TOut, description: 'Transferred to other troops', color: '#E53935' });
+  }
+  stats.push(
     { label: 'Allocated to Scouts (T2G)', value: totalAllocated, description: 'Physical packages only', color: '#4CAF50' },
     { label: 'Troop Sold', value: troopSold, description: 'Booth & troop delivery', color: '#00897B' }
-  ];
+  );
   if (totalReturned > 0) {
     stats.push({ label: 'Returns (G2T)', value: totalReturned, description: 'Returned from scouts', color: '#FF9800' });
   }
@@ -112,6 +119,36 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
                   <td>{String(transfer.orderNumber || '-')}</td>
                   {casesTip ? <TooltipCell tooltip={casesTip}>{transfer.cases || 0}</TooltipCell> : <td>{transfer.cases || 0}</td>}
                   {tip ? <TooltipCell tooltip={tip}>{transfer.packages || 0}</TooltipCell> : <td>{transfer.packages || 0}</td>}
+                  <td>{formatCurrency(transfer.amount ?? 0)}</td>
+                  <td class={statusClass}>{statusText}</td>
+                </tr>
+              );
+            })}
+          </DataTable>
+        </>
+      )}
+
+      {t2tOutTransfers.length > 0 && (
+        <>
+          <h4>Sent to Other Troops (T2T Out)</h4>
+          <p class="meta-text">
+            {totalT2TOut} packages sent across {t2tOutTransfers.length} transfer{t2tOutTransfers.length !== 1 ? 's' : ''}
+          </p>
+          <DataTable columns={['Date', 'To', 'Order #', 'Packages', 'Amount', 'Status']}>
+            {t2tOutTransfers.map((transfer: Transfer, i: number) => {
+              const isPending =
+                transfer.status === SC_TRANSFER_STATUS.SAVED ||
+                (transfer.actions && (transfer.actions.submittable || transfer.actions.approvable));
+              const statusText = isPending ? 'Pending' : 'Completed';
+              const statusClass = isPending ? 'status-warning' : 'status-success';
+              const tip = transferTooltip(transfer.varieties);
+
+              return (
+                <tr key={i}>
+                  <td>{formatDate(transfer.date)}</td>
+                  <td>{`Troop ${transfer.to}`}</td>
+                  <td>{String(transfer.orderNumber || '-')}</td>
+                  {tip ? <TooltipCell tooltip={tip}>{-(transfer.packages || 0)}</TooltipCell> : <td>{-(transfer.packages || 0)}</td>}
                   <td>{formatCurrency(transfer.amount ?? 0)}</td>
                   <td class={statusClass}>{statusText}</td>
                 </tr>

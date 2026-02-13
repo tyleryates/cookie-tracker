@@ -2,4 +2,5 @@
 @import "./styles/base.css";
 @import "./styles/components.css";
 @import "./styles/sync.css";
+@import "./styles/settings.css";
 @import "./styles/tables.css";

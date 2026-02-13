@@ -7,12 +7,22 @@ import type {
   SCBoothDividerResult,
   SCBoothLocationRaw,
   SCBoothTimeSlot,
-  SCCombinedData,
   SCDirectShipDivider,
   SCReservationsResponse,
   SCVirtualCookieShare
 } from '../../scrapers/sc-types';
 import type { BoothAvailableDate, BoothLocation, CookieType } from '../../types';
+
+/** Explicit params for allocation imports (replaces SCCombinedData) */
+export interface AllocationData {
+  directShipDivider?: SCDirectShipDivider | Record<string, any>[] | null;
+  virtualCookieShares?: SCVirtualCookieShare[];
+  reservations?: SCReservationsResponse | null;
+  boothDividers?: SCBoothDividerResult[];
+  boothLocations?: SCBoothLocationRaw[];
+  cookieIdMap?: Record<string, CookieType> | null;
+}
+
 import { sumPhysicalPackages } from '../utils';
 import { parseVarietiesFromAPI } from './parsers';
 import { parseGirlAllocation, registerScout } from './scout-helpers';
@@ -215,30 +225,30 @@ function importBoothLocations(store: DataStore, locationsData: SCBoothLocationRa
 }
 
 /** Import optional supplemental data from Smart Cookie API (dividers, booths, cookie shares) */
-export function importAllocations(store: DataStore, apiData: SCCombinedData): void {
-  const cookieIdMap = (apiData.cookieIdMap as Record<string, CookieType>) ?? null;
+export function importAllocations(store: DataStore, data: AllocationData): void {
+  const cookieIdMap = data.cookieIdMap ?? null;
 
-  if (apiData.directShipDivider && !Array.isArray(apiData.directShipDivider) && apiData.directShipDivider.girls) {
-    importDirectShipDivider(store, apiData.directShipDivider);
+  if (data.directShipDivider && !Array.isArray(data.directShipDivider) && data.directShipDivider.girls) {
+    importDirectShipDivider(store, data.directShipDivider);
   }
 
-  if (apiData.virtualCookieShares && apiData.virtualCookieShares.length > 0) {
-    importVirtualCookieShares(store, apiData.virtualCookieShares);
+  if (data.virtualCookieShares && data.virtualCookieShares.length > 0) {
+    importVirtualCookieShares(store, data.virtualCookieShares);
   }
 
   if (cookieIdMap) {
     store.metadata.cookieIdMap = cookieIdMap;
   }
-  if (apiData.reservations) {
-    importReservations(store, apiData.reservations, cookieIdMap);
+  if (data.reservations) {
+    importReservations(store, data.reservations, cookieIdMap);
   }
-  if (apiData.boothDividers && apiData.boothDividers.length > 0) {
-    importBoothDividers(store, apiData.boothDividers, cookieIdMap);
+  if (data.boothDividers && data.boothDividers.length > 0) {
+    importBoothDividers(store, data.boothDividers, cookieIdMap);
   }
-  if (Array.isArray(apiData.directShipDivider) && apiData.directShipDivider.length > 0) {
-    importDirectShipDividers(store, apiData.directShipDivider, cookieIdMap);
+  if (Array.isArray(data.directShipDivider) && data.directShipDivider.length > 0) {
+    importDirectShipDividers(store, data.directShipDivider, cookieIdMap);
   }
-  if (apiData.boothLocations && apiData.boothLocations.length > 0) {
-    importBoothLocations(store, apiData.boothLocations);
+  if (data.boothLocations && data.boothLocations.length > 0) {
+    importBoothLocations(store, data.boothLocations);
   }
 }

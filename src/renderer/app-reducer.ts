@@ -2,8 +2,7 @@
 // Side effects (IPC calls, timers) stay in the component; only pure state
 // transitions live here.
 
-import type { AppConfig, DatasetEntry, UnifiedDataset } from '../types';
-import type { SyncState } from './components/sync-section';
+import type { AppConfig, EndpointSyncState, SyncState, UnifiedDataset } from '../types';
 
 // ============================================================================
 // STATE
@@ -17,14 +16,11 @@ export interface StatusMessage {
 export interface AppState {
   unified: UnifiedDataset | null;
   appConfig: AppConfig | null;
-  datasetList: DatasetEntry[];
-  currentDatasetIndex: number;
   autoSyncEnabled: boolean;
   activeReport: string | null;
-  modalOpen: boolean;
+  activePage: 'dashboard' | 'settings' | 'welcome';
   statusMessage: StatusMessage | null;
   syncState: SyncState;
-  showSetupHint: boolean;
 }
 
 // ============================================================================
@@ -34,21 +30,22 @@ export interface AppState {
 export type Action =
   | { type: 'SET_STATUS'; msg: string; statusType: StatusMessage['type'] }
   | { type: 'CLEAR_STATUS' }
-  | { type: 'SET_SETUP_HINT'; show: boolean }
+  | { type: 'SET_WELCOME' }
   | { type: 'LOAD_CONFIG'; config: AppConfig }
-  | { type: 'SET_UNIFIED'; unified: UnifiedDataset; datasetList: DatasetEntry[] }
-  | { type: 'SET_DATASET_INDEX'; index: number }
+  | { type: 'SET_UNIFIED'; unified: UnifiedDataset }
   | { type: 'SET_ACTIVE_REPORT'; report: string | null }
   | { type: 'DEFAULT_REPORT' }
   | { type: 'TOGGLE_AUTO_SYNC'; enabled: boolean }
-  | { type: 'OPEN_MODAL' }
-  | { type: 'CLOSE_MODAL' }
-  | { type: 'UPDATE_SYNC'; patch: Partial<SyncState> }
-  | { type: 'SYNC_SOURCE_UPDATE'; source: 'dc' | 'sc' | 'booth'; patch: Partial<SyncState['dc']> }
+  | { type: 'OPEN_SETTINGS' }
+  | { type: 'CLOSE_SETTINGS' }
+  | { type: 'SYNC_ENDPOINT_UPDATE'; endpoint: string; status: EndpointSyncState['status']; lastSync?: string; cached?: boolean }
   | { type: 'SYNC_STARTED' }
   | { type: 'SYNC_FINISHED' }
   | { type: 'UPDATE_BOOTH_LOCATIONS'; boothLocations: UnifiedDataset['boothLocations'] }
-  | { type: 'IGNORE_SLOT'; config: AppConfig };
+  | { type: 'IGNORE_SLOT'; config: AppConfig }
+  | { type: 'WIPE_LOGINS' }
+  | { type: 'WIPE_CONFIG' }
+  | { type: 'WIPE_DATA'; syncState: SyncState };
 
 // ============================================================================
 // REDUCER
@@ -62,27 +59,14 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'CLEAR_STATUS':
       return { ...state, statusMessage: null };
 
-    case 'SET_SETUP_HINT':
-      return { ...state, showSetupHint: action.show };
+    case 'SET_WELCOME':
+      return { ...state, activePage: 'welcome' };
 
     case 'LOAD_CONFIG':
-      return {
-        ...state,
-        appConfig: action.config,
-        autoSyncEnabled: action.config.autoSyncEnabled ?? true,
-        syncState: action.config.lastBoothSync
-          ? {
-              ...state.syncState,
-              booth: { ...state.syncState.booth, status: 'synced', lastSync: action.config.lastBoothSync }
-            }
-          : state.syncState
-      };
+      return { ...state, appConfig: action.config, autoSyncEnabled: action.config.autoSyncEnabled ?? true };
 
     case 'SET_UNIFIED':
-      return { ...state, unified: action.unified, datasetList: action.datasetList };
-
-    case 'SET_DATASET_INDEX':
-      return { ...state, currentDatasetIndex: action.index };
+      return { ...state, unified: action.unified };
 
     case 'SET_ACTIVE_REPORT':
       return { ...state, activeReport: action.report };
@@ -93,34 +77,33 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'TOGGLE_AUTO_SYNC':
       return { ...state, autoSyncEnabled: action.enabled };
 
-    case 'OPEN_MODAL':
-      return { ...state, modalOpen: true };
+    case 'OPEN_SETTINGS':
+      return { ...state, activePage: 'settings' };
 
-    case 'CLOSE_MODAL':
-      return { ...state, modalOpen: false };
+    case 'CLOSE_SETTINGS':
+      return { ...state, activePage: 'dashboard' };
 
-    case 'UPDATE_SYNC':
-      return { ...state, syncState: { ...state.syncState, ...action.patch } };
-
-    case 'SYNC_SOURCE_UPDATE':
+    case 'SYNC_ENDPOINT_UPDATE': {
+      const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };
       return {
         ...state,
         syncState: {
           ...state.syncState,
-          [action.source]: { ...state.syncState[action.source], ...action.patch }
+          endpoints: {
+            ...state.syncState.endpoints,
+            [action.endpoint]: {
+              ...prev,
+              status: action.status,
+              lastSync: action.lastSync ?? prev.lastSync,
+              cached: action.cached
+            }
+          }
         }
       };
+    }
 
     case 'SYNC_STARTED':
-      return {
-        ...state,
-        syncState: {
-          ...state.syncState,
-          syncing: true,
-          dc: { ...state.syncState.dc, status: 'syncing', progress: 0, progressText: 'Starting...' },
-          sc: { ...state.syncState.sc, status: 'syncing', progress: 0, progressText: 'Starting...' }
-        }
-      };
+      return { ...state, syncState: { ...state.syncState, syncing: true } };
 
     case 'SYNC_FINISHED':
       return { ...state, syncState: { ...state.syncState, syncing: false } };
@@ -130,6 +113,15 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'IGNORE_SLOT':
       return { ...state, appConfig: action.config };
+
+    case 'WIPE_LOGINS':
+      return { ...state, activePage: 'welcome' };
+
+    case 'WIPE_CONFIG':
+      return { ...state, appConfig: null };
+
+    case 'WIPE_DATA':
+      return { ...state, unified: null, activeReport: null, syncState: action.syncState };
 
     default:
       return state;

@@ -1,16 +1,33 @@
 // Data Pipeline — runs in main process.
-// Scan → parse → import → build unified → return to renderer.
+// Reads pipeline files from current/, legacy manual files from data/in/.
+// Passes individual pieces directly to importers, then builds UnifiedDataset.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ExcelJS from 'exceljs';
-import { DC_COLUMNS } from './constants';
+import { DC_COLUMNS, PIPELINE_FILES } from './constants';
 import { buildUnifiedDataset } from './data-processing/calculators/index';
-import { importDigitalCookie, importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './data-processing/importers';
-import { createDataStore, type DataStore, type ReadonlyDataStore } from './data-store';
+import type { AllocationData } from './data-processing/importers';
+import {
+  importAllocations,
+  importDigitalCookie,
+  importSmartCookie,
+  importSmartCookieOrders,
+  importSmartCookieReport
+} from './data-processing/importers';
+import { createDataStore, type ReadonlyDataStore } from './data-store';
 import Logger from './logger';
-import type { DataFileInfo, DatasetEntry, LoadDataResult, LoadedSources } from './types';
-import { validateDCData, validateSCData } from './validators';
+import type {
+  SCBoothDividerResult,
+  SCBoothLocationRaw,
+  SCDirectShipDivider,
+  SCMeResponse,
+  SCOrdersResponse,
+  SCReservationsResponse,
+  SCVirtualCookieShare
+} from './scrapers/sc-types';
+import type { CookieType, DataFileInfo, LoadDataResult, LoadedSources } from './types';
+import { validateDCData, validateSCOrders } from './validators';
 
 // ============================================================================
 // EXCEL PARSING
@@ -76,124 +93,53 @@ function isDigitalCookieFormat(data: Record<string, any>[]): boolean {
   return headers.includes(DC_COLUMNS.GIRL_FIRST_NAME) && headers.includes(DC_COLUMNS.ORDER_NUMBER);
 }
 
-function isSmartCookieAPIFormat(data: Record<string, any>): boolean {
-  return data?.orders && Array.isArray(data.orders);
+// ============================================================================
+// PIPELINE FILE READING
+// ============================================================================
+
+const isObject = (d: unknown): boolean => typeof d === 'object' && d !== null && !Array.isArray(d);
+const isArray = (d: unknown): boolean => Array.isArray(d);
+
+/** Read a pipeline file from current/ as raw JSON. Optional shape validator rejects corrupted data. */
+function readPipelineFile<T>(currentDir: string, filename: string, validate?: (data: unknown) => boolean): T | null {
+  const filePath = path.join(currentDir, filename);
+  if (!fs.existsSync(filePath)) return null;
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    if (validate && !validate(data)) {
+      Logger.warn(`Pipeline file ${filename}: unexpected shape, skipping`);
+      return null;
+    }
+    return data as T;
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================================
-// FILE SCANNING
+// LEGACY FILE SCANNING (data/in/ for manual imports)
 // ============================================================================
 
-function scanDataFiles(inDir: string): DataFileInfo[] {
-  if (!fs.existsSync(inDir)) {
-    fs.mkdirSync(inDir, { recursive: true });
-  }
+function scanLegacyFiles(inDir: string): DataFileInfo[] {
+  if (!fs.existsSync(inDir)) return [];
 
   const fileNames = fs.readdirSync(inDir).filter((file) => {
     const ext = path.extname(file).toLowerCase();
-    return ['.xlsx', '.xls', '.csv', '.json'].includes(ext);
+    return ['.xlsx', '.xls', '.csv'].includes(ext);
   });
 
   const files: DataFileInfo[] = [];
   for (const name of fileNames) {
     const filePath = path.join(inDir, name);
     const ext = path.extname(name).toLowerCase();
-    let data: Record<string, unknown> | Buffer;
-    if (ext === '.json') {
-      const jsonStr = fs.readFileSync(filePath, 'utf8');
-      data = JSON.parse(jsonStr);
-    } else {
-      data = fs.readFileSync(filePath);
-    }
-
-    files.push({ name, path: filePath, data, extension: ext });
+    files.push({ name, path: filePath, data: fs.readFileSync(filePath), extension: ext });
   }
 
   return files;
 }
 
-// ============================================================================
-// FILE UTILITIES
-// ============================================================================
-
-function findLatestFile(files: DataFileInfo[], prefix: string, extension: string, nameIncludes?: string): DataFileInfo | null {
-  const filtered = files.filter((f: DataFileInfo) => {
-    if (f.extension !== extension) return false;
-    if (nameIncludes) return f.name.includes(nameIncludes);
-    return f.name.startsWith(prefix);
-  });
-  filtered.sort((a: DataFileInfo, b: DataFileInfo) => b.name.localeCompare(a.name));
-  return filtered.length > 0 ? filtered[0] : null;
-}
-
-function parseTimestampFromFilename(name: string, prefix: string, ext: string): Date | null {
-  const stripped = name.replace(prefix, '').replace(ext, '');
-  const match = stripped.match(/^(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})$/);
-  if (!match) return null;
-  const [, y, mo, d, h, mi, s] = match;
-  return new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}`);
-}
-
-function formatTimestamp(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
-
-// ============================================================================
-// DATASET HISTORY
-// ============================================================================
-
-function buildDatasetList(files: DataFileInfo[]): DatasetEntry[] {
-  const scFiles = files.filter((f) => f.name.startsWith('SC-') && f.extension === '.json').sort((a, b) => b.name.localeCompare(a.name));
-  const dcFiles = files.filter((f) => f.name.startsWith('DC-') && f.extension === '.xlsx').sort((a, b) => b.name.localeCompare(a.name));
-
-  const pairedDc = new Set<string>();
-  const entries: DatasetEntry[] = [];
-
-  for (const sc of scFiles) {
-    const scTs = parseTimestampFromFilename(sc.name, 'SC-', '.json');
-    if (!scTs) continue;
-
-    let bestDc: DataFileInfo | null = null;
-    let bestDiff = Infinity;
-    for (const dc of dcFiles) {
-      if (pairedDc.has(dc.name)) continue;
-      const dcTs = parseTimestampFromFilename(dc.name, 'DC-', '.xlsx');
-      if (!dcTs) continue;
-      const diff = Math.abs(scTs.getTime() - dcTs.getTime());
-      if (diff < 5 * 60 * 1000 && diff < bestDiff) {
-        bestDiff = diff;
-        bestDc = dc;
-      }
-    }
-
-    if (bestDc) pairedDc.add(bestDc.name);
-    entries.push({
-      label: formatTimestamp(scTs),
-      scFile: sc,
-      dcFile: bestDc,
-      timestamp: scTs.toISOString()
-    });
-  }
-
-  for (const dc of dcFiles) {
-    if (pairedDc.has(dc.name)) continue;
-    const dcTs = parseTimestampFromFilename(dc.name, 'DC-', '.xlsx');
-    if (!dcTs) continue;
-    entries.push({
-      label: formatTimestamp(dcTs),
-      scFile: null,
-      dcFile: dc,
-      timestamp: dcTs.toISOString()
-    });
-  }
-
-  entries.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-  if (entries.length > 0) {
-    entries[0].label += ' (Latest)';
-  }
-
-  return entries;
+function findFileByIncludes(files: DataFileInfo[], nameIncludes: string, extension: string): DataFileInfo | null {
+  return files.find((f) => f.extension === extension && f.name.includes(nameIncludes)) ?? null;
 }
 
 // ============================================================================
@@ -201,18 +147,6 @@ function buildDatasetList(files: DataFileInfo[]): DatasetEntry[] {
 // ============================================================================
 
 type FileLoadResult = { loaded: boolean; issue?: string };
-
-function loadJsonFile(file: DataFileInfo, store: DataStore): FileLoadResult {
-  if (isSmartCookieAPIFormat(file.data)) {
-    const validation = validateSCData(file.data);
-    if (!validation.valid) {
-      Logger.warn('SC data validation issues:', validation.issues);
-    }
-    importSmartCookieAPI(store, file.data);
-    return { loaded: true };
-  }
-  return { loaded: false, issue: `Smart Cookie JSON not recognized: ${file.name}` };
-}
 
 async function loadExcelFile(
   file: DataFileInfo,
@@ -228,52 +162,83 @@ async function loadExcelFile(
   return { loaded: false, issue: `${errorLabel}: ${file.name}` };
 }
 
-async function loadSourceFiles(
-  files: DataFileInfo[],
-  store: DataStore,
-  specificSc?: DataFileInfo | null,
-  specificDc?: DataFileInfo | null
-): Promise<LoadedSources> {
-  const issues: string[] = [];
-  const scFile = specificSc !== undefined ? specificSc : findLatestFile(files, 'SC-', '.json');
-  const dcFile = specificDc !== undefined ? specificDc : findLatestFile(files, 'DC-', '.xlsx');
-  const scReportFile = findLatestFile(files, '', '.xlsx', 'ReportExport');
-  const scTransferFile = findLatestFile(files, '', '.xlsx', 'CookieOrders');
+// ============================================================================
+// PUBLIC API
+// ============================================================================
 
-  let scTimestamp: string | null = null;
-  let dcTimestamp: string | null = null;
+/**
+ * Load and build unified dataset from files on disk.
+ * Reads sync data from current/ (API responses, DC export) and
+ * legacy manual files from data/in/ (ReportExport, CookieOrders).
+ */
+export async function loadData(dataDir: string): Promise<LoadDataResult | null> {
+  const currentDir = path.join(dataDir, 'current');
+  const inDir = path.join(dataDir, 'in');
 
-  // Smart Cookie API (JSON)
-  let sc = false;
-  if (scFile) {
-    const r = loadJsonFile(scFile, store);
-    sc = r.loaded;
-    if (r.loaded) scTimestamp = parseTimestampFromFilename(scFile.name, 'SC-', '.json')?.toISOString() ?? null;
-    else if (r.issue) issues.push(r.issue);
+  const store = createDataStore();
+  const loaded: LoadedSources = { sc: false, dc: false, scReport: false, scTransfer: false, issues: [] };
+
+  // Pre-set troop identity from seasonal data (sc-troop.json) so T2T direction is known during import
+  // troop_id is an internal SC database ID; troop_name is the human-readable name (e.g. "Troop 3990")
+  // Both are needed because the from/to fields in orders may match either format
+  const troopData = readPipelineFile<SCMeResponse>(dataDir, 'sc-troop.json', isObject);
+  if (troopData?.role?.troop_id) {
+    store.troopNumber = String(troopData.role.troop_id);
+  }
+  if (troopData?.role?.troop_name) {
+    store.troopName = String(troopData.role.troop_name);
   }
 
-  // Digital Cookie (Excel)
-  let dc = false;
-  if (dcFile) {
-    const r = await loadExcelFile(
-      dcFile,
-      isDigitalCookieFormat,
-      (data) => {
-        const validation = validateDCData(data);
-        if (!validation.valid) {
-          Logger.warn('DC data validation issues:', validation.issues);
-        }
-        importDigitalCookie(store, data);
-      },
-      'Digital Cookie XLSX not recognized'
+  // 1. Smart Cookie API data from current/ pipeline files
+  const ordersData = readPipelineFile<SCOrdersResponse>(currentDir, PIPELINE_FILES.SC_ORDERS, isObject);
+  if (ordersData?.orders) {
+    const validation = validateSCOrders(ordersData);
+    if (!validation.valid) {
+      Logger.warn('SC orders validation issues:', validation.issues);
+    }
+    importSmartCookieOrders(store, ordersData);
+
+    // Import allocations from individual pipeline files
+    const cookieSharesKeyed = readPipelineFile<Record<string, SCVirtualCookieShare>>(currentDir, PIPELINE_FILES.SC_COOKIE_SHARES, isObject);
+    const boothDividersKeyed = readPipelineFile<Record<string, SCBoothDividerResult>>(
+      currentDir,
+      PIPELINE_FILES.SC_BOOTH_ALLOCATIONS,
+      isObject
     );
-    dc = r.loaded;
-    if (r.loaded) dcTimestamp = parseTimestampFromFilename(dcFile.name, 'DC-', '.xlsx')?.toISOString() ?? null;
-    else if (r.issue) issues.push(r.issue);
+
+    const allocationData: AllocationData = {
+      directShipDivider: readPipelineFile<SCDirectShipDivider>(currentDir, PIPELINE_FILES.SC_DIRECT_SHIP, isObject) ?? null,
+      virtualCookieShares: cookieSharesKeyed ? Object.values(cookieSharesKeyed) : [],
+      reservations: readPipelineFile<SCReservationsResponse>(currentDir, PIPELINE_FILES.SC_RESERVATIONS, isObject) ?? null,
+      boothDividers: boothDividersKeyed ? Object.values(boothDividersKeyed) : [],
+      boothLocations: readPipelineFile<SCBoothLocationRaw[]>(currentDir, PIPELINE_FILES.SC_BOOTH_LOCATIONS, isArray) ?? [],
+      cookieIdMap: readPipelineFile<Record<string, CookieType>>(currentDir, PIPELINE_FILES.SC_COOKIE_ID_MAP, isObject) ?? null
+    };
+    importAllocations(store, allocationData);
+    loaded.sc = true;
   }
 
-  // Smart Cookie Report (Excel)
-  let scReport = false;
+  // 2. Digital Cookie export from current/dc-export.xlsx
+  const dcExportPath = path.join(currentDir, PIPELINE_FILES.DC_EXPORT);
+  if (fs.existsSync(dcExportPath)) {
+    const buffer = fs.readFileSync(dcExportPath);
+    const parsedData = await parseExcel(buffer);
+    if (isDigitalCookieFormat(parsedData)) {
+      const validation = validateDCData(parsedData);
+      if (!validation.valid) {
+        Logger.warn('DC data validation issues:', validation.issues);
+      }
+      importDigitalCookie(store, parsedData);
+      loaded.dc = true;
+    } else {
+      loaded.issues.push('Digital Cookie export not recognized');
+    }
+  }
+
+  // 3. Legacy manual files from data/in/ (SC Report exports, transfer exports)
+  const legacyFiles = scanLegacyFiles(inDir);
+
+  const scReportFile = findFileByIncludes(legacyFiles, 'ReportExport', '.xlsx');
   if (scReportFile) {
     const r = await loadExcelFile(
       scReportFile,
@@ -281,49 +246,26 @@ async function loadSourceFiles(
       (data) => importSmartCookieReport(store, data),
       'Smart Cookie Report empty/unreadable'
     );
-    scReport = r.loaded;
-    if (r.issue) issues.push(r.issue);
+    loaded.scReport = r.loaded;
+    if (r.issue) loaded.issues.push(r.issue);
   }
 
-  // Smart Cookie Transfers (Excel) — skipped if API data present
-  let scTransfer = false;
-  if (!sc && scTransferFile) {
+  const scTransferFile = findFileByIncludes(legacyFiles, 'CookieOrders', '.xlsx');
+  if (!loaded.sc && scTransferFile) {
     const r = await loadExcelFile(
       scTransferFile,
       (data) => data?.length > 0,
       (data) => importSmartCookie(store, data),
       'Smart Cookie Transfer empty/unreadable'
     );
-    scTransfer = r.loaded;
-    if (r.issue) issues.push(r.issue);
-  } else if (sc && scTransferFile) {
+    loaded.scTransfer = r.loaded;
+    if (r.issue) loaded.issues.push(r.issue);
+  } else if (loaded.sc && scTransferFile) {
     store.metadata.warnings.push({ type: 'SC_TRANSFER_SKIPPED', reason: 'SC API data present', file: scTransferFile.name });
     Logger.warn('Skipping CookieOrders.xlsx import because SC API data is present.');
   }
 
-  return { sc, dc, scReport, scTransfer, issues, scTimestamp, dcTimestamp };
-}
-
-// ============================================================================
-// PUBLIC API
-// ============================================================================
-
-/**
- * Load and build unified dataset from files on disk.
- * This is the main entry point for the data pipeline, called from the main process.
- */
-export async function loadData(
-  inDir: string,
-  options?: { specificSc?: DataFileInfo | null; specificDc?: DataFileInfo | null }
-): Promise<LoadDataResult | null> {
-  const files = scanDataFiles(inDir);
-  if (files.length === 0) return null;
-
-  const store = createDataStore();
-  const datasetList = buildDatasetList(files);
-  const loaded = await loadSourceFiles(files, store, options?.specificSc, options?.specificDc);
   const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;
-
   if (!anyLoaded) return null;
 
   Logger.debug('Building unified dataset...');
@@ -335,5 +277,5 @@ export async function loadData(
   }
   Logger.info('Unified dataset ready:', { scouts: Object.keys(unified.scouts).length });
 
-  return { unified, datasetList, loaded };
+  return { unified, loaded };
 }

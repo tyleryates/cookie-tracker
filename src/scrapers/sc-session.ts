@@ -1,12 +1,10 @@
 // Smart Cookie Session — owns auth state (cookie jar, XSRF, troopId)
-// Scrapers and main process use this for authenticated API calls.
+// Pure HTTP client. Scrapers and main process use this for authenticated API calls.
 
-import axios, { type AxiosInstance, isAxiosError } from 'axios';
+import axios, { type AxiosInstance, type AxiosResponse, isAxiosError } from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { type Cookie, CookieJar } from 'tough-cookie';
 import { HTTP_STATUS, SPECIAL_IDENTIFIERS } from '../constants';
-import Logger from '../logger';
-import { requestWithRetry } from './request-utils';
 import type { SCMeResponse } from './sc-types';
 
 export class SmartCookieSession {
@@ -19,7 +17,12 @@ export class SmartCookieSession {
 
   constructor() {
     this.cookieJar = new CookieJar();
-    this.client = wrapper(
+    this.client = this.createClient();
+  }
+
+  /** Create a fresh axios client with the current cookie jar */
+  private createClient(): AxiosInstance {
+    return wrapper(
       axios.create({
         baseURL: 'https://app.abcsmartcookies.com',
         jar: this.cookieJar,
@@ -57,47 +60,55 @@ export class SmartCookieSession {
   }
 
   /** Login to Smart Cookie. Stores credentials for re-login. */
-  async login(username: string, password: string, silent = false): Promise<boolean> {
+  async login(username: string, password: string): Promise<boolean> {
     this.credentials = { username, password };
 
-    const response = await this.client.post(
-      '/webapi/api/account/login',
-      { username, password },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          Referer: 'https://abcsmartcookies.com/'
+    const response = await this.client
+      .post(
+        '/webapi/api/account/login',
+        { username, password },
+        {
+          headers: { 'Content-Type': 'application/json', Referer: 'https://abcsmartcookies.com/' }
         }
-      }
-    );
+      )
+      .catch((error) => {
+        if (isAxiosError(error) && error.response && error.response.status >= 400 && error.response.status < 500) {
+          throw new Error('Invalid login credentials');
+        }
+        throw error;
+      });
 
     if (response.status !== HTTP_STATUS.OK) {
-      throw new Error(`Login failed with status ${response.status}`);
+      throw new Error('Invalid login credentials');
     }
 
     await this.extractXsrfToken();
 
-    // Call /me endpoint to establish session and capture troopId
+    // Call /me to establish session and capture troopId
     try {
-      const meData = await this.apiGet<SCMeResponse>('/webapi/api/me', '/me endpoint');
-      this.meResponse = meData || null;
-
-      if (meData?.role?.troop_id) {
-        this.troopId = meData.role.troop_id;
-      }
-
-      await this.extractXsrfToken();
-    } catch (err) {
-      if (!silent) Logger.warn('Warning: /me endpoint failed:', (err as Error).message);
+      await this.fetchMe();
+    } catch {
+      // Non-fatal — troopId can be extracted from C2T orders as fallback
     }
 
     return true;
   }
 
-  /** Re-login using stored credentials (silent). Used by requestWithRetry. */
+  /** Re-login using stored credentials (silent). Used by authenticatedRequest. */
   async relogin(): Promise<boolean> {
     if (!this.credentials) throw new Error('No stored credentials for re-login');
-    return this.login(this.credentials.username, this.credentials.password, true);
+    return this.login(this.credentials.username, this.credentials.password);
+  }
+
+  /** Fetch /me endpoint to get troop identity. Called right after login — no retry needed. */
+  async fetchMe(): Promise<SCMeResponse | null> {
+    const response = await this.client.get<SCMeResponse>('/webapi/api/me', { headers: this.authHeaders });
+    const meData = response.data || null;
+    this.meResponse = meData;
+    if (meData?.role?.troop_id) {
+      this.troopId = meData.role.troop_id;
+    }
+    return this.meResponse;
   }
 
   private get authHeaders() {
@@ -111,39 +122,54 @@ export class SmartCookieSession {
     return new Error(`${label} failed: ${(error as Error).message}`);
   }
 
-  /** Authenticated GET request */
-  async apiGet<T = any>(url: string, label: string): Promise<T> {
-    if (!this.xsrfToken) throw new Error('XSRF token not available. Must login first.');
+  /** Check if an error is an authentication error (401 or 403) */
+  private isAuthError(error: unknown): boolean {
+    return isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403);
+  }
+
+  /** Execute an authenticated request with automatic re-login on auth failure */
+  private async authenticatedRequest<T>(requestFn: () => Promise<AxiosResponse<T>>, label: string): Promise<T> {
+    if (!this.xsrfToken) throw new Error('Not authenticated. Must login first.');
+
     try {
-      const response = await this.client.get(url, { headers: this.authHeaders });
+      const response = await requestFn();
       if (response.status !== HTTP_STATUS.OK) throw new Error(`${label} failed with status ${response.status}`);
       return response.data;
     } catch (error: unknown) {
+      if (this.isAuthError(error) && this.credentials) {
+        await this.relogin();
+        try {
+          const response = await requestFn();
+          if (response.status !== HTTP_STATUS.OK) throw new Error(`${label} failed with status ${response.status}`);
+          return response.data;
+        } catch (retryError: unknown) {
+          throw this.formatApiError(retryError, label);
+        }
+      }
       throw this.formatApiError(error, label);
     }
+  }
+
+  /** Authenticated GET request */
+  async apiGet<T = unknown>(url: string, label: string): Promise<T> {
+    return this.authenticatedRequest<T>(() => this.client.get(url, { headers: this.authHeaders }), label);
   }
 
   /** Authenticated POST request */
-  async apiPost<T = any>(url: string, body: Record<string, any>, label: string): Promise<T> {
-    if (!this.xsrfToken) throw new Error('XSRF token not available. Must login first.');
-    try {
-      const response = await this.client.post(url, body, {
-        headers: { 'Content-Type': 'application/json;charset=UTF-8', ...this.authHeaders }
-      });
-      if (response.status !== HTTP_STATUS.OK) throw new Error(`${label} failed with status ${response.status}`);
-      return response.data;
-    } catch (error: unknown) {
-      throw this.formatApiError(error, label);
-    }
+  async apiPost<T = unknown>(url: string, body: Record<string, unknown>, label: string): Promise<T> {
+    return this.authenticatedRequest<T>(
+      () => this.client.post(url, body, { headers: { 'Content-Type': 'application/json;charset=UTF-8', ...this.authHeaders } }),
+      label
+    );
   }
 
-  /** Wrap a fetch in try/catch with retry and re-login. Returns fallback on failure. */
-  async fetchOptional<T>(fetchFn: () => Promise<T>, label: string, fallback: T): Promise<T> {
-    try {
-      return await requestWithRetry(fetchFn, () => this.relogin(), { logPrefix: `Smart Cookie: ${label}` });
-    } catch (error) {
-      Logger.warn(`Warning: Could not fetch ${label.toLowerCase()}:`, (error as Error).message);
-      return fallback;
-    }
+  /** Reset all session state and recreate the HTTP client */
+  reset(): void {
+    this.xsrfToken = null;
+    this.troopId = null;
+    this.meResponse = null;
+    this.credentials = null;
+    this.cookieJar = new CookieJar();
+    this.client = this.createClient();
   }
 }

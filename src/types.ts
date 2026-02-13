@@ -2,6 +2,8 @@
 // Single source of truth for all data structure types
 
 import type { ALLOCATION_CHANNEL, ALLOCATION_SOURCE, OrderType, Owner, PaymentMethod, TransferCategory, TransferType } from './constants';
+import type { SCCookieMapEntry, SCMeResponse } from './scrapers/sc-types';
+import type { DCRole, SeasonalDataFiles } from './seasonal-data';
 
 // ============================================================================
 // COOKIE TYPES
@@ -92,6 +94,8 @@ export type TransferInput = Partial<Transfer> & {
   virtualBooth?: boolean;
   boothDivider?: boolean;
   directShipDivider?: boolean;
+  troopNumber?: string;
+  troopName?: string;
 };
 
 // ============================================================================
@@ -258,12 +262,27 @@ export interface Warning {
 // ============================================================================
 
 export interface ScrapeProgress {
-  source: 'dc' | 'sc';
-  status: string;
-  progress: number;
+  endpoint: string;
+  status: 'syncing' | 'synced' | 'error';
+  cached?: boolean;
 }
 
 export type ProgressCallback = ((progress: ScrapeProgress) => void) | null;
+
+// ============================================================================
+// SYNC STATE (per-endpoint sync tracking)
+// ============================================================================
+
+export interface EndpointSyncState {
+  status: 'idle' | 'syncing' | 'synced' | 'error';
+  lastSync: string | null;
+  cached?: boolean;
+}
+
+export interface SyncState {
+  syncing: boolean;
+  endpoints: Record<string, EndpointSyncState>;
+}
 
 // ============================================================================
 // CREDENTIALS
@@ -355,6 +374,7 @@ export interface TroopTotals {
   inventory: number;
   donations: number;
   c2tReceived: number;
+  t2tOut: number;
   directShip: number;
   boothDividerT2G: number;
   virtualBoothT2G: number;
@@ -370,10 +390,12 @@ export interface TroopTotals {
 
 export interface TransferBreakdowns {
   c2t: Transfer[];
+  t2tOut: Transfer[];
   t2g: Transfer[];
   g2t: Transfer[];
   totals: {
     c2t: number;
+    t2tOut: number;
     t2gPhysical: number;
     g2t: number;
   };
@@ -449,7 +471,6 @@ export interface AppConfig {
   boothIds: number[];
   boothDayFilters: DayFilter[];
   ignoredTimeSlots: IgnoredTimeSlot[];
-  lastBoothSync?: string;
 }
 
 // ============================================================================
@@ -476,14 +497,21 @@ export interface ScrapeResults {
   smartCookie: ScrapeSourceResult | null;
   success: boolean;
   error?: string;
+  /** Per-endpoint final statuses (set by orchestrator from progress events) */
+  endpointStatuses: Record<string, { status: 'synced' | 'error'; lastSync?: string }>;
+}
+
+export interface Timestamps {
+  endpoints: Record<string, string>;
+  lastUnifiedBuild: string | null;
 }
 
 export interface IpcChannelMap {
   'load-data': {
-    request: { specificSc?: DataFileInfo | null; specificDc?: DataFileInfo | null } | undefined;
+    request: undefined;
     response: LoadDataResult | null;
   };
-  'save-file': { request: { filename: string; content: string; type?: string }; response: { path: string } };
+  'save-file': { request: { filename: string; content: string }; response: { path: string } };
   'load-credentials': { request: undefined; response: Credentials };
   'save-credentials': { request: Credentials; response: undefined };
   'load-config': { request: undefined; response: AppConfig };
@@ -493,6 +521,37 @@ export interface IpcChannelMap {
   'cancel-sync': { request: undefined; response: undefined };
   'refresh-booth-locations': { request: undefined; response: BoothLocation[] };
   'fetch-booth-catalog': { request: undefined; response: BoothLocation[] };
+  'export-diagnostics': { request: undefined; response: { path: string } | null };
+  'verify-sc': {
+    request: { username: string; password: string };
+    response: { troop: SCMeResponse; cookies: SCCookieMapEntry[] };
+  };
+  'verify-dc': {
+    request: { username: string; password: string };
+    response: { roles: DCRole[] };
+  };
+  'save-seasonal-data': {
+    request: Partial<SeasonalDataFiles>;
+    response: undefined;
+  };
+  'load-seasonal-data': {
+    request: undefined;
+    response: SeasonalDataFiles;
+  };
+  'load-timestamps': { request: undefined; response: Timestamps };
+  'record-unified-build': { request: undefined; response: undefined };
+  'wipe-logins': {
+    request: undefined;
+    response: undefined;
+  };
+  'wipe-config': {
+    request: undefined;
+    response: undefined;
+  };
+  'wipe-data': {
+    request: undefined;
+    response: undefined;
+  };
 }
 
 export interface IpcEventMap {
@@ -511,25 +570,15 @@ export interface DataFileInfo {
   data?: any;
 }
 
-export interface DatasetEntry {
-  label: string;
-  scFile: DataFileInfo | null;
-  dcFile: DataFileInfo | null;
-  timestamp: string;
-}
-
 export interface LoadedSources {
   sc: boolean;
   dc: boolean;
   scReport: boolean;
   scTransfer: boolean;
   issues: string[];
-  scTimestamp: string | null;
-  dcTimestamp: string | null;
 }
 
 export interface LoadDataResult {
   unified: UnifiedDataset;
-  datasetList: DatasetEntry[];
   loaded: LoadedSources;
 }

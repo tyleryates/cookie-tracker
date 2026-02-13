@@ -13,7 +13,42 @@ describe('createTransfer — category classification', () => {
     expect(t.category).toBe(TRANSFER_CATEGORY.COUNCIL_TO_TROOP);
   });
 
-  it('classifies T2T as COUNCIL_TO_TROOP', () => {
+  it('classifies incoming T2T as COUNCIL_TO_TROOP', () => {
+    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop A', to: 'Troop B', troopNumber: 'Troop B' });
+    expect(t.category).toBe(TRANSFER_CATEGORY.COUNCIL_TO_TROOP);
+  });
+
+  it('classifies outgoing T2T as TROOP_OUTGOING', () => {
+    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop B', to: 'Troop A', troopNumber: 'Troop B' });
+    expect(t.category).toBe(TRANSFER_CATEGORY.TROOP_OUTGOING);
+  });
+
+  it('classifies outgoing T2T when troopNumber is numeric ID and from is troop name', () => {
+    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop 3990', to: 'Troop 1234', troopNumber: '3990' });
+    expect(t.category).toBe(TRANSFER_CATEGORY.TROOP_OUTGOING);
+  });
+
+  it('classifies incoming T2T when troopNumber is numeric ID and from is different troop', () => {
+    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop 1234', to: 'Troop 3990', troopNumber: '3990' });
+    expect(t.category).toBe(TRANSFER_CATEGORY.COUNCIL_TO_TROOP);
+  });
+
+  it('classifies outgoing T2T via troopName when troopNumber is an internal ID', () => {
+    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop 3990', to: 'Troop 1234', troopNumber: '54321', troopName: 'Troop 3990' });
+    expect(t.category).toBe(TRANSFER_CATEGORY.TROOP_OUTGOING);
+  });
+
+  it('classifies outgoing T2T via troopName digit extraction', () => {
+    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop 3990', to: 'Troop 1234', troopNumber: '54321', troopName: '3990' });
+    expect(t.category).toBe(TRANSFER_CATEGORY.TROOP_OUTGOING);
+  });
+
+  it('classifies incoming T2T correctly when troopName does not match from', () => {
+    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop 1234', to: 'Troop 3990', troopNumber: '54321', troopName: 'Troop 3990' });
+    expect(t.category).toBe(TRANSFER_CATEGORY.COUNCIL_TO_TROOP);
+  });
+
+  it('classifies T2T without troopNumber as COUNCIL_TO_TROOP (safe default)', () => {
     const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop A', to: 'Troop B' });
     expect(t.category).toBe(TRANSFER_CATEGORY.COUNCIL_TO_TROOP);
   });

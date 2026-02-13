@@ -1,34 +1,37 @@
 // Base Scraper — shared constructor, progress, and abort logic
 
+import * as fs from 'node:fs';
 import * as path from 'node:path';
+import Logger from '../logger';
 import type { ProgressCallback } from '../types';
 
-export function getTimestamp(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day}-${hours}-${minutes}-${seconds}`;
+/** Save data to current/{filename} as raw JSON (no envelope) */
+export function savePipelineFile(dataDir: string, filename: string, data: unknown): void {
+  try {
+    const dir = path.join(dataDir, 'current');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(path.join(dir, filename), JSON.stringify(data, null, 2));
+  } catch (err) {
+    Logger.warn('Could not save pipeline file:', (err as Error).message);
+  }
 }
 
 export abstract class BaseScraper {
   dataDir: string;
-  inDir: string;
+  currentDir: string;
   progressCallback: ProgressCallback;
-  abstract readonly source: 'dc' | 'sc';
 
   constructor(dataDir: string, progressCallback: ProgressCallback = null) {
     this.dataDir = dataDir;
-    this.inDir = path.join(dataDir, 'in');
+    this.currentDir = path.join(dataDir, 'current');
     this.progressCallback = progressCallback;
   }
 
-  sendProgress(status: string, progress: number): void {
+  sendEndpointStatus(endpoint: string, status: 'syncing' | 'synced' | 'error', cached?: boolean): void {
     if (this.progressCallback) {
-      this.progressCallback({ source: this.source, status, progress });
+      this.progressCallback({ endpoint, status, cached });
     }
   }
 

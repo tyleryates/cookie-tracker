@@ -3,10 +3,9 @@
 import { DATA_SOURCES, PACKAGES_PER_CASE, SC_API_COLUMNS, SC_REPORT_COLUMNS, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../../constants';
 import type { DataStore } from '../../data-store';
 import { createTransfer, mergeOrCreateOrder } from '../../data-store-operations';
-import type { SCCombinedData } from '../../scrapers/sc-types';
+import type { SCOrdersResponse } from '../../scrapers/sc-types';
 import type { Order, TransferInput } from '../../types';
 import { isC2TTransfer } from '../utils';
-import { importAllocations } from './allocations';
 import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSCTransfer } from './parsers';
 import { mergeDCOrderFromSC, recordImportMetadata, trackScoutFromAPITransfer, updateScoutData } from './scout-helpers';
 
@@ -69,9 +68,9 @@ export function importSmartCookieReport(store: DataStore, reportData: Record<str
   recordImportMetadata(store, 'lastImportSCReport', DATA_SOURCES.SMART_COOKIE_REPORT, reportData.length);
 }
 
-/** Import Smart Cookie API data from API endpoints */
-export function importSmartCookieAPI(store: DataStore, apiData: SCCombinedData): void {
-  const orders = apiData.orders || [];
+/** Import Smart Cookie orders from /orders/search API endpoint */
+export function importSmartCookieOrders(store: DataStore, ordersData: SCOrdersResponse): void {
+  const orders = ordersData.orders || [];
 
   for (const order of orders) {
     // Handle both old format and new /orders/search API format
@@ -102,7 +101,9 @@ export function importSmartCookieAPI(store: DataStore, apiData: SCCombinedData):
       virtualBooth: order.virtual_booth || false,
       boothDivider: !!(order.smart_divider_id && !order.virtual_booth),
       status: order.status || '',
-      actions: order.actions || {}
+      actions: order.actions || {},
+      troopNumber: store.troopNumber || undefined,
+      troopName: store.troopName || undefined
     };
 
     store.transfers.push(createTransfer(transferData as TransferInput));
@@ -113,8 +114,6 @@ export function importSmartCookieAPI(store: DataStore, apiData: SCCombinedData):
 
     trackScoutFromAPITransfer(store, type, to, from);
   }
-
-  importAllocations(store, apiData);
 
   recordImportMetadata(store, 'lastImportSC', DATA_SOURCES.SMART_COOKIE_API, orders.length);
 }
@@ -137,7 +136,9 @@ export function importSmartCookie(store: DataStore, scData: Record<string, any>[
       to: to,
       packages: parseInt(row[SC_API_COLUMNS.TOTAL], 10) || 0,
       varieties: varieties,
-      amount: parseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT]) || 0
+      amount: parseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT]) || 0,
+      troopNumber: store.troopNumber || undefined,
+      troopName: store.troopName || undefined
     };
 
     store.transfers.push(createTransfer(transferData));

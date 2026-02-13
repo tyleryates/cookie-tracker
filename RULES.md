@@ -113,8 +113,9 @@ PGA = Total Packages Credited / Active Girls (girls with at least 1 package sold
 
 **Formula:** Troop Proceeds = (Packages Credited × Rate) − (Exempt Packages × Rate)
 
-**Packages Credited** = C2T Received + Cookie Share + Direct Ship:
+**Packages Credited** = C2T Received − T2T Out + Cookie Share + Direct Ship:
 - **C2T Received** — Physical packages picked up from council (includes packages still in troop inventory, not yet allocated to scouts)
+- **T2T Out** — Packages sent to another troop (subtracted — we sent those cookies away)
 - **Cookie Share** — Virtual donations (not physical inventory, but counts for proceeds)
 - **Direct Ship** — Orders shipped from supplier (troop never handles, but gets proceeds)
 
@@ -253,7 +254,9 @@ The SC API returns all record types through `/orders/search`. Each transfer is a
 
 | Transfer Type | Category | Direction | Meaning | Counted as "Sold"? |
 |--------------|----------|-----------|---------|-------------------|
-| **C2T** / **C2T(P)** / **T2T** | `COUNCIL_TO_TROOP` | IN (+) | Troop picks up from council | No (inventory in) |
+| **C2T** / **C2T(P)** | `COUNCIL_TO_TROOP` | IN (+) | Troop picks up from council | No (inventory in) |
+| **T2T** (from our troop) | `TROOP_OUTGOING` | OUT (−) | Troop sends to another troop | No (inventory out) |
+| **T2T** (to our troop) | `COUNCIL_TO_TROOP` | IN (+) | Another troop sends to us | No (inventory in) |
 | **T2G** (physical pickup) | `GIRL_PICKUP` | OUT (−) | Scout picks up from troop | **Yes** |
 | **T2G** (virtual booth) | `VIRTUAL_BOOTH_ALLOCATION` | OUT (−) | Troop delivery credited to scout | **Yes** |
 | **T2G** (booth divider) | `BOOTH_SALES_ALLOCATION` | OUT (−) | Booth sale credited to scout | **Yes** |
@@ -274,6 +277,12 @@ Excludes: `COUNCIL_TO_TROOP` (inventory in), `GIRL_RETURN` (returns), `DC_ORDER_
 ### BOOTH_COOKIE_SHARE vs COOKIE_SHARE_RECORD
 
 When a booth sells Cookie Share packages and the TCM distributes via Smart Booth Divider, SC creates COOKIE_SHARE entries with a `smart_divider_id`. These are categorized as `BOOTH_COOKIE_SHARE` — they are automatic and should NOT be counted as manual entries needing reconciliation. Manual Virtual Cookie Share entries (no `smart_divider_id`) are categorized as `COOKIE_SHARE_RECORD`. The Virtual Cookie Share reconciliation report uses this distinction to determine what the TCM needs to manually adjust.
+
+### T2T Direction Detection
+
+T2T (Troop-to-Troop) transfers are directional. Direction is determined by comparing the transfer's `from` field against our troop number. If our troop is the sender, it's `TROOP_OUTGOING` (inventory out); otherwise it's `COUNCIL_TO_TROOP` (inventory in).
+
+**Format mismatch:** The SC API's `from`/`to` fields contain troop names (e.g., "Troop 3990") while `troopNumber` comes from `/me` `troop_id` as a numeric ID (e.g., "3990"). The `matchesTroopNumber()` helper in `data-store-operations.ts` handles this by extracting the numeric part from the `from` field before comparing.
 
 ### Important: Negative Quantities
 
@@ -306,11 +315,16 @@ C2T transfers have suffixes: `"C2T"`, `"C2T(P)"`, potentially others. Always mat
 
 ### Troop Inventory Calculation
 
-Net Troop Inventory = C2T Total − T2G Physical Total − Site Orders Physical
+Net Troop Inventory = C2T Received − T2T Out − Girl Pickups − Virtual Booth T2G − Booth Divider T2G + G2T Returns
 
-- **C2T Total** — All packages picked up from council
-- **T2G Physical Total** — `GIRL_PICKUP` category only (excludes virtual booth, booth divider, Cookie Share)
-- **Site Orders Physical** — Troop site delivery orders fulfilled from stock (excludes shipped, donation-only)
+- **C2T Received** — All packages picked up from council (C2T, C2T(P), incoming T2T)
+- **T2T Out** — Packages sent to another troop (`TROOP_OUTGOING` category)
+- **Girl Pickups** — `GIRL_PICKUP` category only (physical T2G scouts picked up)
+- **Virtual Booth T2G** — `VIRTUAL_BOOTH_ALLOCATION` category (site delivery orders allocated to scouts)
+- **Booth Divider T2G** — `BOOTH_SALES_ALLOCATION` category (booth sales allocated to scouts)
+- **G2T Returns** — `GIRL_RETURN` category (scouts returning cookies to troop)
+
+See `troop-totals.ts` `buildTroopTotals()` for the implementation.
 
 ### Scout Inventory Calculation
 
@@ -449,7 +463,7 @@ SC API uses numeric cookie IDs, not names:
 | 52 | Caramel Chocolate Chip |
 | 56 | Exploremores |
 
-These IDs are stable within a season but may change between years. Verify by comparing SC CSV export to API data.
+These IDs are stable within a season but may change between years. Verify by comparing SC CSV export to API data. If a new cookie variety appears in the SC API with an unknown name, the app logs a warning. To add it, update `COOKIE_NAME_NORMALIZATION` in `src/cookie-constants.ts`.
 
 ### Order Number Formats and Matching
 

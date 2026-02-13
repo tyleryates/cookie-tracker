@@ -1,155 +1,202 @@
-// SyncSection — Sync status rows, progress bars, dataset selector, controls
+// SyncSection — High-level sync summary with collapsible endpoint detail
 // Sub-components defined in-file since they're small and only used here.
 
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { formatMaxAge, SYNC_ENDPOINTS } from '../../constants';
+import type { EndpointSyncState, SyncState } from '../../types';
 import type { StatusMessage } from '../app-reducer';
-import type { DatasetEntry } from '../data-loader';
 import { DateFormatter } from '../format-utils';
 
 // ============================================================================
-// TYPES
+// HELPERS
 // ============================================================================
 
-export interface SourceSyncState {
-  status: 'idle' | 'syncing' | 'synced' | 'error';
-  lastSync: string | null;
-  progress: number;
-  progressText: string;
-  errorMessage?: string;
-}
-
-export interface SyncState {
-  syncing: boolean;
-  dc: SourceSyncState;
-  sc: SourceSyncState;
-  booth: SourceSyncState;
-}
-
 export function createInitialSyncState(): SyncState {
-  return {
-    syncing: false,
-    dc: { status: 'idle', lastSync: null, progress: 0, progressText: '' },
-    sc: { status: 'idle', lastSync: null, progress: 0, progressText: '' },
-    booth: { status: 'idle', lastSync: null, progress: 0, progressText: '' }
-  };
+  const endpoints: Record<string, EndpointSyncState> = {};
+  for (const ep of SYNC_ENDPOINTS) {
+    endpoints[ep.id] = { status: 'idle', lastSync: null };
+  }
+  return { syncing: false, endpoints };
 }
+
+type OverallStatus = 'idle' | 'syncing' | 'synced' | 'partial' | 'error';
+
+function computeOverallStatus(endpoints: Record<string, EndpointSyncState>): {
+  status: OverallStatus;
+  syncedCount: number;
+  errorCount: number;
+  syncingCount: number;
+  total: number;
+  lastSync: string | null;
+} {
+  let syncedCount = 0;
+  let errorCount = 0;
+  let syncingCount = 0;
+  let lastSync: string | null = null;
+  const total = SYNC_ENDPOINTS.length;
+
+  for (const ep of SYNC_ENDPOINTS) {
+    const s = endpoints[ep.id];
+    if (!s) continue;
+    if (s.status === 'synced') syncedCount++;
+    else if (s.status === 'error') errorCount++;
+    else if (s.status === 'syncing') syncingCount++;
+    if (s.lastSync && (!lastSync || s.lastSync > lastSync)) lastSync = s.lastSync;
+  }
+
+  let status: OverallStatus = 'idle';
+  if (syncingCount > 0) status = 'syncing';
+  else if (syncedCount === total) status = 'synced';
+  else if (errorCount > 0 && syncedCount > 0) status = 'partial';
+  else if (errorCount > 0) status = 'error';
+  else if (syncedCount > 0) status = 'partial';
+
+  return { status, syncedCount, errorCount, syncingCount, total, lastSync };
+}
+
+// ============================================================================
+// PROPS
+// ============================================================================
 
 interface SyncSectionProps {
   syncState: SyncState;
-  datasets: DatasetEntry[];
-  currentDatasetIndex: number;
   autoSyncEnabled: boolean;
   statusMessage: StatusMessage | null;
-  showSetupHint: boolean;
   onSync: () => void;
   onToggleAutoSync: (enabled: boolean) => void;
-  onDatasetChange: (index: number) => void;
-  onConfigureLogins: () => void;
-  onRecalculate: () => void;
-  onExport: () => void;
-  hasData: boolean;
 }
 
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
 
-function SourceStatus({
-  label,
-  badge,
-  status,
-  lastSync
+function EndpointRow({
+  name,
+  source,
+  frequency,
+  epState,
+  showFrequency
 }: {
-  label: string;
-  badge: string;
-  status: SourceSyncState['status'];
-  lastSync: string | null;
+  name: string;
+  source: string;
+  frequency: string;
+  epState: EndpointSyncState;
+  showFrequency: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
 
-  const statusIcon = status === 'synced' ? '✓' : status === 'error' ? '✗' : status === 'syncing' ? '...' : '✗';
-  const statusClass = status === 'synced' ? 'synced' : status === 'error' ? 'error' : status === 'syncing' ? 'syncing' : 'not-synced';
+  const statusClass =
+    epState.status === 'synced' ? 'synced' : epState.status === 'error' ? 'error' : epState.status === 'syncing' ? 'syncing' : 'not-synced';
 
-  const timestampDisplay = lastSync
+  const timestampDisplay = epState.lastSync
     ? hovered
-      ? DateFormatter.toFullTimestamp(lastSync)
-      : DateFormatter.toFriendly(lastSync)
-    : status === 'error'
+      ? DateFormatter.toFullTimestamp(epState.lastSync)
+      : DateFormatter.toFriendly(epState.lastSync)
+    : epState.status === 'error'
       ? 'Failed'
-      : 'Never synced';
+      : '';
 
-  const timestampColor = status === 'error' ? '#EF4444' : lastSync ? '#666' : undefined;
+  const timestampColor = epState.status === 'error' && !epState.lastSync ? '#EF4444' : undefined;
+
+  const statusTooltip = epState.cached ? 'Cached' : undefined;
 
   return (
-    <div class="sync-status-row">
-      <div class="sync-source-label">
-        <strong>{label}</strong>
-        <span class="source-badge">{badge}</span>
-      </div>
-      <div class="sync-source-status">
-        <span class={`sync-status ${statusClass}`}>{statusIcon}</span>
+    <tr class="endpoint-row">
+      <td class="endpoint-source">{source && <span class={`source-badge ${source === 'SC' ? 'primary' : ''}`}>{source}</span>}</td>
+      <td class="endpoint-name">{name}</td>
+      <td class="endpoint-timestamp">
         <output
           class="sync-timestamp"
-          style={{ cursor: lastSync ? 'pointer' : undefined, color: timestampColor }}
+          style={{ cursor: epState.lastSync ? 'pointer' : undefined, color: timestampColor }}
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         >
           {timestampDisplay}
         </output>
-      </div>
-    </div>
+      </td>
+      {showFrequency && (
+        <td class="endpoint-frequency">
+          <span class="source-badge">{frequency}</span>
+        </td>
+      )}
+      <td class="endpoint-status-cell">
+        <span class={`sync-status ${statusClass}`} title={statusTooltip}>
+          {epState.status === 'syncing' ? <span class="spinner" /> : epState.status === 'synced' ? '\u2713' : '\u2717'}
+        </span>
+      </td>
+    </tr>
   );
 }
 
-function ProgressBar({ visible, progress, text }: { visible: boolean; progress: number; text: string }) {
-  if (!visible) return null;
+function EndpointTable({ endpoints, autoSyncEnabled }: { endpoints: Record<string, EndpointSyncState>; autoSyncEnabled: boolean }) {
   return (
-    <div class="scrape-progress" style={{ display: 'block' }}>
-      <div class="progress-bar">
-        <div class="progress-fill" style={{ width: `${progress}%` }} />
-      </div>
-      <div class="progress-text">{text}</div>
-    </div>
+    <table class="endpoint-table">
+      <tbody>
+        {SYNC_ENDPOINTS.map((ep) => {
+          const epState = endpoints[ep.id] || { status: 'idle', lastSync: null };
+          return (
+            <EndpointRow
+              key={ep.id}
+              name={ep.name}
+              source={ep.source}
+              frequency={formatMaxAge(ep.maxAgeMs)}
+              epState={epState}
+              showFrequency={autoSyncEnabled}
+            />
+          );
+        })}
+      </tbody>
+    </table>
   );
 }
 
-function DatasetSelector({
-  datasets,
-  selectedIndex,
-  onChange
+function SyncSummary({
+  overall,
+  expanded,
+  onToggle
 }: {
-  datasets: DatasetEntry[];
-  selectedIndex: number;
-  onChange: (index: number) => void;
+  overall: ReturnType<typeof computeOverallStatus>;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
+  let statusIcon: preact.ComponentChild;
+  let statusText: string;
+  let statusClass: string;
+
+  switch (overall.status) {
+    case 'syncing':
+      statusIcon = <span class="spinner" />;
+      statusText = `Syncing\u2026 (${overall.syncedCount}/${overall.total})`;
+      statusClass = 'syncing';
+      break;
+    case 'synced':
+      statusIcon = '\u2713';
+      statusText = 'All synced';
+      statusClass = 'synced';
+      break;
+    case 'partial':
+      statusIcon = '!';
+      statusText = `${overall.syncedCount} of ${overall.total} synced`;
+      statusClass = 'partial';
+      break;
+    case 'error':
+      statusIcon = '\u2717';
+      statusText = 'Sync failed';
+      statusClass = 'error';
+      break;
+    default:
+      statusIcon = '\u2014';
+      statusText = 'Not synced yet';
+      statusClass = 'idle';
+  }
+
   return (
-    <div class="dataset-selector">
-      <label for="datasetSelect">Dataset:</label>
-      <select
-        id="datasetSelect"
-        class="form-input"
-        value={String(selectedIndex)}
-        onChange={(e) => {
-          const idx = parseInt((e.target as HTMLSelectElement).value, 10);
-          if (!Number.isNaN(idx)) onChange(idx);
-        }}
-      >
-        {datasets.length === 0 ? (
-          <option value="">No data</option>
-        ) : (
-          datasets.map((ds, i) => {
-            const parts: string[] = [];
-            if (ds.scFile) parts.push('SC');
-            if (ds.dcFile) parts.push('DC');
-            return (
-              <option key={i} value={String(i)}>
-                {ds.label} [{parts.join('+')}]
-              </option>
-            );
-          })
-        )}
-      </select>
-    </div>
+    <button type="button" class={`sync-summary ${statusClass}`} onClick={onToggle}>
+      <span class="sync-summary-icon">{statusIcon}</span>
+      <span class="sync-summary-text">{statusText}</span>
+      {overall.lastSync && <span class="sync-summary-time">{DateFormatter.toFriendly(overall.lastSync)}</span>}
+      <span class={`sync-summary-chevron ${expanded ? 'expanded' : ''}`}>{'\u25B8'}</span>
+    </button>
   );
 }
 
@@ -172,7 +219,7 @@ function SyncControls({
       <label class="toggle-switch" title="Enable automatic hourly sync">
         <input type="checkbox" checked={autoSyncEnabled} onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)} />
         <span class="toggle-slider" />
-        <span class="toggle-label">Auto-sync hourly</span>
+        <span class="toggle-label">Auto Sync</span>
       </label>
     </div>
   );
@@ -182,67 +229,36 @@ function SyncControls({
 // MAIN COMPONENT
 // ============================================================================
 
-export function SyncSection({
-  syncState,
-  datasets,
-  currentDatasetIndex,
-  autoSyncEnabled,
-  statusMessage,
-  showSetupHint,
-  onSync,
-  onToggleAutoSync,
-  onDatasetChange,
-  onConfigureLogins,
-  onRecalculate,
-  onExport,
-  hasData
-}: SyncSectionProps) {
-  const showScProgress = syncState.sc.status === 'syncing' && syncState.sc.progress > 0;
-  const showDcProgress = syncState.dc.status === 'syncing' && syncState.dc.progress > 0;
+export function SyncSection({ syncState, autoSyncEnabled, statusMessage, onSync, onToggleAutoSync }: SyncSectionProps) {
+  const overall = computeOverallStatus(syncState.endpoints);
+  const [manualToggle, setManualToggle] = useState<boolean | null>(null);
+
+  // Auto-expand when syncing or errors; auto-collapse when all synced
+  const autoExpanded = overall.status === 'syncing' || overall.status === 'error' || overall.status === 'partial';
+  const expanded = manualToggle ?? autoExpanded;
+
+  // Reset manual toggle when auto-state changes (so auto-behavior takes over again)
+  const prevAuto = useRef(autoExpanded);
+  useEffect(() => {
+    if (prevAuto.current !== autoExpanded) {
+      prevAuto.current = autoExpanded;
+      setManualToggle(null);
+    }
+  }, [autoExpanded]);
 
   return (
     <>
-      <div class="sync-card" style={{ borderColor: '#4CAF50', borderWidth: '3px' }}>
-        <SourceStatus label="Smart Cookie" badge="Sales & inventory" status={syncState.sc.status} lastSync={syncState.sc.lastSync} />
-        <ProgressBar visible={showScProgress} progress={syncState.sc.progress} text={syncState.sc.progressText} />
+      <SyncSummary overall={overall} expanded={expanded} onToggle={() => setManualToggle(!expanded)} />
 
-        <SourceStatus label="Digital Cookie" badge="Orders & customers" status={syncState.dc.status} lastSync={syncState.dc.lastSync} />
-        <ProgressBar visible={showDcProgress} progress={syncState.dc.progress} text={syncState.dc.progressText} />
+      {expanded && <EndpointTable endpoints={syncState.endpoints} autoSyncEnabled={autoSyncEnabled} />}
 
-        <SourceStatus label="Booth Availability" badge="Every 15 min" status={syncState.booth.status} lastSync={syncState.booth.lastSync} />
-        <ProgressBar
-          visible={syncState.booth.status === 'syncing' && syncState.booth.progress > 0}
-          progress={syncState.booth.progress}
-          text={syncState.booth.progressText}
-        />
+      <SyncControls syncing={syncState.syncing} autoSyncEnabled={autoSyncEnabled} onSync={onSync} onToggleAutoSync={onToggleAutoSync} />
 
-        <SyncControls syncing={syncState.syncing} autoSyncEnabled={autoSyncEnabled} onSync={onSync} onToggleAutoSync={onToggleAutoSync} />
-
-        {statusMessage && (
-          <div class={`sync-status-message ${statusMessage.type}`} style={{ display: 'block' }}>
-            {statusMessage.msg}
-          </div>
-        )}
-      </div>
-
-      {showSetupHint && (
-        <p class="table-hint" style={{ marginTop: '10px' }}>
-          {'💡 First time? Click "Configure Logins" to set up credentials, then use "Sync Now" to download data'}
-        </p>
+      {statusMessage && (
+        <div class={`sync-status-message ${statusMessage.type}`} style={{ display: 'block' }}>
+          {statusMessage.msg}
+        </div>
       )}
-
-      <div class="button-group" style={{ marginTop: '20px' }}>
-        <button type="button" class="btn btn-secondary" onClick={onConfigureLogins}>
-          {'⚙️ Configure Logins'}
-        </button>
-        <button type="button" class="btn btn-secondary" onClick={onRecalculate}>
-          {'🔄 Recalculate'}
-        </button>
-        <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
-          {'💾 Download Data'}
-        </button>
-        <DatasetSelector datasets={datasets} selectedIndex={currentDatasetIndex} onChange={onDatasetChange} />
-      </div>
     </>
   );
 }

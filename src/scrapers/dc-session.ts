@@ -1,11 +1,12 @@
 // Digital Cookie Session — owns auth state (cookie jar, CSRF, role selection)
 // Scrapers and main process use this for authenticated requests.
 
-import axios, { type AxiosInstance } from 'axios';
+import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, isAxiosError } from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import * as cheerio from 'cheerio';
 import { CookieJar } from 'tough-cookie';
 import { HTTP_STATUS } from '../constants';
+import Logger from '../logger';
 
 export class DigitalCookieSession {
   client: AxiosInstance;
@@ -13,8 +14,13 @@ export class DigitalCookieSession {
   private credentials: { username: string; password: string; role?: string } | null = null;
 
   constructor() {
+    this.client = this.createClient();
+  }
+
+  /** Create a fresh axios client with a new cookie jar */
+  private createClient(): AxiosInstance {
     const jar = new CookieJar();
-    this.client = wrapper(
+    return wrapper(
       axios.create({
         baseURL: 'https://digitalcookie.girlscouts.org',
         jar: jar,
@@ -91,15 +97,25 @@ export class DigitalCookieSession {
     return { troopId: troopMatch[1], serviceUnitId: serviceUnitMatch[1] };
   }
 
-  /** Login to Digital Cookie. Stores credentials for re-login. */
-  async login(username: string, password: string, roleName: string | null): Promise<boolean> {
-    this.credentials = { username, password, role: roleName || undefined };
+  /** Parse all role options from the select-role page HTML */
+  private parseRoles(html: string): Array<{ id: string; name: string }> {
+    const $ = cheerio.load(html);
+    const roles: Array<{ id: string; name: string }> = [];
+    $('.custom-dropdown-option').each((_i: number, elem: any) => {
+      const name = $(elem).text().trim();
+      const id = $(elem).attr('data-value');
+      if (id && name) {
+        roles.push({ id, name });
+      }
+    });
+    return roles;
+  }
 
-    // Get CSRF token
+  /** Shared login flow: fetch CSRF token and submit credentials */
+  private async authenticate(username: string, password: string): Promise<void> {
     const loginPageResponse = await this.client.get('/login');
     const csrfToken = this.extractCSRFToken(loginPageResponse.data);
 
-    // Submit login
     const params = new URLSearchParams({
       j_username: username,
       j_password: password,
@@ -113,6 +129,40 @@ export class DigitalCookieSession {
     if (loginResponse.status !== HTTP_STATUS.OK && loginResponse.status !== HTTP_STATUS.FOUND) {
       throw new Error(`Login failed with status ${loginResponse.status}`);
     }
+  }
+
+  /** Check if an error is an authentication error (401 or 403) */
+  private isAuthError(error: unknown): boolean {
+    return isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403);
+  }
+
+  /** Authenticated GET request with automatic re-login on auth failure */
+  async authenticatedGet<T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    try {
+      return await this.client.get<T>(url, config);
+    } catch (error: unknown) {
+      if (this.isAuthError(error) && this.credentials) {
+        Logger.warn(`DC auth error on GET ${url}, attempting re-login`);
+        await this.relogin();
+        return await this.client.get<T>(url, config);
+      }
+      throw error;
+    }
+  }
+
+  /** Login through role selection page and return available roles without selecting one. */
+  async fetchRoles(username: string, password: string): Promise<Array<{ id: string; name: string }>> {
+    await this.authenticate(username, password);
+
+    const rolePageResponse = await this.client.get('/select-role');
+    return this.parseRoles(rolePageResponse.data);
+  }
+
+  /** Login to Digital Cookie. Stores credentials for re-login. */
+  async login(username: string, password: string, roleName: string | null): Promise<boolean> {
+    this.credentials = { username, password, role: roleName || undefined };
+
+    await this.authenticate(username, password);
 
     // Get and select role
     const rolePageResponse = await this.client.get('/select-role');
@@ -131,5 +181,12 @@ export class DigitalCookieSession {
   async relogin(): Promise<boolean> {
     if (!this.credentials) throw new Error('No stored credentials for re-login');
     return this.login(this.credentials.username, this.credentials.password, this.credentials.role || null);
+  }
+
+  /** Reset all session state and recreate the HTTP client */
+  reset(): void {
+    this.selectedRoleName = null;
+    this.credentials = null;
+    this.client = this.createClient();
   }
 }

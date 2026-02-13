@@ -55,7 +55,7 @@ export type PaymentMethod = (typeof PAYMENT_METHOD)[keyof typeof PAYMENT_METHOD]
 export const TRANSFER_TYPE = {
   C2T: 'C2T', // Council to Troop (inventory in)
   C2T_P: 'C2T(P)', // Council to Troop planned (with parentheses)
-  T2T: 'T2T', // Troop to Troop (inventory in from another troop)
+  T2T: 'T2T', // Troop to Troop (direction depends on from/to — see TROOP_OUTGOING category)
   T2G: 'T2G', // Troop to Girl (inventory out)
   G2T: 'G2T', // Girl to Troop (inventory return)
   D: 'D', // Digital Cookie order synced to SC (raw API value)
@@ -75,7 +75,8 @@ export type TransferType = (typeof TRANSFER_TYPE)[keyof typeof TRANSFER_TYPE];
 // which. See category groups below for how reports distinguish them.
 export const TRANSFER_CATEGORY = {
   // Actual inventory transfers
-  COUNCIL_TO_TROOP: 'COUNCIL_TO_TROOP', // C2T, C2T(P), T2T — inventory received
+  COUNCIL_TO_TROOP: 'COUNCIL_TO_TROOP', // C2T, C2T(P), incoming T2T — inventory received
+  TROOP_OUTGOING: 'TROOP_OUTGOING', // T2T from our troop — inventory sent to another troop
   GIRL_PICKUP: 'GIRL_PICKUP', // T2G physical pickup
   VIRTUAL_BOOTH_ALLOCATION: 'VIRTUAL_BOOTH_ALLOCATION', // T2G virtual booth
   BOOTH_SALES_ALLOCATION: 'BOOTH_SALES_ALLOCATION', // T2G booth divider
@@ -281,3 +282,44 @@ export const HTTP_STATUS = {
   OK: 200, // Request successful
   FOUND: 302 // Redirect (used by authentication endpoints)
 } as const;
+
+// ============================================================================
+// PIPELINE FILES — Single source of truth for filenames in current/
+// ============================================================================
+
+export const PIPELINE_FILES = {
+  SC_ORDERS: 'sc-orders.json',
+  SC_DIRECT_SHIP: 'sc-direct-ship.json',
+  SC_COOKIE_SHARES: 'sc-cookie-shares.json',
+  SC_RESERVATIONS: 'sc-reservations.json',
+  SC_BOOTH_ALLOCATIONS: 'sc-booth-allocations.json',
+  SC_BOOTH_CATALOG: 'sc-booth-catalog.json',
+  SC_BOOTH_LOCATIONS: 'sc-booth-locations.json',
+  SC_COOKIE_ID_MAP: 'sc-cookie-id-map.json',
+  DC_EXPORT: 'dc-export.xlsx',
+  UNIFIED: 'unified.json'
+} as const;
+
+// ============================================================================
+// SYNC ENDPOINTS — Per-endpoint sync status registry
+// ============================================================================
+
+/** Derive a human-readable frequency label from milliseconds */
+export function formatMaxAge(ms: number): string {
+  const minutes = ms / 60_000;
+  if (minutes < 60) return `${minutes} min`;
+  const hours = minutes / 60;
+  if (hours === 1) return 'Hourly';
+  return `${hours} hours`;
+}
+
+export const SYNC_ENDPOINTS = [
+  { id: 'sc-orders', source: 'SC', name: 'Orders', maxAgeMs: 3_600_000, syncAction: 'sync' },
+  { id: 'sc-direct-ship', source: 'SC', name: 'Direct Ship Allocations', maxAgeMs: 3_600_000, syncAction: 'sync' },
+  { id: 'sc-cookie-shares', source: 'SC', name: 'Cookie Share Details', maxAgeMs: 3_600_000, syncAction: 'sync' },
+  { id: 'sc-reservations', source: 'SC', name: 'Reservations', maxAgeMs: 3_600_000, syncAction: 'sync' },
+  { id: 'sc-booth-allocations', source: 'SC', name: 'Booth Allocations', maxAgeMs: 3_600_000, syncAction: 'sync' },
+  { id: 'sc-booth-catalog', source: 'SC', name: 'Booth Catalog', maxAgeMs: 14_400_000, syncAction: 'sync' },
+  { id: 'sc-booth-availability', source: 'SC', name: 'Booth Availability', maxAgeMs: 900_000, syncAction: 'refreshBooths' },
+  { id: 'dc-troop-report', source: 'DC', name: 'Troop Report', maxAgeMs: 3_600_000, syncAction: 'sync' }
+] as const;

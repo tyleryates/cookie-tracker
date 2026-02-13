@@ -46,9 +46,10 @@ export interface SCOrdersResponse {
   summary?: { total_cases?: number };
 }
 
-/** Response from /me */
+/** Response from /me — stores full API response; known fields typed for convenience */
 export interface SCMeResponse {
-  role?: { troop_id?: string };
+  role?: { troop_id?: string; troop_name?: string; [key: string]: any };
+  [key: string]: any;
 }
 
 /** Entry from /me/cookies */
@@ -137,25 +138,4 @@ export interface SCBoothLocationRaw {
     date: string;
     timeSlots: Array<{ start_time?: string; startTime?: string; end_time?: string; endTime?: string }>;
   }>;
-}
-
-/** Params for saveOrdersData */
-export interface SaveOrdersParams {
-  ordersData: SCOrdersResponse;
-  directShipDivider: SCDirectShipDivider | null;
-  virtualCookieShares: SCVirtualCookieShare[];
-  reservations: SCReservationsResponse | null;
-  boothDividers: SCBoothDividerResult[];
-  boothLocations: SCBoothLocationRaw[];
-  cookieIdMap: Record<string, string> | null;
-}
-
-/** Shape of saved SC-*.json files (SCOrdersResponse + supplemental data) */
-export interface SCCombinedData extends SCOrdersResponse {
-  directShipDivider?: SCDirectShipDivider | Record<string, any>[] | null;
-  virtualCookieShares?: SCVirtualCookieShare[];
-  reservations?: SCReservationsResponse | null;
-  boothDividers?: SCBoothDividerResult[];
-  boothLocations?: SCBoothLocationRaw[];
-  cookieIdMap?: Record<string, string> | null;
 }

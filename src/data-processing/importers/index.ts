@@ -1,5 +1,6 @@
 // Data Importers — Re-exports for public API
 
-export { normalizeBoothLocation } from './allocations';
+export type { AllocationData } from './allocations';
+export { importAllocations, normalizeBoothLocation } from './allocations';
 export { importDigitalCookie } from './digital-cookie';
-export { importSmartCookie, importSmartCookieAPI, importSmartCookieReport } from './smart-cookie';
+export { importSmartCookie, importSmartCookieOrders, importSmartCookieReport } from './smart-cookie';

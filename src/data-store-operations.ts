@@ -1,23 +1,44 @@
 // Data Store Operations — Factory functions for creating orders and transfers
 
 import { DATA_SOURCES, OWNER, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
-import { buildPhysicalVarieties, isIncomingInventory, sumPhysicalPackages } from './data-processing/utils';
+import { buildPhysicalVarieties, isC2TTransfer, sumPhysicalPackages } from './data-processing/utils';
 import type { DataStore } from './data-store';
 import Logger from './logger';
 import type { Order, OrderMetadata, Transfer, TransferInput } from './types';
+
+/** Check if a from/to field matches our troop number.
+ *  Handles format mismatch: troopNumber is a numeric ID (e.g. "3990")
+ *  but the API from/to fields may contain names (e.g. "Troop 3990"). */
+function matchesTroopNumber(field: string, troopNumber: string): boolean {
+  if (field === troopNumber) return true;
+  // Extract the numeric part from the field and compare
+  const digits = field.match(/\d+/)?.[0];
+  return digits === troopNumber;
+}
 
 /** Classify a transfer into an explicit category based on type + flags */
 function classifyTransferCategory(
   type: string | undefined,
   virtualBooth: boolean,
   boothDivider: boolean,
-  directShipDivider: boolean
+  directShipDivider: boolean,
+  from?: string,
+  troopNumber?: string,
+  troopName?: string
 ): TransferCategory {
   if (!type) {
     Logger.warn('Missing transfer type — defaulting to DC_ORDER_RECORD category');
     return TRANSFER_CATEGORY.DC_ORDER_RECORD;
   }
-  if (isIncomingInventory(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
+  if (isC2TTransfer(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
+  if (type === TRANSFER_TYPE.T2T) {
+    // Outgoing T2T: our troop is the sender → inventory out
+    // Check both troopNumber (from troop_id) and troopName (from troop_name)
+    // because troop_id may be an internal SC ID that doesn't match the from field
+    if (from && troopNumber && matchesTroopNumber(from, troopNumber)) return TRANSFER_CATEGORY.TROOP_OUTGOING;
+    if (from && troopName && matchesTroopNumber(from, troopName)) return TRANSFER_CATEGORY.TROOP_OUTGOING;
+    return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
+  }
   if (type === TRANSFER_TYPE.G2T) return TRANSFER_CATEGORY.GIRL_RETURN;
   if (type === TRANSFER_TYPE.T2G) {
     if (virtualBooth) return TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION;
@@ -77,7 +98,10 @@ export function createTransfer(data: TransferInput): Transfer {
     data.type,
     data.virtualBooth || false,
     data.boothDivider || false,
-    data.directShipDivider || false
+    data.directShipDivider || false,
+    data.from,
+    data.troopNumber,
+    data.troopName
   );
 
   const physicalPackages = sumPhysicalPackages(data.varieties);

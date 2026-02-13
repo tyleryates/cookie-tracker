@@ -27,21 +27,15 @@ const scOrderSchema = z
   })
   .passthrough();
 
-const scDataSchema = z
+const scOrdersSchema = z
   .object({
-    orders: z.array(scOrderSchema),
-    directShipDivider: z.record(z.string(), z.unknown()).optional(),
-    reservations: z
-      .object({ reservations: z.array(z.unknown()) })
-      .passthrough()
-      .optional(),
-    cookieIdMap: z.record(z.string(), z.unknown()).optional()
+    orders: z.array(scOrderSchema)
   })
   .passthrough();
 
-/** Validate Smart Cookie API JSON data shape */
-export function validateSCData(data: unknown): ValidationResult {
-  return fromZodResult(scDataSchema.safeParse(data));
+/** Validate Smart Cookie orders response shape */
+export function validateSCOrders(data: unknown): ValidationResult {
+  return fromZodResult(scOrdersSchema.safeParse(data));
 }
 
 // ============================================================================

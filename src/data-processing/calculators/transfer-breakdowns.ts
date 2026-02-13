@@ -11,10 +11,12 @@ import { isKnownTransferType } from '../utils';
 function buildTransferBreakdowns(store: ReadonlyDataStore, warnings: Warning[]): TransferBreakdowns {
   const seenUnknownTypes = new Set<string>();
   const c2t: Transfer[] = [];
+  const t2tOut: Transfer[] = [];
   const t2g: Transfer[] = [];
   const g2t: Transfer[] = [];
 
   let c2tTotal = 0;
+  let t2tOutTotal = 0;
   let t2gPhysicalTotal = 0;
   let g2tTotal = 0;
 
@@ -35,6 +37,9 @@ function buildTransferBreakdowns(store: ReadonlyDataStore, warnings: Warning[]):
     if (transfer.category === TRANSFER_CATEGORY.COUNCIL_TO_TROOP) {
       c2t.push(transfer);
       c2tTotal += transfer.physicalPackages || 0;
+    } else if (transfer.category === TRANSFER_CATEGORY.TROOP_OUTGOING) {
+      t2tOut.push(transfer);
+      t2tOutTotal += transfer.physicalPackages || 0;
     } else if (transfer.category === TRANSFER_CATEGORY.GIRL_RETURN) {
       g2t.push(transfer);
       g2tTotal += transfer.physicalPackages || 0;
@@ -52,15 +57,18 @@ function buildTransferBreakdowns(store: ReadonlyDataStore, warnings: Warning[]):
   };
 
   c2t.sort(sortByDate);
+  t2tOut.sort(sortByDate);
   t2g.sort(sortByDate);
   g2t.sort(sortByDate);
 
   return {
     c2t,
+    t2tOut,
     t2g,
     g2t,
     totals: {
       c2t: c2tTotal,
+      t2tOut: t2tOutTotal,
       t2gPhysical: t2gPhysicalTotal,
       g2t: g2tTotal
     }

@@ -39,7 +39,8 @@ Three layers with strict boundaries:
 
 - **Renderer MUST NOT import from `data-processing/`** — all data arrives via IPC as a finished UnifiedDataset. If a renderer file needs a calculation, either pre-compute it in the data-processing layer or put the helper in `renderer/format-utils.ts`.
 - **Data-processing MUST NOT import from renderer or scrapers** — it's pure functions operating on data.
-- **Shared types/constants** live in `src/types.ts` and `src/constants.ts` — both layers import from these.
+- **Shared types/constants** live in `src/types.ts`, `src/constants.ts`, and `src/cookie-constants.ts` (cookie names, pricing, variety mappings) — both layers import from these.
+- **Seasonal data** (`src/seasonal-data.ts`) — Persists SC session data (troop info, cookie ID map) across syncs so the pipeline knows troop identity before importing orders.
 
 ### Conventions
 

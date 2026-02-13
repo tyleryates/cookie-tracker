@@ -2,25 +2,22 @@
 
 import { useCallback, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
-import type { Credentials, DayFilter } from '../types';
+import type { DayFilter } from '../types';
 import { type AppState, appReducer } from './app-reducer';
-import { LoginModal } from './components/login-modal';
 import { ReportsSection } from './components/reports-section';
+import { SettingsPage } from './components/settings-page';
 import { createInitialSyncState, SyncSection } from './components/sync-section';
-import { useAppInit, useAutoSync, useDataLoader, useStatusMessage, useSync } from './hooks';
+import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
 
 const initialState: AppState = {
   unified: null,
   appConfig: null,
-  datasetList: [],
-  currentDatasetIndex: 0,
-  autoSyncEnabled: true,
+  autoSyncEnabled: false,
   activeReport: null,
-  modalOpen: false,
+  activePage: 'dashboard',
   statusMessage: null,
-  syncState: createInitialSyncState(),
-  showSetupHint: false
+  syncState: createInitialSyncState()
 };
 
 export function App() {
@@ -31,17 +28,16 @@ export function App() {
 
   // Hook chain
   const { showStatus } = useStatusMessage(dispatch, state.statusMessage);
-  const { loadData, recalculate, exportData, changeDataset } = useDataLoader(dispatch, showStatus, stateRef);
-  const { sync, refreshBooths } = useSync(dispatch, showStatus, loadData, state.appConfig);
-  useAutoSync(state.autoSyncEnabled, sync, refreshBooths);
-  const { checkLoginStatus } = useAppInit(dispatch, loadData);
+  const { loadData, recalculate, exportData } = useDataLoader(dispatch, showStatus);
+  const { sync, refreshBooths } = useSync(dispatch, showStatus, loadData, state.appConfig, state.syncState, state.autoSyncEnabled);
+  useAppInit(dispatch, loadData);
 
   // Remaining inline callbacks (too small to extract)
   const handleToggleAutoSync = useCallback(
     (enabled: boolean) => {
       dispatch({ type: 'TOGGLE_AUTO_SYNC', enabled });
       ipcInvoke('update-config', { autoSyncEnabled: enabled });
-      showStatus(enabled ? 'Auto-sync enabled (syncs every hour)' : 'Auto-sync disabled', 'success');
+      showStatus(enabled ? 'Auto sync enabled' : 'Auto sync disabled', 'success');
     },
     [showStatus]
   );
@@ -50,13 +46,11 @@ export function App() {
     dispatch({ type: 'SET_ACTIVE_REPORT', report: type });
   }, []);
 
-  const handleSaveCredentials = useCallback(
-    async (_credentials: Credentials) => {
-      dispatch({ type: 'CLOSE_MODAL' });
-      await checkLoginStatus();
-    },
-    [checkLoginStatus]
-  );
+  const handleCloseSettings = useCallback(() => {
+    const wasWelcome = stateRef.current.activePage === 'welcome';
+    dispatch({ type: 'CLOSE_SETTINGS' });
+    if (wasWelcome) sync();
+  }, [sync]);
 
   const handleSaveBoothIds = useCallback(
     async (boothIds: number[]) => {
@@ -86,6 +80,18 @@ export function App() {
     showStatus('Ignored time slots cleared', 'success');
   }, [showStatus]);
 
+  const handleWipeConfig = useCallback(async () => {
+    await ipcInvoke('wipe-config');
+    dispatch({ type: 'WIPE_CONFIG' });
+    showStatus('Config wiped', 'success');
+  }, [showStatus]);
+
+  const handleWipeData = useCallback(async () => {
+    await ipcInvoke('wipe-data');
+    dispatch({ type: 'WIPE_DATA', syncState: createInitialSyncState() });
+    showStatus('Data wiped', 'success');
+  }, [showStatus]);
+
   const handleIgnoreSlot = useCallback(async (boothId: number, date: string, startTime: string) => {
     const config = stateRef.current.appConfig;
     const ignored = [...(config?.ignoredTimeSlots || []), { boothId, date, startTime }];
@@ -95,30 +101,54 @@ export function App() {
     await ipcInvoke('update-config', { ignoredTimeSlots: ignored });
   }, []);
 
+  if (state.activePage === 'settings' || state.activePage === 'welcome') {
+    return (
+      <div class="container">
+        <header>
+          <h1>{'\uD83C\uDF6A Girl Scout Cookie Tracker'}</h1>
+          <p>Smart Cookie + Digital Cookie</p>
+        </header>
+        <main>
+          <section class="import-section">
+            <SettingsPage
+              mode={state.activePage === 'welcome' ? 'welcome' : 'settings'}
+              onBack={handleCloseSettings}
+              onRecalculate={recalculate}
+              onExport={exportData}
+              onWipeConfig={handleWipeConfig}
+              onWipeData={handleWipeData}
+              hasData={!!state.unified}
+            />
+          </section>
+        </main>
+        <footer class="app-footer">
+          <span>v{packageJson.version}</span>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div class="container">
       <header>
-        <h1>{'🍪 Girl Scout Cookie Tracker'}</h1>
+        <h1>{'\uD83C\uDF6A Girl Scout Cookie Tracker'}</h1>
         <p>Smart Cookie + Digital Cookie</p>
       </header>
 
       <main>
         <section class="import-section">
-          <h2>Data Sync & Status</h2>
+          <div class="section-header-row">
+            <h2>Data Sync & Status</h2>
+            <button type="button" class="btn btn-secondary" onClick={() => dispatch({ type: 'OPEN_SETTINGS' })}>
+              Settings
+            </button>
+          </div>
           <SyncSection
             syncState={state.syncState}
-            datasets={state.datasetList}
-            currentDatasetIndex={state.currentDatasetIndex}
             autoSyncEnabled={state.autoSyncEnabled}
             statusMessage={state.statusMessage}
-            showSetupHint={state.showSetupHint}
             onSync={sync}
             onToggleAutoSync={handleToggleAutoSync}
-            onDatasetChange={changeDataset}
-            onConfigureLogins={() => dispatch({ type: 'OPEN_MODAL' })}
-            onRecalculate={recalculate}
-            onExport={exportData}
-            hasData={!!state.unified}
           />
         </section>
 
@@ -126,7 +156,7 @@ export function App() {
           activeReport={state.activeReport}
           unified={state.unified}
           appConfig={state.appConfig}
-          boothSyncing={state.syncState.booth.status === 'syncing'}
+          boothSyncing={state.syncState.endpoints['sc-booth-availability']?.status === 'syncing'}
           onSelectReport={handleSelectReport}
           onIgnoreSlot={handleIgnoreSlot}
           onResetIgnored={handleResetIgnored}
@@ -135,10 +165,6 @@ export function App() {
           onSaveDayFilters={handleSaveDayFilters}
         />
       </main>
-
-      {state.modalOpen && (
-        <LoginModal onClose={() => dispatch({ type: 'CLOSE_MODAL' })} onSave={handleSaveCredentials} showStatus={showStatus} />
-      )}
 
       <footer class="app-footer">
         <span>v{packageJson.version}</span>

@@ -160,13 +160,9 @@ h2 {
   }
 }
 
-@keyframes slideUp {
-  from {
-    transform: translateY(40px);
-    opacity: 0;
-  }
+@keyframes spin {
   to {
-    transform: translateY(0);
-    opacity: 1;
+    transform: rotate(360deg);
   }
 }
+

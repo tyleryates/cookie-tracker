@@ -1,7 +1,7 @@
 // Varieties Calculations
 // Aggregates cookie variety counts and calculates troop inventory by variety
 
-import { ORDER_TYPE, T2G_CATEGORIES, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
+import { ORDER_TYPE, T2G_CATEGORIES, TRANSFER_CATEGORY, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
 import type { Scout, Varieties, VarietiesResult } from '../../types';
 import { accumulateVarieties } from '../utils';
@@ -16,8 +16,9 @@ import { needsInventory } from './helpers';
  *
  * INVENTORY CALCULATION (variety-level):
  * - Start with 0 for each variety
- * - Add C2T varieties (packages received from council)
+ * - Add C2T/G2T varieties (packages received from council or returned by scouts)
  * - Subtract ALL T2G varieties (physical + virtual booth + booth divider)
+ * - Subtract outgoing T2T (packages sent to other troops)
  * - Cookie Share excluded (virtual, never in physical inventory)
  */
 function buildVarieties(store: ReadonlyDataStore, scouts: Record<string, Scout>): VarietiesResult {
@@ -41,11 +42,11 @@ function buildVarieties(store: ReadonlyDataStore, scouts: Record<string, Scout>)
   }
 
   // Calculate net troop inventory by variety (SC transfer data)
-  // C2T/G2T add to troop stock, all T2G categories subtract from troop stock
+  // C2T/G2T add to troop stock; T2G + outgoing T2T subtract from troop stock
   for (const transfer of store.transfers) {
     if (TROOP_INVENTORY_IN_CATEGORIES.has(transfer.category)) {
       accumulateVarieties(transfer.physicalVarieties, inventory);
-    } else if (T2G_CATEGORIES.has(transfer.category)) {
+    } else if (T2G_CATEGORIES.has(transfer.category) || transfer.category === TRANSFER_CATEGORY.TROOP_OUTGOING) {
       accumulateVarieties(transfer.physicalVarieties, inventory, { sign: -1 });
     }
   }

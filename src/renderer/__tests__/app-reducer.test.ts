@@ -1,26 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import type { AppConfig, BoothLocation, DatasetEntry, UnifiedDataset } from '../../types';
+import { SYNC_ENDPOINTS } from '../../constants';
+import type { AppConfig, BoothLocation, EndpointSyncState, SyncState, UnifiedDataset } from '../../types';
 import { type AppState, appReducer } from '../app-reducer';
-import type { SourceSyncState, SyncState } from '../components/sync-section';
 
 // =============================================================================
 // HELPERS
 // =============================================================================
 
-function makeSyncState(overrides?: Partial<SyncState>): SyncState {
-  const makeSource = (patch?: Partial<SourceSyncState>): SourceSyncState => ({
-    status: 'idle',
-    lastSync: null,
-    progress: 0,
-    progressText: '',
-    ...patch
-  });
+function makeEndpoints(overrides?: Record<string, Partial<EndpointSyncState>>): Record<string, EndpointSyncState> {
+  const endpoints: Record<string, EndpointSyncState> = {};
+  for (const ep of SYNC_ENDPOINTS) {
+    endpoints[ep.id] = { status: 'idle', lastSync: null, ...overrides?.[ep.id] };
+  }
+  return endpoints;
+}
+
+function makeSyncState(overrides?: Partial<SyncState> & { endpointOverrides?: Record<string, Partial<EndpointSyncState>> }): SyncState {
   return {
-    syncing: false,
-    dc: makeSource(overrides?.dc),
-    sc: makeSource(overrides?.sc),
-    booth: makeSource(overrides?.booth),
-    ...overrides
+    syncing: overrides?.syncing ?? false,
+    endpoints: overrides?.endpoints ?? makeEndpoints(overrides?.endpointOverrides)
   };
 }
 
@@ -28,14 +26,11 @@ function makeState(overrides?: Partial<AppState>): AppState {
   return {
     unified: null,
     appConfig: null,
-    datasetList: [],
-    currentDatasetIndex: 0,
     autoSyncEnabled: true,
     activeReport: null,
-    modalOpen: false,
+    activePage: 'dashboard' as const,
     statusMessage: null,
     syncState: makeSyncState(),
-    showSetupHint: false,
     ...overrides
   };
 }
@@ -153,20 +148,14 @@ describe('CLEAR_STATUS', () => {
 });
 
 // =============================================================================
-// SET_SETUP_HINT
+// SET_WELCOME
 // =============================================================================
 
-describe('SET_SETUP_HINT', () => {
-  it('sets showSetupHint to true', () => {
-    const state = makeState({ showSetupHint: false });
-    const result = appReducer(state, { type: 'SET_SETUP_HINT', show: true });
-    expect(result.showSetupHint).toBe(true);
-  });
-
-  it('sets showSetupHint to false', () => {
-    const state = makeState({ showSetupHint: true });
-    const result = appReducer(state, { type: 'SET_SETUP_HINT', show: false });
-    expect(result.showSetupHint).toBe(false);
+describe('SET_WELCOME', () => {
+  it('sets activePage to welcome', () => {
+    const state = makeState({ activePage: 'dashboard' });
+    const result = appReducer(state, { type: 'SET_WELCOME' });
+    expect(result.activePage).toBe('welcome');
   });
 });
 
@@ -198,33 +187,11 @@ describe('LOAD_CONFIG', () => {
     expect(result.autoSyncEnabled).toBe(true);
   });
 
-  it('updates booth sync state when lastBoothSync is present', () => {
-    const config = makeAppConfig({ lastBoothSync: '2025-01-15T10:00:00Z' });
+  it('does not modify sync state', () => {
+    const config = makeAppConfig();
     const state = makeState();
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.syncState.booth.status).toBe('synced');
-    expect(result.syncState.booth.lastSync).toBe('2025-01-15T10:00:00Z');
-  });
-
-  it('does not update booth sync state when lastBoothSync is absent', () => {
-    const config = makeAppConfig(); // no lastBoothSync
-    const originalSyncState = makeSyncState();
-    const state = makeState({ syncState: originalSyncState });
-    const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.syncState.booth.status).toBe('idle');
-    expect(result.syncState.booth.lastSync).toBeNull();
-  });
-
-  it('preserves other sync state fields when updating booth', () => {
-    const config = makeAppConfig({ lastBoothSync: '2025-01-15T10:00:00Z' });
-    const state = makeState({
-      syncState: makeSyncState({
-        dc: { status: 'synced', lastSync: '2025-01-14T08:00:00Z', progress: 100, progressText: 'Done' }
-      })
-    });
-    const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.syncState.dc.status).toBe('synced');
-    expect(result.syncState.dc.lastSync).toBe('2025-01-14T08:00:00Z');
+    expect(result.syncState).toBe(state.syncState);
   });
 });
 
@@ -233,25 +200,11 @@ describe('LOAD_CONFIG', () => {
 // =============================================================================
 
 describe('SET_UNIFIED', () => {
-  it('sets unified and datasetList', () => {
+  it('sets unified', () => {
     const unified = makeUnifiedDataset();
-    const datasetList: DatasetEntry[] = [{ label: '2025-01-15', scFile: null, dcFile: null, timestamp: '2025-01-15T10:00:00Z' }];
     const state = makeState();
-    const result = appReducer(state, { type: 'SET_UNIFIED', unified, datasetList });
+    const result = appReducer(state, { type: 'SET_UNIFIED', unified });
     expect(result.unified).toBe(unified);
-    expect(result.datasetList).toBe(datasetList);
-  });
-});
-
-// =============================================================================
-// SET_DATASET_INDEX
-// =============================================================================
-
-describe('SET_DATASET_INDEX', () => {
-  it('sets currentDatasetIndex', () => {
-    const state = makeState({ currentDatasetIndex: 0 });
-    const result = appReducer(state, { type: 'SET_DATASET_INDEX', index: 3 });
-    expect(result.currentDatasetIndex).toBe(3);
   });
 });
 
@@ -316,104 +269,97 @@ describe('TOGGLE_AUTO_SYNC', () => {
 });
 
 // =============================================================================
-// OPEN_MODAL
+// OPEN_SETTINGS
 // =============================================================================
 
-describe('OPEN_MODAL', () => {
-  it('sets modalOpen to true', () => {
-    const state = makeState({ modalOpen: false });
-    const result = appReducer(state, { type: 'OPEN_MODAL' });
-    expect(result.modalOpen).toBe(true);
+describe('OPEN_SETTINGS', () => {
+  it('sets activePage to settings', () => {
+    const state = makeState({ activePage: 'dashboard' });
+    const result = appReducer(state, { type: 'OPEN_SETTINGS' });
+    expect(result.activePage).toBe('settings');
   });
 });
 
 // =============================================================================
-// CLOSE_MODAL
+// CLOSE_SETTINGS
 // =============================================================================
 
-describe('CLOSE_MODAL', () => {
-  it('sets modalOpen to false', () => {
-    const state = makeState({ modalOpen: true });
-    const result = appReducer(state, { type: 'CLOSE_MODAL' });
-    expect(result.modalOpen).toBe(false);
+describe('CLOSE_SETTINGS', () => {
+  it('sets activePage to dashboard', () => {
+    const state = makeState({ activePage: 'settings' });
+    const result = appReducer(state, { type: 'CLOSE_SETTINGS' });
+    expect(result.activePage).toBe('dashboard');
   });
 });
 
 // =============================================================================
-// UPDATE_SYNC
+// WIPE_LOGINS
 // =============================================================================
 
-describe('UPDATE_SYNC', () => {
-  it('merges partial patch into syncState', () => {
-    const state = makeState();
-    const result = appReducer(state, { type: 'UPDATE_SYNC', patch: { syncing: true } });
-    expect(result.syncState.syncing).toBe(true);
-    // Other fields preserved
-    expect(result.syncState.dc.status).toBe('idle');
+describe('WIPE_LOGINS', () => {
+  it('sets activePage to welcome', () => {
+    const state = makeState({ activePage: 'dashboard' });
+    const result = appReducer(state, { type: 'WIPE_LOGINS' });
+    expect(result.activePage).toBe('welcome');
   });
 
-  it('can update nested source objects', () => {
-    const newDc: SourceSyncState = { status: 'synced', lastSync: '2025-01-15T10:00:00Z', progress: 100, progressText: 'Done' };
-    const state = makeState();
-    const result = appReducer(state, { type: 'UPDATE_SYNC', patch: { dc: newDc } });
-    expect(result.syncState.dc).toEqual(newDc);
+  it('sets activePage to welcome from settings', () => {
+    const state = makeState({ activePage: 'settings' });
+    const result = appReducer(state, { type: 'WIPE_LOGINS' });
+    expect(result.activePage).toBe('welcome');
   });
 });
 
 // =============================================================================
-// SYNC_SOURCE_UPDATE
+// SYNC_ENDPOINT_UPDATE
 // =============================================================================
 
-describe('SYNC_SOURCE_UPDATE', () => {
-  it('merges patch into dc source', () => {
+describe('SYNC_ENDPOINT_UPDATE', () => {
+  it('updates a single endpoint status', () => {
     const state = makeState();
-    const result = appReducer(state, {
-      type: 'SYNC_SOURCE_UPDATE',
-      source: 'dc',
-      patch: { status: 'syncing', progress: 50, progressText: 'Downloading orders...' }
-    });
-    expect(result.syncState.dc.status).toBe('syncing');
-    expect(result.syncState.dc.progress).toBe(50);
-    expect(result.syncState.dc.progressText).toBe('Downloading orders...');
-    // lastSync preserved from initial state
-    expect(result.syncState.dc.lastSync).toBeNull();
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    expect(result.syncState.endpoints['sc-orders'].status).toBe('syncing');
+    expect(result.syncState.endpoints['sc-orders'].lastSync).toBeNull();
   });
 
-  it('merges patch into sc source', () => {
+  it('updates endpoint status and lastSync', () => {
     const state = makeState();
     const result = appReducer(state, {
-      type: 'SYNC_SOURCE_UPDATE',
-      source: 'sc',
-      patch: { status: 'synced', lastSync: '2025-01-15T12:00:00Z' }
+      type: 'SYNC_ENDPOINT_UPDATE',
+      endpoint: 'dc-troop-report',
+      status: 'synced',
+      lastSync: '2025-01-15T12:00:00Z'
     });
-    expect(result.syncState.sc.status).toBe('synced');
-    expect(result.syncState.sc.lastSync).toBe('2025-01-15T12:00:00Z');
+    expect(result.syncState.endpoints['dc-troop-report'].status).toBe('synced');
+    expect(result.syncState.endpoints['dc-troop-report'].lastSync).toBe('2025-01-15T12:00:00Z');
   });
 
-  it('merges patch into booth source', () => {
-    const state = makeState();
-    const result = appReducer(state, {
-      type: 'SYNC_SOURCE_UPDATE',
-      source: 'booth',
-      patch: { status: 'error', errorMessage: 'Network failure' }
-    });
-    expect(result.syncState.booth.status).toBe('error');
-    expect(result.syncState.booth.errorMessage).toBe('Network failure');
-  });
-
-  it('preserves other sources when updating one', () => {
+  it('preserves lastSync when not provided', () => {
     const state = makeState({
       syncState: makeSyncState({
-        dc: { status: 'synced', lastSync: '2025-01-14T08:00:00Z', progress: 100, progressText: 'Done' }
+        endpointOverrides: { 'sc-orders': { status: 'synced', lastSync: '2025-01-14T08:00:00Z' } }
       })
     });
-    const result = appReducer(state, {
-      type: 'SYNC_SOURCE_UPDATE',
-      source: 'sc',
-      patch: { status: 'syncing' }
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    expect(result.syncState.endpoints['sc-orders'].status).toBe('syncing');
+    expect(result.syncState.endpoints['sc-orders'].lastSync).toBe('2025-01-14T08:00:00Z');
+  });
+
+  it('preserves other endpoints when updating one', () => {
+    const state = makeState({
+      syncState: makeSyncState({
+        endpointOverrides: { 'dc-troop-report': { status: 'synced', lastSync: '2025-01-14T08:00:00Z' } }
+      })
     });
-    expect(result.syncState.dc.status).toBe('synced');
-    expect(result.syncState.sc.status).toBe('syncing');
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    expect(result.syncState.endpoints['dc-troop-report'].status).toBe('synced');
+    expect(result.syncState.endpoints['sc-orders'].status).toBe('syncing');
+  });
+
+  it('sets error status', () => {
+    const state = makeState();
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-reservations', status: 'error' });
+    expect(result.syncState.endpoints['sc-reservations'].status).toBe('error');
   });
 });
 
@@ -428,51 +374,32 @@ describe('SYNC_STARTED', () => {
     expect(result.syncState.syncing).toBe(true);
   });
 
-  it('resets dc progress to syncing state', () => {
+  it('does not reset endpoint states', () => {
     const state = makeState({
       syncState: makeSyncState({
-        dc: { status: 'synced', lastSync: '2025-01-14T08:00:00Z', progress: 100, progressText: 'Done' }
+        endpointOverrides: {
+          'sc-orders': { status: 'synced', lastSync: '2025-01-14T08:00:00Z' },
+          'dc-troop-report': { status: 'synced', lastSync: '2025-01-14T09:00:00Z' }
+        }
       })
     });
     const result = appReducer(state, { type: 'SYNC_STARTED' });
-    expect(result.syncState.dc.status).toBe('syncing');
-    expect(result.syncState.dc.progress).toBe(0);
-    expect(result.syncState.dc.progressText).toBe('Starting...');
+    expect(result.syncState.endpoints['sc-orders'].status).toBe('synced');
+    expect(result.syncState.endpoints['sc-orders'].lastSync).toBe('2025-01-14T08:00:00Z');
+    expect(result.syncState.endpoints['dc-troop-report'].status).toBe('synced');
   });
 
-  it('resets sc progress to syncing state', () => {
+  it('preserves booth endpoint states', () => {
     const state = makeState({
       syncState: makeSyncState({
-        sc: { status: 'synced', lastSync: '2025-01-14T08:00:00Z', progress: 100, progressText: 'Done' }
+        endpointOverrides: {
+          'sc-booth-availability': { status: 'synced', lastSync: '2025-01-14T07:00:00Z' }
+        }
       })
     });
     const result = appReducer(state, { type: 'SYNC_STARTED' });
-    expect(result.syncState.sc.status).toBe('syncing');
-    expect(result.syncState.sc.progress).toBe(0);
-    expect(result.syncState.sc.progressText).toBe('Starting...');
-  });
-
-  it('preserves dc and sc lastSync values', () => {
-    const state = makeState({
-      syncState: makeSyncState({
-        dc: { status: 'synced', lastSync: '2025-01-14T08:00:00Z', progress: 100, progressText: 'Done' },
-        sc: { status: 'synced', lastSync: '2025-01-14T09:00:00Z', progress: 100, progressText: 'Done' }
-      })
-    });
-    const result = appReducer(state, { type: 'SYNC_STARTED' });
-    expect(result.syncState.dc.lastSync).toBe('2025-01-14T08:00:00Z');
-    expect(result.syncState.sc.lastSync).toBe('2025-01-14T09:00:00Z');
-  });
-
-  it('does not reset booth state', () => {
-    const state = makeState({
-      syncState: makeSyncState({
-        booth: { status: 'synced', lastSync: '2025-01-14T07:00:00Z', progress: 0, progressText: '' }
-      })
-    });
-    const result = appReducer(state, { type: 'SYNC_STARTED' });
-    expect(result.syncState.booth.status).toBe('synced');
-    expect(result.syncState.booth.lastSync).toBe('2025-01-14T07:00:00Z');
+    expect(result.syncState.endpoints['sc-booth-availability'].status).toBe('synced');
+    expect(result.syncState.endpoints['sc-booth-availability'].lastSync).toBe('2025-01-14T07:00:00Z');
   });
 });
 
@@ -487,17 +414,19 @@ describe('SYNC_FINISHED', () => {
     expect(result.syncState.syncing).toBe(false);
   });
 
-  it('preserves source sync states', () => {
+  it('preserves all endpoint states', () => {
     const state = makeState({
       syncState: makeSyncState({
         syncing: true,
-        dc: { status: 'synced', lastSync: '2025-01-15T10:00:00Z', progress: 100, progressText: 'Done' },
-        sc: { status: 'synced', lastSync: '2025-01-15T10:05:00Z', progress: 100, progressText: 'Done' }
+        endpointOverrides: {
+          'sc-orders': { status: 'synced', lastSync: '2025-01-15T10:00:00Z' },
+          'sc-direct-ship': { status: 'error' }
+        }
       })
     });
     const result = appReducer(state, { type: 'SYNC_FINISHED' });
-    expect(result.syncState.dc.status).toBe('synced');
-    expect(result.syncState.sc.status).toBe('synced');
+    expect(result.syncState.endpoints['sc-orders'].status).toBe('synced');
+    expect(result.syncState.endpoints['sc-direct-ship'].status).toBe('error');
   });
 });
 
@@ -589,7 +518,7 @@ describe('immutability', () => {
 
   it('returns a new object for state-changing actions', () => {
     const state = makeState();
-    const result = appReducer(state, { type: 'OPEN_MODAL' });
+    const result = appReducer(state, { type: 'OPEN_SETTINGS' });
     expect(result).not.toBe(state);
   });
 });

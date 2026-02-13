@@ -1,0 +1,98 @@
+/* Settings page */
+
+.settings-cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.settings-card {
+  background: var(--surface-raised);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--gray-200);
+  padding: 24px;
+}
+
+.settings-card h3 {
+  color: var(--primary);
+  margin: 0 0 16px 0;
+  font-size: 1.2em;
+  font-weight: 600;
+}
+
+.settings-form .form-group:last-of-type {
+  margin-bottom: 12px;
+}
+
+.settings-verify-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-error {
+  font-size: 0.85em;
+  color: var(--error);
+}
+
+.settings-status-indicators {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.settings-status-ok {
+  font-size: 0.9em;
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.settings-welcome-message {
+  font-size: 1.1em;
+  color: var(--gray-700);
+  margin: 0 0 8px 0;
+}
+
+.settings-role-hint {
+  display: block;
+  font-size: 0.85em;
+  color: var(--gray-500);
+  margin-top: 4px;
+}
+
+.settings-danger-zone {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.settings-danger-zone h3 {
+  color: var(--gray-500);
+  margin: 0 0 16px 0;
+  font-size: 0.9em;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Dataset Selector */
+.dataset-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dataset-selector label {
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--gray-700);
+  white-space: nowrap;
+}
+
+.dataset-selector .form-input {
+  width: auto;
+  display: inline-block;
+  padding: 6px 10px;
+  font-size: 0.9em;
+}

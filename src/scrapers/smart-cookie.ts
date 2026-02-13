@@ -1,15 +1,14 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { isAxiosError } from 'axios';
-import { SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../constants';
+import { PIPELINE_FILES, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../constants';
 import { normalizeCookieName } from '../cookie-constants';
 import Logger from '../logger';
+import type SeasonalData from '../seasonal-data';
 import type { ProgressCallback, ScrapeSourceResult } from '../types';
-import { BaseScraper, getTimestamp } from './base-scraper';
-import { requestWithRetry } from './request-utils';
+import { BaseScraper, savePipelineFile } from './base-scraper';
+import type BoothCache from './booth-cache';
+import type { BoothDatesData, BoothTimesData } from './booth-cache';
 import { SmartCookieSession } from './sc-session';
 import type {
-  SaveOrdersParams,
   SCBoothDividerResult,
   SCBoothLocationRaw,
   SCBoothTimeSlot,
@@ -32,12 +31,34 @@ const BOOTH_DIVIDER_CONCURRENCY = 3;
  * Supports AbortSignal for cancellation.
  */
 class SmartCookieScraper extends BaseScraper {
-  readonly source = 'sc' as const;
   session: SmartCookieSession;
 
-  constructor(dataDir: string, progressCallback: ProgressCallback = null) {
+  constructor(dataDir: string, progressCallback: ProgressCallback = null, session?: SmartCookieSession) {
     super(dataDir, progressCallback);
-    this.session = new SmartCookieSession();
+    this.session = session || new SmartCookieSession();
+  }
+
+  /** Unified fetch + status reporting. Fatal endpoints throw; non-fatal return fallback. */
+  private async fetchEndpoint<T>(
+    endpoint: string,
+    fetchFn: () => Promise<T>,
+    opts: { fatal?: boolean; fallback?: T; cached?: { fresh: boolean; data: T } } = {}
+  ): Promise<T> {
+    if (opts.cached?.fresh) {
+      this.sendEndpointStatus(endpoint, 'synced', true);
+      return opts.cached.data;
+    }
+    this.sendEndpointStatus(endpoint, 'syncing');
+    try {
+      const result = await fetchFn();
+      this.sendEndpointStatus(endpoint, 'synced');
+      return result;
+    } catch (error) {
+      this.sendEndpointStatus(endpoint, 'error');
+      if (opts.fatal) throw error;
+      Logger.warn(`${endpoint}: ${(error as Error).message}`);
+      return opts.fallback as T;
+    }
   }
 
   /** Initialize orders page context */
@@ -51,7 +72,6 @@ class SmartCookieScraper extends BaseScraper {
 
   async fetchOrders(signal?: AbortSignal): Promise<SCOrdersResponse> {
     this.checkAborted(signal);
-    this.sendProgress('Fetching orders...', 25);
 
     await this.initializeOrdersContext();
 
@@ -64,9 +84,7 @@ class SmartCookieScraper extends BaseScraper {
     };
 
     try {
-      const data = await this.session.apiPost<SCOrdersResponse>('/webapi/api/orders/search', searchPayload, 'Orders search');
-      this.sendProgress('Orders fetched', 35);
-      return data;
+      return await this.session.apiPost<SCOrdersResponse>('/webapi/api/orders/search', searchPayload, 'Orders search');
     } catch (error: unknown) {
       if (isAxiosError(error) && error.response) {
         Logger.error('Orders API Error Response:', {
@@ -80,19 +98,17 @@ class SmartCookieScraper extends BaseScraper {
 
   async fetchDirectShipDivider(signal?: AbortSignal): Promise<SCDirectShipDivider> {
     this.checkAborted(signal);
-    this.sendProgress('Fetching direct ship allocations...', 40);
-    return this.session.apiGet<SCDirectShipDivider>('/webapi/api/troops/directship/smart-directship-divider', 'Direct ship divider fetch');
+    return this.session.apiGet<SCDirectShipDivider>('/webapi/api/troops/directship/smart-directship-divider', 'Direct ship');
   }
 
   async fetchVirtualCookieShare(orderId: string): Promise<SCVirtualCookieShare> {
-    return this.session.apiGet<SCVirtualCookieShare>(`/webapi/api/cookie-shares/virtual/${orderId}`, 'Virtual cookie share fetch');
+    return this.session.apiGet<SCVirtualCookieShare>(`/webapi/api/cookie-shares/virtual/${orderId}`, 'Cookie shares');
   }
 
-  async fetchAllVirtualCookieShares(ordersData: SCOrdersResponse, signal?: AbortSignal): Promise<SCVirtualCookieShare[]> {
+  async fetchAllVirtualCookieShares(ordersData: SCOrdersResponse, signal?: AbortSignal): Promise<Record<string, SCVirtualCookieShare>> {
     this.checkAborted(signal);
-    this.sendProgress('Fetching virtual cookie share details...', 45);
 
-    const virtualCookieShares: SCVirtualCookieShare[] = [];
+    const keyedShares: Record<string, SCVirtualCookieShare> = {};
 
     const cookieShareOrders = (ordersData.orders || []).filter((order: SCOrder) => {
       const type = order.transfer_type || order.type || '';
@@ -105,21 +121,20 @@ class SmartCookieScraper extends BaseScraper {
       const orderId = String(order.id || order.order_id || '');
       if (orderId) {
         try {
-          const details = await this.fetchVirtualCookieShare(orderId);
-          virtualCookieShares.push(details);
+          keyedShares[orderId] = await this.fetchVirtualCookieShare(orderId);
         } catch (error) {
           Logger.warn(`Warning: Could not fetch virtual cookie share ${orderId}:`, (error as Error).message);
         }
       }
     }
 
-    return virtualCookieShares;
+    return keyedShares;
   }
 
-  async fetchCookieIdMap(): Promise<Record<string, string>> {
-    const data = await this.session.apiGet<SCCookieMapEntry[]>('/webapi/api/me/cookies', 'Cookie map fetch');
+  /** Build processed cookie ID → type map from raw API entries */
+  buildCookieIdMap(entries: SCCookieMapEntry[]): Record<string, string> {
     const cookieMap: Record<string, string> = {};
-    (data || []).forEach((cookie) => {
+    for (const cookie of entries) {
       if (cookie.id && cookie.name) {
         const cookieType = normalizeCookieName(cookie.name);
         if (cookieType) {
@@ -128,8 +143,13 @@ class SmartCookieScraper extends BaseScraper {
           Logger.warn(`Unknown cookie variety "${cookie.name}" from API. Update COOKIE_NAME_NORMALIZATION in cookie-constants.ts`);
         }
       }
-    });
+    }
     return cookieMap;
+  }
+
+  async fetchCookieIdMap(): Promise<Record<string, string>> {
+    const data = await this.session.apiGet<SCCookieMapEntry[]>('/webapi/api/me/cookies', 'Cookie map fetch');
+    return this.buildCookieIdMap(data || []);
   }
 
   async fetchReservations(): Promise<SCReservationsResponse | null> {
@@ -137,29 +157,28 @@ class SmartCookieScraper extends BaseScraper {
       Logger.warn('Warning: No troopId available, skipping reservations fetch');
       return null;
     }
-    return this.session.apiGet<SCReservationsResponse>(
-      `/webapi/api/troops/reservations?troop_id=${this.session.troopId}`,
-      'Reservations fetch'
-    );
+    return this.session.apiGet<SCReservationsResponse>(`/webapi/api/troops/reservations?troop_id=${this.session.troopId}`, 'Reservations');
   }
 
   async fetchSmartBoothDivider(reservationId: string): Promise<{ girls?: SCDividerGirl[] } | null> {
-    return this.session.apiGet(`/webapi/api/troops/reservations/smart-booth-divider/${reservationId}`, 'Booth divider fetch');
+    return this.session.apiGet(`/webapi/api/troops/reservations/smart-booth-divider/${reservationId}`, 'Booth allocations');
   }
 
   /**
    * Fetch all booth dividers with concurrency limiting.
    * Runs up to BOOTH_DIVIDER_CONCURRENCY fetches in parallel.
    */
-  async fetchAllBoothDividers(reservationsData: SCReservationsResponse, signal?: AbortSignal): Promise<SCBoothDividerResult[]> {
+  async fetchAllBoothDividers(
+    reservationsData: SCReservationsResponse,
+    signal?: AbortSignal
+  ): Promise<Record<string, SCBoothDividerResult>> {
     const reservations = reservationsData?.reservations || [];
-    if (!Array.isArray(reservations) || reservations.length === 0) return [];
+    if (!Array.isArray(reservations) || reservations.length === 0) return {};
 
     const distributed = reservations.filter((r: SCReservation) => r.booth?.is_distributed || r.is_distributed);
-    if (distributed.length === 0) return [];
+    if (distributed.length === 0) return {};
 
-    const boothDividers: SCBoothDividerResult[] = [];
-    let completed = 0;
+    const keyedDividers: Record<string, SCBoothDividerResult> = {};
 
     // Process in batches of BOOTH_DIVIDER_CONCURRENCY
     for (let i = 0; i < distributed.length; i += BOOTH_DIVIDER_CONCURRENCY) {
@@ -187,76 +206,88 @@ class SmartCookieScraper extends BaseScraper {
       );
 
       for (const result of batchResults) {
-        if (result) boothDividers.push(result);
+        if (result) {
+          keyedDividers[result.reservationId] = result;
+        }
       }
-
-      completed += batch.length;
-      const progress = 66 + Math.round((completed / distributed.length) * 9);
-      this.sendProgress(`Fetching booth divider ${completed}/${distributed.length}...`, progress);
     }
 
-    return boothDividers;
+    return keyedDividers;
   }
 
-  async fetchBoothLocations(boothIds: number[] = []): Promise<SCBoothLocationRaw[]> {
+  /** Fetch booth catalog only, using cache if available */
+  async fetchBoothCatalog(cache?: BoothCache): Promise<SCBoothLocationRaw[]> {
+    if (cache?.isCatalogFresh()) {
+      return cache.getCatalog() || [];
+    }
     if (!this.session.troopId) {
-      Logger.warn('Warning: No troopId available, skipping booth locations fetch');
+      Logger.warn('No troopId available, skipping booth catalog fetch');
       return [];
     }
-
     const allBooths = await this.session.apiPost<SCBoothLocationRaw[]>(
       '/webapi/api/booths/search',
       { troop_id: this.session.troopId },
-      'Booth locations fetch'
+      'Booth catalog'
     );
+    const result = allBooths || [];
+    if (cache) cache.setCatalog(result);
+    return result;
+  }
 
-    const filtered = boothIds.length > 0 ? (allBooths || []).filter((b) => boothIds.includes(b.id || b.booth_id || 0)) : allBooths || [];
+  /** Fetch booth availability (dates + times) for selected booths, using cache */
+  async fetchBoothAvailability(boothIds: number[], catalog: SCBoothLocationRaw[], cache?: BoothCache): Promise<SCBoothLocationRaw[]> {
+    const filtered = boothIds.length > 0 ? catalog.filter((b) => boothIds.includes(b.id || b.booth_id || 0)) : catalog;
 
-    if (boothIds.length > 0) {
-      for (const booth of filtered) {
-        booth.availableDates = await this.fetchBoothAvailability(booth.id || booth.booth_id || 0);
+    if (boothIds.length === 0) return filtered;
+
+    for (const booth of filtered) {
+      const boothId = booth.id || booth.booth_id || 0;
+
+      // Tier 2: Dates
+      let rawDates: BoothDatesData;
+      if (cache?.isDatesFresh(boothId)) {
+        rawDates = cache.getDates(boothId)!;
+      } else {
+        rawDates = await this.fetchBoothDates(boothId);
+        cache?.setDates(boothId, rawDates);
       }
+      const dates = Array.isArray(rawDates) ? rawDates : rawDates?.dates || [];
+
+      const availableDates: { date: string; timeSlots: SCBoothTimeSlot[] }[] = [];
+      for (const d of dates) {
+        const dateStr = typeof d === 'string' ? d : d.date || '';
+        if (!dateStr) continue;
+
+        // Tier 3: Time slots
+        let rawTimes: BoothTimesData;
+        if (cache?.isTimeSlotsFresh(boothId, dateStr)) {
+          rawTimes = cache.getTimeSlots(boothId, dateStr)!;
+        } else {
+          rawTimes = await this.fetchBoothTimes(boothId, dateStr);
+          cache?.setTimeSlots(boothId, dateStr, rawTimes);
+        }
+        const slots = Array.isArray(rawTimes) ? rawTimes : rawTimes?.times || rawTimes?.slots || [];
+        availableDates.push({
+          date: dateStr,
+          timeSlots: slots.map((s: SCBoothTimeSlot) => ({
+            start_time: s.start_time || s.startTime || s.start || '',
+            end_time: s.end_time || s.endTime || s.end || ''
+          }))
+        });
+      }
+
+      booth.availableDates = availableDates;
     }
 
     return filtered;
   }
 
-  async fetchBoothAvailability(boothId: number): Promise<{ date: string; timeSlots: SCBoothTimeSlot[] }[]> {
-    try {
-      const datesData = await this.fetchBoothDates(boothId);
-      const dates = Array.isArray(datesData) ? datesData : datesData?.dates || [];
-      const result: { date: string; timeSlots: SCBoothTimeSlot[] }[] = [];
-
-      for (const d of dates) {
-        const dateStr = typeof d === 'string' ? d : d.date || '';
-        if (!dateStr) continue;
-        result.push({ date: dateStr, timeSlots: await this.fetchBoothTimeSlots(boothId, dateStr) });
-      }
-
-      return result;
-    } catch (err) {
-      Logger.warn(`Warning: Could not fetch dates for booth ${boothId}:`, (err as Error).message);
-      return [];
-    }
-  }
-
-  async fetchBoothTimeSlots(boothId: number, date: string): Promise<SCBoothTimeSlot[]> {
-    try {
-      const timesData = await this.fetchBoothTimes(boothId, date);
-      const slots = Array.isArray(timesData) ? timesData : timesData?.times || timesData?.slots || [];
-      return slots.map((s: SCBoothTimeSlot) => ({
-        start_time: s.start_time || s.startTime || s.start || '',
-        end_time: s.end_time || s.endTime || s.end || ''
-      }));
-    } catch (err) {
-      Logger.warn(`Warning: Could not fetch times for booth ${boothId} on ${date}:`, (err as Error).message);
-      return [];
-    }
-  }
-
   async fetchBoothDates(boothId: number): Promise<{ dates?: Array<string | { date: string }> } | Array<string | { date: string }>> {
     if (!this.session.troopId) throw new Error('No troopId available. Must sync first.');
-    return this.session.apiGet(`/webapi/api/booths/availability?booth_id=${boothId}&troop_id=${this.session.troopId}`, 'Booth dates fetch');
+    return this.session.apiGet(
+      `/webapi/api/booths/availability?booth_id=${boothId}&troop_id=${this.session.troopId}`,
+      'Booth availability dates'
+    );
   }
 
   async fetchBoothTimes(
@@ -266,7 +297,7 @@ class SmartCookieScraper extends BaseScraper {
     if (!this.session.troopId) throw new Error('No troopId available. Must sync first.');
     return this.session.apiGet(
       `/webapi/api/booths/availability/times?booth_id=${boothId}&date=${date}&troop_id=${this.session.troopId}`,
-      'Booth times fetch'
+      'Booth availability times'
     );
   }
 
@@ -285,59 +316,16 @@ class SmartCookieScraper extends BaseScraper {
     return null;
   }
 
-  async saveOrdersData(params: SaveOrdersParams): Promise<string> {
-    this.sendProgress('Saving data...', 80);
-    const { ordersData, directShipDivider, virtualCookieShares, reservations, boothDividers, boothLocations, cookieIdMap } = params;
-
-    if (!fs.existsSync(this.inDir)) {
-      fs.mkdirSync(this.inDir, { recursive: true });
-    }
-
-    const timestamp = getTimestamp();
-    const filePath = path.join(this.inDir, `SC-${timestamp}.json`);
-
-    const combinedData = {
-      ...ordersData,
-      directShipDivider: directShipDivider || null,
-      virtualCookieShares: virtualCookieShares || [],
-      reservations: reservations || null,
-      boothDividers: boothDividers || [],
-      boothLocations: boothLocations || [],
-      cookieIdMap: cookieIdMap || null
-    };
-
-    fs.writeFileSync(filePath, JSON.stringify(combinedData, null, 2));
-    this.saveDebugData({ ordersData, directShipDivider, virtualCookieShares, reservations, boothDividers, cookieIdMap });
-
-    this.sendProgress('Data saved', 90);
-    return filePath;
-  }
-
-  saveDebugData(rawResponses: Record<string, any>): void {
-    try {
-      const debugDir = path.join(this.dataDir, 'debug');
-      if (!fs.existsSync(debugDir)) {
-        fs.mkdirSync(debugDir, { recursive: true });
-      }
-      const debugData = {
-        timestamp: new Date().toISOString(),
-        troopId: this.session.troopId,
-        me: this.session.meResponse || null,
-        ...rawResponses
-      };
-      fs.writeFileSync(path.join(debugDir, 'SC-debug-latest.json'), JSON.stringify(debugData, null, 2));
-    } catch (err) {
-      Logger.warn('Warning: Could not save debug data:', (err as Error).message);
-    }
-  }
-
   /**
    * Main scrape method. Accepts AbortSignal for cancellation.
+   * seasonalData and boothCache enable staleness-based caching for config endpoints.
    */
   async scrape(
     credentials: { username: string; password: string },
     boothIds: number[] = [],
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    seasonalData?: SeasonalData,
+    boothCache?: BoothCache
   ): Promise<ScrapeSourceResult> {
     if (!credentials?.username || !credentials?.password) {
       return { success: false, source: 'Smart Cookie', error: 'Username and password are required' };
@@ -345,95 +333,89 @@ class SmartCookieScraper extends BaseScraper {
 
     try {
       this.checkAborted(signal);
-      this.sendProgress('Starting...', 5);
 
-      // Login via session
-      this.sendProgress('Logging in...', 10);
+      // Phase 1: Login
+      this.sendEndpointStatus('sc-login', 'syncing');
       await this.session.login(credentials.username, credentials.password);
-      this.sendProgress('Login successful', 20);
+
+      // Use stored troop info if available (seasonal data)
+      const storedTroop = seasonalData?.loadTroop();
+      if (storedTroop?.role?.troop_id) {
+        this.session.troopId = storedTroop.role.troop_id;
+        this.session.meResponse = storedTroop;
+      }
+      this.sendEndpointStatus('sc-login', 'synced');
 
       this.checkAborted(signal);
 
-      // Step 1: Fetch orders
-      const ordersData = await requestWithRetry(
-        () => this.fetchOrders(signal),
-        () => this.session.relogin(),
-        { logPrefix: 'Smart Cookie: Fetch Orders', rateLimit: false }
-      );
+      // Phase 2: Independent fetches in parallel
+      const storedCookies = seasonalData?.loadCookies();
+      const cookieMapCached = storedCookies?.length ? { fresh: true, data: this.buildCookieIdMap(storedCookies) } : undefined;
+      const catalogCached = boothCache?.isCatalogFresh() ? { fresh: true, data: boothCache.getCatalog() || [] } : undefined;
+
+      const [ordersData, directShipDivider, reservations, catalog, cookieIdMap] = await Promise.all([
+        this.fetchEndpoint('sc-orders', () => this.fetchOrders(signal), { fatal: true }),
+        this.fetchEndpoint<SCDirectShipDivider | null>('sc-direct-ship', () => this.fetchDirectShipDivider(signal), { fallback: null }),
+        this.fetchEndpoint<SCReservationsResponse | null>('sc-reservations', () => this.fetchReservations(), { fallback: null }),
+        this.fetchEndpoint<SCBoothLocationRaw[]>('sc-booth-catalog', () => this.fetchBoothCatalog(boothCache), {
+          fallback: [],
+          cached: catalogCached
+        }),
+        this.fetchEndpoint<Record<string, string> | null>('sc-cookie-map', () => this.fetchCookieIdMap(), {
+          fallback: null,
+          cached: cookieMapCached
+        })
+      ]);
 
       // Fallback troopId extraction
       if (!this.session.troopId && ordersData?.orders) {
         this.session.troopId = this.extractTroopIdFromOrders(ordersData.orders);
       }
 
-      this.checkAborted(signal);
-
-      // Step 2: Direct ship divider
-      const directShipDivider = await requestWithRetry(
-        () => this.fetchDirectShipDivider(signal),
-        () => this.session.relogin(),
-        { logPrefix: 'Smart Cookie: Fetch Direct Ship' }
-      );
+      // Save Phase 2 data (durable across Phase 3 failures/cancellation)
+      savePipelineFile(this.dataDir, PIPELINE_FILES.SC_ORDERS, ordersData);
+      if (directShipDivider) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_DIRECT_SHIP, directShipDivider);
+      if (reservations) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_RESERVATIONS, reservations);
+      savePipelineFile(this.dataDir, PIPELINE_FILES.SC_BOOTH_CATALOG, catalog);
+      if (cookieIdMap) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_COOKIE_ID_MAP, cookieIdMap);
 
       this.checkAborted(signal);
 
-      // Step 3: Virtual cookie shares
-      const virtualCookieShares = await requestWithRetry(
-        () => this.fetchAllVirtualCookieShares(ordersData, signal),
-        () => this.session.relogin(),
-        { logPrefix: 'Smart Cookie: Fetch Cookie Shares' }
-      );
+      // Phase 3: Dependent fetches
+      const [cookieShares, boothAllocations, boothLocations] = await Promise.all([
+        this.fetchEndpoint<Record<string, SCVirtualCookieShare>>(
+          'sc-cookie-shares',
+          () => this.fetchAllVirtualCookieShares(ordersData, signal),
+          {
+            fallback: {}
+          }
+        ),
+        reservations
+          ? this.fetchEndpoint<Record<string, SCBoothDividerResult>>(
+              'sc-booth-allocations',
+              () => this.fetchAllBoothDividers(reservations, signal),
+              { fallback: {} }
+            )
+          : (() => {
+              this.sendEndpointStatus('sc-booth-allocations', 'synced');
+              return {} as Record<string, SCBoothDividerResult>;
+            })(),
+        this.fetchEndpoint<SCBoothLocationRaw[]>(
+          'sc-booth-availability',
+          () => this.fetchBoothAvailability(boothIds, catalog, boothCache),
+          { fallback: catalog }
+        )
+      ]);
 
-      this.checkAborted(signal);
-
-      // Step 4: Cookie ID map (non-fatal)
-      this.sendProgress('Fetching cookie map...', 50);
-      const cookieIdMap = await this.session.fetchOptional(() => this.fetchCookieIdMap(), 'Fetch Cookie Map', null);
-
-      this.checkAborted(signal);
-
-      // Step 5: Booth locations (non-fatal)
-      this.sendProgress('Fetching booth locations...', 55);
-      const boothLocations = await this.session.fetchOptional(() => this.fetchBoothLocations(boothIds), 'Fetch Booth Locations', []);
-
-      this.checkAborted(signal);
-
-      // Step 6: Reservations (non-fatal)
-      this.sendProgress('Fetching reservations...', 60);
-      const reservations = await this.session.fetchOptional(() => this.fetchReservations(), 'Fetch Reservations', null);
-
-      this.checkAborted(signal);
-
-      // Step 7: Booth dividers with concurrent batching (non-fatal)
-      let boothDividers: SCBoothDividerResult[] = [];
-      if (reservations) {
-        this.sendProgress('Fetching booth allocations...', 65);
-        boothDividers = await this.session.fetchOptional(
-          () => this.fetchAllBoothDividers(reservations, signal),
-          'Fetch Booth Dividers',
-          []
-        );
-      }
-
-      this.checkAborted(signal);
-
-      // Step 8: Save
-      const filePath = await this.saveOrdersData({
-        ordersData,
-        directShipDivider,
-        virtualCookieShares,
-        reservations,
-        boothDividers,
-        boothLocations,
-        cookieIdMap
-      });
-
-      this.sendProgress('Complete', 100);
+      // Save Phase 3 data
+      if (Object.keys(cookieShares).length > 0) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_COOKIE_SHARES, cookieShares);
+      if (Object.keys(boothAllocations).length > 0) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_BOOTH_ALLOCATIONS, boothAllocations);
+      if (boothLocations.length > 0 && boothIds.length > 0)
+        savePipelineFile(this.dataDir, PIPELINE_FILES.SC_BOOTH_LOCATIONS, boothLocations);
 
       return {
         success: true,
         source: 'Smart Cookie API',
-        filePath,
         orderCount: ordersData.orders?.length || 0,
         totalCases: ordersData.summary?.total_cases || 0
       };

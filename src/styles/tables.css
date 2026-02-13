@@ -30,39 +30,21 @@ tr:hover {
   background: var(--surface-raised);
 }
 
-/* Normal Table: summary/main tables */
+/* Normal Table: summary/main tables (inherits base th/td/tr:hover) */
 .table-normal {
-  width: 100%;
-  border-collapse: collapse;
   margin-top: 20px;
-  font-size: 0.95em;
   background: var(--surface);
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
 
-.table-normal th {
-  background: var(--primary);
-  color: white;
-  padding: 14px 16px;
-  text-align: left;
-  font-weight: 600;
-}
-
 .table-normal td {
   padding: 14px 16px;
-  border-bottom: 1px solid var(--gray-200);
 }
 
-.table-normal tr:hover {
-  background: var(--surface-raised);
-}
-
-/* Compact Table: detailed/raw data */
+/* Compact Table: detailed/raw data (inherits base th/td/tr:hover) */
 .table-compact {
-  width: 100%;
-  border-collapse: collapse;
   margin-top: 12px;
   font-size: 0.85em;
   background: var(--surface);
@@ -71,22 +53,13 @@ tr:hover {
   box-shadow: var(--shadow-sm);
 }
 
-.table-compact th {
-  background: var(--primary);
-  color: white;
-  padding: 5px 8px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 0.95em;
-}
-
+.table-compact th,
 .table-compact td {
   padding: 5px 8px;
-  border-bottom: 1px solid var(--gray-200);
 }
 
-.table-compact tr:hover {
-  background: var(--surface-raised);
+.table-compact th {
+  font-size: 0.95em;
 }
 
 .table-hint {
@@ -119,7 +92,7 @@ tr:hover {
 }
 
 .scout-row:hover {
-  background: linear-gradient(to right, #d1fae5 0%, transparent 100%);
+  background: linear-gradient(to right, var(--primary-light) 0%, transparent 100%);
 }
 
 .expand-icon {
@@ -144,7 +117,7 @@ tr:hover {
 }
 
 .booth-row:hover {
-  background: linear-gradient(to right, #bbdefb 0%, transparent 100%);
+  background: linear-gradient(to right, var(--info-light) 0%, transparent 100%);
 }
 
 /* Booth location cards */
@@ -166,6 +139,13 @@ tr:hover {
 
 .booth-card-body {
   padding: 12px 16px;
+}
+
+.booth-address {
+  font-size: 0.82em;
+  font-weight: normal;
+  color: var(--gray-400);
+  margin-top: 2px;
 }
 
 .booth-type-badge {
@@ -198,7 +178,7 @@ tr:hover {
 
 .booth-date-label {
   font-weight: 600;
-  color: #1565c0;
+  color: var(--status-info);
   margin-bottom: 6px;
 }
 

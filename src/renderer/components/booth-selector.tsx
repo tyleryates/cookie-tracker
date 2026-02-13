@@ -16,6 +16,7 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set(currentBoothIds));
+  const [expandedStores, setExpandedStores] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +39,17 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
     };
   }, []);
 
+  // Auto-expand stores that have existing selections when catalog loads
+  useEffect(() => {
+    if (catalog.length === 0 || currentBoothIds.length === 0) return;
+    const idSet = new Set(currentBoothIds);
+    const toExpand = new Set<string>();
+    for (const booth of catalog) {
+      if (idSet.has(booth.id)) toExpand.add(booth.storeName || 'Unknown');
+    }
+    if (toExpand.size > 0) setExpandedStores(toExpand);
+  }, [catalog, currentBoothIds]);
+
   const storeGroups = useMemo(() => {
     const groups = new Map<string, BoothLocation[]>();
     for (const booth of catalog) {
@@ -49,6 +61,15 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
     // Sort by store name
     return new Map([...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])));
   }, [catalog]);
+
+  const toggleExpanded = (storeName: string) => {
+    setExpandedStores((prev) => {
+      const next = new Set(prev);
+      if (next.has(storeName)) next.delete(storeName);
+      else next.add(storeName);
+      return next;
+    });
+  };
 
   const toggleStore = (storeName: string) => {
     const booths = storeGroups.get(storeName) || [];
@@ -100,7 +121,7 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
     <div class="report-visual">
       <h3>Select Booths</h3>
       <p class="muted-text" style={{ marginTop: '-16px', marginBottom: '16px' }}>
-        Toggle stores to enable them, then select specific locations within each store.
+        Click a store to expand it and select specific locations. Use the toggle to select all locations at once.
       </p>
 
       {[...storeGroups.entries()].map(([storeName, booths]) => {
@@ -109,19 +130,19 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
         const allSelected = selectedCount === boothIds.length;
         const storeEnabled = selectedCount > 0;
 
+        const expanded = expandedStores.has(storeName);
+
         return (
           <div key={storeName} class="booth-card">
-            <button type="button" class="booth-card-header booth-selector-store-btn" onClick={() => toggleStore(storeName)}>
+            <button type="button" class="booth-card-header booth-selector-store-btn" onClick={() => toggleExpanded(storeName)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span class="toggle-switch">
-                  <input
-                    type="checkbox"
-                    checked={storeEnabled}
-                    onClick={(e: Event) => e.stopPropagation()}
-                    onChange={() => toggleStore(storeName)}
-                  />
-                  <span class="toggle-slider" />
-                </span>
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = storeEnabled && !allSelected; }}
+                  onClick={(e: Event) => e.stopPropagation()}
+                  onChange={() => toggleStore(storeName)}
+                />
                 <div style={{ textAlign: 'left' }}>
                   <strong>{storeName}</strong>
                   <div class="meta-text">
@@ -129,14 +150,12 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
                   </div>
                 </div>
               </div>
-              {allSelected && booths.length > 1 && (
-                <span class="muted-text" style={{ fontSize: '0.85em' }}>
-                  All selected
-                </span>
-              )}
+              <span class="muted-text" style={{ fontSize: '0.85em' }}>
+                {expanded ? '▾' : `▸ ${booths.length} location${booths.length === 1 ? '' : 's'}`}
+              </span>
             </button>
 
-            {storeEnabled && (
+            {expanded && (
               <div class="booth-card-body">
                 {booths.map((booth) => {
                   const addr = [booth.address.street, booth.address.city, booth.address.state, booth.address.zip]

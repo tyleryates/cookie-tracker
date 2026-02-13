@@ -63,15 +63,21 @@ function buildTroopTotals(
 ): TroopTotals {
   const rawDCData = store.metadata.rawDCData || [];
 
-  // Net troop inventory: received from council minus all outflows, plus returns
+  // Net troop inventory: received minus all outflows, plus returns
   const totalInventory =
-    packageTotals.c2tReceived - packageTotals.allocated - packageTotals.virtualBoothT2G - packageTotals.boothDividerT2G + packageTotals.g2t;
+    packageTotals.c2tReceived -
+    packageTotals.t2tOut -
+    packageTotals.allocated -
+    packageTotals.virtualBoothT2G -
+    packageTotals.boothDividerT2G +
+    packageTotals.g2t;
   const scoutAgg = aggregateScoutTotals(scouts);
   // Total donations = DC non-site (individual girl orders) + credited allocations (site orders distributed to scouts)
   const donations = countDCDonations(rawDCData) + scoutAgg.creditedDonations;
 
   // Troop proceeds: rate depends on Per Girl Average (PGA)
-  const packagesCredited = packageTotals.c2tReceived + donations + scoutAgg.directShip;
+  // Outgoing T2T reduces credited packages (we sent those cookies away)
+  const packagesCredited = packageTotals.c2tReceived - packageTotals.t2tOut + donations + scoutAgg.directShip;
   const pga = scoutCounts.active > 0 ? Math.round(packagesCredited / scoutCounts.active) : 0;
   const proceedsRate = getTroopProceedsRate(pga);
   const grossProceeds = packagesCredited * proceedsRate;
@@ -87,6 +93,7 @@ function buildTroopTotals(
     inventory: totalInventory,
     donations,
     c2tReceived: packageTotals.c2tReceived,
+    t2tOut: packageTotals.t2tOut,
     directShip: packageTotals.directShip,
     boothDividerT2G: packageTotals.boothDividerT2G,
     virtualBoothT2G: packageTotals.virtualBoothT2G,

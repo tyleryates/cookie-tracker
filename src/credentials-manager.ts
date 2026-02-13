@@ -59,15 +59,6 @@ class CredentialsManager {
    */
   saveCredentials(credentials: Credentials): { success: boolean; error?: string; path?: string; encrypted?: boolean } {
     try {
-      // Validate credentials structure
-      const validation = this.validateCredentials(credentials);
-      if (!validation.valid) {
-        return {
-          success: false,
-          error: validation.error
-        };
-      }
-
       // Create data directory if it doesn't exist
       const dataDir = path.dirname(this.credentialsPath);
       if (!fs.existsSync(dataDir)) {

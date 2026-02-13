@@ -1,7 +1,7 @@
 .PHONY: help dev compile watch build build-win build-all clean install version lint format knip typecheck test \
        publish publish-mac publish-win test-build \
        bump-patch bump-minor bump-major release-patch release-minor release-major commit-version \
-       check-token pre-release show-releases dist-info git-status
+       check-token pre-release show-releases dist-info check-signing git-status
 
 # === Development ===
 
@@ -139,11 +139,47 @@ show-releases:  ## Show GitHub releases for this repo
 	curl -s "https://api.github.com/repos/$$REPO/releases" | grep -E '"tag_name"|"name"|"published_at"' | head -30
 
 dist-info:  ## Show info about built packages
-	@if [ -d "dist" ]; then \
+	@if [ -d "release" ]; then \
 		echo "Built packages:"; \
-		ls -lh dist/*.dmg dist/*.exe 2>/dev/null || echo "No packages found in dist/"; \
+		ls -lh release/*.dmg release/*.zip release/*.exe 2>/dev/null || echo "No packages found in release/"; \
 	else \
-		echo "No dist/ directory found. Run 'make build' first."; \
+		echo "No release/ directory found. Run 'make build' first."; \
+	fi
+
+check-signing:  ## Verify code signing environment is ready
+	@echo "Checking code signing environment..."; \
+	READY=true; \
+	if security find-identity -v -p codesigning | grep -q "Developer ID Application"; then \
+		echo "✅ Developer ID Application certificate found"; \
+		security find-identity -v -p codesigning | grep "Developer ID Application"; \
+	else \
+		echo "❌ No Developer ID Application certificate found in Keychain"; \
+		READY=false; \
+	fi; \
+	if [ -n "$$APPLE_ID" ]; then \
+		echo "✅ APPLE_ID is set"; \
+	else \
+		echo "❌ APPLE_ID not set"; \
+		READY=false; \
+	fi; \
+	if [ -n "$$APPLE_APP_SPECIFIC_PASSWORD" ]; then \
+		echo "✅ APPLE_APP_SPECIFIC_PASSWORD is set"; \
+	else \
+		echo "❌ APPLE_APP_SPECIFIC_PASSWORD not set"; \
+		READY=false; \
+	fi; \
+	if [ -n "$$APPLE_TEAM_ID" ]; then \
+		echo "✅ APPLE_TEAM_ID is set"; \
+	else \
+		echo "❌ APPLE_TEAM_ID not set"; \
+		READY=false; \
+	fi; \
+	if [ "$$READY" = "true" ]; then \
+		echo ""; \
+		echo "✅ Ready to build signed + notarized app!"; \
+	else \
+		echo ""; \
+		echo "⚠️  Some checks failed. See docs/DISTRIBUTION-UPDATES.md for setup instructions."; \
 	fi
 
 # === Cleanup ===

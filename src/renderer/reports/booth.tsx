@@ -162,7 +162,12 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
                 <ExpandableRow
                   key={idx}
                   rowClass="booth-row"
-                  firstCell={<strong>{r.booth.storeName || '-'}</strong>}
+                  firstCell={
+                    <>
+                      <strong>{r.booth.storeName || '-'}</strong>
+                      {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
+                    </>
+                  }
                   cells={[
                     formatDate(r.timeslot.date),
                     timeDisplay,

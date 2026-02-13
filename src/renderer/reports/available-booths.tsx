@@ -140,6 +140,10 @@ export function AvailableBoothsReport({
     );
   }
 
+  const boothCount = appConfig?.boothIds?.length || 0;
+  const filterCount = filters.length;
+  const isFullyConfigured = boothCount > 0 && filterCount > 0;
+
   const boothsWithDates = boothLocations.filter((loc) => {
     const filtered = filterAvailableDates(loc.availableDates || [], filters);
     return removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots).length > 0;
@@ -149,14 +153,16 @@ export function AvailableBoothsReport({
     <div class="report-visual">
       <h3>Available Booths</h3>
       <div class="report-toolbar">
-        <button type="button" class="btn btn-primary" disabled={refreshing} onClick={onRefresh}>
-          {refreshing ? 'Refreshing...' : 'Refresh Availability'}
-        </button>
+        {isFullyConfigured && (
+          <button type="button" class="btn btn-primary" disabled={refreshing} onClick={onRefresh}>
+            {refreshing ? 'Refreshing...' : 'Refresh Availability'}
+          </button>
+        )}
         <button type="button" class="btn btn-secondary" onClick={() => setSelecting(true)}>
-          Select Booths
+          Select Booths{boothCount > 0 ? ` (${boothCount})` : ''}
         </button>
         <button type="button" class="btn btn-secondary" onClick={() => setFiltering(true)}>
-          Filter Days
+          Filter Days{filterCount > 0 ? ` (${filterCount})` : ''}
         </button>
         {ignoredTimeSlots.length > 0 && (
           <button type="button" class="btn btn-secondary" onClick={onResetIgnored}>
@@ -165,7 +171,15 @@ export function AvailableBoothsReport({
         )}
       </div>
 
-      {boothsWithDates.length === 0 ? (
+      {!isFullyConfigured ? (
+        <div class="info-box info-box-neutral">
+          <strong>Setup Required</strong> — {boothCount === 0 && filterCount === 0
+            ? 'Select booths and configure day/time filters to see availability.'
+            : boothCount === 0
+              ? 'Select booths to see availability.'
+              : 'Configure day/time filters to see availability.'}
+        </div>
+      ) : boothsWithDates.length === 0 ? (
         <p class="muted-text">No available booth slots found. Booth availability is fetched from Smart Cookie during sync.</p>
       ) : (
         boothsWithDates.map((loc) => {

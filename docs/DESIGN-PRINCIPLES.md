@@ -116,7 +116,7 @@ transfer.physicalVarieties = { /* varieties without Cookie Share */ };
 // data-store-operations.ts - classifyTransferCategory()
 // Explicit category from raw type + API flags — no remainder logic
 function classifyTransferCategory(type, virtualBooth, boothDivider, directShipDivider) {
-  if (isIncomingInventory(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
+  if (isC2TTransfer(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
   if (type === TRANSFER_TYPE.G2T) return TRANSFER_CATEGORY.GIRL_RETURN;
   if (type === TRANSFER_TYPE.T2G) {
     if (virtualBooth) return TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION;

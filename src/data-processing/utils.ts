@@ -23,14 +23,6 @@ export function isC2TTransfer(transferType: string): boolean {
   return transferType === TRANSFER_TYPE.C2T || transferType === TRANSFER_TYPE.C2T_P || transferType.startsWith('C2T');
 }
 
-/**
- * Check if a transfer is incoming troop inventory (C2T or T2T)
- * Both Council-to-Troop and Troop-to-Troop transfers add to troop inventory.
- */
-export function isIncomingInventory(transferType: string): boolean {
-  return isC2TTransfer(transferType) || transferType === TRANSFER_TYPE.T2T;
-}
-
 const KNOWN_TRANSFER_TYPES = new Set<string>([
   TRANSFER_TYPE.T2T,
   TRANSFER_TYPE.T2G,

@@ -6,7 +6,6 @@ import {
   accumulateVarieties,
   buildPhysicalVarieties,
   isC2TTransfer,
-  isIncomingInventory,
   isKnownTransferType,
   sumPhysicalPackages
 } from '../utils';
@@ -37,27 +36,6 @@ describe('isC2TTransfer', () => {
 
   it('returns false for empty/falsy input', () => {
     expect(isC2TTransfer('')).toBe(false);
-  });
-});
-
-// =============================================================================
-// isIncomingInventory
-// =============================================================================
-
-describe('isIncomingInventory', () => {
-  it('returns true for C2T transfers', () => {
-    expect(isIncomingInventory('C2T')).toBe(true);
-    expect(isIncomingInventory('C2T(P)')).toBe(true);
-  });
-
-  it('returns true for T2T transfers', () => {
-    expect(isIncomingInventory(TRANSFER_TYPE.T2T)).toBe(true);
-  });
-
-  it('returns false for outgoing types', () => {
-    expect(isIncomingInventory('T2G')).toBe(false);
-    expect(isIncomingInventory('G2T')).toBe(false);
-    expect(isIncomingInventory('D')).toBe(false);
   });
 });
 

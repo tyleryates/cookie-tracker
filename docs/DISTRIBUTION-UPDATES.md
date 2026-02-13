@@ -19,8 +19,8 @@ This guide explains how to distribute updates to users who have the Cookie Track
    make build-win       # Windows
    make build-all       # Both
    ```
-4. Find the installers in `dist/` folder:
-   - macOS: `Cookie Tracker-1.0.1.dmg`
+4. Find the installers in `release/` folder:
+   - macOS: `Cookie Tracker-1.0.1-arm64.dmg` + `.zip`
    - Windows: `Cookie Tracker Setup 1.0.1.exe`
 5. Share the file via email, Dropbox, Google Drive, etc.
 
@@ -40,42 +40,12 @@ This guide explains how to distribute updates to users who have the Cookie Track
 
 This option has been set up in the code. Here's how to use it:
 
-### Initial Setup (One Time):
+### Setup:
 
-1. **Create a GitHub repository:**
-   ```bash
-   cd /path/to/cookie-tracker
-   git init
-   git add .
-   git commit -m "Initial commit"
-   ```
+The GitHub publish config is already in `package.json` (owner: `tyleryates`, repo: `cookie-tracker`). You just need a GitHub token:
 
-2. **Create repo on GitHub** and push:
-   ```bash
-   git remote add origin https://github.com/YOUR_USERNAME/cookie-tracker.git
-   git push -u origin main
-   ```
-
-3. **Add publish configuration to package.json:**
-
-   Open `package.json` and add this inside the `"build"` section:
-   ```json
-   "publish": {
-     "provider": "github",
-     "owner": "your-github-username",
-     "repo": "cookie-tracker"
-   },
-   ```
-
-   Replace `your-github-username` with your actual GitHub username.
-
-4. **Create GitHub Personal Access Token:**
-   - Go to: https://github.com/settings/tokens
-   - Click "Generate new token (classic)"
-   - Select scope: `repo` (full control)
-   - Copy the token
-
-5. **Set environment variable** (add to `~/.zshrc` or `~/.bash_profile`):
+1. **Create a GitHub Personal Access Token** at https://github.com/settings/tokens (classic, `repo` scope)
+2. **Set env var** (add to `~/.zshrc`):
    ```bash
    export GH_TOKEN="your_github_token_here"
    ```
@@ -206,7 +176,7 @@ If you don't want to use GitHub public releases:
 - Is app packaged? (`npm run build`, not `npm start`)
 - Is GitHub token set? (`echo $GH_TOKEN`)
 - Is publish config correct in package.json?
-- Did the GitHub release get created? (Check: https://github.com/YOUR_USERNAME/cookie-tracker/releases)
+- Did the GitHub release get created? (Check the repo's Releases page on GitHub)
 
 **Debug:**
 ```bash
@@ -234,15 +204,86 @@ curl -H "Authorization: token $GH_TOKEN" https://api.github.com/user
 
 ### Mac users see "damaged" message:
 
-**Cause:** App not code-signed
+**Cause:** App not code-signed or not notarized.
 
-**Solution:**
+**Solution:** The app is now configured for automatic code signing and notarization. See the [Code Signing & Notarization](#code-signing--notarization-macos) section below. If you're distributing to a user before signing is set up, they can run:
 ```bash
-# User workaround (one-time):
 xattr -cr "/Applications/Cookie Tracker.app"
 ```
 
-Or get an Apple Developer account ($99/year) for code signing.
+---
+
+## Code Signing & Notarization (macOS)
+
+The build is configured to automatically sign, notarize, and package the app as a DMG. This eliminates the "damaged app" warning for users. If the signing environment variables are not set, the build still produces an unsigned app (safe for local dev).
+
+### One-Time Setup
+
+#### 1. Install a Developer ID Application certificate
+
+1. Go to [developer.apple.com](https://developer.apple.com) > Account > Certificates, Identifiers & Profiles > Certificates
+2. Click **+** and choose **Developer ID Application**
+3. Follow the steps to create a Certificate Signing Request (CSR) via Keychain Access
+4. Download the certificate and double-click to install it in Keychain
+
+Verify it's installed:
+```bash
+security find-identity -v -p codesigning | grep "Developer ID Application"
+```
+
+#### 2. Generate an app-specific password
+
+1. Go to [appleid.apple.com](https://appleid.apple.com) > Sign-In and Security > App-Specific Passwords
+2. Generate a password named `electron-notarize`
+3. Copy the password (format: `xxxx-xxxx-xxxx-xxxx`)
+
+#### 3. Find your Team ID
+
+Go to [developer.apple.com](https://developer.apple.com) > Account > Membership details > Team ID (10-character string).
+
+#### 4. Set environment variables
+
+Add to `~/.zshrc`:
+```bash
+export APPLE_ID="your@email.com"
+export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+export APPLE_TEAM_ID="XXXXXXXXXX"
+```
+
+Then reload: `source ~/.zshrc`
+
+#### 5. Verify everything
+
+```bash
+make check-signing
+```
+
+### How It Works
+
+- **Code signing**: electron-builder automatically finds the "Developer ID Application" certificate in Keychain
+- **Hardened runtime**: Enabled with Electron-specific entitlements (JIT, unsigned memory, library validation bypass)
+- **Notarization**: electron-builder submits the app to Apple and staples the notarization ticket
+- **Output**: `release/` contains both a `.dmg` (drag-to-Applications installer) and `.zip` (for electron-updater auto-updates)
+
+### Build Output
+
+```bash
+make build
+# Produces in release/:
+#   Cookie Tracker-{version}-arm64.dmg    — DMG installer
+#   Cookie Tracker-{version}-arm64-mac.zip — zip for auto-updater
+#   latest-mac.yml                         — auto-update metadata
+```
+
+### Verification
+
+```bash
+# Check the app is signed
+codesign -dv --verbose=2 "release/mac-arm64/Cookie Tracker.app"
+
+# Check Gatekeeper accepts it (after notarization)
+spctl -a -t exec -vv "release/mac-arm64/Cookie Tracker.app"
+```
 
 ---
 
@@ -302,7 +343,7 @@ Before publishing an update:
 - [ ] Update README.md if needed
 - [ ] Compile TypeScript: `make compile`
 - [ ] Commit changes to git
-- [ ] Build and test locally: `make build && open dist/*.dmg`
+- [ ] Build and test locally: `make build && open release/*.dmg`
 - [ ] Verify app opens and works
 - [ ] Publish: `make publish`
 - [ ] Verify GitHub release was created

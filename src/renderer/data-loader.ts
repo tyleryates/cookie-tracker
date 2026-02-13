@@ -1,22 +1,17 @@
 // Data Loader — thin IPC wrapper for the renderer.
 // All data processing happens in the main process via the data pipeline.
 
+import { PIPELINE_FILES } from '../constants';
 import Logger from '../logger';
-import type { AppConfig, DataFileInfo, DatasetEntry, LoadDataResult, UnifiedDataset } from '../types';
-import { DateFormatter } from './format-utils';
+import type { AppConfig, LoadDataResult, UnifiedDataset } from '../types';
 import { ipcInvoke, ipcInvokeRaw } from './ipc';
-
-export type { DatasetEntry };
 
 // ============================================================================
 // DATA LOADING (delegates to main process)
 // ============================================================================
 
-export async function loadDataFromDisk(options?: {
-  specificSc?: DataFileInfo | null;
-  specificDc?: DataFileInfo | null;
-}): Promise<LoadDataResult | null> {
-  const result = await ipcInvokeRaw('load-data', options);
+export async function loadDataFromDisk(): Promise<LoadDataResult | null> {
+  const result = await ipcInvokeRaw('load-data');
 
   // Unwrap standardized IPC format { success, data }
   if (!result?.success) return null;
@@ -49,38 +44,19 @@ export async function saveUnifiedDatasetToDisk(unified: UnifiedDataset): Promise
   try {
     const exportData = serializeUnifiedDataset(unified);
     const jsonStr = JSON.stringify(exportData, null, 2);
-    const timestamp = DateFormatter.toTimestamp();
-    const filename = `unified-${timestamp}.json`;
 
-    const result = await ipcInvokeRaw('save-file', {
-      filename: filename,
-      content: jsonStr,
-      type: 'unified'
-    });
+    const result = await ipcInvokeRaw('save-file', { filename: PIPELINE_FILES.UNIFIED, content: jsonStr });
 
     if (result.success) {
-      Logger.debug(`Unified dataset saved: ${filename}`);
+      Logger.debug('Unified dataset saved');
+      // Record build timestamp
+      await ipcInvokeRaw('record-unified-build');
     } else {
       Logger.error('Failed to save unified dataset:', result.error);
     }
   } catch (error) {
     Logger.error('Error saving unified dataset:', error);
   }
-}
-
-export function exportUnifiedDataset(unified: UnifiedDataset): void {
-  const exportData = serializeUnifiedDataset(unified);
-  const jsonStr = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const timestamp = new Date().toISOString().split('T')[0];
-  a.download = `unified-dataset-${timestamp}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 export async function loadAppConfig(): Promise<AppConfig> {
