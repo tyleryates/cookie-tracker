@@ -505,6 +505,37 @@ All reports must use consistent ordering: Thin Mints, Caramel deLites, Peanut Bu
 
 ---
 
+## Health Checks & Warnings
+
+The app validates incoming data and collects warnings for anything it cannot classify. This ensures unknown data is visible rather than silently defaulted.
+
+### Warning Types
+
+| Warning Type | Trigger | Severity |
+|---|---|---|
+| `UNKNOWN_ORDER_TYPE` | DC order type string not in classification map | **Blocking** — reports disabled until resolved |
+| `UNKNOWN_PAYMENT_METHOD` | DC payment status not recognized (not CAPTURED/CASH/VENMO) | Warning — order processed with `paymentMethod: null` |
+| `UNKNOWN_TRANSFER_TYPE` | SC transfer type not in known set | Warning — transfer still processed |
+| `UNKNOWN_COOKIE_ID` | SC API cookie ID not in `cookieIdMap` | Warning — packages counted in totals but missing from variety breakdown |
+| `SC_TRANSFER_SKIPPED` | SC CSV file present alongside API data (API preferred) | Info |
+
+### Behavior Rules
+
+- **Unknown order types block all reports.** Users cannot view any report until the unknown type is added to the classification logic. This prevents incorrect financial data.
+- **All other warnings are non-blocking.** Data is processed as-is with null/missing fields, and warnings display in the health banner.
+- **Orders and transfers are never silently discarded.** Warnings flag data quality issues without losing data.
+- **Unknown transfer types are deduplicated** — one warning per unique unknown type string.
+- **Health check counts** (`HealthChecks` in `UnifiedMetadata`) summarize warnings by type for the UI banner.
+
+### Adding New Data Formats
+
+When a new cookie variety, order type, payment method, or transfer type appears:
+1. The app will display a health warning
+2. Add the new value to the relevant map in `constants.ts` or `cookie-constants.ts`
+3. Verify with `make test` and `make typecheck`
+
+---
+
 ## Reports
 
 The app provides seven reports (button labels in parentheses):

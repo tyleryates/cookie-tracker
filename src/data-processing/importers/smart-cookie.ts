@@ -4,13 +4,13 @@ import { DATA_SOURCES, PACKAGES_PER_CASE, SC_API_COLUMNS, SC_REPORT_COLUMNS, SPE
 import type { DataStore } from '../../data-store';
 import { createTransfer, mergeOrCreateOrder } from '../../data-store-operations';
 import type { SCOrdersResponse } from '../../scrapers/sc-types';
-import type { Order, TransferInput } from '../../types';
+import type { Order, RawDataRow, TransferInput } from '../../types';
 import { isC2TTransfer } from '../utils';
 import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSCTransfer } from './parsers';
 import { mergeDCOrderFromSC, recordImportMetadata, trackScoutFromAPITransfer, updateScoutData } from './scout-helpers';
 
 /** Import Smart Cookie Report data (ReportExport.xlsx) */
-export function importSmartCookieReport(store: DataStore, reportData: Record<string, any>[]): void {
+export function importSmartCookieReport(store: DataStore, reportData: RawDataRow[]): void {
   for (const row of reportData) {
     const orderNum = String(row[SC_REPORT_COLUMNS.ORDER_ID] || row[SC_REPORT_COLUMNS.REF_NUMBER]);
     const scout = row[SC_REPORT_COLUMNS.GIRL_NAME] || '';
@@ -83,7 +83,14 @@ export function importSmartCookieOrders(store: DataStore, ordersData: SCOrdersRe
 
     // Parse varieties from cookies array
     // Handle both formats: cookies[].id (new API) or cookies[].cookieId (old format)
-    const { varieties, totalPackages } = parseVarietiesFromAPI(order.cookies);
+    const { varieties, totalPackages, unknownCookieIds } = parseVarietiesFromAPI(order.cookies);
+    for (const id of unknownCookieIds) {
+      store.metadata.warnings.push({
+        type: 'UNKNOWN_COOKIE_ID',
+        message: `Unknown cookie ID ${id} in order ${orderNum}`,
+        orderNumber: orderNum
+      });
+    }
 
     const date = order.date || order.createdDate || '';
     const totalValue = String(order.total ?? order.totalPrice ?? '0');
@@ -119,7 +126,7 @@ export function importSmartCookieOrders(store: DataStore, ordersData: SCOrdersRe
 }
 
 /** Import Smart Cookie data */
-export function importSmartCookie(store: DataStore, scData: Record<string, any>[]): void {
+export function importSmartCookie(store: DataStore, scData: RawDataRow[]): void {
   for (const row of scData) {
     const type = row[SC_API_COLUMNS.TYPE] || '';
     const orderNum = String(row[SC_API_COLUMNS.ORDER_NUM] || '');

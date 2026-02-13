@@ -16,7 +16,7 @@ import { DigitalCookieSession } from './scrapers/dc-session';
 import { SmartCookieSession } from './scrapers/sc-session';
 import SmartCookieScraper from './scrapers/smart-cookie';
 import SeasonalData, { type SeasonalDataFiles } from './seasonal-data';
-import type { AppConfig, Credentials, IpcResponse, Timestamps } from './types';
+import type { AppConfig, CredentialPatch, Credentials, CredentialsSummary, IpcResponse, Timestamps } from './types';
 
 let mainWindow: BrowserWindow | null = null;
 let activeOrchestrator: ScraperOrchestrator | null = null;
@@ -103,14 +103,23 @@ function createWindow(): void {
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
+  // Prevent navigation away from the app and block new windows
+  mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
 
-// Auto-update configuration (notification-only, no auto-install)
-autoUpdater.autoDownload = false; // Don't auto-download
+// Auto-update configuration — downloads silently, renderer shows restart banner
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 
 autoUpdater.on('update-available', (info) => {
   Logger.debug('Update available:', info.version);
-  mainWindow?.webContents.send('update-available', info);
+  mainWindow?.webContents.send('update-available', { version: info.version });
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  Logger.debug('Update downloaded:', info.version);
+  mainWindow?.webContents.send('update-downloaded', { version: info.version });
 });
 
 autoUpdater.on('error', (err) => {
@@ -118,6 +127,14 @@ autoUpdater.on('error', (err) => {
 });
 
 app.whenReady().then(() => {
+  // Set dynamic User-Agent from Electron's Chromium version (replaces hardcoded fallback)
+  const ua = app.userAgentFallback;
+  scSession.userAgent = ua;
+  dcSession.userAgent = ua;
+  // Recreate HTTP clients so new UA takes effect before any API calls
+  scSession.reset();
+  dcSession.reset();
+
   createWindow();
 
   // Check for updates on startup only (only in production)
@@ -125,7 +142,7 @@ app.whenReady().then(() => {
     Logger.debug('Skipping update check in development');
   } else {
     setTimeout(() => {
-      autoUpdater.checkForUpdates();
+      autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
     }, 3000); // Check 3 seconds after app starts
   }
 });
@@ -153,7 +170,7 @@ ipcMain.handle(
 // Handle save file (for unified dataset caching — saves to current/)
 ipcMain.handle(
   'save-file',
-  handleIpcError(async (_event, { filename, content }: { filename: string; content: string }) => {
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { filename, content }: { filename: string; content: string }) => {
     const currentDir = path.join(dataDir, 'current');
     if (!fs.existsSync(currentDir)) fs.mkdirSync(currentDir, { recursive: true });
 
@@ -175,19 +192,36 @@ ipcMain.handle(
   })
 );
 
-// Handle load credentials
+// Handle load credentials — returns summary without passwords
 ipcMain.handle(
   'load-credentials',
-  handleIpcError(async () => {
-    return credentialsManager.loadCredentials();
+  handleIpcError(async (): Promise<CredentialsSummary> => {
+    const creds = credentialsManager.loadCredentials();
+    return {
+      smartCookie: {
+        username: creds.smartCookie.username || '',
+        hasPassword: !!creds.smartCookie.password
+      },
+      digitalCookie: {
+        username: creds.digitalCookie.username || '',
+        hasPassword: !!creds.digitalCookie.password,
+        role: creds.digitalCookie.role,
+        councilId: creds.digitalCookie.councilId
+      }
+    };
   })
 );
 
-// Handle save credentials
+// Handle save credentials — merges partial patch with existing credentials
 ipcMain.handle(
   'save-credentials',
-  handleIpcError(async (_event: any, credentials: Credentials) => {
-    return credentialsManager.saveCredentials(credentials);
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, patch: CredentialPatch) => {
+    const existing = credentialsManager.loadCredentials();
+    const merged = {
+      smartCookie: { ...existing.smartCookie, ...patch.smartCookie },
+      digitalCookie: { ...existing.digitalCookie, ...patch.digitalCookie }
+    };
+    return credentialsManager.saveCredentials(merged);
   })
 );
 
@@ -201,14 +235,14 @@ ipcMain.handle(
 
 ipcMain.handle(
   'save-config',
-  handleIpcError(async (_event: any, config: AppConfig) => {
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, config: AppConfig) => {
     configManager.saveConfig(config);
   })
 );
 
 ipcMain.handle(
   'update-config',
-  handleIpcError(async (_event: any, partial: Partial<AppConfig>) => {
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, partial: Partial<AppConfig>) => {
     const updated = configManager.updateConfig(partial);
     return updated;
   })
@@ -237,7 +271,7 @@ ipcMain.handle(
 
     // Run scraping (pass configured booth IDs)
     const config = configManager.loadConfig();
-    const results = await scraper.scrapeAll(auth.credentials, config.boothIds);
+    const results = await scraper.scrapeAll(auth.credentials, config.availableBoothsEnabled ? config.boothIds : []);
 
     // Persist per-endpoint sync timestamps for restart survival
     const ts = loadTimestamps();
@@ -267,10 +301,12 @@ ipcMain.handle(
 ipcMain.handle(
   'refresh-booth-locations',
   handleIpcError(async () => {
+    const config = configManager.loadConfig();
+    if (!config.availableBoothsEnabled) return [];
+
     await ensureSCSession();
     const scraper = new SmartCookieScraper(dataDir, null, scSession);
     const catalog = await scraper.fetchBoothCatalog(boothCache);
-    const config = configManager.loadConfig();
     const boothLocations = await scraper.fetchBoothAvailability(config.boothIds, catalog, boothCache);
 
     // Persist enriched booth locations to disk for the pipeline
@@ -291,6 +327,9 @@ ipcMain.handle(
 ipcMain.handle(
   'fetch-booth-catalog',
   handleIpcError(async () => {
+    const config = configManager.loadConfig();
+    if (!config.availableBoothsEnabled) return [];
+
     await ensureSCSession();
     const scraper = new SmartCookieScraper(dataDir, null, scSession);
     const catalog = await scraper.fetchBoothCatalog(boothCache);
@@ -301,7 +340,7 @@ ipcMain.handle(
 // Handle verify Smart Cookie credentials
 ipcMain.handle(
   'verify-sc',
-  handleIpcError(async (_event, { username, password }: { username: string; password: string }) => {
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { username, password }: { username: string; password: string }) => {
     const session = new SmartCookieSession();
     await session.login(username, password);
 
@@ -317,7 +356,7 @@ ipcMain.handle(
 // Handle verify Digital Cookie credentials
 ipcMain.handle(
   'verify-dc',
-  handleIpcError(async (_event, { username, password }: { username: string; password: string }) => {
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { username, password }: { username: string; password: string }) => {
     const session = new DigitalCookieSession();
     const roles = await session.fetchRoles(username, password);
     return { roles };
@@ -327,7 +366,7 @@ ipcMain.handle(
 // Handle save seasonal data
 ipcMain.handle(
   'save-seasonal-data',
-  handleIpcError(async (_event, data: Partial<SeasonalDataFiles>) => {
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, data: Partial<SeasonalDataFiles>) => {
     seasonalData.saveAll(data);
   })
 );
@@ -370,22 +409,30 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  'wipe-config',
+  'wipe-data',
   handleIpcError(async () => {
-    const configPath = path.join(dataDir, 'config.json');
-    if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+    // Keep only login-related files (credentials + seasonal data used for verification)
+    const KEEP_FILES = new Set(['credentials.enc', 'sc-troop.json', 'sc-cookies.json', 'dc-roles.json']);
+    if (fs.existsSync(dataDir)) {
+      for (const entry of fs.readdirSync(dataDir)) {
+        if (KEEP_FILES.has(entry)) continue;
+        const fullPath = path.join(dataDir, entry);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          fs.rmSync(fullPath, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(fullPath);
+        }
+      }
+    }
+    activeOrchestrator = null;
   })
 );
 
 ipcMain.handle(
-  'wipe-data',
+  'quit-and-install',
   handleIpcError(async () => {
-    const currentDir = path.join(dataDir, 'current');
-    const inDir = path.join(dataDir, 'in');
-    if (fs.existsSync(currentDir)) fs.rmSync(currentDir, { recursive: true, force: true });
-    if (fs.existsSync(inDir)) fs.rmSync(inDir, { recursive: true, force: true });
-    if (fs.existsSync(timestampsPath)) fs.unlinkSync(timestampsPath);
-    activeOrchestrator = null;
+    autoUpdater.quitAndInstall();
   })
 );
 
@@ -396,9 +443,10 @@ ipcMain.handle(
     if (!mainWindow) throw new Error('No main window');
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    // biome-ignore lint/complexity/noBannedTypes: @types/electron is outdated; Electron 40 returns { canceled, filePath }
-    const showSave = dialog.showSaveDialog as Function;
-    const saveResult: { canceled: boolean; filePath?: string } = await showSave(mainWindow, {
+    // Electron type defs resolve showSaveDialog overload incorrectly with BrowserWindow
+    const showSave: (w: BrowserWindow, o: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue> =
+      dialog.showSaveDialog.bind(dialog);
+    const saveResult = await showSave(mainWindow, {
       defaultPath: `cookie-tracker-diagnostics-${timestamp}.zip`,
       filters: [{ name: 'Zip Archives', extensions: ['zip'] }]
     });
@@ -406,9 +454,7 @@ ipcMain.handle(
     if (saveResult.canceled || !saveResult.filePath) return null;
     const filePath = saveResult.filePath;
 
-    const currentDir = path.join(dataDir, 'current');
-    const inDir = path.join(dataDir, 'in');
-    const configPath = path.join(dataDir, 'config.json');
+    const EXCLUDED_FILES = new Set(['credentials.enc']);
 
     const output = fs.createWriteStream(filePath);
     const archive = archiver('zip', { zlib: { level: 9 } });
@@ -420,25 +466,18 @@ ipcMain.handle(
 
     archive.pipe(output);
 
-    // Add current/ directory (API responses, DC export, unified.json)
-    if (fs.existsSync(currentDir)) {
-      archive.directory(currentDir, 'current');
-    }
-
-    // Add data/in/ legacy files (ReportExport-*, CookieOrders-*)
-    if (fs.existsSync(inDir)) {
-      const inFiles = fs.readdirSync(inDir);
-      for (const file of inFiles) {
-        const fullPath = path.join(inDir, file);
-        if (fs.statSync(fullPath).isFile()) {
-          archive.file(fullPath, { name: `in/${file}` });
+    // Add everything in dataDir except credentials
+    if (fs.existsSync(dataDir)) {
+      for (const entry of fs.readdirSync(dataDir)) {
+        if (EXCLUDED_FILES.has(entry)) continue;
+        const fullPath = path.join(dataDir, entry);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+          archive.directory(fullPath, entry);
+        } else if (stat.isFile()) {
+          archive.file(fullPath, { name: entry });
         }
       }
-    }
-
-    // Add config.json (not credentials)
-    if (fs.existsSync(configPath)) {
-      archive.file(configPath, { name: 'config.json' });
     }
 
     await archive.finalize();

@@ -26,7 +26,7 @@ import type {
   SCReservationsResponse,
   SCVirtualCookieShare
 } from './scrapers/sc-types';
-import type { CookieType, DataFileInfo, LoadDataResult, LoadedSources } from './types';
+import type { CookieType, DataFileInfo, LoadDataResult, LoadedSources, RawDataRow } from './types';
 import { validateDCData, validateSCOrders } from './validators';
 
 // ============================================================================
@@ -52,14 +52,14 @@ function cellToString(value: ExcelJS.CellValue): string {
   return String(value);
 }
 
-async function parseExcel(buffer: Buffer): Promise<Record<string, any>[]> {
+async function parseExcel(buffer: Buffer): Promise<RawDataRow[]> {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer as any);
   const worksheet = workbook.worksheets[0];
   if (!worksheet) return [];
 
   const headers: string[] = [];
-  const rows: Record<string, any>[] = [];
+  const rows: RawDataRow[] = [];
 
   worksheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) {
@@ -67,7 +67,7 @@ async function parseExcel(buffer: Buffer): Promise<Record<string, any>[]> {
         headers[colNumber - 1] = cellToString(cell.value);
       });
     } else {
-      const obj: Record<string, any> = {};
+      const obj: RawDataRow = {};
       row.eachCell((cell, colNumber) => {
         const header = headers[colNumber - 1];
         if (header) {
@@ -87,7 +87,7 @@ async function parseExcel(buffer: Buffer): Promise<Record<string, any>[]> {
 // FORMAT VALIDATORS
 // ============================================================================
 
-function isDigitalCookieFormat(data: Record<string, any>[]): boolean {
+function isDigitalCookieFormat(data: RawDataRow[]): boolean {
   if (!data || data.length === 0) return false;
   const headers = Object.keys(data[0]);
   return headers.includes(DC_COLUMNS.GIRL_FIRST_NAME) && headers.includes(DC_COLUMNS.ORDER_NUMBER);
@@ -150,11 +150,11 @@ type FileLoadResult = { loaded: boolean; issue?: string };
 
 async function loadExcelFile(
   file: DataFileInfo,
-  validator: (data: Record<string, any>[]) => boolean,
-  importer: (data: Record<string, any>[]) => void,
+  validator: (data: RawDataRow[]) => boolean,
+  importer: (data: RawDataRow[]) => void,
   errorLabel: string
 ): Promise<FileLoadResult> {
-  const parsedData = await parseExcel(file.data);
+  const parsedData = await parseExcel(file.data as Buffer);
   if (validator(parsedData)) {
     importer(parsedData);
     return { loaded: true };

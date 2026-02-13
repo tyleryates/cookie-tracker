@@ -1,7 +1,7 @@
 // Varieties Calculations
 // Aggregates cookie variety counts and calculates troop inventory by variety
 
-import { ORDER_TYPE, T2G_CATEGORIES, TRANSFER_CATEGORY, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
+import { ORDER_TYPE, T2G_CATEGORIES, TRANSFER_CATEGORY, TRANSFER_TYPE, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
 import type { Scout, Varieties, VarietiesResult } from '../../types';
 import { accumulateVarieties } from '../utils';
@@ -43,7 +43,9 @@ function buildVarieties(store: ReadonlyDataStore, scouts: Record<string, Scout>)
 
   // Calculate net troop inventory by variety (SC transfer data)
   // C2T/G2T add to troop stock; T2G + outgoing T2T subtract from troop stock
+  // PLANNED transfers are pending pickups — not yet in inventory
   for (const transfer of store.transfers) {
+    if (transfer.type === TRANSFER_TYPE.PLANNED) continue;
     if (TROOP_INVENTORY_IN_CATEGORIES.has(transfer.category)) {
       accumulateVarieties(transfer.physicalVarieties, inventory);
     } else if (T2G_CATEGORIES.has(transfer.category) || transfer.category === TRANSFER_CATEGORY.TROOP_OUTGOING) {

@@ -29,8 +29,8 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
 
   if (scoutsForBooth.length === 0) {
     return (
-      <div class="detail-placeholder muted-text">
-        No scout allocations for this booth yet. Distribute in Smart Cookie to see per-scout breakdown.
+      <div class="booth-detail-content muted-text">
+        No scout allocations yet. Distribute in Smart Cookie to see per-scout breakdown.
       </div>
     );
   }
@@ -38,19 +38,16 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
   scoutsForBooth.sort((a, b) => a.name.localeCompare(b.name));
 
   return (
-    <div class="detail-content">
-      <h6 class="section-subheader">Scout Allocations</h6>
-      <DataTable columns={['Scout', 'Packages', 'Donations']} className="table-compact">
+    <div class="booth-detail-content">
+      <table class="booth-allocation-table">
         {scoutsForBooth.map(({ name, packages, donations }) => (
           <tr key={name}>
-            <td>
-              <strong>{name}</strong>
-            </td>
-            <td>{packages}</td>
-            <td>{donations > 0 ? donations : '—'}</td>
+            <td class="booth-allocation-name"><strong>{name}</strong></td>
+            <td class="booth-allocation-detail">{packages} packages</td>
+            <td class="booth-allocation-detail">{donations > 0 ? `${donations} donations` : ''}</td>
           </tr>
         ))}
-      </DataTable>
+      </table>
     </div>
   );
 }
@@ -116,7 +113,7 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
             description: 'Past booths pending',
             color: pastNotDistributed > 0 ? '#ff9800' : '#999'
           },
-          { label: 'Booth Packages', value: totalBoothPackages, description: 'Physical cookies', color: '#9C27B0' },
+          { label: 'Booth Sales', value: totalBoothPackages, description: 'Physical cookies', color: '#9C27B0' },
           {
             label: 'Booth Donations',
             value: totalBoothDonations,
@@ -130,7 +127,7 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
         <>
           <h4>Booth Reservations</h4>
           <DataTable
-            columns={['Store', 'Date', 'Time', 'Type', 'Packages', 'Donations', 'Status']}
+            columns={['', 'Store', 'Date', 'Time', 'Type', 'Packages', 'Donations', 'Status']}
             className="table-normal booth-table"
             hint="Click on any booth to see scout allocations for that booth."
           >
@@ -162,6 +159,7 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
                 <ExpandableRow
                   key={idx}
                   rowClass="booth-row"
+                  separateCaret
                   firstCell={
                     <>
                       <strong>{r.booth.storeName || '-'}</strong>
@@ -187,7 +185,7 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
                     <span class={statusClass}>{statusText}</span>
                   ]}
                   detail={<BoothScoutAllocations booth={r} scouts={scouts} />}
-                  colSpan={7}
+                  colSpan={8}
                   detailClass="detail-row"
                 />
               );

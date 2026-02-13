@@ -16,18 +16,29 @@ interface ExpandableRowProps {
   rowClass?: string;
   /** CSS class for the detail row */
   detailClass?: string;
+  /** Render the expand icon in its own column instead of inline */
+  separateCaret?: boolean;
 }
 
-export function ExpandableRow({ firstCell, cells, detail, colSpan, rowClass, detailClass }: ExpandableRowProps) {
+export function ExpandableRow({ firstCell, cells, detail, colSpan, rowClass, detailClass, separateCaret }: ExpandableRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <>
       <tr class={rowClass || 'scout-row'} onClick={() => setExpanded(!expanded)}>
-        <td>
-          <span class="expand-icon">{expanded ? '▼' : '▶'}</span>
-          {firstCell}
-        </td>
+        {separateCaret ? (
+          <>
+            <td class="expand-cell">
+              <span class="expand-icon">{expanded ? '▼' : '▶'}</span>
+            </td>
+            <td>{firstCell}</td>
+          </>
+        ) : (
+          <td>
+            <span class="expand-icon">{expanded ? '▼' : '▶'}</span>
+            {firstCell}
+          </td>
+        )}
         {cells.map((cell, i) => (
           <td key={i}>{cell}</td>
         ))}

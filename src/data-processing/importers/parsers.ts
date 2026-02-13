@@ -3,10 +3,10 @@
 import { EXCEL_EPOCH, MS_PER_DAY, PACKAGES_PER_CASE } from '../../constants';
 import { COOKIE_ABBR_MAP, COOKIE_COLUMN_MAP, COOKIE_ID_MAP, DC_COOKIE_COLUMNS, normalizeCookieName } from '../../cookie-constants';
 import Logger from '../../logger';
-import type { CookieType, Varieties } from '../../types';
+import type { CookieType, RawDataRow, Varieties } from '../../types';
 
 /** Parse cookie varieties from Digital Cookie row */
-export function parseVarietiesFromDC(row: Record<string, any>): Varieties {
+export function parseVarietiesFromDC(row: RawDataRow): Varieties {
   const varieties: Record<string, number> = {};
   for (const columnName of DC_COOKIE_COLUMNS) {
     const count = parseInt(row[columnName], 10) || 0;
@@ -25,7 +25,7 @@ export function parseVarietiesFromDC(row: Record<string, any>): Varieties {
 }
 
 /** Parse cookie varieties from Smart Cookie Report row */
-export function parseVarietiesFromSCReport(row: Record<string, any>): { varieties: Varieties; totalCases: number; totalPackages: number } {
+export function parseVarietiesFromSCReport(row: RawDataRow): { varieties: Varieties; totalCases: number; totalPackages: number } {
   const varieties: Record<string, number> = {};
   let totalCases = 0;
   let totalPackages = 0;
@@ -51,32 +51,36 @@ export function parseVarietiesFromSCReport(row: Record<string, any>): { varietie
 export function parseVarietiesFromAPI(
   cookiesArray: Array<{ id?: number; cookieId?: number; quantity: number }> | null | undefined,
   dynamicCookieIdMap: Record<string, CookieType> | null | undefined = null
-): { varieties: Varieties; totalPackages: number } {
+): { varieties: Varieties; totalPackages: number; unknownCookieIds: number[] } {
   const varieties: Record<string, number> = {};
   let totalPackages = 0;
+  const unknownCookieIds: number[] = [];
   const idMap = dynamicCookieIdMap || COOKIE_ID_MAP;
 
   for (const cookie of cookiesArray || []) {
     const cookieId = cookie.id || cookie.cookieId;
     if (cookieId === undefined) continue;
     const cookieName = idMap[cookieId];
+    const qty = Math.abs(cookie.quantity);
 
     if (!cookieName && cookieId && cookie.quantity !== 0) {
-      // Unknown cookie ID - log warning to prevent silent data loss
       Logger.warn(`Unknown cookie ID ${cookieId} with quantity ${cookie.quantity}. Update COOKIE_ID_MAP in cookie-constants.ts`);
+      unknownCookieIds.push(cookieId);
+      // Still count in totalPackages so transfer.packages reflects actual movement
+      totalPackages += qty;
     }
 
     if (cookieName && cookie.quantity !== 0) {
-      varieties[cookieName] = Math.abs(cookie.quantity);
-      totalPackages += Math.abs(cookie.quantity);
+      varieties[cookieName] = qty;
+      totalPackages += qty;
     }
   }
 
-  return { varieties: varieties as Varieties, totalPackages };
+  return { varieties: varieties as Varieties, totalPackages, unknownCookieIds };
 }
 
 /** Parse cookie varieties from Smart Cookie transfer row */
-export function parseVarietiesFromSCTransfer(row: Record<string, any>): Varieties {
+export function parseVarietiesFromSCTransfer(row: RawDataRow): Varieties {
   const varieties: Record<string, number> = {};
 
   for (const [abbr, cookieType] of Object.entries(COOKIE_ABBR_MAP)) {

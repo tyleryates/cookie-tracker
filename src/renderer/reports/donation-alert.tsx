@@ -1,3 +1,4 @@
+import { ORDER_TYPE, OWNER } from '../../constants';
 import { isDCAutoSync } from '../../order-classification';
 import type { Order, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
@@ -119,18 +120,36 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
   const cookieShare = data.cookieShare;
   const scouts = data.scouts;
 
-  const totalDCDonations = cookieShare.digitalCookie.total;
   const manualEntryDonations = cookieShare.digitalCookie.manualEntry;
   const manualCookieShareEntries = cookieShare.smartCookie.manualEntries;
   const totalBoothCookieShare = data.troopTotals.boothSalesDonations;
-  const totalCookieShare = totalDCDonations + totalBoothCookieShare;
   const adjustmentNeeded = manualEntryDonations - manualCookieShareEntries;
 
+  // Compute girl donations split by DC vs in-person
+  let girlDC = 0;
+  let girlInPerson = 0;
+  let siteDonations = 0;
+  for (const scout of Object.values(scouts)) {
+    for (const order of scout.orders) {
+      if (order.donations <= 0 || order.owner !== OWNER.GIRL) continue;
+      if (scout.isSiteOrder) {
+        siteDonations += order.donations;
+      } else if (order.orderType === ORDER_TYPE.DELIVERY || order.orderType === ORDER_TYPE.DIRECT_SHIP || order.orderType === ORDER_TYPE.DONATION) {
+        girlDC += order.donations;
+      } else if (order.orderType === ORDER_TYPE.IN_HAND) {
+        girlInPerson += order.donations;
+      }
+    }
+  }
+  const totalGirlDonations = girlDC + girlInPerson;
+  const totalTroopDonations = totalBoothCookieShare + siteDonations;
+  const totalCookieShare = totalGirlDonations + totalTroopDonations;
+
   const stats: Array<{ label: string; value: string | number; description: string; color: string }> = [
-    { label: 'DC Donations', value: totalDCDonations, description: 'From online orders', color: '#2196F3' }
+    { label: 'Girl Donations', value: totalGirlDonations, description: `${girlDC} DC + ${girlInPerson} in person`, color: '#2196F3' }
   ];
-  if (totalBoothCookieShare > 0) {
-    stats.push({ label: 'Booth Donations', value: totalBoothCookieShare, description: 'From booth sales', color: '#7B1FA2' });
+  if (totalTroopDonations > 0) {
+    stats.push({ label: 'Troop Donations', value: totalTroopDonations, description: `${totalBoothCookieShare} booth + ${siteDonations} site`, color: '#7B1FA2' });
   }
   stats.push({ label: 'Total Donations', value: totalCookieShare, description: 'All Cookie Share', color: '#00897B' });
   stats.push({
@@ -143,13 +162,13 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
   const hasBoothCS = totalBoothCookieShare > 0;
   const scoutRows = buildScoutDonationRows(scouts, data.virtualCookieShareAllocations);
 
-  const headers = ['Scout', 'DC Auto', 'DC Manual', 'SC Entered'];
+  const headers = ['Scout', 'Auto-Synced', 'Needs Entry', 'Entered in SC'];
   if (hasBoothCS) headers.push('Booth');
   headers.push('Total', 'Adjustment');
 
   return (
     <div class="report-visual">
-      <h3>Cookie Share Reconciliation</h3>
+      <h3>Donation Report & Reconciliation</h3>
       <StatCards stats={stats} />
       <StatusBanner adjustmentNeeded={adjustmentNeeded} />
 

@@ -100,31 +100,21 @@ This automatically:
 
 1. User opens the app (already has v1.0.0 installed)
 2. App checks GitHub for updates (happens 3 seconds after launch)
-3. If update found, user sees dialog:
+3. If update found, download starts silently in the background
+4. When download completes, user sees a non-blocking warning banner:
    ```
-   A new version (1.0.1) is available!
-
-   Would you like to download it now? The app will
-   install the update when you restart.
+   Version 1.0.1 downloaded — restart to update
    ```
-4. User clicks OK → Download happens in background
-5. When download completes, user sees:
-   ```
-   Update downloaded successfully!
-
-   Click OK to restart the app and install the update now,
-   or Cancel to install on next restart.
-   ```
-6. User chooses to restart now or later
-7. Next time app launches, it's on v1.0.1 ✓
+5. User can restart when convenient, or the update installs automatically on next quit
+6. Next time app launches, it's on v1.0.1
 
 ### How It Works:
 
-- `src/main.ts` checks GitHub Releases on startup
+- `src/main.ts` checks GitHub Releases on startup (production only)
 - Compares installed version vs latest release
-- If newer version exists, prompts user
-- Downloads update in background
-- Installs on restart (macOS) or immediately (Windows)
+- If newer version exists, downloads silently (`autoDownload: true`)
+- Renderer shows a persistent warning banner when download completes
+- Installs on quit (`autoInstallOnAppQuit: true`) or on manual restart
 
 ### Update Frequency:
 

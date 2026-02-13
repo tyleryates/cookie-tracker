@@ -11,11 +11,11 @@ import type {
   SCReservationsResponse,
   SCVirtualCookieShare
 } from '../../scrapers/sc-types';
-import type { BoothAvailableDate, BoothLocation, CookieType } from '../../types';
+import type { BoothAvailableDate, BoothLocation, CookieType, RawDataRow } from '../../types';
 
 /** Explicit params for allocation imports (replaces SCCombinedData) */
 export interface AllocationData {
-  directShipDivider?: SCDirectShipDivider | Record<string, any>[] | null;
+  directShipDivider?: SCDirectShipDivider | RawDataRow[] | null;
   virtualCookieShares?: SCVirtualCookieShare[];
   reservations?: SCReservationsResponse | null;
   boothDividers?: SCBoothDividerResult[];
@@ -70,6 +70,14 @@ function importVirtualCookieShares(store: DataStore, virtualCookieShares: SCVirt
   }
 }
 
+function formatBoothAddress(addr: unknown): string {
+  if (!addr || typeof addr !== 'object') return typeof addr === 'string' ? addr : '';
+  const a = addr as Record<string, unknown>;
+  const parts = [a.street, a.city, a.state].filter(Boolean);
+  const base = parts.join(', ');
+  return a.zip ? `${base} ${a.zip}` : base;
+}
+
 /** Import booth reservation data from Smart Cookie reservations API */
 function importReservations(
   store: DataStore,
@@ -92,7 +100,7 @@ function importReservations(
       booth: {
         boothId: booth.booth_id || '',
         storeName: booth.store_name || '',
-        address: booth.address || '',
+        address: formatBoothAddress(booth.address),
         reservationType: booth.reservation_type || '',
         isDistributed: booth.is_distributed || false,
         isVirtuallyDistributed: booth.is_virtually_distributed || false
@@ -158,7 +166,7 @@ function importBoothDividers(
 /** Import Direct Ship Divider allocations from Smart Cookie API (legacy array format) */
 function importDirectShipDividers(
   store: DataStore,
-  directShipDividers: Record<string, any>[],
+  directShipDividers: RawDataRow[],
   dynamicCookieIdMap: Record<string, CookieType> | null
 ): void {
   if (!Array.isArray(directShipDividers) || directShipDividers.length === 0) return;
@@ -210,7 +218,9 @@ export function normalizeBoothLocation(loc: SCBoothLocationRaw): BoothLocation {
       street: addr.street || addr.address_1 || '',
       city: addr.city || '',
       state: addr.state || '',
-      zip: addr.zip || addr.postal_code || ''
+      zip: addr.zip || addr.postal_code || '',
+      latitude: addr.latitude,
+      longitude: addr.longitude
     },
     reservationType: loc.reservation_type || '',
     notes: loc.notes || '',

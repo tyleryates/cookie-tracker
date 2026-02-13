@@ -71,6 +71,11 @@
   border-color: var(--primary-hover);
 }
 
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 0.85em;
+}
+
 /* Toggle Switch */
 .toggle-switch {
   display: inline-flex;
@@ -354,4 +359,86 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.sticky-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  padding: 16px 0;
+  border-top: 1px solid var(--gray-200);
+  margin-top: 16px;
+  z-index: 10;
+}
+
+/* Available Booths config box */
+.available-booths-config {
+  background: var(--surface-raised);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.config-section + .config-section {
+  padding-top: 8px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.config-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.config-section-action {
+  padding-top: 4px;
+  border-top: none;
+  align-items: flex-start;
+}
+
+.config-label {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.config-value {
+  font-size: 0.9em;
+  color: var(--gray-700);
+  line-height: 1.4;
+}
+
+.config-day-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.config-day-chip {
+  font-size: 0.85em;
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 3px 8px;
+  color: var(--gray-600);
+}
+
+.config-day-chip strong {
+  color: var(--gray-700);
 }

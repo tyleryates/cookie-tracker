@@ -1,7 +1,7 @@
 // Transfer Breakdowns
 // Pre-classifies transfers into categories (C2T, T2G, G2T) with totals
 
-import { TRANSFER_CATEGORY } from '../../constants';
+import { TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
 import Logger from '../../logger';
 import type { Transfer, TransferBreakdowns, Warning } from '../../types';
@@ -36,7 +36,7 @@ function buildTransferBreakdowns(store: ReadonlyDataStore, warnings: Warning[]):
     // Classify into lists using central category groups
     if (transfer.category === TRANSFER_CATEGORY.COUNCIL_TO_TROOP) {
       c2t.push(transfer);
-      c2tTotal += transfer.physicalPackages || 0;
+      if (transfer.type !== TRANSFER_TYPE.PLANNED) c2tTotal += transfer.physicalPackages || 0;
     } else if (transfer.category === TRANSFER_CATEGORY.TROOP_OUTGOING) {
       t2tOut.push(transfer);
       t2tOutTotal += transfer.physicalPackages || 0;

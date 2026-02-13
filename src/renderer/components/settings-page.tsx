@@ -1,9 +1,9 @@
 // SettingsPage — Full page for credential management with verification
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import Logger from '../../logger';
 import type { DCRole } from '../../seasonal-data';
-import type { Credentials } from '../../types';
+import type { AppConfig, CredentialPatch } from '../../types';
 import { ipcInvoke, ipcInvokeRaw } from '../ipc';
 
 interface SCVerifyResult {
@@ -13,15 +13,16 @@ interface SCVerifyResult {
 
 interface SettingsPageProps {
   mode: 'welcome' | 'settings';
+  appConfig: AppConfig | null;
   onBack: () => void;
   onRecalculate: () => void;
   onExport: () => void;
-  onWipeConfig: () => void;
   onWipeData: () => void;
+  onUpdateConfig: (patch: Partial<AppConfig>) => void;
   hasData: boolean;
 }
 
-export function SettingsPage({ mode, onBack, onRecalculate, onExport, onWipeConfig, onWipeData, hasData }: SettingsPageProps) {
+export function SettingsPage({ mode, appConfig, onBack, onRecalculate, onExport, onWipeData, onUpdateConfig, hasData }: SettingsPageProps) {
   // Smart Cookie fields
   const [scUsername, setScUsername] = useState('');
   const [scPassword, setScPassword] = useState('');
@@ -38,26 +39,17 @@ export function SettingsPage({ mode, onBack, onRecalculate, onExport, onWipeConf
   const [dcConfirmed, setDcConfirmed] = useState(false);
   const [dcError, setDcError] = useState<string | null>(null);
 
-  // Keep a ref to existing credentials so verify handlers can merge
-  const existingCreds = useRef<Credentials | null>(null);
-
   // Load existing credentials + seasonal data on mount
   useEffect(() => {
     (async () => {
       try {
         const [creds, seasonal] = await Promise.all([ipcInvoke('load-credentials'), ipcInvoke('load-seasonal-data')]);
 
-        // Store full credentials ref for merging — needed so saves preserve the other side's password
-        existingCreds.current = {
-          smartCookie: { ...creds.smartCookie },
-          digitalCookie: { ...creds.digitalCookie }
-        };
-
         setScUsername(creds.smartCookie.username || '');
         setDcUsername(creds.digitalCookie.username || '');
 
         // Restore SC verification status only if full credentials (including password) are present
-        if (seasonal.troop && creds.smartCookie.username && creds.smartCookie.password) {
+        if (seasonal.troop && creds.smartCookie.username && creds.smartCookie.hasPassword) {
           setScVerified({
             troopName: seasonal.troop.role?.troop_name || null,
             cookieCount: seasonal.cookies?.length || 0
@@ -65,7 +57,7 @@ export function SettingsPage({ mode, onBack, onRecalculate, onExport, onWipeConf
         }
 
         // Restore DC roles only if full credentials (including password) are present
-        if (seasonal.dcRoles && seasonal.dcRoles.length > 0 && creds.digitalCookie.username && creds.digitalCookie.password) {
+        if (seasonal.dcRoles && seasonal.dcRoles.length > 0 && creds.digitalCookie.username && creds.digitalCookie.hasPassword) {
           setDcRoles(seasonal.dcRoles);
           setDcConfirmed(true);
 
@@ -83,18 +75,8 @@ export function SettingsPage({ mode, onBack, onRecalculate, onExport, onWipeConf
     })();
   }, []);
 
-  const saveCredentials = async (patch: Partial<Credentials>) => {
-    const base = existingCreds.current || {
-      smartCookie: { username: '', password: '' },
-      digitalCookie: { username: '', password: '' }
-    };
-    const merged: Credentials = {
-      smartCookie: { ...base.smartCookie, ...patch.smartCookie },
-      digitalCookie: { ...base.digitalCookie, ...patch.digitalCookie }
-    };
-    const result = await ipcInvokeRaw('save-credentials', merged);
-    if (result.success) existingCreds.current = merged;
-    return result;
+  const saveCredentials = async (patch: CredentialPatch) => {
+    return ipcInvokeRaw('save-credentials', patch);
   };
 
   const handleVerifySC = async () => {
@@ -179,10 +161,7 @@ export function SettingsPage({ mode, onBack, onRecalculate, onExport, onWipeConf
 
   const handleConfirmDC = async () => {
     if (!dcSelectedRole) return;
-    const dc = existingCreds.current?.digitalCookie;
-    if (dc) {
-      await saveCredentials({ digitalCookie: { ...dc, role: dcSelectedRole } });
-    }
+    await saveCredentials({ digitalCookie: { role: dcSelectedRole } });
     setDcConfirmed(true);
     if (mode === 'welcome' && scVerified) onBack();
   };
@@ -361,6 +340,19 @@ export function SettingsPage({ mode, onBack, onRecalculate, onExport, onWipeConf
         </div>
       </div>
       {mode === 'settings' && (
+        <div class="settings-feature-flags">
+          <h3>Features</h3>
+          <label class="settings-toggle">
+            <input
+              type="checkbox"
+              checked={appConfig?.availableBoothsEnabled ?? false}
+              onChange={(e) => onUpdateConfig({ availableBoothsEnabled: (e.target as HTMLInputElement).checked })}
+            />
+            Available Booths monitoring
+          </label>
+        </div>
+      )}
+      {mode === 'settings' && (
         <div class="settings-danger-zone">
           <h3>Danger Zone</h3>
           <div class="button-group">
@@ -369,9 +361,6 @@ export function SettingsPage({ mode, onBack, onRecalculate, onExport, onWipeConf
             </button>
             <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
               Export Diagnostics
-            </button>
-            <button type="button" class="btn btn-secondary" onClick={onWipeConfig}>
-              Wipe Config
             </button>
             <button type="button" class="btn btn-secondary" onClick={onWipeData}>
               Wipe Data

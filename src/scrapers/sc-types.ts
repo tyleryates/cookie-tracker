@@ -78,7 +78,7 @@ export interface SCReservation {
   booth?: {
     booth_id?: string;
     store_name?: string;
-    address?: string;
+    address?: { street?: string; city?: string; state?: string; zip?: string; latitude?: number; longitude?: number };
     reservation_type?: string;
     is_distributed?: boolean;
     is_virtually_distributed?: boolean;
@@ -99,7 +99,7 @@ export interface SCBoothDividerBooth {
   store_name?: string;
   booth_name?: string;
   location?: string;
-  address?: string;
+  address?: { street?: string; city?: string; state?: string; zip?: string; latitude?: number; longitude?: number };
   reservation_type?: string;
   type?: string;
   is_distributed?: boolean;
@@ -131,7 +131,16 @@ export interface SCBoothLocationRaw {
   booth_id?: number;
   store_name?: string;
   name?: string;
-  address?: { street?: string; address_1?: string; city?: string; state?: string; zip?: string; postal_code?: string };
+  address?: {
+    street?: string;
+    address_1?: string;
+    city?: string;
+    state?: string;
+    zip?: string;
+    postal_code?: string;
+    latitude?: number;
+    longitude?: number;
+  };
   reservation_type?: string;
   notes?: string;
   availableDates?: Array<{

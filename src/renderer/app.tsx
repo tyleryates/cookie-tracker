@@ -53,20 +53,22 @@ export function App() {
   }, [sync]);
 
   const handleSaveBoothIds = useCallback(
-    async (boothIds: number[]) => {
-      const updatedConfig = await ipcInvoke('update-config', { boothIds });
-      dispatch({ type: 'LOAD_CONFIG', config: updatedConfig });
+    (boothIds: number[]) => {
+      const current = stateRef.current.appConfig;
+      if (current) dispatch({ type: 'LOAD_CONFIG', config: { ...current, boothIds } });
       showStatus(`Booth selection saved (${boothIds.length} booth${boothIds.length === 1 ? '' : 's'})`, 'success');
+      ipcInvoke('update-config', { boothIds });
       refreshBooths();
     },
     [showStatus, refreshBooths]
   );
 
   const handleSaveDayFilters = useCallback(
-    async (filters: DayFilter[]) => {
-      const updatedConfig = await ipcInvoke('update-config', { boothDayFilters: filters });
-      dispatch({ type: 'LOAD_CONFIG', config: updatedConfig });
+    (filters: DayFilter[]) => {
+      const current = stateRef.current.appConfig;
+      if (current) dispatch({ type: 'LOAD_CONFIG', config: { ...current, boothDayFilters: filters } });
       showStatus('Booth day filters saved', 'success');
+      ipcInvoke('update-config', { boothDayFilters: filters });
     },
     [showStatus]
   );
@@ -78,12 +80,6 @@ export function App() {
     }
     await ipcInvoke('update-config', { ignoredTimeSlots: [] });
     showStatus('Ignored time slots cleared', 'success');
-  }, [showStatus]);
-
-  const handleWipeConfig = useCallback(async () => {
-    await ipcInvoke('wipe-config');
-    dispatch({ type: 'WIPE_CONFIG' });
-    showStatus('Config wiped', 'success');
   }, [showStatus]);
 
   const handleWipeData = useCallback(async () => {
@@ -101,6 +97,11 @@ export function App() {
     await ipcInvoke('update-config', { ignoredTimeSlots: ignored });
   }, []);
 
+  const handleUpdateConfig = useCallback(async (patch: Partial<import('../types').AppConfig>) => {
+    const updatedConfig = await ipcInvoke('update-config', patch);
+    dispatch({ type: 'LOAD_CONFIG', config: updatedConfig });
+  }, []);
+
   if (state.activePage === 'settings' || state.activePage === 'welcome') {
     return (
       <div class="container">
@@ -112,11 +113,12 @@ export function App() {
           <section class="import-section">
             <SettingsPage
               mode={state.activePage === 'welcome' ? 'welcome' : 'settings'}
+              appConfig={state.appConfig}
               onBack={handleCloseSettings}
               onRecalculate={recalculate}
               onExport={exportData}
-              onWipeConfig={handleWipeConfig}
               onWipeData={handleWipeData}
+              onUpdateConfig={handleUpdateConfig}
               hasData={!!state.unified}
             />
           </section>

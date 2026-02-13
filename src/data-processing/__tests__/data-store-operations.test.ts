@@ -34,7 +34,13 @@ describe('createTransfer — category classification', () => {
   });
 
   it('classifies outgoing T2T via troopName when troopNumber is an internal ID', () => {
-    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop 3990', to: 'Troop 1234', troopNumber: '54321', troopName: 'Troop 3990' });
+    const t = createTransfer({
+      type: TRANSFER_TYPE.T2T,
+      from: 'Troop 3990',
+      to: 'Troop 1234',
+      troopNumber: '54321',
+      troopName: 'Troop 3990'
+    });
     expect(t.category).toBe(TRANSFER_CATEGORY.TROOP_OUTGOING);
   });
 
@@ -44,7 +50,13 @@ describe('createTransfer — category classification', () => {
   });
 
   it('classifies incoming T2T correctly when troopName does not match from', () => {
-    const t = createTransfer({ type: TRANSFER_TYPE.T2T, from: 'Troop 1234', to: 'Troop 3990', troopNumber: '54321', troopName: 'Troop 3990' });
+    const t = createTransfer({
+      type: TRANSFER_TYPE.T2T,
+      from: 'Troop 1234',
+      to: 'Troop 3990',
+      troopNumber: '54321',
+      troopName: 'Troop 3990'
+    });
     expect(t.category).toBe(TRANSFER_CATEGORY.COUNCIL_TO_TROOP);
   });
 
@@ -98,9 +110,9 @@ describe('createTransfer — category classification', () => {
     expect(t.category).toBe(TRANSFER_CATEGORY.DIRECT_SHIP);
   });
 
-  it('classifies PLANNED as PLANNED', () => {
+  it('classifies PLANNED as COUNCIL_TO_TROOP', () => {
     const t = createTransfer({ type: TRANSFER_TYPE.PLANNED });
-    expect(t.category).toBe(TRANSFER_CATEGORY.PLANNED);
+    expect(t.category).toBe(TRANSFER_CATEGORY.COUNCIL_TO_TROOP);
   });
 });
 

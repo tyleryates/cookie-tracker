@@ -10,7 +10,8 @@ function buildUnifiedMetadata(store: ReadonlyDataStore, warnings: Warning[] = []
     warningsCount: warnings.length,
     unknownOrderTypes: warnings.filter((w) => w.type === 'UNKNOWN_ORDER_TYPE').length,
     unknownPaymentMethods: warnings.filter((w) => w.type === 'UNKNOWN_PAYMENT_METHOD').length,
-    unknownTransferTypes: warnings.filter((w) => w.type === 'UNKNOWN_TRANSFER_TYPE').length
+    unknownTransferTypes: warnings.filter((w) => w.type === 'UNKNOWN_TRANSFER_TYPE').length,
+    unknownCookieIds: warnings.filter((w) => w.type === 'UNKNOWN_COOKIE_ID').length
   };
 
   return {

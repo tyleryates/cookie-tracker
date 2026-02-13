@@ -11,6 +11,7 @@ import Logger from '../logger';
 export class DigitalCookieSession {
   client: AxiosInstance;
   selectedRoleName: string | null = null;
+  userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36';
   private credentials: { username: string; password: string; role?: string } | null = null;
 
   constructor() {
@@ -27,7 +28,7 @@ export class DigitalCookieSession {
         withCredentials: true,
         maxRedirects: 5,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+          'User-Agent': this.userAgent,
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'en-US,en;q=0.9'
         }

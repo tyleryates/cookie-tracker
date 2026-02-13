@@ -29,5 +29,5 @@ export async function ipcInvokeRaw<K extends keyof IpcChannelMap>(
  * Typed IPC event listener. Returns a cleanup function for use in `useEffect`.
  */
 export function onIpcEvent<K extends keyof IpcEventMap>(channel: K, handler: (data: IpcEventMap[K]) => void): () => void {
-  return window.electronAPI.on(channel, handler as (...args: any[]) => void);
+  return window.electronAPI.on(channel, handler as (...args: unknown[]) => void);
 }

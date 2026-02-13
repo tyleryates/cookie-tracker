@@ -38,7 +38,9 @@ export function useDataLoader(
         }
         return false;
       } catch (error) {
-        if (showMessages) showStatus(`Error loading files: ${(error as Error).message}`, 'error');
+        // Always show load errors — even when showMessages is false (called from sync/init),
+        // errors should be visible to the user
+        showStatus(`Error loading files: ${(error as Error).message}`, 'error');
         Logger.error('Data load error:', error);
         return false;
       }

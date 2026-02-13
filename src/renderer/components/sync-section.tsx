@@ -195,7 +195,7 @@ function SyncSummary({
       <span class="sync-summary-icon">{statusIcon}</span>
       <span class="sync-summary-text">{statusText}</span>
       {overall.lastSync && <span class="sync-summary-time">{DateFormatter.toFriendly(overall.lastSync)}</span>}
-      <span class={`sync-summary-chevron ${expanded ? 'expanded' : ''}`}>{'\u25B8'}</span>
+      <span class={`sync-summary-chevron ${expanded ? 'expanded' : ''}`}>{'\u25B6'}</span>
     </button>
   );
 }

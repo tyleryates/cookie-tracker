@@ -1,7 +1,16 @@
 // Core Type Definitions for Cookie Tracker
 // Single source of truth for all data structure types
 
-import type { ALLOCATION_CHANNEL, ALLOCATION_SOURCE, OrderType, Owner, PaymentMethod, TransferCategory, TransferType } from './constants';
+import type {
+  ALLOCATION_CHANNEL,
+  ALLOCATION_SOURCE,
+  DataSource,
+  OrderType,
+  Owner,
+  PaymentMethod,
+  TransferCategory,
+  TransferType
+} from './constants';
 import type { SCCookieMapEntry, SCMeResponse } from './scrapers/sc-types';
 import type { DCRole, SeasonalDataFiles } from './seasonal-data';
 
@@ -22,6 +31,9 @@ export type CookieType =
   | 'COOKIE_SHARE';
 
 export type Varieties = Partial<Record<CookieType, number>>;
+
+/** A single row of parsed spreadsheet/API data with dynamic column names */
+export type RawDataRow = Record<string, any>;
 
 // ============================================================================
 // ORDER TYPES
@@ -59,7 +71,7 @@ export interface Order {
     council?: string;
     district?: string | null;
   };
-  sources: string[];
+  sources: DataSource[];
   metadata: OrderMetadata;
 }
 
@@ -217,11 +229,11 @@ interface ImportMetadata {
   lastImportSC: string | null;
   lastImportSCReport?: string;
   cookieIdMap: Record<string, CookieType> | null;
-  sources: Array<{ type: string; date: string; records: number }>;
+  sources: Array<{ type: DataSource; date: string; records: number }>;
 }
 
 export interface DataStoreMetadata extends ImportMetadata {
-  rawDCData?: Record<string, any>[];
+  rawDCData?: RawDataRow[];
   warnings: Warning[];
 }
 
@@ -244,7 +256,12 @@ export interface RawScoutData {
 // WARNING TYPE
 // ============================================================================
 
-export type WarningType = 'UNKNOWN_ORDER_TYPE' | 'UNKNOWN_PAYMENT_METHOD' | 'UNKNOWN_TRANSFER_TYPE' | 'SC_TRANSFER_SKIPPED';
+export type WarningType =
+  | 'UNKNOWN_ORDER_TYPE'
+  | 'UNKNOWN_PAYMENT_METHOD'
+  | 'UNKNOWN_TRANSFER_TYPE'
+  | 'UNKNOWN_COOKIE_ID'
+  | 'SC_TRANSFER_SKIPPED';
 
 export interface Warning {
   type: WarningType;
@@ -293,6 +310,18 @@ export interface Credentials {
   smartCookie: { username: string; password: string };
 }
 
+/** Password-free credential summary returned to the renderer */
+export interface CredentialsSummary {
+  digitalCookie: { username: string; hasPassword: boolean; role?: string; councilId?: string };
+  smartCookie: { username: string; hasPassword: boolean };
+}
+
+/** Partial credential update — main process merges with existing */
+export interface CredentialPatch {
+  smartCookie?: Partial<Credentials['smartCookie']>;
+  digitalCookie?: Partial<Credentials['digitalCookie']>;
+}
+
 // ============================================================================
 // BOOTH & RESERVATION TYPES
 // ============================================================================
@@ -328,7 +357,7 @@ export interface BoothAvailableDate {
 export interface BoothLocation {
   id: number;
   storeName: string;
-  address: { street: string; city: string; state: string; zip: string };
+  address: { street: string; city: string; state: string; zip: string; latitude?: number; longitude?: number };
   reservationType: string;
   notes: string;
   availableDates?: BoothAvailableDate[];
@@ -423,6 +452,7 @@ export interface HealthChecks {
   unknownOrderTypes: number;
   unknownPaymentMethods: number;
   unknownTransferTypes: number;
+  unknownCookieIds: number;
 }
 
 export interface UnifiedMetadata extends ImportMetadata {
@@ -468,6 +498,7 @@ export interface IgnoredTimeSlot {
 
 export interface AppConfig {
   autoSyncEnabled: boolean;
+  availableBoothsEnabled: boolean;
   boothIds: number[];
   boothDayFilters: DayFilter[];
   ignoredTimeSlots: IgnoredTimeSlot[];
@@ -512,8 +543,8 @@ export interface IpcChannelMap {
     response: LoadDataResult | null;
   };
   'save-file': { request: { filename: string; content: string }; response: { path: string } };
-  'load-credentials': { request: undefined; response: Credentials };
-  'save-credentials': { request: Credentials; response: undefined };
+  'load-credentials': { request: undefined; response: CredentialsSummary };
+  'save-credentials': { request: CredentialPatch; response: undefined };
   'load-config': { request: undefined; response: AppConfig };
   'save-config': { request: AppConfig; response: undefined };
   'update-config': { request: Partial<AppConfig>; response: AppConfig };
@@ -544,11 +575,11 @@ export interface IpcChannelMap {
     request: undefined;
     response: undefined;
   };
-  'wipe-config': {
+  'wipe-data': {
     request: undefined;
     response: undefined;
   };
-  'wipe-data': {
+  'quit-and-install': {
     request: undefined;
     response: undefined;
   };
@@ -557,6 +588,7 @@ export interface IpcChannelMap {
 export interface IpcEventMap {
   'scrape-progress': ScrapeProgress;
   'update-available': { version: string };
+  'update-downloaded': { version: string };
 }
 
 // ============================================================================
@@ -567,7 +599,7 @@ export interface DataFileInfo {
   name: string;
   extension: string;
   path: string;
-  data?: any;
+  data?: unknown;
 }
 
 export interface LoadedSources {

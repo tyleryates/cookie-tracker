@@ -65,7 +65,7 @@
 .sync-summary-chevron {
   margin-left: auto;
   font-size: 0.8em;
-  opacity: 0.5;
+  color: var(--primary);
   transition: transform var(--transition-fast);
 }
 

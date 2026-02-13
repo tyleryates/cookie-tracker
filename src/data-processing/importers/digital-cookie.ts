@@ -3,11 +3,12 @@
 import { DATA_SOURCES, DC_COLUMNS } from '../../constants';
 import type { DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
+import type { RawDataRow } from '../../types';
 import { parseExcelDate, parseVarietiesFromDC } from './parsers';
 import { recordImportMetadata, updateScoutData } from './scout-helpers';
 
 /** Import Digital Cookie order data from Excel export */
-export function importDigitalCookie(store: DataStore, dcData: Record<string, any>[]): void {
+export function importDigitalCookie(store: DataStore, dcData: RawDataRow[]): void {
   store.metadata.rawDCData = dcData;
 
   for (const row of dcData) {

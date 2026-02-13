@@ -1,6 +1,6 @@
 // BoothDayFilter — 7×6 checkbox grid for filtering booth days and time slots
 
-import { useMemo, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
 import type { DayFilter } from '../../types';
 import { slotOverlapsRange } from '../format-utils';
@@ -103,15 +103,11 @@ export function BoothDayFilter({ currentFilters, onSave, onCancel }: BoothDayFil
     });
   };
 
-  const isDayFullySelected = useMemo(() => {
-    return DAY_LABELS.map((_, day) => BOOTH_TIME_SLOTS.every((s) => selected.has(slotKey(day, s.start))));
-  }, [selected]);
-
   return (
     <div class="report-visual">
-      <h3>Filter Days & Times</h3>
+      <h3>Select Days & Times</h3>
       <p class="muted-text" style={{ marginTop: '-16px', marginBottom: '16px' }}>
-        Toggle which days and time slots appear in Available Booths.
+        Choose which days and time slots to show in Available Booths.
       </p>
 
       <table class="day-filter-grid">
@@ -128,19 +124,8 @@ export function BoothDayFilter({ currentFilters, onSave, onCancel }: BoothDayFil
         <tbody>
           {DAY_LABELS.map((label, day) => (
             <tr key={day}>
-              <th onClick={() => toggleDay(day)} title={`Toggle all ${label}`}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <span class="toggle-switch toggle-switch-sm">
-                    <input
-                      type="checkbox"
-                      checked={isDayFullySelected[day]}
-                      onClick={(e: Event) => e.stopPropagation()}
-                      onChange={() => toggleDay(day)}
-                    />
-                    <span class="toggle-slider" />
-                  </span>
-                  {label}
-                </span>
+              <th onClick={() => toggleDay(day)} title={`Toggle all ${label}`} style={{ cursor: 'pointer' }}>
+                {label}
               </th>
               {BOOTH_TIME_SLOTS.map((slot) => {
                 const key = slotKey(day, slot.start);

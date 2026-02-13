@@ -13,6 +13,7 @@ class ConfigManager {
   getDefaults(): AppConfig {
     return {
       autoSyncEnabled: true,
+      availableBoothsEnabled: false,
       boothIds: [],
       boothDayFilters: [],
       ignoredTimeSlots: []

@@ -26,14 +26,12 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
       await loadData({ showMessages: false });
 
       // Check if both logins are verified — if not, show welcome page
-      try {
-        const [creds, seasonal] = await Promise.all([ipcInvoke('load-credentials'), ipcInvoke('load-seasonal-data')]);
-        const scOk = !!(creds.smartCookie.username && creds.smartCookie.password && seasonal.troop);
-        const dcOk = !!(creds.digitalCookie.username && creds.digitalCookie.password && seasonal.dcRoles?.length);
-        if (!scOk || !dcOk) {
-          dispatch({ type: 'SET_WELCOME' });
-        }
-      } catch {
+      const [credsResult, seasonalResult] = await Promise.allSettled([ipcInvoke('load-credentials'), ipcInvoke('load-seasonal-data')]);
+      const creds = credsResult.status === 'fulfilled' ? credsResult.value : null;
+      const seasonal = seasonalResult.status === 'fulfilled' ? seasonalResult.value : null;
+      const scOk = !!(creds?.smartCookie?.username && creds?.smartCookie?.hasPassword && seasonal?.troop);
+      const dcOk = !!(creds?.digitalCookie?.username && creds?.digitalCookie?.hasPassword && seasonal?.dcRoles?.length);
+      if (!scOk || !dcOk) {
         dispatch({ type: 'SET_WELCOME' });
       }
     })();

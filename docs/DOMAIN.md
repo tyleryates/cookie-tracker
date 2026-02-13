@@ -197,6 +197,8 @@ Troops earn $0.85–$0.95 per package based on Per Girl Average (PGA). Exact tie
 | **T2G** | Troop to Girl (scout pickup from troop inventory) |
 | **G2T** | Girl to Troop (return) |
 | **PGA** | Per Girl Average (total packages sold / girls selling) |
+| **troopNumber** | Numeric troop ID from SC `/me` `troop_id` (e.g., `"3990"`) — used for T2T direction detection |
+| **troopName** | Display name from SC (e.g., `"Troop 3990"`) — appears in transfer `from`/`to` fields |
 
 ---
 

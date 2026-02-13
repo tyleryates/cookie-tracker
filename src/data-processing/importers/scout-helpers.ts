@@ -1,6 +1,6 @@
 // Scout Registration and Helper Functions
 
-import { TRANSFER_TYPE } from '../../constants';
+import { type DataSource, TRANSFER_TYPE } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
@@ -12,7 +12,7 @@ import { parseVarietiesFromAPI } from './parsers';
 export function recordImportMetadata(
   store: DataStore,
   timestampField: 'lastImportDC' | 'lastImportSC' | 'lastImportSCReport',
-  sourceType: string,
+  sourceType: DataSource,
   records: number
 ): void {
   const now = new Date().toISOString();
@@ -80,7 +80,7 @@ export function mergeDCOrderFromSC(
   scout: string,
   transferData: { date: string; packages: number; amount: number },
   varieties: Varieties,
-  source: string,
+  source: DataSource,
   rawData: Record<string, unknown>
 ): void {
   const dcOrderNum = orderNum.substring(1);

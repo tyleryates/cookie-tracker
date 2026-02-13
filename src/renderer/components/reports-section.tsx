@@ -1,5 +1,6 @@
 // ReportsSection — Report button bar, report container, and health banner
 
+import { useRef } from 'preact/hooks';
 import type { AppConfig, BoothReservationImported, DayFilter, UnifiedDataset } from '../../types';
 import { AvailableBoothsReport, countAvailableSlots } from '../reports/available-booths';
 import { BoothReport } from '../reports/booth';
@@ -138,7 +139,8 @@ function renderReport(
   onResetIgnored: () => void,
   onRefreshBooths: () => void,
   onSaveBoothIds: (ids: number[]) => void,
-  onSaveDayFilters: (filters: DayFilter[]) => void
+  onSaveDayFilters: (filters: DayFilter[]) => void,
+  boothResetKey?: number
 ) {
   switch (type) {
     case 'troop':
@@ -156,6 +158,7 @@ function renderReport(
     case 'available-booths':
       return (
         <AvailableBoothsReport
+          key={boothResetKey}
           data={unified}
           config={{
             filters: appConfig?.boothDayFilters || [],
@@ -192,14 +195,24 @@ export function ReportsSection({
   onSaveDayFilters
 }: ReportsSectionProps) {
   const unknownTypes = unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
+  const unknownCookieIds = unified?.metadata?.healthChecks?.unknownCookieIds || 0;
   const hasData = !!unified;
   const isBlocked = unknownTypes > 0;
+
+  // Clicking "Available Booths" while already on that report resets sub-views (selector/filter)
+  const boothResetKeyRef = useRef(0);
+  const handleSelectReport = (type: string) => {
+    if (type === 'available-booths' && activeReport === 'available-booths') {
+      boothResetKeyRef.current += 1;
+    }
+    onSelectReport(type);
+  };
 
   return (
     <section class="reports-section">
       <h2>Reports</h2>
       <div class="button-group">
-        {REPORT_BUTTONS.map((btn) => {
+        {REPORT_BUTTONS.filter((btn) => btn.type !== 'available-booths' || appConfig?.availableBoothsEnabled).map((btn) => {
           const displayLabel = hasData && btn.getWarning ? btn.getWarning(unified, appConfig) : btn.label;
 
           return (
@@ -208,7 +221,7 @@ export function ReportsSection({
               key={btn.type}
               class={`btn btn-secondary${activeReport === btn.type ? ' active' : ''}`}
               disabled={!hasData || isBlocked}
-              onClick={() => onSelectReport(btn.type)}
+              onClick={() => handleSelectReport(btn.type)}
             >
               {displayLabel}
             </button>
@@ -224,6 +237,29 @@ export function ReportsSection({
             message={`Found ${unknownTypes} unknown Digital Cookie order type(s). Update classification rules before viewing reports.`}
             details={unified?.warnings || []}
           />
+        ) : unknownCookieIds > 0 ? (
+          <>
+            <HealthBanner
+              level="warning"
+              title="Unknown Cookie IDs"
+              message={`Found ${unknownCookieIds} unknown cookie ID(s) in Smart Cookie data. These packages are counted in totals but missing from variety breakdowns. Update COOKIE_ID_MAP in cookie-constants.ts.`}
+              details={unified?.warnings?.filter((w) => w.type === 'UNKNOWN_COOKIE_ID') || []}
+            />
+            {activeReport &&
+              unified &&
+              renderReport(
+                activeReport,
+                unified,
+                appConfig,
+                boothSyncing,
+                onIgnoreSlot,
+                onResetIgnored,
+                onRefreshBooths,
+                onSaveBoothIds,
+                onSaveDayFilters,
+                boothResetKeyRef.current
+              )}
+          </>
         ) : (
           activeReport &&
           unified &&

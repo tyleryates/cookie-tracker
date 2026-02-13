@@ -1,7 +1,6 @@
 // useSync — sync handler, booth refresh, auto-sync polling, IPC event listeners
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
-import * as packageJson from '../../../package.json';
 import { SYNC_ENDPOINTS } from '../../constants';
 import Logger from '../../logger';
 import type { AppConfig, SyncState } from '../../types';
@@ -36,6 +35,8 @@ export function useSync(
   autoSyncEnabled: boolean
 ) {
   const refreshBoothsRef = useRef<() => Promise<void>>();
+  const appConfigRef = useRef(appConfig);
+  appConfigRef.current = appConfig;
 
   const sync = useCallback(async () => {
     try {
@@ -79,7 +80,7 @@ export function useSync(
       if (parts.length > 0) {
         await loadData({ showMessages: false });
         // Also refresh booth availability so the notification fires after sync
-        if (refreshBoothsRef.current) {
+        if (refreshBoothsRef.current && appConfigRef.current?.availableBoothsEnabled) {
           await refreshBoothsRef.current();
         }
       }
@@ -114,11 +115,12 @@ export function useSync(
       if (appConfig) {
         const count = countAvailableSlots(updated, appConfig.boothDayFilters, appConfig.ignoredTimeSlots);
         if (count > 0) {
-          new Notification('Booths Available', {
-            body: `${count} time slot${count === 1 ? '' : 's'} found`,
-            tag: 'booth-availability',
-            requireInteraction: true
-          });
+          const msg = `${count} time slot${count === 1 ? '' : 's'} found`;
+          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+            new Notification('Booths Available', { body: msg, tag: 'booth-availability', requireInteraction: true });
+          } else {
+            showStatus(`Booths available: ${msg}`, 'success');
+          }
         }
       }
     } catch (error) {
@@ -143,21 +145,18 @@ export function useSync(
       });
     });
 
-    const cleanupUpdate = onIpcEvent('update-available', (info) => {
-      const response = confirm(
-        `New version ${info.version} is available!\n\n` +
-          `You're currently on version ${packageJson.version}\n\n` +
-          'Click OK to download the latest version from GitHub.'
-      );
-      if (response) {
-        window.electronAPI.openExternal('https://github.com/tyleryates/cookie-tracker/releases/latest');
-        showStatus('Opening download page...', 'success');
-      }
+    const cleanupUpdateAvailable = onIpcEvent('update-available', (info) => {
+      Logger.debug(`Update v${info.version} available, downloading...`);
+    });
+
+    const cleanupUpdateDownloaded = onIpcEvent('update-downloaded', (info) => {
+      showStatus(`Version ${info.version} downloaded — restart to update`, 'warning');
     });
 
     return () => {
       cleanupProgress();
-      cleanupUpdate();
+      cleanupUpdateAvailable();
+      cleanupUpdateDownloaded();
     };
   }, [dispatch, showStatus]);
 
@@ -170,12 +169,13 @@ export function useSync(
     if (!autoSyncEnabled) return;
 
     const actionFns: Record<SyncAction, () => Promise<void>> = { sync, refreshBooths };
+    const enabledActions = SYNC_ACTIONS.filter((a) => a !== 'refreshBooths' || appConfig?.availableBoothsEnabled);
 
     async function checkAndSync() {
       const state = syncStateRef.current;
       if (state.syncing || busyRef.current) return;
 
-      for (const action of SYNC_ACTIONS) {
+      for (const action of enabledActions) {
         const stale = SYNC_ENDPOINTS.filter((ep) => ep.syncAction === action).some((ep) =>
           isStale(state.endpoints[ep.id]?.lastSync, ep.maxAgeMs)
         );
@@ -202,7 +202,7 @@ export function useSync(
     // Then poll periodically
     const interval = setInterval(checkAndSync, CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [autoSyncEnabled, sync, refreshBooths]);
+  }, [autoSyncEnabled, appConfig?.availableBoothsEnabled, sync, refreshBooths]);
 
   return { sync, refreshBooths };
 }

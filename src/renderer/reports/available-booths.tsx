@@ -1,12 +1,13 @@
 // Available Booths Report — Preact component
 // Shows booth locations with filtered availability dates/times
 
-import { useState } from 'preact/hooks';
-import { BOOTH_RESERVATION_TYPE } from '../../constants';
+import { useEffect, useState } from 'preact/hooks';
+import { BOOTH_RESERVATION_TYPE, BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
 import type { AppConfig, BoothAvailableDate, BoothLocation, BoothTimeSlot, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
 import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
-import { formatBoothDate, formatTime12h, parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
+import { formatBoothDate, formatTime12h, haversineDistance, parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
+import { ipcInvoke } from '../ipc';
 
 interface AvailableBoothsConfig {
   filters: DayFilter[];
@@ -103,6 +104,22 @@ export function AvailableBoothsReport({
 }: AvailableBoothsProps) {
   const [selecting, setSelecting] = useState(false);
   const [filtering, setFiltering] = useState(false);
+  const [troopCoords, setTroopCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const seasonal = await ipcInvoke('load-seasonal-data');
+        const addr = seasonal?.troop?.address;
+        if (addr?.latitude && addr?.longitude) {
+          setTroopCoords({ lat: addr.latitude, lng: addr.longitude });
+        }
+      } catch {
+        // Non-critical — distance sorting is optional
+      }
+    })();
+  }, []);
+
   if (!data) {
     return (
       <div class="report-visual">
@@ -140,47 +157,118 @@ export function AvailableBoothsReport({
     );
   }
 
-  const boothCount = appConfig?.boothIds?.length || 0;
+  const boothIds = appConfig?.boothIds || [];
+  const boothCount = boothIds.length;
   const filterCount = filters.length;
   const isFullyConfigured = boothCount > 0 && filterCount > 0;
 
-  const boothsWithDates = boothLocations.filter((loc) => {
-    const filtered = filterAvailableDates(loc.availableDates || [], filters);
-    return removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots).length > 0;
+  const boothDistanceMap = new Map<number, number>();
+  if (troopCoords) {
+    for (const loc of boothLocations) {
+      const { latitude, longitude } = loc.address;
+      if (latitude && longitude) {
+        boothDistanceMap.set(loc.id, haversineDistance(troopCoords.lat, troopCoords.lng, latitude, longitude));
+      }
+    }
+  }
+
+  const boothsWithDates = boothLocations
+    .filter((loc) => {
+      const filtered = filterAvailableDates(loc.availableDates || [], filters);
+      return removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots).length > 0;
+    })
+    .sort((a, b) => (boothDistanceMap.get(a.id) ?? Number.POSITIVE_INFINITY) - (boothDistanceMap.get(b.id) ?? Number.POSITIVE_INFINITY));
+
+  // Build explicit booth location names from selected booth IDs
+  const selectedBooths = boothIds.map((id) => boothLocations.find((loc) => loc.id === id)).filter(Boolean);
+  const uniqueStoreNames = [...new Set(selectedBooths.map((loc) => loc!.storeName).filter(Boolean))].sort();
+
+  // Build per-day time slot summary
+  const filterDays = [...new Set(filters.map((f) => f.day))].sort();
+  const dayTimeDetails = filterDays.map((day) => {
+    const dayFilters = filters.filter((f) => f.day === day);
+    const allSlots = dayFilters.some((f) => !f.timeAfter && !f.timeBefore);
+    if (allSlots) return { day, label: DAY_LABELS[day], slots: 'All times' };
+    const slotLabels = dayFilters
+      .map((f) => {
+        const match = BOOTH_TIME_SLOTS.find((s) => s.start === f.timeAfter && s.end === f.timeBefore);
+        return match?.label || `${f.timeAfter}–${f.timeBefore}`;
+      })
+      .sort();
+    return { day, label: DAY_LABELS[day], slots: slotLabels.join(', ') };
   });
 
   return (
     <div class="report-visual">
       <h3>Available Booths</h3>
-      <div class="report-toolbar">
-        {isFullyConfigured && (
-          <button type="button" class="btn btn-primary" disabled={refreshing} onClick={onRefresh}>
-            {refreshing ? 'Refreshing...' : 'Refresh Availability'}
-          </button>
-        )}
-        <button type="button" class="btn btn-secondary" onClick={() => setSelecting(true)}>
-          Select Booths{boothCount > 0 ? ` (${boothCount})` : ''}
-        </button>
-        <button type="button" class="btn btn-secondary" onClick={() => setFiltering(true)}>
-          Filter Days{filterCount > 0 ? ` (${filterCount})` : ''}
-        </button>
+      <div class="available-booths-config">
+        <div class="config-section">
+          <div class="config-section-header">
+            <span class="config-label">Booths</span>
+            <button type="button" class="btn btn-secondary btn-sm" onClick={() => setSelecting(true)}>
+              Select Booths
+            </button>
+          </div>
+          {boothCount > 0 ? (
+            <div class="config-value">
+              {uniqueStoreNames.join(', ')}
+              {boothCount > 1 && <span class="muted-text"> ({boothCount} locations)</span>}
+            </div>
+          ) : (
+            <div class="config-value muted-text">No booths selected</div>
+          )}
+        </div>
+        <div class="config-section">
+          <div class="config-section-header">
+            <span class="config-label">Days & Times</span>
+            <button type="button" class="btn btn-secondary btn-sm" onClick={() => setFiltering(true)}>
+              Select Days & Times
+            </button>
+          </div>
+          {dayTimeDetails.length > 0 ? (
+            <div class="config-day-list">
+              {dayTimeDetails.map((d) => (
+                <span key={d.day} class="config-day-chip">
+                  <strong>{d.label}</strong> {d.slots}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div class="config-value muted-text">No days selected</div>
+          )}
+        </div>
         {ignoredTimeSlots.length > 0 && (
-          <button type="button" class="btn btn-secondary" onClick={onResetIgnored}>
-            Reset Ignored ({ignoredTimeSlots.length})
-          </button>
+          <div class="config-section">
+            <div class="config-section-header">
+              <span class="config-value">
+                {ignoredTimeSlots.length} ignored time slot{ignoredTimeSlots.length === 1 ? '' : 's'}
+              </span>
+              <button type="button" class="btn btn-secondary btn-sm" onClick={onResetIgnored}>
+                Reset
+              </button>
+            </div>
+          </div>
+        )}
+        {isFullyConfigured && (
+          <div class="config-section config-section-action">
+            <button type="button" class="btn btn-primary btn-sm" disabled={refreshing} onClick={onRefresh}>
+              {refreshing ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
         )}
       </div>
 
       {!isFullyConfigured ? (
         <div class="info-box info-box-neutral">
-          <strong>Setup Required</strong> — {boothCount === 0 && filterCount === 0
+          <strong>Setup Required</strong> —{' '}
+          {boothCount === 0 && filterCount === 0
             ? 'Select booths and configure day/time filters to see availability.'
             : boothCount === 0
               ? 'Select booths to see availability.'
               : 'Configure day/time filters to see availability.'}
         </div>
       ) : boothsWithDates.length === 0 ? (
-        <p class="muted-text">No available booth slots found. Booth availability is fetched from Smart Cookie during sync.</p>
+        <p class="muted-text">No available booth slots found.</p>
       ) : (
         boothsWithDates.map((loc) => {
           const addrParts = [loc.address.street, loc.address.city, loc.address.state, loc.address.zip].filter(Boolean);
@@ -200,7 +288,13 @@ export function AvailableBoothsReport({
               <div class="booth-card-header">
                 <div>
                   <strong>{loc.storeName || '-'}</strong>
-                  <div class="meta-text">{addressStr || '-'}</div>
+                  <div class="meta-text">
+                    {addressStr || '-'}
+                    {(() => {
+                      const dist = boothDistanceMap.get(loc.id);
+                      return dist != null ? ` · ${dist.toFixed(1)} mi` : '';
+                    })()}
+                  </div>
                   {loc.notes && <div class="muted-text note-text">{loc.notes}</div>}
                 </div>
                 <span class={`booth-type-badge ${typeClass}`}>{loc.reservationType || '-'}</span>

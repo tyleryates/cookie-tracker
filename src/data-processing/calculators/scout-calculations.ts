@@ -132,9 +132,7 @@ function calculateInventoryDisplay(scout: Scout, salesByVariety: Varieties): voi
     const salesCount = salesByVariety[variety] || 0;
     const net = inventoryCount - salesCount;
     scout.totals.$inventoryDisplay[variety] = net;
-    // Can't have negative boxes on hand — clamp per variety so one oversold
-    // variety doesn't drag down the total (girl just needs more inventory)
-    inventoryTotal += Math.max(0, net);
+    inventoryTotal += net;
   }
   scout.totals.inventory = inventoryTotal;
 

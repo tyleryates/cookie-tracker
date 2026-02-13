@@ -15,6 +15,34 @@ function transferTooltip(varieties: Varieties | undefined, transform?: (count: n
   return buildVarietyTooltip(transformed);
 }
 
+/** Inventory direction from the troop's perspective */
+type InventoryDirection = 'in' | 'out';
+
+/** Build a human-readable type label, from/to, and direction for a transfer row */
+function describeTransfer(transfer: Transfer): { typeLabel: string; from: string; to: string; direction: InventoryDirection } {
+  switch (transfer.category) {
+    case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
+      if (transfer.type === TRANSFER_TYPE.T2T) {
+        return { typeLabel: 'T2T In', from: `Troop ${transfer.from}`, to: 'Troop', direction: 'in' };
+      }
+      return { typeLabel: 'C2T', from: transfer.from || 'Council', to: 'Troop', direction: 'in' };
+    case TRANSFER_CATEGORY.TROOP_OUTGOING:
+      return { typeLabel: 'T2T Out', from: 'Troop', to: `Troop ${transfer.to}`, direction: 'out' };
+    case TRANSFER_CATEGORY.GIRL_PICKUP:
+      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
+    case TRANSFER_CATEGORY.GIRL_RETURN:
+      return { typeLabel: 'G2T', from: transfer.from || '-', to: 'Troop', direction: 'in' };
+    case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
+      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
+    case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
+      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
+    case TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION:
+      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
+    default:
+      return { typeLabel: transfer.type || '-', from: transfer.from || '-', to: transfer.to || '-', direction: 'out' };
+  }
+}
+
 export function InventoryReport({ data }: { data: UnifiedDataset }) {
   if (!data?.transferBreakdowns) {
     return (
@@ -38,28 +66,37 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   const totalReturned = transferBreakdowns.totals.g2t;
   const netInventory = troopTotals.inventory;
   const inventoryVarieties = varieties.inventory;
-  const troopSold = troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G;
+
+  // Split C2T vs T2T In for the description
+  const t2tInTotal = c2tTransfers
+    .filter((t) => t.type === TRANSFER_TYPE.T2T)
+    .reduce((sum, t) => sum + (t.physicalPackages || 0), 0);
+  const pureC2T = totalOrdered - t2tInTotal;
+  const totalPackages = totalOrdered - totalT2TOut;
+  const descParts = [`${pureC2T} C2T`];
+  if (t2tInTotal > 0) descParts.push(`+ ${t2tInTotal} T2T In`);
+  if (totalT2TOut > 0) descParts.push(`− ${totalT2TOut} T2T Out`);
+  const packagesDesc = descParts.join(' ');
+
+  // T2G net of returns
+  const netT2G = totalAllocated - totalReturned;
+  const t2gDescription = totalReturned > 0 ? `${totalAllocated} out − ${totalReturned} returned` : 'Allocated to scouts';
 
   const stats: Array<{ label: string; value: number; description: string; color: string }> = [
-    { label: 'Total Received', value: totalOrdered, description: 'C2T and incoming T2T pickups', color: '#2196F3' }
+    { label: 'Total Packages', value: totalPackages, description: packagesDesc, color: '#1565C0' },
+    { label: 'Girl Transfers', value: netT2G, description: t2gDescription, color: '#4CAF50' }
   ];
-  if (totalT2TOut > 0) {
-    stats.push({ label: 'Sent to Troops (T2T)', value: totalT2TOut, description: 'Transferred to other troops', color: '#E53935' });
-  }
   stats.push(
-    { label: 'Allocated to Scouts (T2G)', value: totalAllocated, description: 'Physical packages only', color: '#4CAF50' },
-    { label: 'Troop Sold', value: troopSold, description: 'Booth & troop delivery', color: '#00897B' }
+    { label: 'Troop Sales', value: troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G, description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`, color: '#7B1FA2' },
+    { label: 'Current Inventory', value: netInventory, description: 'Packages on hand', color: '#9C27B0' }
   );
-  if (totalReturned > 0) {
-    stats.push({ label: 'Returns (G2T)', value: totalReturned, description: 'Returned from scouts', color: '#FF9800' });
-  }
-  stats.push({ label: 'Troop Inventory', value: netInventory, description: 'Packages on hand', color: '#9C27B0' });
 
   const inventoryRows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(inventoryVarieties))).filter(
     ([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE
   );
 
-  const allScoutTransfers = [...t2gTransfers, ...g2tTransfers].sort(
+  // Combine all transfers into one sorted list
+  const allTransfers = [...c2tTransfers, ...t2tOutTransfers, ...t2gTransfers, ...g2tTransfers].sort(
     (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
   );
 
@@ -68,13 +105,10 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   return (
     <div class="report-visual">
       <h3>Inventory Report</h3>
-      <p class="meta-text" style={{ marginBottom: '20px' }}>
-        Track inventory from Council to Troop to Scouts
-      </p>
 
       <StatCards stats={stats} />
 
-      <h4>Net Troop Inventory by Variety</h4>
+      <h4>Troop Inventory</h4>
       <DataTable columns={['Variety', 'Packages', '']}>
         {inventoryRows.map(([variety, count]) => {
           const cases = Math.floor(count / PACKAGES_PER_CASE);
@@ -95,97 +129,40 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
         })}
       </DataTable>
 
-      {c2tTransfers.length > 0 && (
+      {allTransfers.length > 0 && (
         <>
-          <h4>Inventory Received (C2T / T2T)</h4>
-          <p class="meta-text">
-            {totalOrdered} packages received across {c2tTransfers.length} pickups
-          </p>
-          <DataTable columns={['Date', 'From', 'Order #', 'Cases', 'Packages', 'Amount', 'Status']}>
-            {c2tTransfers.map((transfer: Transfer, i: number) => {
+          <h4>Transfers</h4>
+          <DataTable columns={['Date', 'Type', 'From', 'To', 'Packages', 'Amount', 'Status']}>
+            {allTransfers.map((transfer: Transfer, i: number) => {
               const isPending =
                 transfer.status === SC_TRANSFER_STATUS.SAVED ||
                 (transfer.actions && (transfer.actions.submittable || transfer.actions.approvable));
               const statusText = isPending ? 'Pending' : 'Completed';
               const statusClass = isPending ? 'status-warning' : 'status-success';
-              const tip = transferTooltip(transfer.varieties);
-              const casesTip = transferTooltip(transfer.varieties, (count) => Math.round(count / PACKAGES_PER_CASE));
-              const fromLabel = transfer.type === TRANSFER_TYPE.T2T ? `Troop ${transfer.from}` : transfer.from || 'Council';
 
-              return (
-                <tr key={i}>
-                  <td>{formatDate(transfer.date)}</td>
-                  <td>{fromLabel}</td>
-                  <td>{String(transfer.orderNumber || '-')}</td>
-                  {casesTip ? <TooltipCell tooltip={casesTip}>{transfer.cases || 0}</TooltipCell> : <td>{transfer.cases || 0}</td>}
-                  {tip ? <TooltipCell tooltip={tip}>{transfer.packages || 0}</TooltipCell> : <td>{transfer.packages || 0}</td>}
-                  <td>{formatCurrency(transfer.amount ?? 0)}</td>
-                  <td class={statusClass}>{statusText}</td>
-                </tr>
-              );
-            })}
-          </DataTable>
-        </>
-      )}
-
-      {t2tOutTransfers.length > 0 && (
-        <>
-          <h4>Sent to Other Troops (T2T Out)</h4>
-          <p class="meta-text">
-            {totalT2TOut} packages sent across {t2tOutTransfers.length} transfer{t2tOutTransfers.length !== 1 ? 's' : ''}
-          </p>
-          <DataTable columns={['Date', 'To', 'Order #', 'Packages', 'Amount', 'Status']}>
-            {t2tOutTransfers.map((transfer: Transfer, i: number) => {
-              const isPending =
-                transfer.status === SC_TRANSFER_STATUS.SAVED ||
-                (transfer.actions && (transfer.actions.submittable || transfer.actions.approvable));
-              const statusText = isPending ? 'Pending' : 'Completed';
-              const statusClass = isPending ? 'status-warning' : 'status-success';
-              const tip = transferTooltip(transfer.varieties);
-
-              return (
-                <tr key={i}>
-                  <td>{formatDate(transfer.date)}</td>
-                  <td>{`Troop ${transfer.to}`}</td>
-                  <td>{String(transfer.orderNumber || '-')}</td>
-                  {tip ? <TooltipCell tooltip={tip}>{-(transfer.packages || 0)}</TooltipCell> : <td>{-(transfer.packages || 0)}</td>}
-                  <td>{formatCurrency(transfer.amount ?? 0)}</td>
-                  <td class={statusClass}>{statusText}</td>
-                </tr>
-              );
-            })}
-          </DataTable>
-        </>
-      )}
-
-      {allScoutTransfers.length > 0 && (
-        <>
-          <h4>Scout Transfers (T2G / G2T)</h4>
-          <p class="meta-text">
-            {totalAllocated} physical packages allocated across {t2gTransfers.length} transfers
-            {totalReturned > 0 ? `, ${totalReturned} returned across ${g2tTransfers.length}` : ''}
-          </p>
-          <DataTable columns={['Date', 'Scout', 'Packages', 'Amount']}>
-            {allScoutTransfers.map((transfer: Transfer, i: number) => {
-              const isReturn = transfer.category === TRANSFER_CATEGORY.GIRL_RETURN;
-              const scoutName = isReturn ? transfer.from : transfer.to;
+              const { typeLabel, from, to, direction } = describeTransfer(transfer);
               const packages = transfer.packages || 0;
-              const displayPackages = isReturn ? -packages : packages;
-              const tip = transferTooltip(transfer.varieties, isReturn ? (count) => -count : undefined);
-              const cellClass = isReturn ? 'status-warning-dark' : '';
+              const pkgDisplay = direction === 'out' ? `- ${packages}` : `+ ${packages}`;
+              const pkgClass = direction === 'out' ? 'pkg-out' : 'pkg-in';
+              const tip = transferTooltip(transfer.varieties);
 
               return (
                 <tr key={i}>
                   <td>{formatDate(transfer.date)}</td>
-                  <td>{String(scoutName || '-')}</td>
+                  <td>
+                    <span class={`transfer-type-label transfer-type-${typeLabel.toLowerCase().replace(/\s+/g, '-')}`}>{typeLabel}</span>
+                  </td>
+                  <td>{from}</td>
+                  <td>{to}</td>
                   {tip ? (
-                    <TooltipCell tooltip={tip} className={cellClass ? `tooltip-cell ${cellClass}` : undefined}>
-                      {displayPackages}
+                    <TooltipCell tooltip={tip} className={`tooltip-cell ${pkgClass}`}>
+                      {pkgDisplay}
                     </TooltipCell>
                   ) : (
-                    <td class={cellClass}>{displayPackages}</td>
+                    <td class={pkgClass}>{pkgDisplay}</td>
                   )}
-                  <td class={cellClass}>{formatCurrency(transfer.amount ?? 0)}</td>
+                  <td>{formatCurrency(transfer.amount ?? 0)}</td>
+                  <td class={statusClass}>{statusText}</td>
                 </tr>
               );
             })}

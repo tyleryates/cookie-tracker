@@ -1,6 +1,6 @@
 // Data Store Operations — Factory functions for creating orders and transfers
 
-import { DATA_SOURCES, OWNER, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
+import { DATA_SOURCES, type DataSource, OWNER, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
 import { buildPhysicalVarieties, isC2TTransfer, sumPhysicalPackages } from './data-processing/utils';
 import type { DataStore } from './data-store';
 import Logger from './logger';
@@ -52,13 +52,13 @@ function classifyTransferCategory(
     return TRANSFER_CATEGORY.COOKIE_SHARE_RECORD;
   }
   if (type === TRANSFER_TYPE.DIRECT_SHIP) return TRANSFER_CATEGORY.DIRECT_SHIP;
-  if (type === TRANSFER_TYPE.PLANNED) return TRANSFER_CATEGORY.PLANNED;
+  if (type === TRANSFER_TYPE.PLANNED) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
   Logger.warn(`Unknown transfer type "${type}" — defaulting to DC_ORDER_RECORD category`);
   return TRANSFER_CATEGORY.DC_ORDER_RECORD;
 }
 
 /** Create a new Order object with defaults */
-function createOrder(data: Partial<Order>, source: string): Order {
+function createOrder(data: Partial<Order>, source: DataSource): Order {
   return {
     orderNumber: data.orderNumber || '',
     scout: data.scout || '',
@@ -127,7 +127,7 @@ export function createTransfer(data: TransferInput): Transfer {
 }
 
 /** Get the metadata key for a data source */
-function getMetadataKey(source: string): keyof OrderMetadata {
+function getMetadataKey(source: DataSource): keyof OrderMetadata {
   const keyMap: Record<string, keyof OrderMetadata> = {
     [DATA_SOURCES.DIGITAL_COOKIE]: 'dc',
     [DATA_SOURCES.SMART_COOKIE]: 'sc',
@@ -148,7 +148,7 @@ export function mergeOrCreateOrder(
   store: DataStore,
   orderNum: string,
   orderData: Partial<Order>,
-  source: string,
+  source: DataSource,
   rawData: Record<string, unknown>,
   enrichmentFn?: ((existing: Order, newData: Partial<Order>) => void) | null
 ): Order {

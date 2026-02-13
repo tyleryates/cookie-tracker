@@ -3,7 +3,7 @@
 
 import { PIPELINE_FILES } from '../constants';
 import Logger from '../logger';
-import type { AppConfig, LoadDataResult, UnifiedDataset } from '../types';
+import type { AppConfig, LoadDataResult, RawDataRow, UnifiedDataset } from '../types';
 import { ipcInvoke, ipcInvokeRaw } from './ipc';
 
 // ============================================================================
@@ -25,7 +25,7 @@ export async function loadDataFromDisk(): Promise<LoadDataResult | null> {
 // DATA EXPORT
 // ============================================================================
 
-function serializeUnifiedDataset(unified: UnifiedDataset): Record<string, any> {
+function serializeUnifiedDataset(unified: UnifiedDataset): RawDataRow {
   return {
     scouts: Object.entries(unified.scouts).map(([name, scout]) => {
       const { name: _existingName, ...rest } = scout;
@@ -64,6 +64,6 @@ export async function loadAppConfig(): Promise<AppConfig> {
     return await ipcInvoke('load-config');
   } catch (err) {
     Logger.error('Failed to load config:', err);
-    return { autoSyncEnabled: true, boothIds: [], boothDayFilters: [], ignoredTimeSlots: [] };
+    return { autoSyncEnabled: true, availableBoothsEnabled: false, boothIds: [], boothDayFilters: [], ignoredTimeSlots: [] };
   }
 }

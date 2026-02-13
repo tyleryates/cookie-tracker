@@ -14,7 +14,7 @@ import {
 } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import Logger from '../../logger';
-import type { Order, Scout, Varieties, Warning } from '../../types';
+import type { Order, RawDataRow, Scout, Varieties, Warning } from '../../types';
 import { parseVarietiesFromDC } from '../importers/parsers';
 
 /** Classify payment method from DC payment status string */
@@ -53,7 +53,7 @@ function classifyDCOrder(isSiteOrder: boolean, dcOrderType: string): { owner: Ow
 }
 
 /** Extract basic order information from DC row */
-function extractBasicOrderInfo(row: Record<string, any>): {
+function extractBasicOrderInfo(row: RawDataRow): {
   orderNumber: string;
   date: string;
   packages: number;
@@ -86,7 +86,7 @@ function extractBasicOrderInfo(row: Record<string, any>): {
 }
 
 /** Parse cookie varieties from DC row, adding Cookie Share for donations */
-function parseOrderVarieties(row: Record<string, any>, donations: number): Varieties {
+function parseOrderVarieties(row: RawDataRow, donations: number): Varieties {
   const varieties = parseVarietiesFromDC(row);
   if (donations > 0) {
     (varieties as Record<string, number>)[COOKIE_TYPE.COOKIE_SHARE] = donations;
@@ -134,7 +134,7 @@ function recordClassificationWarning(warnings: Warning[], warningData: Warning):
 }
 
 /** Parse and classify a single Digital Cookie order */
-function parseAndClassifyOrder(row: Record<string, any>, lastName: string, warnings: Warning[]): Order {
+function parseAndClassifyOrder(row: RawDataRow, lastName: string, warnings: Warning[]): Order {
   const basicInfo = extractBasicOrderInfo(row);
   const varieties = parseOrderVarieties(row, basicInfo.donations);
 
@@ -167,7 +167,7 @@ function parseAndClassifyOrder(row: Record<string, any>, lastName: string, warni
 }
 
 /** Add and classify orders from Digital Cookie */
-function addDCOrders(scoutDataset: Map<string, Scout>, rawDCData: Record<string, any>[], warnings: Warning[] = []): void {
+function addDCOrders(scoutDataset: Map<string, Scout>, rawDCData: RawDataRow[], warnings: Warning[] = []): void {
   for (const row of rawDCData) {
     const firstName = row[DC_COLUMNS.GIRL_FIRST_NAME] || '';
     const lastName = row[DC_COLUMNS.GIRL_LAST_NAME] || '';

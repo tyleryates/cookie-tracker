@@ -2,7 +2,7 @@
 // Computes transfer-based inventory metrics (C2T pickups, T2G allocations, G2T returns).
 // Customer sales totals come from scout data, not from this module.
 
-import { TRANSFER_CATEGORY } from '../../constants';
+import { TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
 import type { Transfer } from '../../types';
 
 interface PackageTotals {
@@ -39,6 +39,8 @@ function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
   };
 
   for (const transfer of transfers) {
+    // PLANNED transfers are pending C2T pickups — don't count toward inventory
+    if (transfer.type === TRANSFER_TYPE.PLANNED) continue;
     const field = CATEGORY_TO_FIELD[transfer.category];
     if (field) {
       totals[field] += transfer.physicalPackages || 0;

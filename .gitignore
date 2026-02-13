@@ -14,5 +14,8 @@ archive/
 *.swo
 *~
 
+# Certificates
+*.cer
+
 # Claude Code
 .claude/

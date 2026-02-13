@@ -13,7 +13,7 @@ NEVER create git commits, push, build, or publish without explicit user request.
 - `make format` to auto-format (biome)
 - `make lint` to check formatting/lint without changes
 - `make typecheck` for TypeScript type checking
-- `make test` to run unit tests (vitest)
+- `make test` to run unit tests (vitest, 456 tests across 23 files)
 - `make knip` to find unused exports/files
 - When deleting or renaming a source file, manually remove the corresponding `.js` file from `dist/`
 
@@ -22,6 +22,14 @@ NEVER create git commits, push, build, or publish without explicit user request.
 Electron desktop app that syncs and reconciles Girl Scout cookie sales data from **Digital Cookie** (customer-facing online sales) and **Smart Cookie** (troop management system). These are separate platforms that don't auto-sync — this app downloads from both and reconciles them.
 
 **Smart Cookie is the source of truth** for billing, inventory, and official sales reporting. Digital Cookie is one sales channel that eventually syncs to Smart Cookie. When numbers differ, Smart Cookie is correct. Reports should use SC as the baseline with DC providing supplemental detail.
+
+### Key Features
+
+- **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
+- **Reconciliation** — Matches orders across systems, detects discrepancies
+- **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
+- **7 reports** — Troop Summary, Scout Summary, Cookie Share Reconciliation, Booth Reservations, Available Booths, Inventory, Cookie Popularity
+- **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
 ## How the Code Is Organized
 
@@ -33,11 +41,39 @@ Three layers with strict boundaries:
 
 **Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Sub-directories: `importers/` (parse raw files into DataStore), `calculators/` (compute UnifiedDataset from DataStore).
 
-**Scrapers** (`src/scrapers/`) — API clients for DC and SC. Each scraper has a separate session class (`dc-session.ts`, `sc-session.ts`) that owns auth state.
+**Scrapers** (`src/scrapers/`) — API clients for DC and SC. Each scraper has a separate session class (`dc-session.ts`, `sc-session.ts`) that owns auth state, with automatic re-login on 401/403.
+
+### Key Source Files
+
+| File | Purpose |
+|---|---|
+| `src/types.ts` | All shared types (Order, Transfer, Scout, UnifiedDataset, IPC maps) |
+| `src/constants.ts` | Business logic constants (transfer types, categories, allocation channels) |
+| `src/cookie-constants.ts` | Cookie names, pricing, variety mappings across DC/SC/API |
+| `src/data-store.ts` | DataStore creation and type — intermediate store between import and calculation |
+| `src/data-store-operations.ts` | Transfer/order creation, classification (`classifyTransferCategory`, `matchesTroopNumber`) |
+| `src/order-classification.ts` | DC order type/payment/owner classification |
+| `src/validators.ts` | Input validation for credentials and config |
+| `src/config-manager.ts` | App configuration persistence (booth IDs, filters) |
+| `src/credentials-manager.ts` | Encrypted credential storage |
+| `src/seasonal-data.ts` | Persists SC session data (troop info, cookie ID map) across syncs |
+| `src/data-pipeline.ts` | Orchestrates: scan files, import, build UnifiedDataset |
+
+### Renderer Components
+
+| Component | Purpose |
+|---|---|
+| `reports-section.tsx` | Report tab navigation, health banner, report rendering |
+| `sync-section.tsx` | Sync button, progress display, endpoint status |
+| `settings-page.tsx` | Credential setup, DC role selection, SC verification |
+| `booth-selector.tsx` | Multi-select UI for choosing booth locations to track |
+| `booth-day-filter.tsx` | Day/time filter configuration for Available Booths report |
+| `scout-detail.tsx` | Expandable scout detail panel (orders, allocations, inventory) |
+| `data-table.tsx` | Reusable sortable table component |
 
 ### Layer Rules
 
-- **Renderer MUST NOT import from `data-processing/`** — all data arrives via IPC as a finished UnifiedDataset. If a renderer file needs a calculation, either pre-compute it in the data-processing layer or put the helper in `renderer/format-utils.ts`.
+- **Renderer MUST NOT import from `data-processing/`** — all data arrives via IPC as a finished UnifiedDataset. If a renderer file needs a calculation, either pre-compute it in the data-processing layer or put the helper in `renderer/format-utils.ts`. Type-only imports from shared files (`types.ts`, `constants.ts`) are allowed.
 - **Data-processing MUST NOT import from renderer or scrapers** — it's pure functions operating on data.
 - **Shared types/constants** live in `src/types.ts`, `src/constants.ts`, and `src/cookie-constants.ts` (cookie names, pricing, variety mappings) — both layers import from these.
 - **Seasonal data** (`src/seasonal-data.ts`) — Persists SC session data (troop info, cookie ID map) across syncs so the pipeline knows troop identity before importing orders.
@@ -51,7 +87,7 @@ Three layers with strict boundaries:
 
 ## Key Documentation
 
-- **`RULES.md`** — Business rules, data classification, inventory, financials (single source of truth for how the app should behave)
+- **`RULES.md`** — Business rules, data classification, inventory, financials, health checks (single source of truth for how the app should behave)
 - **`docs/DESIGN-PRINCIPLES.md`** — Architecture principles: classify once, positive sums, reports calculate own needs
 - **`docs/DOMAIN.md`** — Cookie program domain knowledge, data format reference, scraper authentication, glossary
 - **`docs/DISTRIBUTION-UPDATES.md`** — Build, version, and release procedures

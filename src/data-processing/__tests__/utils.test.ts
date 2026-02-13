@@ -2,13 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TRANSFER_TYPE } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { Varieties } from '../../types';
-import {
-  accumulateVarieties,
-  buildPhysicalVarieties,
-  isC2TTransfer,
-  isKnownTransferType,
-  sumPhysicalPackages
-} from '../utils';
+import { accumulateVarieties, buildPhysicalVarieties, isC2TTransfer, isKnownTransferType, sumPhysicalPackages } from '../utils';
 
 // =============================================================================
 // isC2TTransfer

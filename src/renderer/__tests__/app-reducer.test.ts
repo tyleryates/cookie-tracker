@@ -90,7 +90,7 @@ function makeUnifiedDataset(overrides?: Partial<UnifiedDataset>): UnifiedDataset
       unifiedBuildTime: '',
       scoutCount: 0,
       orderCount: 0,
-      healthChecks: { warningsCount: 0, unknownOrderTypes: 0, unknownPaymentMethods: 0, unknownTransferTypes: 0 }
+      healthChecks: { warningsCount: 0, unknownOrderTypes: 0, unknownPaymentMethods: 0, unknownTransferTypes: 0, unknownCookieIds: 0 }
     },
     warnings: [],
     virtualCookieShareAllocations: {},

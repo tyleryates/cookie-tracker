@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { BOOTH_RESERVATION_TYPE } from '../../constants';
 import type { BoothLocation } from '../../types';
+import { haversineDistance } from '../format-utils';
 import { ipcInvoke } from '../ipc';
 
 interface BoothSelectorProps {
@@ -13,6 +14,7 @@ interface BoothSelectorProps {
 
 export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelectorProps) {
   const [catalog, setCatalog] = useState<BoothLocation[]>([]);
+  const [troopCoords, setTroopCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set(currentBoothIds));
@@ -22,9 +24,13 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
     let cancelled = false;
     (async () => {
       try {
-        const booths = await ipcInvoke('fetch-booth-catalog');
+        const [booths, seasonal] = await Promise.all([ipcInvoke('fetch-booth-catalog'), ipcInvoke('load-seasonal-data')]);
         if (!cancelled) {
           setCatalog(booths);
+          const addr = seasonal?.troop?.address;
+          if (addr?.latitude && addr?.longitude) {
+            setTroopCoords({ lat: addr.latitude, lng: addr.longitude });
+          }
           setLoading(false);
         }
       } catch (err) {
@@ -50,6 +56,19 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
     if (toExpand.size > 0) setExpandedStores(toExpand);
   }, [catalog, currentBoothIds]);
 
+  /** Distance in miles from troop to each booth (by booth id) */
+  const boothDistances = useMemo(() => {
+    const distances = new Map<number, number>();
+    if (!troopCoords) return distances;
+    for (const booth of catalog) {
+      const { latitude, longitude } = booth.address;
+      if (latitude && longitude) {
+        distances.set(booth.id, haversineDistance(troopCoords.lat, troopCoords.lng, latitude, longitude));
+      }
+    }
+    return distances;
+  }, [catalog, troopCoords]);
+
   const storeGroups = useMemo(() => {
     const groups = new Map<string, BoothLocation[]>();
     for (const booth of catalog) {
@@ -58,9 +77,21 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
       list.push(booth);
       groups.set(name, list);
     }
-    // Sort by store name
-    return new Map([...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])));
-  }, [catalog]);
+    // Sort locations within each store by distance
+    for (const [, booths] of groups) {
+      booths.sort(
+        (a, b) => (boothDistances.get(a.id) ?? Number.POSITIVE_INFINITY) - (boothDistances.get(b.id) ?? Number.POSITIVE_INFINITY)
+      );
+    }
+    // Sort stores by nearest booth distance, then by store name
+    return new Map(
+      [...groups.entries()].sort((a, b) => {
+        const distA = boothDistances.get(a[1][0]?.id) ?? Number.POSITIVE_INFINITY;
+        const distB = boothDistances.get(b[1][0]?.id) ?? Number.POSITIVE_INFINITY;
+        return distA !== distB ? distA - distB : a[0].localeCompare(b[0]);
+      })
+    );
+  }, [catalog, boothDistances]);
 
   const toggleExpanded = (storeName: string) => {
     setExpandedStores((prev) => {
@@ -85,6 +116,16 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
       }
       return next;
     });
+
+    // Auto-expand when selecting, so user sees what was checked
+    if (!allSelected) {
+      setExpandedStores((prev) => {
+        if (prev.has(storeName)) return prev;
+        const next = new Set(prev);
+        next.add(storeName);
+        return next;
+      });
+    }
   };
 
   const toggleBooth = (id: number) => {
@@ -139,7 +180,9 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
                 <input
                   type="checkbox"
                   checked={allSelected}
-                  ref={(el) => { if (el) el.indeterminate = storeEnabled && !allSelected; }}
+                  ref={(el) => {
+                    if (el) el.indeterminate = storeEnabled && !allSelected;
+                  }}
                   onClick={(e: Event) => e.stopPropagation()}
                   onChange={() => toggleStore(storeName)}
                 />
@@ -147,11 +190,15 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
                   <strong>{storeName}</strong>
                   <div class="meta-text">
                     {selectedCount} of {booths.length} location{booths.length === 1 ? '' : 's'}
+                    {(() => {
+                      const minDist = Math.min(...booths.map((bl) => boothDistances.get(bl.id) ?? Number.POSITIVE_INFINITY));
+                      return Number.isFinite(minDist) ? ` · ${minDist.toFixed(1)} mi` : '';
+                    })()}
                   </div>
                 </div>
               </div>
-              <span class="muted-text" style={{ fontSize: '0.85em' }}>
-                {expanded ? '▾' : `▸ ${booths.length} location${booths.length === 1 ? '' : 's'}`}
+              <span class="muted-text">
+                {booths.length} location{booths.length === 1 ? '' : 's'} <span class="expand-icon">{expanded ? '▼' : '▶'}</span>
               </span>
             </button>
 
@@ -168,10 +215,15 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
                         ? 'type-fcfs'
                         : 'type-default';
 
+                  const dist = boothDistances.get(booth.id);
+
                   return (
                     <label key={booth.id} class="booth-selector-row">
                       <input type="checkbox" checked={selectedIds.has(booth.id)} onChange={() => toggleBooth(booth.id)} />
-                      <span>{addr || `Booth #${booth.id}`}</span>
+                      <span>
+                        {addr || `Booth #${booth.id}`}
+                        {dist != null && <span class="muted-text">{` · ${dist.toFixed(1)} mi`}</span>}
+                      </span>
                       <span class={`booth-type-badge ${typeClass}`}>{booth.reservationType || '-'}</span>
                     </label>
                   );
@@ -182,7 +234,7 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
         );
       })}
 
-      <div class="report-toolbar" style={{ marginTop: '16px' }}>
+      <div class="sticky-footer">
         <button type="button" class="btn btn-primary" onClick={() => onSave([...selectedIds])}>
           Save Selection ({selectedIds.size} booth{selectedIds.size === 1 ? '' : 's'})
         </button>

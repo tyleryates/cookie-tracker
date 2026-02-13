@@ -3,10 +3,10 @@
 
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
-import type { Scout } from '../../types';
+import type { RawDataRow, Scout } from '../../types';
 
 /** Initialize scouts from Digital Cookie and Smart Cookie data */
-function initializeScouts(store: ReadonlyDataStore, rawDCData: Record<string, any>[]): Map<string, Scout> {
+function initializeScouts(store: ReadonlyDataStore, rawDCData: RawDataRow[]): Map<string, Scout> {
   const scoutDataset = new Map<string, Scout>();
 
   // From Digital Cookie orders

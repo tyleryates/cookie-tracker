@@ -4,7 +4,7 @@
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import { getTroopProceedsRate, PROCEEDS_EXEMPT_PACKAGES } from '../../cookie-constants';
 import type { ReadonlyDataStore } from '../../data-store';
-import type { Scout, ScoutCounts, TroopTotals } from '../../types';
+import type { RawDataRow, Scout, ScoutCounts, TroopTotals } from '../../types';
 import type { PackageTotals } from './package-totals';
 
 /** Aggregate scout-level totals: delivery, inventory, shipping, and proceeds */
@@ -22,7 +22,7 @@ function aggregateScoutTotals(scouts: Record<string, Scout>) {
       const { booth: bs, directShip: ds, virtualBooth: vb } = scout.totals.$allocationSummary;
 
       girlDelivery += (scout.totals.delivered || 0) + vb.packages;
-      girlInventory += Math.max(0, scout.totals.inventory || 0);
+      girlInventory += scout.totals.inventory || 0;
       // Credited Cookie Share from divider allocations (site orders distributed to scouts)
       creditedDonations += vb.donations + ds.donations + bs.donations;
       // Booth sales totals (used by booth and donation-alert reports)
@@ -44,7 +44,7 @@ function aggregateScoutTotals(scouts: Record<string, Scout>) {
 /** Count Cookie Share donations from DC raw data (non-site orders only).
  *  Site order donations are handled separately via credited allocations
  *  to avoid double-counting (site orders → booth/VB/DS dividers → scouts). */
-function countDCDonations(rawDCData: Record<string, any>[]): number {
+function countDCDonations(rawDCData: RawDataRow[]): number {
   let total = 0;
   for (const row of rawDCData) {
     if (row[DC_COLUMNS.GIRL_LAST_NAME] === SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME) continue;
