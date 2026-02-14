@@ -429,12 +429,9 @@ ipcMain.handle(
   })
 );
 
-ipcMain.handle(
-  'quit-and-install',
-  handleIpcError(async () => {
-    autoUpdater.quitAndInstall();
-  })
-);
+ipcMain.handle('quit-and-install', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
 
 ipcMain.handle(
   'check-for-updates',

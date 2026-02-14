@@ -182,6 +182,14 @@ export function App() {
 
   return (
     <div class="app-shell">
+      {state.updateReady && (
+        <div class="update-banner">
+          Version {state.updateReady} downloaded —{' '}
+          <button type="button" class="update-banner-btn" onClick={() => ipcInvoke('quit-and-install')}>
+            Restart to update
+          </button>
+        </div>
+      )}
       <AppHeader
         syncing={state.syncState.syncing}
         overallStatus={overall}
@@ -228,14 +236,6 @@ export function App() {
           />
         )}
       </div>
-      {state.updateReady && (
-        <div class="update-banner">
-          Version {state.updateReady} downloaded —{' '}
-          <button type="button" class="update-banner-btn" onClick={() => ipcInvoke('quit-and-install')}>
-            Restart to update
-          </button>
-        </div>
-      )}
       {state.statusMessage && (
         <div class="toast-container">
           <div class={`toast ${state.statusMessage.type}`}>{state.statusMessage.msg}</div>
