@@ -101,40 +101,6 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
       )
     },
     {
-      label: 'Troop Inventory',
-      value: troopTotals.inventory,
-      description: 'Packages on hand',
-      color: '#E65100',
-      detail: (() => {
-        const t2tNet = t2tInTotal - troopTotals.t2tOut;
-        const hasT2T = t2tInTotal > 0 || troopTotals.t2tOut > 0;
-        return (
-          <DetailCards
-            items={[
-              { label: 'Council to Troop', value: pureC2T, description: 'C2T transfers', color: '#1565C0' },
-              ...(hasT2T
-                ? [
-                    {
-                      label: 'Troop to Troop',
-                      value: t2tNet >= 0 ? `+${t2tNet}` : `${t2tNet}`,
-                      description: `${t2tInTotal} in \u2212 ${troopTotals.t2tOut} out`,
-                      color: t2tNet >= 0 ? '#0277bd' : '#f44336'
-                    }
-                  ]
-                : []),
-              {
-                label: 'Sold from Stock',
-                value: soldFromStock,
-                description: `${troopSales} troop + ${girlDelivery} girl`,
-                color: '#2E7D32'
-              },
-              { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls', color: '#F57F17' }
-            ]}
-          />
-        );
-      })()
-    },
-    {
       label: 'Troop Proceeds',
       value: `$${Math.round(troopTotals.troopProceeds)}`,
       description: `$${troopTotals.proceedsRate.toFixed(2)}/pkg`,
@@ -145,7 +111,7 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
             {
               label: 'Packages Credited',
               value: packagesCredited,
-              description: `${troopTotals.scouts.active} girls participating`,
+              description: `${troopTotals.c2tReceived - troopTotals.t2tOut} pkg + ${troopTotals.donations} donations + ${totalShipped} shipped`,
               color: '#1565C0'
             },
             {
@@ -154,7 +120,12 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
               description: `${packagesCredited} pkg / ${troopTotals.scouts.active} girls`,
               color: '#00838F'
             },
-            { label: 'Gross Proceeds', value: `$${Math.round(grossProceeds)}`, description: 'Before deductions', color: '#EF6C00' },
+            {
+              label: 'Gross Proceeds',
+              value: `$${Math.round(grossProceeds)}`,
+              description: `${packagesCredited} pkg \u00D7 $${troopTotals.proceedsRate.toFixed(2)}`,
+              color: '#EF6C00'
+            },
             ...(troopTotals.proceedsDeduction > 0
               ? [
                   {
@@ -168,6 +139,32 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
           ]}
         />
       )
+    },
+    {
+      label: 'Troop Inventory',
+      value: troopTotals.inventory,
+      description: 'Packages on hand',
+      color: '#E65100',
+      detail: (() => {
+        const totalPackages = troopTotals.c2tReceived - troopTotals.t2tOut;
+        const pkgParts = [`${pureC2T} C2T`];
+        if (t2tInTotal > 0) pkgParts.push(`+ ${t2tInTotal} T2T in`);
+        if (troopTotals.t2tOut > 0) pkgParts.push(`\u2212 ${troopTotals.t2tOut} T2T out`);
+        return (
+          <DetailCards
+            items={[
+              { label: 'Total Packages', value: totalPackages, description: pkgParts.join(' '), color: '#1565C0' },
+              {
+                label: 'Sold from Stock',
+                value: soldFromStock,
+                description: `${troopSales} troop + ${girlDelivery} girl`,
+                color: '#2E7D32'
+              },
+              { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls', color: '#F57F17' }
+            ]}
+          />
+        );
+      })()
     }
   ];
 
