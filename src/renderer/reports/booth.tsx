@@ -41,30 +41,34 @@ function getBoothStatus(r: BoothReservationImported, todayLocal: Date, nowMinute
 function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImported; scouts: Record<string, Scout> }) {
   if (!scouts) return null;
 
-  const scoutNames: string[] = [];
+  const scoutCredits: Array<{ name: string; total: number }> = [];
   for (const [name, scout] of Object.entries(scouts)) {
     if (scout.isSiteOrder) continue;
     const boothAllocations = scout.$allocationsByChannel.booth;
-    const hasMatch = boothAllocations.some((a) => {
+    const matching = boothAllocations.filter((a) => {
       const storeMatch = (a.storeName || '').toLowerCase() === (booth.booth.storeName || '').toLowerCase();
       return storeMatch && a.date === booth.timeslot.date;
     });
-    if (hasMatch) scoutNames.push(name);
+    if (matching.length > 0) {
+      const total = matching.reduce((sum, a) => sum + a.packages + a.donations, 0);
+      scoutCredits.push({ name, total });
+    }
   }
 
-  if (scoutNames.length === 0) {
+  if (scoutCredits.length === 0) {
     return (
       <div class="booth-detail-content muted-text">No scout allocations yet. Distribute in Smart Cookie to see per-scout breakdown.</div>
     );
   }
 
-  scoutNames.sort((a, b) => a.localeCompare(b));
+  scoutCredits.sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div class="booth-detail-content">
-      {scoutNames.map((name) => (
+      {scoutCredits.map(({ name, total }) => (
         <div key={name} class="booth-allocation-chip">
           <strong>{name}</strong>
+          <span class="booth-allocation-credit">{total} pkg</span>
         </div>
       ))}
     </div>
