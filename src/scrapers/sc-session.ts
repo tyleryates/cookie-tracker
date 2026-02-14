@@ -5,6 +5,7 @@ import axios, { type AxiosInstance, type AxiosResponse, isAxiosError } from 'axi
 import { wrapper } from 'axios-cookiejar-support';
 import { type Cookie, CookieJar } from 'tough-cookie';
 import { HTTP_STATUS, SPECIAL_IDENTIFIERS } from '../constants';
+import Logger from '../logger';
 import type { SCMeResponse } from './sc-types';
 
 export class SmartCookieSession {
@@ -62,6 +63,7 @@ export class SmartCookieSession {
 
   /** Login to Smart Cookie. Stores credentials for re-login. */
   async login(username: string, password: string): Promise<boolean> {
+    Logger.info('SC session: logging in...');
     this.credentials = { username, password };
 
     const response = await this.client
@@ -74,21 +76,26 @@ export class SmartCookieSession {
       )
       .catch((error) => {
         if (isAxiosError(error) && error.response && error.response.status >= 400 && error.response.status < 500) {
+          Logger.error(`SC session: login failed (HTTP ${error.response.status})`);
           throw new Error('Invalid login credentials');
         }
         throw error;
       });
 
     if (response.status !== HTTP_STATUS.OK) {
+      Logger.error(`SC session: login failed (HTTP ${response.status})`);
       throw new Error('Invalid login credentials');
     }
 
+    Logger.info('SC session: login successful, extracting XSRF token');
     await this.extractXsrfToken();
 
     // Call /me to establish session and capture troopId
     try {
       await this.fetchMe();
+      Logger.info(`SC session: authenticated (troopId=${this.troopId})`);
     } catch {
+      Logger.warn('SC session: /me failed (non-fatal)');
       // Non-fatal — troopId can be extracted from C2T orders as fallback
     }
 

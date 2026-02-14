@@ -38,6 +38,7 @@ export function useSync(
 
   const sync = useCallback(async () => {
     try {
+      Logger.info('Sync: starting');
       dispatch({ type: 'SYNC_STARTED' });
       showStatus('Starting API sync for both platforms...', 'success');
 
@@ -92,24 +93,30 @@ export function useSync(
       }
 
       if (parts.length > 0 && errors.length === 0) {
+        Logger.info(`Sync: complete — ${parts.join(', ')}`);
         showStatus(`Sync complete! ${parts.join(', ')}`, 'success');
       } else if (parts.length > 0 && errors.length > 0) {
+        Logger.warn(`Sync: partial — ${parts.join(', ')}. Errors: ${errors.join('; ')}`);
         showStatus(`Partial sync: ${parts.join(', ')}. Errors: ${errors.join('; ')}`, 'warning');
       } else if (errors.length > 0) {
+        Logger.error(`Sync: failed — ${errors.join('; ')}`);
         showStatus(`Sync failed: ${errors.join('; ')}`, 'error');
       } else {
+        Logger.warn('Sync: completed with warnings');
         showStatus('Sync completed with warnings', 'warning');
       }
     } catch (error) {
       showStatus(`Error: ${(error as Error).message}`, 'error');
       Logger.error('Sync error:', error);
     } finally {
+      Logger.info('Sync: finished');
       dispatch({ type: 'SYNC_FINISHED' });
     }
   }, [dispatch, showStatus, loadData]);
 
   const refreshBooths = useCallback(async () => {
     try {
+      Logger.info('Booth refresh: starting');
       dispatch({ type: 'BOOTH_REFRESH_STARTED' });
 
       const updated = await ipcInvoke('refresh-booth-locations');
@@ -156,10 +163,11 @@ export function useSync(
     });
 
     const cleanupUpdateAvailable = onIpcEvent('update-available', (info) => {
-      Logger.debug(`Update v${info.version} available, downloading...`);
+      Logger.info(`Update v${info.version} available, downloading...`);
     });
 
     const cleanupUpdateDownloaded = onIpcEvent('update-downloaded', (info) => {
+      Logger.info(`Update v${info.version} downloaded, ready to install`);
       dispatch({ type: 'UPDATE_DOWNLOADED', version: info.version });
     });
 

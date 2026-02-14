@@ -29,6 +29,9 @@ let activeOrchestrator: ScraperOrchestrator | null = null;
 const userDataPath = app.getPath('userData');
 const dataDir = path.join(userDataPath, 'data');
 
+// Initialize file logger — truncates on each launch so we always have current session logs
+Logger.init(dataDir);
+
 const credentialsManager = new CredentialsManager(dataDir);
 const configManager = new ConfigManager(dataDir);
 const boothCache = new BoothCache(dataDir);
@@ -123,6 +126,12 @@ function handleIpcError<T>(handler: (...args: any[]) => Promise<T>): (...args: a
   };
 }
 
+// Renderer log relay — fire-and-forget, no response needed
+ipcMain.handle('log-message', (_event, line: string) => {
+  Logger.appendLine(line);
+  return { success: true };
+});
+
 function loadAndValidateCredentials(): { credentials: Credentials; error?: undefined } | { credentials?: undefined; error: string } {
   const credentials = credentialsManager.loadCredentials();
   const validation = credentialsManager.validateCredentials(credentials);
@@ -143,6 +152,7 @@ async function ensureSCSession(): Promise<void> {
 }
 
 function createWindow(): void {
+  Logger.info('Creating main window');
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -158,31 +168,83 @@ function createWindow(): void {
   // Prevent navigation away from the app and block new windows
   mainWindow.webContents.on('will-navigate', (event) => event.preventDefault());
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  mainWindow.on('closed', () => {
+    Logger.info('Main window closed');
+    mainWindow = null;
+  });
 }
 
 // Auto-update configuration — downloads silently, renderer shows restart banner
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+Logger.info(`Auto-updater configured: autoDownload=true, autoInstallOnAppQuit=true, isPackaged=${app.isPackaged}`);
+
+autoUpdater.on('checking-for-update', () => {
+  Logger.info('Checking for updates...');
+});
 
 autoUpdater.on('update-available', (info) => {
-  Logger.debug('Update available:', info.version);
+  Logger.info(`Update available: v${info.version}`);
   mainWindow?.webContents.send('update-available', { version: info.version });
 });
 
+autoUpdater.on('update-not-available', (info) => {
+  Logger.info(`No update available (current: v${info.version})`);
+});
+
+let downloadProgressReceived = false;
 autoUpdater.on('update-downloaded', (info) => {
-  Logger.debug(`Update downloaded: ${info.version} files: ${info.files?.map((f) => f.url).join(', ')}`);
+  const downloadedFile = (info as any).downloadedFile as string | undefined;
+  let fileSize: string | undefined;
+  if (downloadedFile && fs) {
+    try {
+      const stat = fs.statSync(downloadedFile);
+      fileSize = `${(stat.size / (1024 * 1024)).toFixed(1)}MB`;
+    } catch {
+      fileSize = 'stat failed';
+    }
+  }
+  Logger.info(
+    `Update downloaded: v${info.version}, file=${downloadedFile || 'unknown'}, size=${fileSize || 'unknown'}, hadProgress=${downloadProgressReceived}`
+  );
+  if (!downloadProgressReceived) {
+    Logger.info('Update was cached (no download-progress events received) — file from previous download');
+  }
+  downloadProgressReceived = false;
   mainWindow?.webContents.send('update-downloaded', { version: info.version });
 });
 
 autoUpdater.on('download-progress', (progress) => {
-  Logger.debug(`Update download: ${Math.round(progress.percent)}% (${progress.transferred}/${progress.total})`);
+  downloadProgressReceived = true;
+  Logger.info(`Update download: ${Math.round(progress.percent)}% (${progress.transferred}/${progress.total})`);
 });
 
 autoUpdater.on('error', (err) => {
-  Logger.error('Update error:', err.message);
+  Logger.error('Auto-updater error:', err.message);
 });
 
+// Native Squirrel updater events (macOS)
+nativeUpdater.on('checking-for-update', () => Logger.info('Native updater: checking-for-update'));
+nativeUpdater.on('update-available', () => Logger.info('Native updater: update-available'));
+nativeUpdater.on('update-not-available', () => Logger.info('Native updater: update-not-available'));
+nativeUpdater.on('update-downloaded', () => Logger.info('Native updater: update-downloaded'));
+nativeUpdater.on('before-quit-for-update', () => Logger.info('Native updater: before-quit-for-update'));
+nativeUpdater.on('error', (err) => Logger.error('Native updater error:', err.message));
+
+// App lifecycle events
+app.on('before-quit', () => Logger.info('App event: before-quit'));
+app.on('will-quit', () => {
+  Logger.info('App event: will-quit');
+  Logger.close();
+});
+app.on('quit', () => Logger.info('App event: quit'));
+
 app.whenReady().then(() => {
+  Logger.info(
+    `App ready — platform=${process.platform}, arch=${process.arch}, electron=${process.versions.electron}, node=${process.versions.node}`
+  );
+
   // Set dynamic User-Agent from Electron's Chromium version (replaces hardcoded fallback)
   const ua = app.userAgentFallback;
   scSession.userAgent = ua;
@@ -195,8 +257,9 @@ app.whenReady().then(() => {
 
   // Check for updates on startup only (only in production)
   if (!app.isPackaged) {
-    Logger.debug('Skipping update check in development');
+    Logger.info('Skipping update check in development');
   } else {
+    Logger.info('Will check for updates in 3 seconds');
     setTimeout(() => {
       autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
     }, 3000); // Check 3 seconds after app starts
@@ -204,12 +267,14 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  Logger.info('App event: window-all-closed');
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('activate', () => {
+  Logger.info('App event: activate');
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
@@ -219,7 +284,10 @@ app.on('activate', () => {
 ipcMain.handle(
   'load-data',
   handleIpcError(async () => {
-    return loadData(dataDir);
+    Logger.info('IPC: load-data');
+    const result = await loadData(dataDir);
+    Logger.info(`IPC: load-data complete — ${result ? `${Object.keys(result.unified?.scouts || {}).length} scouts` : 'no data'}`);
+    return result;
   })
 );
 
@@ -313,6 +381,7 @@ ipcMain.handle(
       throw new Error(auth.error || 'No credentials available');
     }
 
+    Logger.info('IPC: scrape-websites — starting sync');
     // Initialize scraper orchestrator with long-lived sessions
     const scraper = new ScraperOrchestrator(dataDir, seasonalData, boothCache, scSession, dcSession);
     activeOrchestrator = scraper;
@@ -343,6 +412,7 @@ ipcMain.handle(
     }
     saveTimestamps(ts);
 
+    Logger.info('IPC: scrape-websites — sync complete', Object.keys(results.endpointStatuses));
     activeOrchestrator = null;
     return results;
   })
@@ -352,6 +422,7 @@ ipcMain.handle(
 ipcMain.handle(
   'cancel-sync',
   handleIpcError(async () => {
+    Logger.info('IPC: cancel-sync');
     if (activeOrchestrator) {
       activeOrchestrator.cancel();
       activeOrchestrator = null;
@@ -364,6 +435,7 @@ ipcMain.handle(
 ipcMain.handle(
   'refresh-booth-locations',
   handleIpcError(async (event) => {
+    Logger.info('IPC: refresh-booth-locations');
     const config = configManager.loadConfig();
     if (!config.availableBoothsEnabled) return [];
 
@@ -520,22 +592,33 @@ ipcMain.handle(
 ipcMain.handle(
   'quit-and-install',
   handleIpcError(async () => {
-    Logger.debug('quit-and-install: starting');
+    Logger.info('IPC: quit-and-install — starting');
+    Logger.info(`quit-and-install: mainWindow=${!!mainWindow}, platform=${process.platform}`);
     // macOS workaround: remove lifecycle listeners that prevent quit, then let
     // Squirrel.Mac handle the quit+relaunch via the native updater.
     // See: https://github.com/electron-userland/electron-builder/issues/1604
+    Logger.info('quit-and-install: removing window-all-closed and activate listeners');
     app.removeAllListeners('window-all-closed');
     app.removeAllListeners('activate');
     if (mainWindow) {
+      Logger.info('quit-and-install: removing close listeners from mainWindow');
       mainWindow.removeAllListeners('close');
     }
     // Hook into native Squirrel updater's quit event to force exit —
     // without this, macOS often closes windows but refuses to actually quit.
     nativeUpdater.once('before-quit-for-update', () => {
-      Logger.debug('quit-and-install: before-quit-for-update, calling app.exit()');
+      Logger.info('quit-and-install: before-quit-for-update fired, calling app.exit()');
       app.exit();
     });
+    Logger.info('quit-and-install: calling autoUpdater.quitAndInstall()');
     autoUpdater.quitAndInstall();
+    Logger.info('quit-and-install: quitAndInstall() returned, setting 5s fallback');
+    // Fallback: if Squirrel fails to quit (before-quit-for-update never fires),
+    // force exit after 5s. The update installs on next launch.
+    setTimeout(() => {
+      Logger.info('quit-and-install: fallback timeout reached, calling app.exit(0)');
+      app.exit(0);
+    }, 5000);
   })
 );
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
+import Logger from '../logger';
 import type { DayFilter } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { ReportContent, TabBar } from './components/reports-section';
@@ -236,7 +237,10 @@ export function App() {
           <button
             type="button"
             class="update-banner-btn"
-            onClick={() => ipcInvoke('quit-and-install').catch((e) => console.error('quit-and-install failed:', e))}
+            onClick={() => {
+              Logger.info('User clicked Restart to update');
+              ipcInvoke('quit-and-install').catch((e) => Logger.error('quit-and-install IPC failed:', e));
+            }}
           >
             Restart to update
           </button>

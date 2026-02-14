@@ -23,7 +23,8 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
   'wipe-logins',
   'wipe-data',
   'quit-and-install',
-  'check-for-updates'
+  'check-for-updates',
+  'log-message'
 ]);
 
 const ALLOWED_EVENT_CHANNELS = new Set(['scrape-progress', 'update-available', 'update-downloaded']);

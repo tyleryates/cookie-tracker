@@ -161,9 +161,11 @@ export class DigitalCookieSession {
 
   /** Login to Digital Cookie. Stores credentials for re-login. */
   async login(username: string, password: string, roleName: string | null): Promise<boolean> {
+    Logger.info('DC session: logging in...');
     this.credentials = { username, password, role: roleName || undefined };
 
     await this.authenticate(username, password);
+    Logger.info('DC session: authenticated, selecting role...');
 
     // Get and select role
     const rolePageResponse = await this.client.get('/select-role');
@@ -171,9 +173,11 @@ export class DigitalCookieSession {
 
     const roleResponse = await this.client.get(`/select-role?id=${roleId}`);
     if (roleResponse.status !== HTTP_STATUS.OK && roleResponse.status !== HTTP_STATUS.FOUND) {
+      Logger.error(`DC session: role selection failed (HTTP ${roleResponse.status})`);
       throw new Error(`Role selection failed with status ${roleResponse.status}`);
     }
 
+    Logger.info(`DC session: login successful (role=${selectedRoleName})`);
     this.selectedRoleName = selectedRoleName;
     return true;
   }

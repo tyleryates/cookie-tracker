@@ -93,12 +93,15 @@ class DigitalCookieScraper extends BaseScraper {
       const councilId = credentials.councilId || DEFAULT_COUNCIL_ID;
 
       // Login via session
+      Logger.info('dc-login: authenticating...');
       this.sendEndpointStatus('dc-login', 'syncing');
       try {
         await this.session.login(credentials.username, credentials.password, credentials.role || '');
+        Logger.info('dc-login: success');
         this.sendEndpointStatus('dc-login', 'synced');
       } catch (loginError) {
         const httpStatus = isAxiosError(loginError) ? loginError.response?.status : undefined;
+        Logger.error(`dc-login: failed (HTTP ${httpStatus ?? '?'}) ${(loginError as Error).message}`);
         this.sendEndpointStatus('dc-login', 'error', false, undefined, undefined, httpStatus, (loginError as Error).message);
         throw loginError;
       }
@@ -106,7 +109,9 @@ class DigitalCookieScraper extends BaseScraper {
       this.checkAborted(signal);
 
       // Download export
+      Logger.info('dc-troop-report: downloading...');
       const filePath = await this.downloadExport(councilId, signal);
+      Logger.info(`dc-troop-report: saved to ${filePath}`);
 
       return { success: true, source: 'Digital Cookie', filePath };
     } catch (error) {

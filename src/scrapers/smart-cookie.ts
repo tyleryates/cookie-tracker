@@ -45,23 +45,26 @@ class SmartCookieScraper extends BaseScraper {
     opts: { fatal?: boolean; fallback?: T; cached?: { fresh: boolean; data: T } } = {}
   ): Promise<T> {
     if (opts.cached?.fresh) {
+      Logger.info(`${endpoint}: using cached data`);
       this.sendEndpointStatus(endpoint, 'synced', true);
       return opts.cached.data;
     }
+    Logger.info(`${endpoint}: fetching...`);
     this.sendEndpointStatus(endpoint, 'syncing');
     const startTime = Date.now();
     try {
       const result = await fetchFn();
       const durationMs = Date.now() - startTime;
       const dataSize = result != null ? JSON.stringify(result).length : undefined;
+      Logger.info(`${endpoint}: success (${durationMs}ms, ${dataSize ?? 0}B)`);
       this.sendEndpointStatus(endpoint, 'synced', false, durationMs, dataSize);
       return result;
     } catch (error) {
       const durationMs = Date.now() - startTime;
       const httpStatus = isAxiosError(error) ? error.response?.status : undefined;
+      Logger.error(`${endpoint}: failed (${durationMs}ms, HTTP ${httpStatus ?? '?'}) ${(error as Error).message}`);
       this.sendEndpointStatus(endpoint, 'error', false, durationMs, undefined, httpStatus, (error as Error).message);
       if (opts.fatal) throw error;
-      Logger.warn(`${endpoint}: ${(error as Error).message}`);
       return opts.fallback as T;
     }
   }
