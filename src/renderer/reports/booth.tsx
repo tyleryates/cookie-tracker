@@ -68,7 +68,7 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
       {scoutCredits.map(({ name, total }) => (
         <div key={name} class="booth-allocation-chip">
           <strong>{name}</strong>
-          <span class="booth-allocation-credit">{total} pkg</span>
+          <span class="booth-allocation-credit">{total} sales</span>
         </div>
       ))}
     </div>
