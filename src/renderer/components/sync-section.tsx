@@ -178,11 +178,17 @@ function EndpointRow({
           {epState.status === 'syncing' ? (
             <span class="spinner" />
           ) : epState.status === 'error' && epState.httpStatus ? (
-            `HTTP ${epState.httpStatus}`
+            epState.httpStatus
           ) : epState.status === 'synced' ? (
-            '\u2713'
-          ) : (
+            epState.cached ? (
+              'cached'
+            ) : (
+              200
+            )
+          ) : epState.status === 'error' ? (
             '\u2717'
+          ) : (
+            ''
           )}
         </span>
       </td>

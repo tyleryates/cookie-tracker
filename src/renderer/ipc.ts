@@ -10,7 +10,8 @@ type HasRequest<K extends keyof IpcChannelMap> = IpcChannelMap[K]['request'] ext
  */
 export async function ipcInvoke<K extends keyof IpcChannelMap>(channel: K, ...args: HasRequest<K>): Promise<IpcChannelMap[K]['response']> {
   const result: IpcResponse<IpcChannelMap[K]['response']> = await window.electronAPI.invoke(channel, ...args);
-  if (!result.success) throw new Error(result.error);
+  if (!result || typeof result !== 'object') throw new Error(`IPC ${channel}: unexpected response`);
+  if (!result.success) throw new Error(result.error || `IPC ${channel} failed`);
   return result.data;
 }
 
