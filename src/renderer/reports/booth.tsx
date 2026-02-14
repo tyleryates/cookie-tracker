@@ -10,38 +10,30 @@ import { buildVarietyTooltip, countBoothsNeedingDistribution, formatBoothDate, f
 function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImported; scouts: Record<string, Scout> }) {
   if (!scouts) return null;
 
-  const scoutsForBooth: Array<{ name: string; packages: number; donations: number }> = [];
+  const scoutNames: string[] = [];
   for (const [name, scout] of Object.entries(scouts)) {
     if (scout.isSiteOrder) continue;
     const boothAllocations = scout.$allocationsByChannel.booth;
-    const matchingAllocations = boothAllocations.filter((a) => {
+    const hasMatch = boothAllocations.some((a) => {
       const storeMatch = (a.storeName || '').toLowerCase() === (booth.booth.storeName || '').toLowerCase();
-      const dateMatch = a.date === booth.timeslot.date;
-      return storeMatch && dateMatch;
+      return storeMatch && a.date === booth.timeslot.date;
     });
-
-    if (matchingAllocations.length > 0) {
-      const totalPackages = matchingAllocations.reduce((sum: number, a) => sum + (a.packages || 0), 0);
-      const totalDonations = matchingAllocations.reduce((sum: number, a) => sum + (a.donations || 0), 0);
-      scoutsForBooth.push({ name, packages: totalPackages, donations: totalDonations });
-    }
+    if (hasMatch) scoutNames.push(name);
   }
 
-  if (scoutsForBooth.length === 0) {
+  if (scoutNames.length === 0) {
     return (
       <div class="booth-detail-content muted-text">No scout allocations yet. Distribute in Smart Cookie to see per-scout breakdown.</div>
     );
   }
 
-  scoutsForBooth.sort((a, b) => a.name.localeCompare(b.name));
+  scoutNames.sort((a, b) => a.localeCompare(b));
 
   return (
     <div class="booth-detail-content">
-      {scoutsForBooth.map(({ name, packages, donations }) => (
+      {scoutNames.map((name) => (
         <div key={name} class="booth-allocation-chip">
           <strong>{name}</strong>
-          <span class="booth-chip-stat">{packages} pkg</span>
-          {donations > 0 && <span class="booth-chip-stat">{donations} donations</span>}
         </div>
       ))}
     </div>
@@ -119,7 +111,7 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
         <DataTable
           columns={['', 'Store', 'Date', 'Time', 'Type', 'Packages', 'Donations', 'Status']}
           className="table-normal booth-table"
-          hint="Click on any booth to see scout allocations for that booth."
+          hint="Click on any booth to see scouts who attended that booth."
         >
           {sorted.map((r, idx) => {
             const timeDisplay = formatTimeRange(r.timeslot.startTime, r.timeslot.endTime);

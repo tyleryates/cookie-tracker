@@ -103,6 +103,7 @@ export function App() {
 
   // Booth reset key — bumped when user re-clicks "Available Booths" tab
   const boothResetKeyRef = useRef(0);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const handleToggleAutoSync = useCallback(
     (enabled: boolean) => {
@@ -118,6 +119,7 @@ export function App() {
       boothResetKeyRef.current += 1;
     }
     dispatch({ type: 'SET_ACTIVE_REPORT', report: type });
+    contentRef.current?.scrollTo(0, 0);
   }, []);
 
   const handleCloseSettings = useCallback(() => {
@@ -202,7 +204,7 @@ export function App() {
       {!isSettings && !isWelcome && (
         <TabBar activeReport={state.activeReport} unified={state.unified} appConfig={state.appConfig} onSelectReport={handleSelectReport} />
       )}
-      <div class="app-content">
+      <div class="app-content" ref={contentRef}>
         {isSettings || isWelcome ? (
           <SettingsPage
             mode={isWelcome ? 'welcome' : 'settings'}

@@ -1,6 +1,6 @@
 // HTML Builder Utilities
 
-import { COOKIE_ORDER, getCookieDisplayName } from '../cookie-constants';
+import { COOKIE_ORDER, getCookieColor, getCookieDisplayName } from '../cookie-constants';
 import type { BoothReservationImported, BoothTimeSlot, CookieType, Varieties } from '../types';
 
 /** Sort varieties entries by preferred display order */
@@ -136,11 +136,17 @@ function formatCurrency(value: number): string {
   return `$${Math.round(value || 0)}`;
 }
 
-/** Build variety tooltip as plain text string (for Preact TooltipCell) */
+/** Build variety tooltip as HTML string with colored dots */
 function buildVarietyTooltip(varieties: Varieties): string {
   if (!varieties || Object.keys(varieties).length === 0) return '';
   return sortVarietiesByOrder(Object.entries(varieties))
-    .map(([variety, count]) => `${getCookieDisplayName(variety)}: ${count}`)
+    .map(([variety, count]) => {
+      const color = getCookieColor(variety);
+      const dot = color
+        ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};margin-right:5px;vertical-align:middle"></span>`
+        : '';
+      return `${dot}${getCookieDisplayName(variety)}: ${count}`;
+    })
     .join('\n');
 }
 

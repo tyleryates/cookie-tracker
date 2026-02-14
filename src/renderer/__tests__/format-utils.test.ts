@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COOKIE_ORDER, getCookieDisplayName } from '../../cookie-constants';
+import { COOKIE_ORDER } from '../../cookie-constants';
 import { classifyOrderStatus } from '../../order-classification';
 import type { BoothTimeSlot } from '../../types';
 import {
@@ -78,18 +78,19 @@ describe('buildVarietyTooltip', () => {
     expect(buildVarietyTooltip(undefined as any)).toBe('');
   });
 
-  it('returns newline-separated "Name: count" lines using display names', () => {
+  it('returns newline-separated lines with display names and colored dots', () => {
     const varieties = { THIN_MINTS: 5, TREFOILS: 3 };
     const result = buildVarietyTooltip(varieties);
     const lines = result.split('\n');
-    expect(lines).toContain(`${getCookieDisplayName('THIN_MINTS')}: 5`);
-    expect(lines).toContain(`${getCookieDisplayName('TREFOILS')}: 3`);
+    expect(lines.some((l) => l.includes('Thin Mints: 5'))).toBe(true);
+    expect(lines.some((l) => l.includes('Trefoils: 3'))).toBe(true);
   });
 
-  it('uses actual cookie display names', () => {
+  it('includes colored dot spans in output', () => {
     const varieties = { THIN_MINTS: 2 };
     const result = buildVarietyTooltip(varieties);
-    expect(result).toBe('Thin Mints: 2');
+    expect(result).toContain('Thin Mints: 2');
+    expect(result).toContain('border-radius:50%');
   });
 });
 

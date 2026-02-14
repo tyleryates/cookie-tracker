@@ -159,6 +159,10 @@ function AllocationDetails({ scout }: { scout: Scout }) {
   );
 }
 
+function titleCase(s: string): string {
+  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function buildOrderTooltip(order: Order): string {
   const dc = order.metadata.dc as Record<string, string> | null;
   if (!dc) return '';
@@ -167,14 +171,14 @@ function buildOrderTooltip(order: Order): string {
   const shipFirst = dc['Shipping First Name'] || '';
   const shipLast = dc['Shipping Last Name'] || '';
   const shipName = `${shipFirst} ${shipLast}`.trim();
-  if (shipName) lines.push(shipName);
+  if (shipName) lines.push(titleCase(shipName));
 
   // Fall back to billing name if no shipping name (e.g. donations)
   if (!shipName) {
     const billFirst = dc['Billing First Name'] || '';
     const billLast = dc['Billing Last Name'] || '';
     const billName = `${billFirst} ${billLast}`.trim();
-    if (billName) lines.push(billName);
+    if (billName) lines.push(titleCase(billName));
   }
 
   return lines.join('\n');

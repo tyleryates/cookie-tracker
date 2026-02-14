@@ -391,10 +391,15 @@ tr:hover {
   background: var(--surface);
 }
 
-.scout-breakdown .table-compact th:first-child,
-.scout-breakdown .table-compact td:first-child {
+.scout-breakdown .table-compact:not(.inventory-table) th:first-child,
+.scout-breakdown .table-compact:not(.inventory-table) td:first-child {
   white-space: nowrap;
   width: 1%;
+}
+
+.scout-breakdown .inventory-table th:first-child,
+.scout-breakdown .inventory-table td:first-child {
+  width: 40%;
 }
 
 .scout-breakdown {

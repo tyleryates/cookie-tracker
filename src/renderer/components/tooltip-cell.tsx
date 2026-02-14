@@ -31,7 +31,7 @@ export function TooltipCell({ tooltip, children, style, tag, className }: Toolti
     const rect = ref.current.getBoundingClientRect();
     const el = document.createElement('div');
     el.className = 'tooltip-fixed';
-    el.textContent = tooltip;
+    el.innerHTML = tooltip.replace(/\n/g, '<br>');
     document.body.appendChild(el);
 
     // Position centered above the element, clamped to viewport
