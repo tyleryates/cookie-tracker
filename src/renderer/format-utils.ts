@@ -201,16 +201,25 @@ function formatBoothDate(dateStr: string): string {
   return dateStr;
 }
 
-/** Count past non-virtual booth reservations that haven't been distributed */
+/** Count non-virtual booth reservations that need distribution (past, or today after end time) */
 function countBoothsNeedingDistribution(boothReservations: BoothReservationImported[]): number {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return boothReservations.filter((r) => {
     const type = (r.booth.reservationType || '').toLowerCase();
     if (type.includes('virtual')) return false;
     if (r.booth.isDistributed) return false;
-    const d = r.timeslot.date ? new Date(r.timeslot.date) : null;
-    return !d || d < today;
+    if (!r.timeslot.date) return true;
+    const parts = r.timeslot.date.split(/[-/]/);
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    if (d < todayMidnight) return true; // Past day
+    if (d.getTime() === todayMidnight.getTime()) {
+      // Today — only count if booth end time has passed
+      const endMin = parseTimeToMinutes(r.timeslot.endTime || '');
+      return endMin >= 0 && nowMinutes >= endMin;
+    }
+    return false; // Future
   }).length;
 }
 

@@ -64,6 +64,13 @@ export async function loadAppConfig(): Promise<AppConfig> {
     return await ipcInvoke('load-config');
   } catch (err) {
     Logger.error('Failed to load config:', err);
-    return { autoSyncEnabled: true, availableBoothsEnabled: false, boothIds: [], boothDayFilters: [], ignoredTimeSlots: [] };
+    return {
+      autoSyncEnabled: true,
+      autoRefreshBoothsEnabled: true,
+      availableBoothsEnabled: false,
+      boothIds: [],
+      boothDayFilters: [],
+      ignoredTimeSlots: []
+    };
   }
 }

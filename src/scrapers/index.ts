@@ -58,7 +58,11 @@ class ScraperOrchestrator {
       if (progress.status === 'synced' || progress.status === 'error') {
         endpointStatuses[progress.endpoint] = {
           status: progress.status,
-          lastSync: progress.status === 'synced' ? new Date().toISOString() : undefined
+          lastSync: progress.status === 'synced' ? new Date().toISOString() : undefined,
+          durationMs: progress.durationMs,
+          dataSize: progress.dataSize,
+          httpStatus: progress.httpStatus,
+          error: progress.error
         };
       }
     };

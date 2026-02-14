@@ -119,16 +119,10 @@ function SiteOrderWarning({ siteOrders }: { siteOrders: SiteOrdersDataset }) {
   if (!hasUnallocated) return null;
 
   return (
-    <div
-      style={{
-        padding: '12px 16px',
-        borderRadius: '8px',
-        background: '#FFF8E1',
-        borderLeft: '4px solid #F57F17',
-        marginBottom: '16px'
-      }}
-    >
-      <strong style={{ color: '#E65100' }}>Unallocated Troop Orders</strong>
+    <div class="info-box info-box-warning">
+      <p>
+        <strong>Unallocated Troop Orders</strong>
+      </p>
       <ul style={{ margin: '8px 0 0', paddingLeft: '20px', listStyle: 'none' }}>
         {girlDelivery.hasWarning && (
           <li>
@@ -170,6 +164,10 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
   const siteOrders = data.siteOrders;
   const proceedsRate = data.troopTotals.proceedsRate;
 
+  const hasUnallocated = siteOrders.directShip.hasWarning || siteOrders.girlDelivery.hasWarning || siteOrders.boothSale.hasWarning;
+  const hasNegativeInventory = (data.troopTotals.scouts.withNegativeInventory ?? 0) > 0;
+  const hasIssues = hasUnallocated || hasNegativeInventory;
+
   const sortedScouts = Object.entries(scouts)
     .filter(([_name, scout]) => !scout.isSiteOrder && (scout.totals.totalSold || 0) > 0)
     .sort((a, b) => a[0].localeCompare(b[0]));
@@ -178,7 +176,12 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
 
   return (
     <div class="report-visual">
-      <h3>Scout Summary</h3>
+      <div class="report-header-row">
+        <h3>Scout Summary</h3>
+        <span class={`report-status-badge ${hasIssues ? 'report-status-warning' : 'report-status-ok'}`}>
+          {hasIssues ? 'Needs Attention' : 'All OK'}
+        </span>
+      </div>
       <SiteOrderWarning siteOrders={siteOrders} />
       <p class="table-hint">
         Click on any scout to see detailed breakdown. <strong>Inventory</strong> = net packages on hand (picked up minus sold).{' '}

@@ -16,15 +16,7 @@ interface ScoutDonationRow {
 }
 
 function StatusBanner({ adjustmentNeeded }: { adjustmentNeeded: number }) {
-  if (adjustmentNeeded === 0) {
-    return (
-      <div class="info-box info-box-success">
-        <p>
-          <strong>Reconciled — no manual entries needed in Smart Cookie.</strong>
-        </p>
-      </div>
-    );
-  }
+  if (adjustmentNeeded === 0) return null;
   if (adjustmentNeeded > 0) {
     return (
       <div class="info-box info-box-warning">
@@ -149,7 +141,7 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
   const totalTroopDonations = totalBoothCookieShare + siteDonations;
   const totalCookieShare = totalGirlDonations + totalTroopDonations;
 
-  const stats: Array<{ label: string; value: string | number; description: string; color: string }> = [
+  const stats: Array<{ label: string; value: string | number; description: string; color: string; operator?: string }> = [
     { label: 'Girl Donations', value: totalGirlDonations, description: `${girlDC} DC + ${girlInPerson} in person`, color: '#00838F' }
   ];
   if (totalTroopDonations > 0) {
@@ -157,15 +149,16 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
       label: 'Troop Donations',
       value: totalTroopDonations,
       description: `${totalBoothCookieShare} booth + ${siteDonations} site`,
-      color: '#7B1FA2'
+      color: '#7B1FA2',
+      operator: '+'
     });
   }
-  stats.push({ label: 'Total Donations', value: totalCookieShare, description: 'All Cookie Share', color: '#1565C0' });
   stats.push({
-    label: 'Needs Entry',
-    value: adjustmentNeeded === 0 ? '—' : adjustmentNeeded > 0 ? `+${adjustmentNeeded}` : `${adjustmentNeeded}`,
-    description: 'Manual SC adjustment',
-    color: adjustmentNeeded === 0 ? '#4CAF50' : adjustmentNeeded > 0 ? '#ff9800' : '#f44336'
+    label: 'Total Donations',
+    value: totalCookieShare,
+    description: 'All Cookie Share',
+    color: '#E91E63',
+    operator: '='
   });
 
   const hasBoothCS = totalBoothCookieShare > 0;
@@ -175,9 +168,18 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
   if (hasBoothCS) headers.push('Booth');
   headers.push('Total', 'Adjustment');
 
+  const isReconciled = adjustmentNeeded === 0;
+
   return (
     <div class="report-visual">
-      <h3>Donation Report & Reconciliation</h3>
+      <div class="report-header-row">
+        <h3>Donation Report & Reconciliation</h3>
+        <span
+          class={`report-status-badge ${isReconciled ? 'report-status-ok' : adjustmentNeeded > 0 ? 'report-status-warning' : 'report-status-error'}`}
+        >
+          {isReconciled ? 'Reconciled' : 'Needs Adjustment'}
+        </span>
+      </div>
       <StatCards stats={stats} />
       <StatusBanner adjustmentNeeded={adjustmentNeeded} />
 

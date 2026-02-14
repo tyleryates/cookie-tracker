@@ -221,6 +221,16 @@ tr:hover {
   background: rgba(255, 152, 0, 0.12);
 }
 
+/* Troop pill — highlights "Troop" in transfer from/to columns */
+.troop-pill {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.82em;
+  font-weight: 600;
+  color: var(--primary);
+  background: rgba(0, 174, 88, 0.12);
+}
+
 /* Inventory in/out package display */
 .pkg-in {
   color: #2e7d32;

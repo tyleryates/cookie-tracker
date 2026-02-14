@@ -3,10 +3,19 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import { BOOTH_RESERVATION_TYPE, BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
-import type { AppConfig, BoothAvailableDate, BoothLocation, BoothTimeSlot, DayFilter, IgnoredTimeSlot, UnifiedDataset } from '../../types';
+import type {
+  AppConfig,
+  BoothAvailableDate,
+  BoothLocation,
+  BoothTimeSlot,
+  DayFilter,
+  EndpointSyncState,
+  IgnoredTimeSlot,
+  UnifiedDataset
+} from '../../types';
 import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
-import { formatBoothDate, formatTime12h, haversineDistance, parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
+import { DateFormatter, formatBoothDate, formatTime12h, haversineDistance, parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
 import { ipcInvoke } from '../ipc';
 
 interface AvailableBoothsConfig {
@@ -83,7 +92,7 @@ interface AvailableBoothsProps {
   data: UnifiedDataset;
   config: AvailableBoothsConfig;
   appConfig: AppConfig | null;
-  refreshing: boolean;
+  syncState: EndpointSyncState;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
   onResetIgnored: () => void;
   onRefresh: () => void;
@@ -95,7 +104,7 @@ export function AvailableBoothsReport({
   data,
   config,
   appConfig,
-  refreshing,
+  syncState,
   onIgnoreSlot,
   onResetIgnored,
   onRefresh,
@@ -105,6 +114,16 @@ export function AvailableBoothsReport({
   const [selecting, setSelecting] = useState(false);
   const [filtering, setFiltering] = useState(false);
   const [troopCoords, setTroopCoords] = useState<{ lat: number; lng: number } | null>(null);
+
+  const { filters, ignoredTimeSlots } = config;
+  const boothIds = appConfig?.boothIds || [];
+  const boothCount = boothIds.length;
+  const filterCount = filters.length;
+  const isFullyConfigured = boothCount > 0 && filterCount > 0;
+
+  const [filtersOpen, setFiltersOpen] = useState(!isFullyConfigured);
+
+  const refreshing = syncState.status === 'syncing';
 
   useEffect(() => {
     (async () => {
@@ -128,13 +147,12 @@ export function AvailableBoothsReport({
     );
   }
 
-  const { filters, ignoredTimeSlots } = config;
   const boothLocations = data.boothLocations || [];
 
   if (selecting) {
     return (
       <BoothSelector
-        currentBoothIds={appConfig?.boothIds || []}
+        currentBoothIds={boothIds}
         onSave={(ids) => {
           setSelecting(false);
           onSaveBoothIds(ids);
@@ -157,11 +175,6 @@ export function AvailableBoothsReport({
     );
   }
 
-  const boothIds = appConfig?.boothIds || [];
-  const boothCount = boothIds.length;
-  const filterCount = filters.length;
-  const isFullyConfigured = boothCount > 0 && filterCount > 0;
-
   const boothDistanceMap = new Map<number, number>();
   if (troopCoords) {
     for (const loc of boothLocations) {
@@ -179,12 +192,14 @@ export function AvailableBoothsReport({
     })
     .sort((a, b) => (boothDistanceMap.get(a.id) ?? Number.POSITIVE_INFINITY) - (boothDistanceMap.get(b.id) ?? Number.POSITIVE_INFINITY));
 
-  // Build explicit booth location names from selected booth IDs
-  const selectedBooths = boothIds.map((id) => boothLocations.find((loc) => loc.id === id)).filter(Boolean);
-  const uniqueStoreNames = [...new Set(selectedBooths.map((loc) => loc!.storeName).filter(Boolean))].sort();
-
-  // Build per-day time slot summary
+  // Build collapsed summary text
   const filterDays = [...new Set(filters.map((f) => f.day))].sort();
+  const summaryParts: string[] = [];
+  if (boothCount > 0) summaryParts.push(`${boothCount} booth${boothCount === 1 ? '' : 's'}`);
+  if (filterDays.length > 0) summaryParts.push(filterDays.map((d) => DAY_LABELS[d]).join(', '));
+  const collapsedSummary = summaryParts.join(' \u00B7 ');
+
+  // Build per-day time slot detail for expanded view
   const dayTimeDetails = filterDays.map((day) => {
     const dayFilters = filters.filter((f) => f.day === day);
     const allSlots = dayFilters.some((f) => !f.timeAfter && !f.timeBefore);
@@ -192,155 +207,195 @@ export function AvailableBoothsReport({
     const slotLabels = dayFilters
       .map((f) => {
         const match = BOOTH_TIME_SLOTS.find((s) => s.start === f.timeAfter && s.end === f.timeBefore);
-        return match?.label || `${f.timeAfter}–${f.timeBefore}`;
+        return match?.label || `${f.timeAfter}\u2013${f.timeBefore}`;
       })
       .sort();
     return { day, label: DAY_LABELS[day], slots: slotLabels.join(', ') };
   });
 
+  // Build store name list for expanded view
+  const selectedBooths = boothIds.map((id) => boothLocations.find((loc) => loc.id === id)).filter(Boolean);
+  const uniqueStoreNames = [...new Set(selectedBooths.map((loc) => loc!.storeName).filter(Boolean))].sort();
+
+  // Sync status display
+  let syncStatusText: string;
+  let syncStatusIcon: string;
+  if (refreshing) {
+    syncStatusText = 'Finding\u2026';
+    syncStatusIcon = '';
+  } else if (syncState.status === 'error') {
+    syncStatusText = 'Last check failed';
+    syncStatusIcon = '\u2717';
+  } else if (syncState.lastSync) {
+    syncStatusText = DateFormatter.toFriendly(syncState.lastSync);
+    syncStatusIcon = '\u2713';
+  } else {
+    syncStatusText = 'Not yet checked';
+    syncStatusIcon = '';
+  }
+
   return (
     <div class="report-visual">
       <h3>Booth Finder</h3>
-      <div class="available-booths-config">
-        <div class="config-section">
-          <div class="config-section-header">
-            <span class="config-label">Booths</span>
-            <button type="button" class="btn btn-secondary btn-sm" onClick={() => setSelecting(true)}>
-              Select Booths
-            </button>
-          </div>
-          {boothCount > 0 ? (
-            <div class="config-value">
-              {uniqueStoreNames.join(', ')}
-              {boothCount > 1 && <span class="muted-text"> ({boothCount} locations)</span>}
-            </div>
-          ) : (
-            <div class="config-value muted-text">No booths selected</div>
-          )}
-        </div>
-        <div class="config-section">
-          <div class="config-section-header">
-            <span class="config-label">Days & Times</span>
-            <button type="button" class="btn btn-secondary btn-sm" onClick={() => setFiltering(true)}>
-              Select Days & Times
-            </button>
-          </div>
-          {dayTimeDetails.length > 0 ? (
-            <div class="config-day-list">
-              {dayTimeDetails.map((d) => (
-                <span key={d.day} class="config-day-chip">
-                  <strong>{d.label}</strong> {d.slots}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div class="config-value muted-text">No days selected</div>
-          )}
-        </div>
-        {ignoredTimeSlots.length > 0 && (
-          <div class="config-section">
-            <div class="config-section-header">
-              <span class="config-value">
-                {ignoredTimeSlots.length} ignored time slot{ignoredTimeSlots.length === 1 ? '' : 's'}
-              </span>
-              <button type="button" class="btn btn-secondary btn-sm" onClick={onResetIgnored}>
-                Reset
-              </button>
-            </div>
-          </div>
-        )}
-        {isFullyConfigured && (
-          <div class="config-section config-section-action">
-            <button type="button" class="btn btn-primary btn-sm" disabled={refreshing} onClick={onRefresh}>
-              {refreshing ? 'Finding...' : 'Find Booths'}
-            </button>
-          </div>
-        )}
-      </div>
 
-      {!isFullyConfigured ? (
-        <div class="info-box info-box-neutral">
-          <strong>Setup Required</strong> —{' '}
-          {boothCount === 0 && filterCount === 0
-            ? 'Select booths and configure day/time filters to see availability.'
-            : boothCount === 0
-              ? 'Select booths to see availability.'
-              : 'Configure day/time filters to see availability.'}
-        </div>
-      ) : boothsWithDates.length === 0 ? (
-        <p class="muted-text">No available booth slots found.</p>
-      ) : (
-        boothsWithDates.map((loc) => {
-          const addrParts = [loc.address.street, loc.address.city, loc.address.state, loc.address.zip].filter(Boolean);
-          const addressStr = addrParts.join(', ');
-          const typeClass =
-            loc.reservationType === BOOTH_RESERVATION_TYPE.LOTTERY
-              ? 'type-lottery'
-              : loc.reservationType === BOOTH_RESERVATION_TYPE.FCFS
-                ? 'type-fcfs'
-                : 'type-default';
+      {/* Control panel — filters collapsible, button + status below */}
+      <div class="filter-card">
+        <button type="button" class="filter-toggle" onClick={() => setFiltersOpen(!filtersOpen)}>
+          <span class="filter-toggle-icon">{filtersOpen ? '\u25BC' : '\u25B6'}</span>
+          Filters
+          {!filtersOpen && collapsedSummary && <span class="filter-toggle-summary">{collapsedSummary}</span>}
+        </button>
 
-          const filtered = filterAvailableDates(loc.availableDates || [], filters);
-          const dates = removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots);
-
-          return (
-            <div key={loc.id} class="booth-card">
-              <div class="booth-card-header">
-                <div>
-                  <strong>{loc.storeName || '-'}</strong>
-                  <div class="meta-text">
-                    {addressStr || '-'}
-                    {(() => {
-                      const dist = boothDistanceMap.get(loc.id);
-                      return dist != null ? ` · ${dist.toFixed(1)} mi` : '';
-                    })()}
-                  </div>
-                  {loc.notes && <div class="muted-text note-text">{loc.notes}</div>}
+        {filtersOpen && (
+          <div class="available-booths-config">
+            <div class="config-section">
+              <div class="config-section-header">
+                <span class="config-label">Booths</span>
+                <button type="button" class="btn btn-secondary btn-sm" onClick={() => setSelecting(true)}>
+                  Select Booths
+                </button>
+              </div>
+              {boothCount > 0 ? (
+                <div class="config-value">
+                  {uniqueStoreNames.join(', ')}
+                  {boothCount > 1 && <span class="muted-text"> ({boothCount} locations)</span>}
                 </div>
-                <span class={`booth-type-badge ${typeClass}`}>{loc.reservationType || '-'}</span>
-              </div>
-
-              <div class="booth-card-body">
-                {dates.map((d) => (
-                  <div key={d.date} class="booth-date-group">
-                    <div class="booth-date-label">{formatBoothDate(d.date)}</div>
-                    {d.timeSlots.length === 0 ? (
-                      <span class="muted-text">No time slots available</span>
-                    ) : (
-                      <div class="booth-slot-list">
-                        {d.timeSlots.map((slot) => {
-                          const friendly =
-                            slot.startTime && slot.endTime
-                              ? `${formatTime12h(slot.startTime)} – ${formatTime12h(slot.endTime)}`
-                              : formatTime12h(slot.startTime) || '-';
-                          const raw = slot.startTime && slot.endTime ? `${slot.startTime} – ${slot.endTime}` : slot.startTime || '-';
-
-                          return (
-                            <span key={`${d.date}-${slot.startTime}`} title={raw} class="booth-time-slot">
-                              {friendly}
-                              <button
-                                type="button"
-                                class="booth-slot-dismiss"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onIgnoreSlot(loc.id, d.date, slot.startTime);
-                                }}
-                                title="Ignore this time slot"
-                              >
-                                &times;
-                              </button>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
+              ) : (
+                <div class="config-value muted-text">No booths selected</div>
+              )}
             </div>
-          );
-        })
-      )}
+            <div class="config-section">
+              <div class="config-section-header">
+                <span class="config-label">Days & Times</span>
+                <button type="button" class="btn btn-secondary btn-sm" onClick={() => setFiltering(true)}>
+                  Select Days & Times
+                </button>
+              </div>
+              {dayTimeDetails.length > 0 ? (
+                <div class="config-day-list">
+                  {dayTimeDetails.map((d) => (
+                    <span key={d.day} class="config-day-chip">
+                      <strong>{d.label}</strong> {d.slots}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div class="config-value muted-text">No days selected</div>
+              )}
+            </div>
+            {ignoredTimeSlots.length > 0 && (
+              <div class="config-section">
+                <div class="config-section-header">
+                  <span class="config-value">
+                    {ignoredTimeSlots.length} ignored time slot{ignoredTimeSlots.length === 1 ? '' : 's'}
+                  </span>
+                  <button type="button" class="btn btn-secondary btn-sm" onClick={onResetIgnored}>
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div class="booth-action-row">
+          {isFullyConfigured ? (
+            <button type="button" class="btn btn-primary btn-sm" disabled={refreshing} onClick={onRefresh}>
+              Find Booths
+            </button>
+          ) : (
+            <span class="booth-sync-status">
+              {boothCount === 0 && filterCount === 0
+                ? 'Select booths and days to get started'
+                : boothCount === 0
+                  ? 'Select booths to get started'
+                  : 'Select days to get started'}
+            </span>
+          )}
+          {isFullyConfigured && (
+            <span class="booth-sync-status">
+              {refreshing && <span class="spinner" />}
+              {syncStatusText}
+              {syncStatusIcon && ` ${syncStatusIcon}`}
+            </span>
+          )}
+        </div>
+      </div>
+      {isFullyConfigured &&
+        (boothsWithDates.length === 0 ? (
+          <p class="muted-text">No available booth slots found.</p>
+        ) : (
+          boothsWithDates.map((loc) => {
+            const addrParts = [loc.address.street, loc.address.city, loc.address.state, loc.address.zip].filter(Boolean);
+            const addressStr = addrParts.join(', ');
+            const typeClass =
+              loc.reservationType === BOOTH_RESERVATION_TYPE.LOTTERY
+                ? 'type-lottery'
+                : loc.reservationType === BOOTH_RESERVATION_TYPE.FCFS
+                  ? 'type-fcfs'
+                  : 'type-default';
+
+            const filtered = filterAvailableDates(loc.availableDates || [], filters);
+            const dates = removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots);
+
+            return (
+              <div key={loc.id} class="booth-card">
+                <div class="booth-card-header">
+                  <div>
+                    <strong>{loc.storeName || '-'}</strong>
+                    <div class="meta-text">
+                      {addressStr || '-'}
+                      {(() => {
+                        const dist = boothDistanceMap.get(loc.id);
+                        return dist != null ? ` \u00B7 ${dist.toFixed(1)} mi` : '';
+                      })()}
+                    </div>
+                    {loc.notes && <div class="muted-text note-text">{loc.notes}</div>}
+                  </div>
+                  <span class={`booth-type-badge ${typeClass}`}>{loc.reservationType || '-'}</span>
+                </div>
+
+                <div class="booth-card-body">
+                  {dates.map((d) => (
+                    <div key={d.date} class="booth-date-group">
+                      <div class="booth-date-label">{formatBoothDate(d.date)}</div>
+                      {d.timeSlots.length === 0 ? (
+                        <span class="muted-text">No time slots available</span>
+                      ) : (
+                        <div class="booth-slot-list">
+                          {d.timeSlots.map((slot) => {
+                            const friendly =
+                              slot.startTime && slot.endTime
+                                ? `${formatTime12h(slot.startTime)} \u2013 ${formatTime12h(slot.endTime)}`
+                                : formatTime12h(slot.startTime) || '-';
+                            const raw = slot.startTime && slot.endTime ? `${slot.startTime} \u2013 ${slot.endTime}` : slot.startTime || '-';
+
+                            return (
+                              <span key={`${d.date}-${slot.startTime}`} title={raw} class="booth-time-slot">
+                                {friendly}
+                                <button
+                                  type="button"
+                                  class="booth-slot-dismiss"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onIgnoreSlot(loc.id, d.date, slot.startTime);
+                                  }}
+                                  title="Ignore this time slot"
+                                >
+                                  &times;
+                                </button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        ))}
     </div>
   );
 }

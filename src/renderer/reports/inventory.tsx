@@ -80,19 +80,18 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   const netT2G = totalAllocated - totalReturned;
   const t2gDescription = totalReturned > 0 ? `${totalAllocated} out − ${totalReturned} returned` : 'Allocated to scouts';
 
-  const stats: Array<{ label: string; value: number; description: string; color: string }> = [
+  const stats: Array<{ label: string; value: number; description: string; color: string; operator?: string }> = [
     { label: 'Total Packages', value: totalPackages, description: packagesDesc, color: '#1565C0' },
-    { label: 'Girl Transfers', value: netT2G, description: t2gDescription, color: '#00838F' }
-  ];
-  stats.push(
+    { label: 'Girl Transfers', value: netT2G, description: t2gDescription, color: '#00838F', operator: '\u2212' },
     {
       label: 'Troop Sales',
       value: troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G,
       description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
-      color: '#7B1FA2'
+      color: '#7B1FA2',
+      operator: '\u2212'
     },
-    { label: 'Troop Inventory', value: netInventory, description: 'Packages on hand', color: '#E65100' }
-  );
+    { label: 'Troop Inventory', value: netInventory, description: 'Packages on hand', color: '#E65100', operator: '=' }
+  ];
 
   const inventoryRows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(inventoryVarieties))).filter(
     ([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE
@@ -107,11 +106,9 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
 
   return (
     <div class="report-visual">
-      <h3>Inventory Report</h3>
+      <h3>Troop Inventory</h3>
 
       <StatCards stats={stats} />
-
-      <h4>Troop Inventory</h4>
       <DataTable columns={['Variety', 'Packages', '']}>
         {inventoryRows.map(([variety, count]) => {
           const cases = Math.floor(count / PACKAGES_PER_CASE);
@@ -164,8 +161,8 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
                   <td>
                     <span class={`transfer-type-label transfer-type-${typeLabel.toLowerCase().replace(/\s+/g, '-')}`}>{typeLabel}</span>
                   </td>
-                  <td>{from}</td>
-                  <td>{to}</td>
+                  <td>{from === 'Troop' ? <span class="troop-pill">Troop</span> : from}</td>
+                  <td>{to === 'Troop' ? <span class="troop-pill">Troop</span> : to}</td>
                   {tip ? (
                     <TooltipCell tooltip={tip} className={`tooltip-cell ${pkgClass}`}>
                       {pkgDisplay}

@@ -280,6 +280,10 @@ export interface ScrapeProgress {
   endpoint: string;
   status: 'syncing' | 'synced' | 'error';
   cached?: boolean;
+  durationMs?: number;
+  dataSize?: number;
+  httpStatus?: number;
+  error?: string;
 }
 
 export type ProgressCallback = ((progress: ScrapeProgress) => void) | null;
@@ -292,10 +296,15 @@ export interface EndpointSyncState {
   status: 'idle' | 'syncing' | 'synced' | 'error';
   lastSync: string | null;
   cached?: boolean;
+  durationMs?: number;
+  dataSize?: number;
+  httpStatus?: number;
+  error?: string;
 }
 
 export interface SyncState {
   syncing: boolean;
+  refreshingBooths: boolean;
   endpoints: Record<string, EndpointSyncState>;
 }
 
@@ -496,6 +505,7 @@ export interface IgnoredTimeSlot {
 
 export interface AppConfig {
   autoSyncEnabled: boolean;
+  autoRefreshBoothsEnabled: boolean;
   availableBoothsEnabled: boolean;
   boothIds: number[];
   boothDayFilters: DayFilter[];
@@ -527,11 +537,23 @@ export interface ScrapeResults {
   success: boolean;
   error?: string;
   /** Per-endpoint final statuses (set by orchestrator from progress events) */
-  endpointStatuses: Record<string, { status: 'synced' | 'error'; lastSync?: string }>;
+  endpointStatuses: Record<
+    string,
+    { status: 'synced' | 'error'; lastSync?: string; durationMs?: number; dataSize?: number; httpStatus?: number; error?: string }
+  >;
+}
+
+export interface EndpointMetadata {
+  lastSync: string | null;
+  status: 'synced' | 'error';
+  durationMs?: number;
+  dataSize?: number;
+  httpStatus?: number;
+  error?: string;
 }
 
 export interface Timestamps {
-  endpoints: Record<string, string>;
+  endpoints: Record<string, EndpointMetadata>;
   lastUnifiedBuild: string | null;
 }
 

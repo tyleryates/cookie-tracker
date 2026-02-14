@@ -1,6 +1,24 @@
 import { ORDER_TYPE, OWNER, TRANSFER_TYPE } from '../../constants';
 import type { UnifiedDataset } from '../../types';
+import type { Stat } from '../components/stat-cards';
 import { StatCards } from '../components/stat-cards';
+
+/** Sub-cards rendered inside a drill-down panel */
+function DetailCards({ items }: { items: Array<{ label: string; value: string | number; description: string; color?: string }> }) {
+  return (
+    <div class="detail-cards">
+      {items.map((item, i) => (
+        <div key={i} class="detail-card">
+          <div class="detail-card-label">{item.label}</div>
+          <div class="detail-card-value" style={{ color: item.color || 'var(--gray-800)' }}>
+            {item.value}
+          </div>
+          <div class="detail-card-desc">{item.description}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
   if (!data?.troopTotals) {
@@ -34,6 +52,7 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
     }
   }
   const totalShipped = troopShipped + girlShipped;
+  const troopDonations = troopTotals.donations - girlDonations;
 
   const totalSold = troopSales + girlDelivery + totalShipped + troopTotals.donations;
   const soldFromStock = troopTotals.boothDividerT2G + troopTotals.girlDelivery;
@@ -44,89 +63,105 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
   const t2tInTotal = c2tTransfers.filter((t) => t.type === TRANSFER_TYPE.T2T).reduce((sum, t) => sum + (t.physicalPackages || 0), 0);
   const pureC2T = troopTotals.c2tReceived - t2tInTotal;
   const totalPackages = troopTotals.c2tReceived - troopTotals.t2tOut;
-  const descParts = [`${pureC2T} C2T`];
-  if (t2tInTotal > 0) descParts.push(`+ ${t2tInTotal} T2T In`);
-  if (troopTotals.t2tOut > 0) descParts.push(`− ${troopTotals.t2tOut} T2T Out`);
-  const packagesDesc = descParts.join(' ');
 
-  const inventoryStats: Array<{ label: string; value: string | number; description: string; color: string }> = [
-    { label: 'Total Packages', value: totalPackages, description: packagesDesc, color: '#1565C0' },
-    { label: 'Packages Sold', value: soldFromStock, description: `${troopSales} troop + ${girlDelivery} girl`, color: '#2E7D32' }
-  ];
-  inventoryStats.push(
-    { label: 'Troop Inventory', value: troopTotals.inventory, description: 'Troop on hand', color: '#E65100' },
-    { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls, unsold', color: '#F57F17' }
-  );
-
-  const financialStats: Array<{ label: string; value: string; description: string; color: string }> = [
+  const stats: Stat[] = [
     {
-      label: 'Packages Credited',
-      value: `${packagesCredited}`,
-      description: `${totalPackages} received + ${totalShipped} shipped + ${troopTotals.donations} donations`,
-      color: '#1565C0'
-    },
-    {
-      label: 'Per Girl Average',
-      value: `$${troopTotals.scouts.active > 0 ? Math.round(packagesCredited / troopTotals.scouts.active) : 0}`,
-      description: `${troopTotals.scouts.active} girls participating`,
-      color: '#00838F'
-    },
-    {
-      label: 'Gross Proceeds',
-      value: `$${Math.round(grossProceeds)}`,
-      description: `$${troopTotals.proceedsRate.toFixed(2)}/pkg owed to troop`,
-      color: '#EF6C00'
-    }
-  ];
-  if (troopTotals.proceedsDeduction > 0) {
-    financialStats.push({
-      label: 'First-50 Deduction',
-      value: `-$${Math.round(troopTotals.proceedsDeduction)}`,
-      description: `${troopTotals.proceedsExemptPackages} pkg × $${troopTotals.proceedsRate.toFixed(2)}`,
-      color: '#f44336'
-    });
-  }
-  financialStats.push({
-    label: 'Troop Proceeds',
-    value: `$${Math.round(troopTotals.troopProceeds)}`,
-    description: 'After first-50 deduction',
-    color: '#2E7D32'
-  });
-
-  return (
-    <div class="report-visual dashboard-layout">
-      <div class="dashboard-section">
-        <h4 class="report-section-header">Sales by Channel</h4>
-        <StatCards
-          stats={[
+      label: 'Total Sold',
+      value: totalSold,
+      description: 'All channels combined',
+      color: '#2E7D32',
+      detail: (
+        <DetailCards
+          items={[
             {
               label: 'Troop Package Sales',
               value: troopSales,
               description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
               color: '#7B1FA2'
             },
-            { label: 'Girl Package Sales', value: girlDelivery, description: `${dcDelivery} DC + ${inPerson} in person`, color: '#00838F' },
-            { label: 'Direct Ship', value: totalShipped, description: `${troopShipped} troop + ${girlShipped} girl`, color: '#37474F' },
+            {
+              label: 'Girl Package Sales',
+              value: girlDelivery,
+              description: `${dcDelivery} DC delivery + ${inPerson} in person`,
+              color: '#00838F'
+            },
+            {
+              label: 'Direct Ship',
+              value: totalShipped,
+              description: `${troopShipped} troop + ${girlShipped} girl`,
+              color: '#37474F'
+            },
             {
               label: 'Donations',
               value: troopTotals.donations,
-              description: `${troopTotals.donations - girlDonations} troop + ${girlDonations} girl`,
+              description: `${troopDonations} troop + ${girlDonations} girl`,
               color: '#E91E63'
-            },
-            { label: 'Total Sold', value: totalSold, description: 'All channels', color: '#2E7D32' }
+            }
           ]}
         />
-      </div>
+      )
+    },
+    {
+      label: 'Total Packages',
+      value: totalPackages,
+      description: 'Physical inventory',
+      color: '#1565C0',
+      detail: (
+        <DetailCards
+          items={[
+            { label: 'Council to Troop', value: pureC2T, description: 'C2T transfers', color: '#1565C0' },
+            ...(t2tInTotal > 0 ? [{ label: 'T2T In', value: t2tInTotal, description: 'From other troops' }] : []),
+            ...(troopTotals.t2tOut > 0
+              ? [{ label: 'T2T Out', value: `-${troopTotals.t2tOut}`, description: 'To other troops', color: '#f44336' }]
+              : []),
+            { label: 'Sold from Stock', value: soldFromStock, description: `${troopSales} troop + ${girlDelivery} girl`, color: '#2E7D32' },
+            { label: 'Troop Inventory', value: troopTotals.inventory, description: 'On hand', color: '#E65100' },
+            { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls', color: '#F57F17' }
+          ]}
+        />
+      )
+    },
+    {
+      label: 'Troop Proceeds',
+      value: `$${Math.round(troopTotals.troopProceeds)}`,
+      description: `$${troopTotals.proceedsRate.toFixed(2)}/pkg`,
+      color: '#2E7D32',
+      detail: (
+        <DetailCards
+          items={[
+            {
+              label: 'Packages Credited',
+              value: packagesCredited,
+              description: `${troopTotals.scouts.active} girls participating`,
+              color: '#1565C0'
+            },
+            {
+              label: 'Per Girl Average',
+              value: `$${troopTotals.scouts.active > 0 ? Math.round(packagesCredited / troopTotals.scouts.active) : 0}`,
+              description: `${packagesCredited} pkg / ${troopTotals.scouts.active} girls`,
+              color: '#00838F'
+            },
+            { label: 'Gross Proceeds', value: `$${Math.round(grossProceeds)}`, description: 'Before deductions', color: '#EF6C00' },
+            ...(troopTotals.proceedsDeduction > 0
+              ? [
+                  {
+                    label: 'First-50 Deduction',
+                    value: `-$${Math.round(troopTotals.proceedsDeduction)}`,
+                    description: `${troopTotals.proceedsExemptPackages} pkg \u00D7 $${troopTotals.proceedsRate.toFixed(2)}`,
+                    color: '#f44336'
+                  }
+                ]
+              : [])
+          ]}
+        />
+      )
+    }
+  ];
 
-      <div class="dashboard-section">
-        <h4 class="report-section-header">Inventory</h4>
-        <StatCards stats={inventoryStats} />
-      </div>
-
-      <div class="dashboard-section">
-        <h4 class="report-section-header">Finances</h4>
-        <StatCards stats={financialStats} />
-      </div>
+  return (
+    <div class="report-visual">
+      <h4 class="report-section-header">Overview</h4>
+      <StatCards stats={stats} defaultExpanded={0} />
     </div>
   );
 }

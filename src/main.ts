@@ -16,7 +16,7 @@ import { DigitalCookieSession } from './scrapers/dc-session';
 import { SmartCookieSession } from './scrapers/sc-session';
 import SmartCookieScraper from './scrapers/smart-cookie';
 import SeasonalData, { type SeasonalDataFiles } from './seasonal-data';
-import type { AppConfig, CredentialPatch, Credentials, CredentialsSummary, IpcResponse, Timestamps } from './types';
+import type { AppConfig, CredentialPatch, Credentials, CredentialsSummary, EndpointMetadata, IpcResponse, Timestamps } from './types';
 
 let mainWindow: BrowserWindow | null = null;
 let activeOrchestrator: ScraperOrchestrator | null = null;
@@ -41,12 +41,64 @@ const dcSession = new DigitalCookieSession();
 // Timestamps — persisted to disk so auto-sync knows what's fresh after restart
 const timestampsPath = path.join(dataDir, 'timestamps.json');
 
+const KNOWN_ENDPOINT_KEYS = new Set(['lastSync', 'status', 'durationMs', 'dataSize', 'httpStatus', 'error']);
+
+function isValidEndpointMetadata(value: unknown): value is EndpointMetadata {
+  if (typeof value !== 'object' || value === null) return false;
+  const v = value as Record<string, unknown>;
+  return (v.status === 'synced' || v.status === 'error') && (v.lastSync === null || typeof v.lastSync === 'string');
+}
+
 function loadTimestamps(): Timestamps {
+  const empty: Timestamps = { endpoints: {}, lastUnifiedBuild: null };
   try {
     const raw = JSON.parse(fs.readFileSync(timestampsPath, 'utf8'));
-    return { endpoints: raw.endpoints || {}, lastUnifiedBuild: raw.lastUnifiedBuild || null };
+    if (typeof raw !== 'object' || raw === null) return empty;
+
+    let healed = false;
+    const endpoints: Record<string, EndpointMetadata> = {};
+
+    // Strip unknown root keys
+    for (const key of Object.keys(raw)) {
+      if (key !== 'endpoints' && key !== 'lastUnifiedBuild') {
+        healed = true;
+      }
+    }
+
+    const rawEndpoints = raw.endpoints;
+    if (typeof rawEndpoints === 'object' && rawEndpoints !== null) {
+      for (const [ep, value] of Object.entries(rawEndpoints)) {
+        // Migration: old format stored plain ISO strings
+        if (typeof value === 'string') {
+          endpoints[ep] = { lastSync: value, status: 'synced' };
+          healed = true;
+          continue;
+        }
+        // Work with raw object before type narrowing
+        const obj = value as Record<string, unknown>;
+        if (!isValidEndpointMetadata(obj)) {
+          healed = true;
+          continue;
+        }
+        // Strip unknown keys within endpoint entries
+        const cleaned: Record<string, unknown> = {};
+        for (const k of Object.keys(obj)) {
+          if (KNOWN_ENDPOINT_KEYS.has(k)) cleaned[k] = obj[k];
+          else healed = true;
+        }
+        endpoints[ep] = cleaned as unknown as EndpointMetadata;
+      }
+    }
+
+    const result: Timestamps = {
+      endpoints,
+      lastUnifiedBuild: typeof raw.lastUnifiedBuild === 'string' ? raw.lastUnifiedBuild : null
+    };
+
+    if (healed) saveTimestamps(result);
+    return result;
   } catch {
-    return { endpoints: {}, lastUnifiedBuild: null };
+    return empty;
   }
 }
 
@@ -273,10 +325,17 @@ ipcMain.handle(
     const config = configManager.loadConfig();
     const results = await scraper.scrapeAll(auth.credentials, config.availableBoothsEnabled ? config.boothIds : []);
 
-    // Persist per-endpoint sync timestamps for restart survival
+    // Persist per-endpoint sync metadata for restart survival
     const ts = loadTimestamps();
     for (const [ep, info] of Object.entries(results.endpointStatuses)) {
-      if (info.lastSync) ts.endpoints[ep] = info.lastSync;
+      ts.endpoints[ep] = {
+        lastSync: info.lastSync || null,
+        status: info.status,
+        durationMs: info.durationMs,
+        dataSize: info.dataSize,
+        httpStatus: info.httpStatus,
+        error: info.error
+      };
     }
     saveTimestamps(ts);
 
@@ -300,23 +359,48 @@ ipcMain.handle(
 // Uses long-lived SC session, logging in if needed
 ipcMain.handle(
   'refresh-booth-locations',
-  handleIpcError(async () => {
+  handleIpcError(async (event) => {
     const config = configManager.loadConfig();
     if (!config.availableBoothsEnabled) return [];
 
+    const progressCallback = (progress: import('./types').ScrapeProgress) => event.sender.send('scrape-progress', progress);
+
     await ensureSCSession();
     const scraper = new SmartCookieScraper(dataDir, null, scSession);
-    const catalog = await scraper.fetchBoothCatalog(boothCache);
-    const boothLocations = await scraper.fetchBoothAvailability(config.boothIds, catalog, boothCache);
+
+    // Track catalog fetch with timing/size — skip cache on manual refresh
+    progressCallback({ endpoint: 'sc-booth-catalog', status: 'syncing' });
+    const catalogStart = Date.now();
+    const catalog = await scraper.fetchBoothCatalog();
+    if (boothCache) boothCache.setCatalog(catalog);
+    progressCallback({
+      endpoint: 'sc-booth-catalog',
+      status: 'synced',
+      durationMs: Date.now() - catalogStart,
+      dataSize: JSON.stringify(catalog).length
+    });
+
+    // Track availability fetch with timing/size
+    progressCallback({ endpoint: 'sc-booth-availability', status: 'syncing' });
+    const availStart = Date.now();
+    const boothLocations = await scraper.fetchBoothAvailability(config.boothIds, catalog);
+    progressCallback({
+      endpoint: 'sc-booth-availability',
+      status: 'synced',
+      durationMs: Date.now() - availStart,
+      dataSize: JSON.stringify(boothLocations).length
+    });
 
     // Persist enriched booth locations to disk for the pipeline
     if (boothLocations.length > 0 && config.boothIds.length > 0) {
       savePipelineFile(dataDir, PIPELINE_FILES.SC_BOOTH_LOCATIONS, boothLocations);
     }
 
-    // Persist booth sync timestamp
+    // Persist booth sync metadata
     const ts = loadTimestamps();
-    ts.endpoints['sc-booth-availability'] = new Date().toISOString();
+    const now = new Date().toISOString();
+    ts.endpoints['sc-booth-catalog'] = { lastSync: now, status: 'synced' };
+    ts.endpoints['sc-booth-availability'] = { lastSync: now, status: 'synced' };
     saveTimestamps(ts);
 
     return boothLocations.map(normalizeBoothLocation);
@@ -429,9 +513,12 @@ ipcMain.handle(
   })
 );
 
-ipcMain.handle('quit-and-install', () => {
-  autoUpdater.quitAndInstall(false, true);
-});
+ipcMain.handle(
+  'quit-and-install',
+  handleIpcError(async () => {
+    autoUpdater.quitAndInstall(false, true);
+  })
+);
 
 ipcMain.handle(
   'check-for-updates',

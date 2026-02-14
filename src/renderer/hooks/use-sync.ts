@@ -14,9 +14,6 @@ import { countAvailableSlots } from '../reports/available-booths';
 
 const CHECK_INTERVAL_MS = 60_000;
 
-const SYNC_ACTIONS = ['sync', 'refreshBooths'] as const;
-type SyncAction = (typeof SYNC_ACTIONS)[number];
-
 function isStale(lastSync: string | undefined | null, maxAgeMs: number): boolean {
   if (!lastSync) return true;
   return Date.now() - new Date(lastSync).getTime() > maxAgeMs;
@@ -32,7 +29,8 @@ export function useSync(
   loadData: (opts?: { showMessages?: boolean }) => Promise<boolean>,
   appConfig: AppConfig | null,
   syncState: SyncState,
-  autoSyncEnabled: boolean
+  autoSyncEnabled: boolean,
+  autoRefreshBoothsEnabled: boolean
 ) {
   const refreshBoothsRef = useRef<() => Promise<void>>();
   const appConfigRef = useRef(appConfig);
@@ -74,7 +72,16 @@ export function useSync(
         // Apply final per-endpoint statuses from results (authoritative, replaces progress events)
         if (scrapeData.endpointStatuses) {
           for (const [endpoint, info] of Object.entries(scrapeData.endpointStatuses)) {
-            dispatch({ type: 'SYNC_ENDPOINT_UPDATE', endpoint, status: info.status, lastSync: info.lastSync });
+            dispatch({
+              type: 'SYNC_ENDPOINT_UPDATE',
+              endpoint,
+              status: info.status,
+              lastSync: info.lastSync,
+              durationMs: info.durationMs,
+              dataSize: info.dataSize,
+              httpStatus: info.httpStatus,
+              error: info.error
+            });
           }
         }
       }
@@ -82,10 +89,6 @@ export function useSync(
       // Reload data if anything succeeded (even partial — e.g. SC ok, DC failed)
       if (parts.length > 0) {
         await loadData({ showMessages: false });
-        // Also refresh booth availability so the notification fires after sync
-        if (refreshBoothsRef.current && appConfigRef.current?.availableBoothsEnabled) {
-          await refreshBoothsRef.current();
-        }
       }
 
       if (parts.length > 0 && errors.length === 0) {
@@ -107,13 +110,10 @@ export function useSync(
 
   const refreshBooths = useCallback(async () => {
     try {
-      dispatch({ type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-booth-availability', status: 'syncing' });
+      dispatch({ type: 'BOOTH_REFRESH_STARTED' });
 
       const updated = await ipcInvoke('refresh-booth-locations');
       dispatch({ type: 'UPDATE_BOOTH_LOCATIONS', boothLocations: updated });
-
-      const now = new Date().toISOString();
-      dispatch({ type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-booth-availability', status: 'synced', lastSync: now });
 
       if (appConfig) {
         const count = countAvailableSlots(updated, appConfig.boothDayFilters, appConfig.ignoredTimeSlots);
@@ -124,12 +124,15 @@ export function useSync(
           } else {
             showStatus(`Booths available: ${msg}`, 'success');
           }
+        } else {
+          showStatus('No available booth slots found', 'success');
         }
       }
     } catch (error) {
       Logger.error('Booth availability refresh failed:', error);
       showStatus(`Booth refresh error: ${(error as Error).message}`, 'error');
-      dispatch({ type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-booth-availability', status: 'error' });
+    } finally {
+      dispatch({ type: 'BOOTH_REFRESH_FINISHED' });
     }
   }, [dispatch, showStatus, appConfig]);
   refreshBoothsRef.current = refreshBooths;
@@ -144,7 +147,11 @@ export function useSync(
         endpoint: progress.endpoint,
         status: progress.status,
         lastSync: progress.status === 'synced' ? new Date().toISOString() : undefined,
-        cached: progress.cached
+        cached: progress.cached,
+        durationMs: progress.durationMs,
+        dataSize: progress.dataSize,
+        httpStatus: progress.httpStatus,
+        error: progress.error
       });
     });
 
@@ -166,46 +173,70 @@ export function useSync(
   // Auto-sync polling — uses refs to read latest state without resetting the timer
   const syncStateRef = useRef(syncState);
   syncStateRef.current = syncState;
-  const busyRef = useRef(false);
+  const reportsBusyRef = useRef(false);
+  const boothsBusyRef = useRef(false);
 
+  // Reports auto-sync effect
   useEffect(() => {
     if (!autoSyncEnabled) return;
 
-    const actionFns: Record<SyncAction, () => Promise<void>> = { sync, refreshBooths };
-    const enabledActions = SYNC_ACTIONS.filter((a) => a !== 'refreshBooths' || appConfig?.availableBoothsEnabled);
-
-    async function checkAndSync() {
+    async function checkReports() {
       const state = syncStateRef.current;
-      if (state.syncing || busyRef.current) return;
+      if (state.syncing || reportsBusyRef.current) return;
 
-      for (const action of enabledActions) {
-        const stale = SYNC_ENDPOINTS.filter((ep) => ep.syncAction === action).some((ep) =>
-          isStale(state.endpoints[ep.id]?.lastSync, ep.maxAgeMs)
-        );
+      const stale = SYNC_ENDPOINTS.filter((ep) => ep.syncAction === 'sync').some((ep) =>
+        isStale(state.endpoints[ep.id]?.lastSync, ep.maxAgeMs)
+      );
 
-        if (stale) {
-          busyRef.current = true;
-          Logger.debug(`Auto-sync: ${action} endpoints stale, triggering...`);
-          try {
-            await actionFns[action]();
-            Logger.debug(`Auto-sync: ${action} completed`);
-          } catch (error) {
-            Logger.error(`Auto-sync ${action} error:`, error);
-          } finally {
-            busyRef.current = false;
-          }
-          return; // One action per check cycle
+      if (stale) {
+        reportsBusyRef.current = true;
+        Logger.debug('Auto-sync: report endpoints stale, triggering...');
+        try {
+          await sync();
+          Logger.debug('Auto-sync: reports completed');
+        } catch (error) {
+          Logger.error('Auto-sync reports error:', error);
+        } finally {
+          reportsBusyRef.current = false;
         }
       }
     }
 
-    // Check immediately (covers app open + enable toggle)
-    checkAndSync();
-
-    // Then poll periodically
-    const interval = setInterval(checkAndSync, CHECK_INTERVAL_MS);
+    checkReports();
+    const interval = setInterval(checkReports, CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [autoSyncEnabled, appConfig?.availableBoothsEnabled, sync, refreshBooths]);
+  }, [autoSyncEnabled, sync]);
+
+  // Booths auto-refresh effect
+  useEffect(() => {
+    if (!autoRefreshBoothsEnabled || !appConfig?.availableBoothsEnabled) return;
+
+    async function checkBooths() {
+      const state = syncStateRef.current;
+      if (state.refreshingBooths || boothsBusyRef.current) return;
+
+      const stale = SYNC_ENDPOINTS.filter((ep) => ep.syncAction === 'refreshBooths').some((ep) =>
+        isStale(state.endpoints[ep.id]?.lastSync, ep.maxAgeMs)
+      );
+
+      if (stale) {
+        boothsBusyRef.current = true;
+        Logger.debug('Auto-sync: booth endpoints stale, triggering...');
+        try {
+          await refreshBooths();
+          Logger.debug('Auto-sync: booths completed');
+        } catch (error) {
+          Logger.error('Auto-sync booths error:', error);
+        } finally {
+          boothsBusyRef.current = false;
+        }
+      }
+    }
+
+    checkBooths();
+    const interval = setInterval(checkBooths, CHECK_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [autoRefreshBoothsEnabled, appConfig?.availableBoothsEnabled, refreshBooths]);
 
   return { sync, refreshBooths };
 }

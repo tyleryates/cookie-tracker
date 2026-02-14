@@ -5,7 +5,38 @@ import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, countBoothsNeedingDistribution, formatBoothDate, formatTimeRange } from '../format-utils';
+import { buildVarietyTooltip, countBoothsNeedingDistribution, formatBoothDate, formatTimeRange, parseTimeToMinutes } from '../format-utils';
+
+/** Parse YYYY-MM-DD as local midnight (avoids UTC parsing pitfall) */
+function parseLocalDate(dateStr: string): Date {
+  const parts = dateStr.split(/[-/]/);
+  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+}
+
+/** Compute booth status based on date, time, and distribution state */
+function getBoothStatus(r: BoothReservationImported, todayLocal: Date, nowMinutes: number): { text: string; className: string } {
+  if (r.booth.isDistributed) return { text: 'Distributed', className: 'status-success' };
+
+  const boothDate = r.timeslot.date ? parseLocalDate(r.timeslot.date) : null;
+  if (!boothDate) return { text: 'Needs Distribution', className: 'status-warning' };
+
+  const isToday = boothDate.getTime() === todayLocal.getTime();
+  const isFuture = boothDate > todayLocal;
+
+  if (isFuture) return { text: 'Upcoming', className: 'muted-text' };
+
+  if (isToday) {
+    const startMin = parseTimeToMinutes(r.timeslot.startTime || '');
+    const endMin = parseTimeToMinutes(r.timeslot.endTime || '');
+
+    if (startMin >= 0 && nowMinutes < startMin) return { text: 'Today', className: 'status-info' };
+    if (endMin >= 0 && nowMinutes < endMin) return { text: 'In Progress', className: 'status-info' };
+    // After end time today — needs distribution
+  }
+
+  // Past (or today after end time) and not distributed
+  return { text: 'Needs Distribution', className: 'status-warning' };
+}
 
 function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImported; scouts: Record<string, Scout> }) {
   if (!scouts) return null;
@@ -60,8 +91,9 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
   const totalReservations = nonVirtualReservations.length;
   const distributed = nonVirtualReservations.filter((r: BoothReservationImported) => r.booth.isDistributed).length;
   const pastNotDistributed = countBoothsNeedingDistribution(boothReservations);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
+  const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
   const totalBoothPackages = data.troopTotals.boothSalesPackages;
   const totalBoothDonations = data.troopTotals.boothSalesDonations;
@@ -85,18 +117,28 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
 
   return (
     <div class="report-visual">
-      <h3>Booth Reservations & Sales</h3>
+      <div class="report-header-row">
+        <h3>Booth Reservations & Sales</h3>
+        <span class={`report-status-badge ${pastNotDistributed > 0 ? 'report-status-warning' : 'report-status-ok'}`}>
+          {pastNotDistributed > 0 ? 'Needs Distribution' : 'All OK'}
+        </span>
+      </div>
+
+      {pastNotDistributed > 0 && (
+        <div class="info-box info-box-warning">
+          <p>
+            <strong>
+              {pastNotDistributed} booth{pastNotDistributed === 1 ? '' : 's'} needs distribution
+            </strong>{' '}
+            — allocate cookies in Smart Cookie.
+          </p>
+        </div>
+      )}
 
       <StatCards
         stats={[
           { label: 'Reservations', value: totalReservations, description: 'Total booth slots', color: '#1565C0' },
           { label: 'Distributed', value: distributed, description: 'Allocations complete', color: '#2E7D32' },
-          {
-            label: 'Needs Distribution',
-            value: pastNotDistributed,
-            description: 'Past booths pending',
-            color: pastNotDistributed > 0 ? '#ff9800' : '#999'
-          },
           { label: 'Booth Sales', value: totalBoothPackages, description: 'Physical cookies', color: '#7B1FA2' },
           {
             label: 'Booth Donations',
@@ -115,21 +157,7 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
         >
           {sorted.map((r, idx) => {
             const timeDisplay = formatTimeRange(r.timeslot.startTime, r.timeslot.endTime);
-
-            const boothDate = r.timeslot.date ? new Date(r.timeslot.date) : null;
-            const isFuture = boothDate && boothDate >= today;
-
-            let statusText: string, statusClass: string;
-            if (r.booth.isDistributed) {
-              statusText = 'Distributed';
-              statusClass = 'status-success';
-            } else if (isFuture) {
-              statusText = 'Upcoming';
-              statusClass = 'muted-text';
-            } else {
-              statusText = 'Not Distributed';
-              statusClass = 'status-warning';
-            }
+            const { text: statusText, className: statusClass } = getBoothStatus(r, todayLocal, nowMinutes);
 
             const donations = r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
             const physicalPackages = r.physicalPackages;

@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { isAxiosError } from 'axios';
 import { DEFAULT_COUNCIL_ID, PIPELINE_FILES } from '../constants';
 import Logger from '../logger';
 import type { ProgressCallback, ScrapeSourceResult } from '../types';
@@ -27,6 +28,7 @@ class DigitalCookieScraper extends BaseScraper {
     const { troopId, serviceUnitId } = this.session.extractTroopInfo(this.session.selectedRoleName!);
 
     this.sendEndpointStatus('dc-troop-report', 'syncing');
+    const startTime = Date.now();
 
     const generateResponse = await this.session.authenticatedGet<{ errorCode: string; errorMessage?: string; responseData: string }>(
       '/ajaxCall/generateReport',
@@ -42,16 +44,18 @@ class DigitalCookieScraper extends BaseScraper {
 
     const result = generateResponse.data;
     if (result.errorCode !== '0') {
-      this.sendEndpointStatus('dc-troop-report', 'error');
-      throw new Error(`Report generation failed (errorCode=${result.errorCode}): ${result.errorMessage || JSON.stringify(result)}`);
+      const errMsg = `Report generation failed (errorCode=${result.errorCode}): ${result.errorMessage || JSON.stringify(result)}`;
+      this.sendEndpointStatus('dc-troop-report', 'error', false, Date.now() - startTime, undefined, undefined, errMsg);
+      throw new Error(errMsg);
     }
 
     const responseData = JSON.parse(result.responseData);
     const fileName = responseData.fileName;
 
     if (!fileName || responseData.statusCode !== 'Success') {
-      this.sendEndpointStatus('dc-troop-report', 'error');
-      throw new Error('Report generation did not return a valid file name');
+      const errMsg = 'Report generation did not return a valid file name';
+      this.sendEndpointStatus('dc-troop-report', 'error', false, Date.now() - startTime, undefined, undefined, errMsg);
+      throw new Error(errMsg);
     }
 
     this.checkAborted(signal);
@@ -69,7 +73,9 @@ class DigitalCookieScraper extends BaseScraper {
 
     fs.writeFileSync(filePath, downloadResponse.data);
 
-    this.sendEndpointStatus('dc-troop-report', 'synced');
+    const durationMs = Date.now() - startTime;
+    const dataSize = downloadResponse.data?.length;
+    this.sendEndpointStatus('dc-troop-report', 'synced', false, durationMs, dataSize);
     return filePath;
   }
 
@@ -88,8 +94,14 @@ class DigitalCookieScraper extends BaseScraper {
 
       // Login via session
       this.sendEndpointStatus('dc-login', 'syncing');
-      await this.session.login(credentials.username, credentials.password, credentials.role || '');
-      this.sendEndpointStatus('dc-login', 'synced');
+      try {
+        await this.session.login(credentials.username, credentials.password, credentials.role || '');
+        this.sendEndpointStatus('dc-login', 'synced');
+      } catch (loginError) {
+        const httpStatus = isAxiosError(loginError) ? loginError.response?.status : undefined;
+        this.sendEndpointStatus('dc-login', 'error', false, undefined, undefined, httpStatus, (loginError as Error).message);
+        throw loginError;
+      }
 
       this.checkAborted(signal);
 

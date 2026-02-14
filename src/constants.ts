@@ -316,7 +316,7 @@ export const SYNC_ENDPOINTS = [
   { id: 'sc-reservations', source: 'SC', name: 'Reservations', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
   { id: 'sc-booth-allocations', source: 'SC', name: 'Booth Allocations', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
   { id: 'dc-troop-report', source: 'DC', name: 'Troop Report', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
-  { id: 'sc-booth-catalog', source: 'SC', name: 'Booth Catalog', maxAgeMs: 14_400_000, syncAction: 'sync', group: 'booth-availability' },
+  { id: 'sc-booth-catalog', source: 'SC', name: 'Booth Catalog', maxAgeMs: 14_400_000, syncAction: 'manual', group: 'booth-availability' },
   {
     id: 'sc-booth-availability',
     source: 'SC',

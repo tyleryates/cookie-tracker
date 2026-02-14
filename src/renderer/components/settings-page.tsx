@@ -14,15 +14,24 @@ interface SCVerifyResult {
 interface SettingsPageProps {
   mode: 'welcome' | 'settings';
   appConfig: AppConfig | null;
+  autoSyncEnabled: boolean;
+  autoRefreshBoothsEnabled: boolean;
   onBack: () => void;
-  onRecalculate: () => void;
-  onExport: () => void;
-  onWipeData: () => void;
   onUpdateConfig: (patch: Partial<AppConfig>) => void;
-  hasData: boolean;
+  onToggleAutoSync: (enabled: boolean) => void;
+  onToggleAutoRefreshBooths: (enabled: boolean) => void;
 }
 
-export function SettingsPage({ mode, appConfig, onBack, onRecalculate, onExport, onWipeData, onUpdateConfig, hasData }: SettingsPageProps) {
+export function SettingsPage({
+  mode,
+  appConfig,
+  autoSyncEnabled,
+  autoRefreshBoothsEnabled,
+  onBack,
+  onUpdateConfig,
+  onToggleAutoSync,
+  onToggleAutoRefreshBooths
+}: SettingsPageProps) {
   // Smart Cookie fields
   const [scUsername, setScUsername] = useState('');
   const [scPassword, setScPassword] = useState('');
@@ -199,6 +208,35 @@ export function SettingsPage({ mode, appConfig, onBack, onRecalculate, onExport,
           keychain.
         </p>
       )}
+      {mode === 'settings' && (
+        <div class="settings-toggles">
+          <label class="toggle-switch">
+            <input type="checkbox" checked={autoSyncEnabled} onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)} />
+            <span class="toggle-slider" />
+            <span class="toggle-label">Auto Sync Reports</span>
+          </label>
+          {appConfig?.availableBoothsEnabled && (
+            <label class="toggle-switch">
+              <input
+                type="checkbox"
+                checked={autoRefreshBoothsEnabled}
+                onChange={(e) => onToggleAutoRefreshBooths((e.target as HTMLInputElement).checked)}
+              />
+              <span class="toggle-slider" />
+              <span class="toggle-label">Auto Refresh Booths</span>
+            </label>
+          )}
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              checked={appConfig?.availableBoothsEnabled ?? false}
+              onChange={(e) => onUpdateConfig({ availableBoothsEnabled: (e.target as HTMLInputElement).checked })}
+            />
+            <span class="toggle-slider" />
+            <span class="toggle-label">Booth Finder</span>
+          </label>
+        </div>
+      )}
       <div class="settings-cards">
         {/* Smart Cookie Section */}
         <div class="settings-card">
@@ -330,35 +368,6 @@ export function SettingsPage({ mode, appConfig, onBack, onRecalculate, onExport,
           </form>
         </div>
       </div>
-      {mode === 'settings' && (
-        <div class="settings-feature-flags">
-          <h3>Features</h3>
-          <label class="settings-toggle">
-            <input
-              type="checkbox"
-              checked={appConfig?.availableBoothsEnabled ?? false}
-              onChange={(e) => onUpdateConfig({ availableBoothsEnabled: (e.target as HTMLInputElement).checked })}
-            />
-            Booth Finder monitoring
-          </label>
-        </div>
-      )}
-      {mode === 'settings' && (
-        <div class="settings-danger-zone">
-          <h3>Danger Zone</h3>
-          <div class="button-group">
-            <button type="button" class="btn btn-secondary" onClick={onRecalculate}>
-              Recalculate
-            </button>
-            <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
-              Export Diagnostics
-            </button>
-            <button type="button" class="btn btn-secondary" onClick={onWipeData}>
-              Wipe Data
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

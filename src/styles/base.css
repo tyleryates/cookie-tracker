@@ -55,10 +55,46 @@ body {
   -webkit-app-region: no-drag;
 }
 
-.app-header-sync-status {
-  font-size: 0.8em;
-  color: rgba(255, 255, 255, 0.7);
+.app-header-sync-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.15);
+  font-size: 0.75em;
   white-space: nowrap;
+}
+
+.sync-pill-label {
+  font-weight: 600;
+  color: #fff;
+}
+
+.sync-pill-status {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sync-pill.syncing {
+  background: rgba(255, 193, 7, 0.25);
+}
+
+.sync-pill.syncing .sync-pill-status {
+  color: #ffd54f;
+}
+
+.sync-pill.error {
+  background: rgba(244, 67, 54, 0.25);
+}
+
+.sync-pill.error .sync-pill-status {
+  color: #ef9a9a;
 }
 
 .icon-btn {
@@ -192,7 +228,7 @@ body {
 /* Toast Overlay */
 .toast-container {
   position: fixed;
-  top: 12px;
+  bottom: 16px;
   right: 16px;
   z-index: 1000;
   pointer-events: none;

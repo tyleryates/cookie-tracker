@@ -1,6 +1,6 @@
 // ReportsSection — TabBar and ReportContent components, health banner, report rendering
 
-import type { AppConfig, DayFilter, UnifiedDataset } from '../../types';
+import type { AppConfig, DayFilter, EndpointSyncState, UnifiedDataset } from '../../types';
 import { countBoothsNeedingDistribution } from '../format-utils';
 import { AvailableBoothsReport, countAvailableSlots } from '../reports/available-booths';
 import { BoothReport } from '../reports/booth';
@@ -25,7 +25,7 @@ interface ReportContentProps {
   activeReport: string | null;
   unified: UnifiedDataset | null;
   appConfig: AppConfig | null;
-  boothSyncing: boolean;
+  boothSyncState: EndpointSyncState;
   boothResetKey: number;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
   onResetIgnored: () => void;
@@ -79,7 +79,7 @@ const REPORT_BUTTONS: ReportButton[] = [
   { type: 'summary', label: 'Scouts', getWarning: (u) => getScoutWarningLabel(u) },
   { type: 'booth', label: 'Booths', getWarning: (u) => getBoothWarningLabel(u) },
   { type: 'donation-alert', label: 'Donations', getWarning: (u) => getDonationWarningLabel(u) },
-  { type: 'inventory', label: 'Inventory' },
+  { type: 'inventory', label: 'Troop Inventory' },
   { type: 'variety', label: 'Cookie Popularity' }
 ];
 
@@ -133,7 +133,7 @@ function renderReport(
   type: string,
   unified: UnifiedDataset,
   appConfig: AppConfig | null,
-  boothSyncing: boolean,
+  boothSyncState: EndpointSyncState,
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void,
   onResetIgnored: () => void,
   onRefreshBooths: () => void,
@@ -164,7 +164,7 @@ function renderReport(
             ignoredTimeSlots: appConfig?.ignoredTimeSlots || []
           }}
           appConfig={appConfig}
-          refreshing={boothSyncing}
+          syncState={boothSyncState}
           onIgnoreSlot={onIgnoreSlot}
           onResetIgnored={onResetIgnored}
           onRefresh={onRefreshBooths}
@@ -226,7 +226,7 @@ export function TabBar({ activeReport, unified, appConfig, onSelectReport }: Tab
         style={visibleTools.length === 0 ? { marginLeft: 'auto' } : undefined}
         onClick={() => onSelectReport('sync')}
       >
-        Status
+        Data
       </button>
     </nav>
   );
@@ -240,7 +240,7 @@ export function ReportContent({
   activeReport,
   unified,
   appConfig,
-  boothSyncing,
+  boothSyncState,
   boothResetKey,
   onIgnoreSlot,
   onResetIgnored,
@@ -281,7 +281,7 @@ export function ReportContent({
         activeReport,
         unified,
         appConfig,
-        boothSyncing,
+        boothSyncState,
         onIgnoreSlot,
         onResetIgnored,
         onRefreshBooths,

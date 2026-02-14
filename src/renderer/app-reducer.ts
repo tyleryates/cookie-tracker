@@ -17,6 +17,7 @@ export interface AppState {
   unified: UnifiedDataset | null;
   appConfig: AppConfig | null;
   autoSyncEnabled: boolean;
+  autoRefreshBoothsEnabled: boolean;
   activeReport: string | null;
   activePage: 'dashboard' | 'settings' | 'welcome';
   statusMessage: StatusMessage | null;
@@ -37,11 +38,24 @@ export type Action =
   | { type: 'SET_ACTIVE_REPORT'; report: string | null }
   | { type: 'DEFAULT_REPORT' }
   | { type: 'TOGGLE_AUTO_SYNC'; enabled: boolean }
+  | { type: 'TOGGLE_AUTO_REFRESH_BOOTHS'; enabled: boolean }
   | { type: 'OPEN_SETTINGS' }
   | { type: 'CLOSE_SETTINGS' }
-  | { type: 'SYNC_ENDPOINT_UPDATE'; endpoint: string; status: EndpointSyncState['status']; lastSync?: string; cached?: boolean }
+  | {
+      type: 'SYNC_ENDPOINT_UPDATE';
+      endpoint: string;
+      status: EndpointSyncState['status'];
+      lastSync?: string;
+      cached?: boolean;
+      durationMs?: number;
+      dataSize?: number;
+      httpStatus?: number;
+      error?: string;
+    }
   | { type: 'SYNC_STARTED' }
   | { type: 'SYNC_FINISHED' }
+  | { type: 'BOOTH_REFRESH_STARTED' }
+  | { type: 'BOOTH_REFRESH_FINISHED' }
   | { type: 'UPDATE_BOOTH_LOCATIONS'; boothLocations: UnifiedDataset['boothLocations'] }
   | { type: 'IGNORE_SLOT'; config: AppConfig }
   | { type: 'WIPE_DATA'; syncState: SyncState }
@@ -63,7 +77,12 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, activePage: 'welcome' };
 
     case 'LOAD_CONFIG':
-      return { ...state, appConfig: action.config, autoSyncEnabled: action.config.autoSyncEnabled ?? true };
+      return {
+        ...state,
+        appConfig: action.config,
+        autoSyncEnabled: action.config.autoSyncEnabled ?? true,
+        autoRefreshBoothsEnabled: action.config.autoRefreshBoothsEnabled ?? true
+      };
 
     case 'SET_UNIFIED':
       return { ...state, unified: action.unified };
@@ -77,6 +96,9 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'TOGGLE_AUTO_SYNC':
       return { ...state, autoSyncEnabled: action.enabled };
 
+    case 'TOGGLE_AUTO_REFRESH_BOOTHS':
+      return { ...state, autoRefreshBoothsEnabled: action.enabled };
+
     case 'OPEN_SETTINGS':
       return { ...state, activePage: 'settings' };
 
@@ -85,6 +107,7 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'SYNC_ENDPOINT_UPDATE': {
       const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };
+      const isSyncing = action.status === 'syncing';
       return {
         ...state,
         syncState: {
@@ -95,7 +118,12 @@ export function appReducer(state: AppState, action: Action): AppState {
               ...prev,
               status: action.status,
               lastSync: action.lastSync ?? prev.lastSync,
-              cached: action.cached
+              cached: action.cached,
+              // Clear previous sync's timing/error when starting a new sync; store when finished
+              durationMs: isSyncing ? undefined : (action.durationMs ?? prev.durationMs),
+              dataSize: isSyncing ? undefined : (action.dataSize ?? prev.dataSize),
+              httpStatus: isSyncing ? undefined : (action.httpStatus ?? prev.httpStatus),
+              error: isSyncing ? undefined : (action.error ?? prev.error)
             }
           }
         }
@@ -107,6 +135,12 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'SYNC_FINISHED':
       return { ...state, syncState: { ...state.syncState, syncing: false } };
+
+    case 'BOOTH_REFRESH_STARTED':
+      return { ...state, syncState: { ...state.syncState, refreshingBooths: true } };
+
+    case 'BOOTH_REFRESH_FINISHED':
+      return { ...state, syncState: { ...state.syncState, refreshingBooths: false } };
 
     case 'UPDATE_BOOTH_LOCATIONS':
       return state.unified ? { ...state, unified: { ...state.unified, boothLocations: action.boothLocations } } : state;

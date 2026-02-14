@@ -29,9 +29,17 @@ export abstract class BaseScraper {
     this.progressCallback = progressCallback;
   }
 
-  sendEndpointStatus(endpoint: string, status: 'syncing' | 'synced' | 'error', cached?: boolean): void {
+  sendEndpointStatus(
+    endpoint: string,
+    status: 'syncing' | 'synced' | 'error',
+    cached?: boolean,
+    durationMs?: number,
+    dataSize?: number,
+    httpStatus?: number,
+    error?: string
+  ): void {
     if (this.progressCallback) {
-      this.progressCallback({ endpoint, status, cached });
+      this.progressCallback({ endpoint, status, cached, durationMs, dataSize, httpStatus, error });
     }
   }
 

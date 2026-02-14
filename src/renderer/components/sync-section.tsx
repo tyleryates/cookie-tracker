@@ -14,7 +14,7 @@ export function createInitialSyncState(): SyncState {
   for (const ep of SYNC_ENDPOINTS) {
     endpoints[ep.id] = { status: 'idle', lastSync: null };
   }
-  return { syncing: false, endpoints };
+  return { syncing: false, refreshingBooths: false, endpoints };
 }
 
 type OverallStatus = 'idle' | 'syncing' | 'synced' | 'partial' | 'error';
@@ -50,6 +50,72 @@ export function computeOverallStatus(endpoints: Record<string, EndpointSyncState
   else if (syncedCount > 0) status = 'partial';
 
   return { status, syncedCount, errorCount, syncingCount, total, lastSync };
+}
+
+export interface GroupStatus {
+  status: OverallStatus;
+  lastSync: string | null;
+}
+
+export function computeGroupStatuses(
+  endpoints: Record<string, EndpointSyncState>,
+  syncFlags?: { syncing: boolean; refreshingBooths: boolean }
+): {
+  reports: GroupStatus;
+  booths: GroupStatus;
+} {
+  function compute(group: string): GroupStatus {
+    const eps = SYNC_ENDPOINTS.filter((ep) => ep.group === group);
+    let syncedCount = 0;
+    let errorCount = 0;
+    let syncingCount = 0;
+    let lastSync: string | null = null;
+
+    for (const ep of eps) {
+      const s = endpoints[ep.id];
+      if (!s) continue;
+      if (s.status === 'synced') syncedCount++;
+      else if (s.status === 'error') errorCount++;
+      else if (s.status === 'syncing') syncingCount++;
+      if (s.lastSync && (!lastSync || s.lastSync > lastSync)) lastSync = s.lastSync;
+    }
+
+    let status: OverallStatus = 'idle';
+    if (syncingCount > 0) status = 'syncing';
+    else if (syncedCount === eps.length) status = 'synced';
+    else if (errorCount > 0 && syncedCount > 0) status = 'partial';
+    else if (errorCount > 0) status = 'error';
+    else if (syncedCount > 0) status = 'partial';
+
+    return { status, lastSync };
+  }
+
+  const reports = compute('reports');
+  const booths = compute('booth-availability');
+
+  // Override: if the top-level syncing flag is on, force group status to 'syncing'
+  // to prevent flicker when one platform finishes before the other starts
+  if (syncFlags?.syncing) reports.status = 'syncing';
+  if (syncFlags?.refreshingBooths) booths.status = 'syncing';
+
+  return { reports, booths };
+}
+
+// ============================================================================
+// FORMAT HELPERS
+// ============================================================================
+
+function formatDuration(ms: number | undefined): string {
+  if (ms == null) return '';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function formatDataSize(bytes: number | undefined): string {
+  if (bytes == null) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // ============================================================================
@@ -100,52 +166,71 @@ function EndpointRow({
           {timestampDisplay}
         </output>
       </td>
+      <td class="endpoint-duration">{formatDuration(epState.durationMs)}</td>
+      <td class="endpoint-data-size">{formatDataSize(epState.dataSize)}</td>
       {showFrequency && (
         <td class="endpoint-frequency">
           <span class="source-badge">{frequency}</span>
         </td>
       )}
       <td class="endpoint-status-cell">
-        <span class={`sync-status ${statusClass}`} title={statusTooltip}>
-          {epState.status === 'syncing' ? <span class="spinner" /> : epState.status === 'synced' ? '\u2713' : '\u2717'}
+        <span class={`sync-status ${statusClass}`} title={epState.error || statusTooltip}>
+          {epState.status === 'syncing' ? (
+            <span class="spinner" />
+          ) : epState.status === 'error' && epState.httpStatus ? (
+            `HTTP ${epState.httpStatus}`
+          ) : epState.status === 'synced' ? (
+            '\u2713'
+          ) : (
+            '\u2717'
+          )}
         </span>
       </td>
     </tr>
   );
 }
 
-const ENDPOINT_GROUPS = [
-  { key: 'reports', label: 'Reports' },
-  { key: 'booth-availability', label: 'Booth Finder' }
-] as const;
+interface EndpointTableProps {
+  endpoints: Record<string, EndpointSyncState>;
+  availableBoothsEnabled: boolean;
+  showFrequency: boolean;
+}
 
-function EndpointTable({ endpoints, autoSyncEnabled }: { endpoints: Record<string, EndpointSyncState>; autoSyncEnabled: boolean }) {
+function EndpointTable({ endpoints, availableBoothsEnabled, showFrequency }: EndpointTableProps) {
+  const reportEndpoints = SYNC_ENDPOINTS.filter((ep) => ep.group === 'reports');
+  const boothEndpoints = availableBoothsEnabled ? SYNC_ENDPOINTS.filter((ep) => ep.group === 'booth-availability') : [];
+  const colCount = showFrequency ? 7 : 6;
+
+  const renderRows = (eps: ReadonlyArray<(typeof SYNC_ENDPOINTS)[number]>) =>
+    eps.map((ep) => {
+      const epState = endpoints[ep.id] || { status: 'idle', lastSync: null };
+      return (
+        <EndpointRow
+          key={ep.id}
+          name={ep.name}
+          source={ep.source}
+          frequency={formatMaxAge(ep.maxAgeMs)}
+          epState={epState}
+          showFrequency={showFrequency}
+        />
+      );
+    });
+
   return (
     <table class="endpoint-table">
       <tbody>
-        {ENDPOINT_GROUPS.map((group) => {
-          const groupEndpoints = SYNC_ENDPOINTS.filter((ep) => ep.group === group.key);
-          return (
-            <>
-              <tr class="endpoint-group-header">
-                <td colSpan={autoSyncEnabled ? 5 : 4}>{group.label}</td>
-              </tr>
-              {groupEndpoints.map((ep) => {
-                const epState = endpoints[ep.id] || { status: 'idle', lastSync: null };
-                return (
-                  <EndpointRow
-                    key={ep.id}
-                    name={ep.name}
-                    source={ep.source}
-                    frequency={formatMaxAge(ep.maxAgeMs)}
-                    epState={epState}
-                    showFrequency={autoSyncEnabled}
-                  />
-                );
-              })}
-            </>
-          );
-        })}
+        <tr class="endpoint-group-label">
+          <td colSpan={colCount}>Reports</td>
+        </tr>
+        {renderRows(reportEndpoints)}
+        {boothEndpoints.length > 0 && (
+          <>
+            <tr class="endpoint-group-label">
+              <td colSpan={colCount}>Booth Finder</td>
+            </tr>
+            {renderRows(boothEndpoints)}
+          </>
+        )}
       </tbody>
     </table>
   );
@@ -157,25 +242,51 @@ function EndpointTable({ endpoints, autoSyncEnabled }: { endpoints: Record<strin
 
 interface SyncTabProps {
   syncState: SyncState;
-  autoSyncEnabled: boolean;
-  onSync: () => void;
-  onToggleAutoSync: (enabled: boolean) => void;
+  availableBoothsEnabled: boolean;
+  onSyncReports: () => void;
+  onRefreshBooths: () => void;
+  onRecalculate: () => void;
+  onExport: () => void;
+  onWipeData: () => void;
+  hasData: boolean;
 }
 
-export function SyncTab({ syncState, autoSyncEnabled, onSync, onToggleAutoSync }: SyncTabProps) {
+export function SyncTab({
+  syncState,
+  availableBoothsEnabled,
+  onSyncReports,
+  onRefreshBooths,
+  onRecalculate,
+  onExport,
+  onWipeData,
+  hasData
+}: SyncTabProps) {
   return (
     <div class="report-visual">
-      <h3>Sync Status</h3>
-      <EndpointTable endpoints={syncState.endpoints} autoSyncEnabled={autoSyncEnabled} />
+      <h3>Data</h3>
+      <EndpointTable endpoints={syncState.endpoints} availableBoothsEnabled={availableBoothsEnabled} showFrequency={false} />
       <div class="sync-controls">
-        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing} onClick={onSync}>
-          Sync Now
+        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing} onClick={onSyncReports}>
+          {syncState.syncing ? 'Refreshing\u2026' : 'Refresh Reports'}
         </button>
-        <label class="toggle-switch" title="Enable automatic hourly sync">
-          <input type="checkbox" checked={autoSyncEnabled} onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)} />
-          <span class="toggle-slider" />
-          <span class="toggle-label">Auto Sync</span>
-        </label>
+        {availableBoothsEnabled && (
+          <button type="button" class="btn btn-secondary active" disabled={syncState.refreshingBooths} onClick={onRefreshBooths}>
+            {syncState.refreshingBooths ? 'Refreshing\u2026' : 'Refresh Booths'}
+          </button>
+        )}
+      </div>
+      <div class="settings-danger-zone">
+        <div class="button-group">
+          <button type="button" class="btn btn-secondary" onClick={onRecalculate}>
+            Recalculate
+          </button>
+          <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
+            Export Diagnostics
+          </button>
+          <button type="button" class="btn btn-secondary" onClick={onWipeData}>
+            Wipe Data
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import type { DayFilter } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { ReportContent, TabBar } from './components/reports-section';
 import { SettingsPage } from './components/settings-page';
-import { computeOverallStatus, createInitialSyncState, SyncTab } from './components/sync-section';
+import { computeGroupStatuses, createInitialSyncState, type GroupStatus, SyncTab } from './components/sync-section';
 import { DateFormatter } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
@@ -15,6 +15,7 @@ const initialState: AppState = {
   unified: null,
   appConfig: null,
   autoSyncEnabled: false,
+  autoRefreshBoothsEnabled: false,
   activeReport: null,
   activePage: 'dashboard',
   statusMessage: null,
@@ -26,9 +27,33 @@ const initialState: AppState = {
 // APP HEADER
 // ============================================================================
 
+function SyncPill({ label, group }: { label: string; group: GroupStatus }) {
+  let statusText: string;
+  let modifier = '';
+  if (group.status === 'syncing') {
+    statusText = 'Syncing\u2026';
+    modifier = 'syncing';
+  } else if (group.status === 'error') {
+    statusText = 'Failed';
+    modifier = 'error';
+  } else if (group.lastSync) {
+    statusText = DateFormatter.toFriendly(group.lastSync);
+  } else {
+    return null;
+  }
+
+  return (
+    <span class={`sync-pill ${modifier}`}>
+      <span class="sync-pill-label">{label}</span>
+      <span class="sync-pill-status">{statusText}</span>
+    </span>
+  );
+}
+
 function AppHeader({
   syncing,
-  overallStatus,
+  groups,
+  showBooths,
   onSync,
   onOpenSettings,
   showBackButton,
@@ -36,21 +61,15 @@ function AppHeader({
   isWelcome
 }: {
   syncing: boolean;
-  overallStatus: ReturnType<typeof computeOverallStatus>;
+  groups: ReturnType<typeof computeGroupStatuses>;
+  showBooths: boolean;
   onSync: () => void;
   onOpenSettings: () => void;
   showBackButton: boolean;
   onBack: () => void;
   isWelcome: boolean;
 }) {
-  let syncStatusText = '';
-  if (!isWelcome && !showBackButton) {
-    if (overallStatus.status === 'syncing') {
-      syncStatusText = `Syncing\u2026 (${overallStatus.syncedCount}/${overallStatus.total})`;
-    } else if (overallStatus.lastSync) {
-      syncStatusText = DateFormatter.toFriendly(overallStatus.lastSync);
-    }
-  }
+  const showPills = !isWelcome && !showBackButton;
 
   return (
     <div class="app-header">
@@ -66,7 +85,12 @@ function AppHeader({
       </span>
       {!isWelcome && (
         <div class="app-header-actions">
-          {syncStatusText && <span class="app-header-sync-status">{syncStatusText}</span>}
+          {showPills && (
+            <div class="app-header-sync-pills">
+              <SyncPill label="Reports" group={groups.reports} />
+              {showBooths && <SyncPill label="Booths" group={groups.booths} />}
+            </div>
+          )}
           {!showBackButton && (
             <button type="button" class="icon-btn has-tooltip" disabled={syncing} onClick={onSync}>
               {syncing ? <span class="spinner" /> : '\u21BB'}
@@ -98,18 +122,40 @@ export function App() {
   // Hook chain
   const { showStatus } = useStatusMessage(dispatch, state.statusMessage);
   const { loadData, recalculate, exportData } = useDataLoader(dispatch, showStatus);
-  const { sync, refreshBooths } = useSync(dispatch, showStatus, loadData, state.appConfig, state.syncState, state.autoSyncEnabled);
+  const { sync, refreshBooths } = useSync(
+    dispatch,
+    showStatus,
+    loadData,
+    state.appConfig,
+    state.syncState,
+    state.autoSyncEnabled,
+    state.autoRefreshBoothsEnabled
+  );
   useAppInit(dispatch, loadData);
 
   // Booth reset key — bumped when user re-clicks "Available Booths" tab
   const boothResetKeyRef = useRef(0);
   const contentRef = useRef<HTMLDivElement>(null);
 
+  const handleHeaderSync = useCallback(() => {
+    sync();
+    if (state.appConfig?.availableBoothsEnabled) refreshBooths();
+  }, [sync, refreshBooths, state.appConfig?.availableBoothsEnabled]);
+
   const handleToggleAutoSync = useCallback(
     (enabled: boolean) => {
       dispatch({ type: 'TOGGLE_AUTO_SYNC', enabled });
       ipcInvoke('update-config', { autoSyncEnabled: enabled });
       showStatus(enabled ? 'Auto sync enabled' : 'Auto sync disabled', 'success');
+    },
+    [showStatus]
+  );
+
+  const handleToggleAutoRefreshBooths = useCallback(
+    (enabled: boolean) => {
+      dispatch({ type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled });
+      ipcInvoke('update-config', { autoRefreshBoothsEnabled: enabled });
+      showStatus(enabled ? 'Auto refresh booths enabled' : 'Auto refresh booths disabled', 'success');
     },
     [showStatus]
   );
@@ -178,7 +224,7 @@ export function App() {
     dispatch({ type: 'LOAD_CONFIG', config: updatedConfig });
   }, []);
 
-  const overall = computeOverallStatus(state.syncState.endpoints);
+  const groups = computeGroupStatuses(state.syncState.endpoints, state.syncState);
   const isSettings = state.activePage === 'settings';
   const isWelcome = state.activePage === 'welcome';
 
@@ -187,15 +233,16 @@ export function App() {
       {state.updateReady && (
         <div class="update-banner">
           Version {state.updateReady} downloaded —{' '}
-          <button type="button" class="update-banner-btn" onClick={() => ipcInvoke('quit-and-install')}>
+          <button type="button" class="update-banner-btn" onClick={() => ipcInvoke('quit-and-install').catch(() => {})}>
             Restart to update
           </button>
         </div>
       )}
       <AppHeader
         syncing={state.syncState.syncing}
-        overallStatus={overall}
-        onSync={sync}
+        groups={groups}
+        showBooths={!!state.appConfig?.availableBoothsEnabled}
+        onSync={handleHeaderSync}
         onOpenSettings={() => dispatch({ type: 'OPEN_SETTINGS' })}
         showBackButton={isSettings}
         onBack={handleCloseSettings}
@@ -209,26 +256,30 @@ export function App() {
           <SettingsPage
             mode={isWelcome ? 'welcome' : 'settings'}
             appConfig={state.appConfig}
+            autoSyncEnabled={state.autoSyncEnabled}
+            autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
             onBack={handleCloseSettings}
-            onRecalculate={recalculate}
-            onExport={exportData}
-            onWipeData={handleWipeData}
             onUpdateConfig={handleUpdateConfig}
-            hasData={!!state.unified}
+            onToggleAutoSync={handleToggleAutoSync}
+            onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
           />
         ) : state.activeReport === 'sync' ? (
           <SyncTab
             syncState={state.syncState}
-            autoSyncEnabled={state.autoSyncEnabled}
-            onSync={sync}
-            onToggleAutoSync={handleToggleAutoSync}
+            availableBoothsEnabled={!!state.appConfig?.availableBoothsEnabled}
+            onSyncReports={sync}
+            onRefreshBooths={refreshBooths}
+            onRecalculate={recalculate}
+            onExport={exportData}
+            onWipeData={handleWipeData}
+            hasData={!!state.unified}
           />
         ) : (
           <ReportContent
             activeReport={state.activeReport}
             unified={state.unified}
             appConfig={state.appConfig}
-            boothSyncing={state.syncState.endpoints['sc-booth-availability']?.status === 'syncing'}
+            boothSyncState={state.syncState.endpoints['sc-booth-availability'] || { status: 'idle', lastSync: null }}
             boothResetKey={boothResetKeyRef.current}
             onIgnoreSlot={handleIgnoreSlot}
             onResetIgnored={handleResetIgnored}

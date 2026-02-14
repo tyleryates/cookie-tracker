@@ -13,6 +13,7 @@ class ConfigManager {
   getDefaults(): AppConfig {
     return {
       autoSyncEnabled: true,
+      autoRefreshBoothsEnabled: true,
       availableBoothsEnabled: false,
       boothIds: [],
       boothDayFilters: [],
@@ -29,9 +30,34 @@ class ConfigManager {
       }
       const raw = fs.readFileSync(this.configPath, 'utf8');
       const disk = JSON.parse(raw);
-      return { ...defaults, ...disk };
+      if (typeof disk !== 'object' || disk === null) {
+        this.saveConfig(defaults);
+        return defaults;
+      }
+
+      // Only pick known keys and validate types match defaults
+      let healed = false;
+      const result = { ...defaults };
+      for (const key of Object.keys(defaults) as Array<keyof AppConfig>) {
+        if (key in disk) {
+          const defaultType = Array.isArray(defaults[key]) ? 'array' : typeof defaults[key];
+          const diskType = Array.isArray(disk[key]) ? 'array' : typeof disk[key];
+          if (diskType === defaultType) {
+            result[key] = disk[key];
+          } else {
+            healed = true;
+          }
+        }
+      }
+      // Detect unknown keys
+      for (const key of Object.keys(disk)) {
+        if (!(key in defaults)) healed = true;
+      }
+      if (healed) this.saveConfig(result);
+      return result;
     } catch (error) {
       Logger.error('Error loading config:', error);
+      this.saveConfig(defaults);
       return defaults;
     }
   }

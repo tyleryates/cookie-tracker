@@ -22,7 +22,8 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
   'record-unified-build',
   'wipe-logins',
   'wipe-data',
-  'quit-and-install'
+  'quit-and-install',
+  'check-for-updates'
 ]);
 
 const ALLOWED_EVENT_CHANNELS = new Set(['scrape-progress', 'update-available', 'update-downloaded']);

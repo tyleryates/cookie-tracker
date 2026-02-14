@@ -1,24 +1,79 @@
 // StatCards — Preact replacement for createHorizontalStats()
+// Supports optional drill-down: click a card to expand detail below the row.
 
-interface Stat {
+import type { ComponentChildren } from 'preact';
+import { useState } from 'preact/hooks';
+
+export interface Stat {
   label: string;
   value: string | number;
   description: string;
   color?: string;
+  operator?: string; // '+', '−', '=', etc. — displayed before this card
+  highlight?: boolean; // darker background to visually emphasize this card
+  detail?: ComponentChildren; // expandable drill-down content
 }
 
-export function StatCards({ stats }: { stats: Stat[] }) {
+export function StatCards({ stats, defaultExpanded }: { stats: Stat[]; defaultExpanded?: number }) {
+  const [expanded, setExpanded] = useState<number | null>(defaultExpanded ?? null);
+  const hasOperators = stats.some((s) => s.operator);
+
+  let columns: string;
+  if (hasOperators) {
+    const parts: string[] = [];
+    for (let i = 0; i < stats.length; i++) {
+      if (stats[i].operator) parts.push('auto');
+      parts.push('1fr');
+    }
+    columns = parts.join(' ');
+  } else {
+    columns = `repeat(${stats.length}, 1fr)`;
+  }
+
+  // Count grid columns for detail row colspan
+  const colCount = hasOperators ? stats.reduce((n, s) => n + (s.operator ? 2 : 1), 0) : stats.length;
+
+  const handleClick = (i: number) => {
+    if (!stats[i].detail) return;
+    if (expanded === i) return; // tab behavior — stays selected
+    setExpanded(i);
+  };
+
   return (
-    <div class="stat-cards" style={{ gridTemplateColumns: `repeat(${stats.length}, 1fr)` }}>
-      {stats.map((stat, i) => (
-        <div key={i} class="stat-card">
-          <div class="stat-card-label">{stat.label}</div>
-          <div class="stat-card-value" style={{ color: stat.color || '#666' }}>
-            {stat.value}
-          </div>
-          <div class="stat-card-description">{stat.description}</div>
+    <div class="stat-cards-wrapper">
+      <div class="stat-cards" style={{ gridTemplateColumns: columns }}>
+        {stats.map((stat, i) => {
+          const cardClass = `stat-card${stat.highlight ? ' stat-card-highlight' : ''}${stat.detail ? ' stat-card-expandable' : ''}${expanded === i ? ' stat-card-active' : ''}`;
+          const content = (
+            <>
+              <div class="stat-card-label">{stat.label}</div>
+              <div class="stat-card-value" style={{ color: stat.color || '#666' }}>
+                {stat.value}
+              </div>
+              <div class="stat-card-description">{stat.description}</div>
+            </>
+          );
+          return (
+            <>
+              {stat.operator && <div class="stat-operator">{stat.operator}</div>}
+              {stat.detail ? (
+                <button key={i} type="button" class={cardClass} onClick={() => handleClick(i)}>
+                  {content}
+                </button>
+              ) : (
+                <div key={i} class={cardClass}>
+                  {content}
+                </div>
+              )}
+            </>
+          );
+        })}
+      </div>
+      {expanded !== null && stats[expanded]?.detail && (
+        <div class="stat-card-detail" style={{ gridColumn: `1 / span ${colCount}` }}>
+          {stats[expanded].detail}
         </div>
-      ))}
+      )}
     </div>
   );
 }

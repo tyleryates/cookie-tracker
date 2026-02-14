@@ -18,6 +18,7 @@ function makeEndpoints(overrides?: Record<string, Partial<EndpointSyncState>>): 
 function makeSyncState(overrides?: Partial<SyncState> & { endpointOverrides?: Record<string, Partial<EndpointSyncState>> }): SyncState {
   return {
     syncing: overrides?.syncing ?? false,
+    refreshingBooths: overrides?.refreshingBooths ?? false,
     endpoints: overrides?.endpoints ?? makeEndpoints(overrides?.endpointOverrides)
   };
 }
@@ -27,10 +28,12 @@ function makeState(overrides?: Partial<AppState>): AppState {
     unified: null,
     appConfig: null,
     autoSyncEnabled: true,
+    autoRefreshBoothsEnabled: true,
     activeReport: null,
     activePage: 'dashboard' as const,
     statusMessage: null,
     syncState: makeSyncState(),
+    updateReady: null,
     ...overrides
   };
 }
@@ -38,6 +41,8 @@ function makeState(overrides?: Partial<AppState>): AppState {
 function makeAppConfig(overrides?: Partial<AppConfig>): AppConfig {
   return {
     autoSyncEnabled: true,
+    autoRefreshBoothsEnabled: true,
+    availableBoothsEnabled: false,
     boothIds: [],
     boothDayFilters: [],
     ignoredTimeSlots: [],
@@ -187,6 +192,21 @@ describe('LOAD_CONFIG', () => {
     expect(result.autoSyncEnabled).toBe(true);
   });
 
+  it('sets autoRefreshBoothsEnabled from config', () => {
+    const config = makeAppConfig({ autoRefreshBoothsEnabled: false });
+    const state = makeState({ autoRefreshBoothsEnabled: true });
+    const result = appReducer(state, { type: 'LOAD_CONFIG', config });
+    expect(result.autoRefreshBoothsEnabled).toBe(false);
+  });
+
+  it('defaults autoRefreshBoothsEnabled to true when config omits it', () => {
+    const config = makeAppConfig();
+    (config as any).autoRefreshBoothsEnabled = undefined;
+    const state = makeState({ autoRefreshBoothsEnabled: false });
+    const result = appReducer(state, { type: 'LOAD_CONFIG', config });
+    expect(result.autoRefreshBoothsEnabled).toBe(true);
+  });
+
   it('does not modify sync state', () => {
     const config = makeAppConfig();
     const state = makeState();
@@ -269,6 +289,24 @@ describe('TOGGLE_AUTO_SYNC', () => {
 });
 
 // =============================================================================
+// TOGGLE_AUTO_REFRESH_BOOTHS
+// =============================================================================
+
+describe('TOGGLE_AUTO_REFRESH_BOOTHS', () => {
+  it('sets autoRefreshBoothsEnabled to true', () => {
+    const state = makeState({ autoRefreshBoothsEnabled: false });
+    const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: true });
+    expect(result.autoRefreshBoothsEnabled).toBe(true);
+  });
+
+  it('sets autoRefreshBoothsEnabled to false', () => {
+    const state = makeState({ autoRefreshBoothsEnabled: true });
+    const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: false });
+    expect(result.autoRefreshBoothsEnabled).toBe(false);
+  });
+});
+
+// =============================================================================
 // OPEN_SETTINGS
 // =============================================================================
 
@@ -343,6 +381,90 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
     const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-reservations', status: 'error' });
     expect(result.syncState.endpoints['sc-reservations'].status).toBe('error');
   });
+
+  it('stores durationMs and dataSize when synced', () => {
+    const state = makeState();
+    const result = appReducer(state, {
+      type: 'SYNC_ENDPOINT_UPDATE',
+      endpoint: 'sc-orders',
+      status: 'synced',
+      lastSync: '2025-01-15T12:00:00Z',
+      durationMs: 1200,
+      dataSize: 245000
+    });
+    expect(result.syncState.endpoints['sc-orders'].durationMs).toBe(1200);
+    expect(result.syncState.endpoints['sc-orders'].dataSize).toBe(245000);
+  });
+
+  it('clears durationMs and dataSize when status transitions to syncing', () => {
+    const state = makeState({
+      syncState: makeSyncState({
+        endpointOverrides: { 'sc-orders': { status: 'synced', lastSync: '2025-01-14T08:00:00Z', durationMs: 500, dataSize: 1000 } }
+      })
+    });
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    expect(result.syncState.endpoints['sc-orders'].durationMs).toBeUndefined();
+    expect(result.syncState.endpoints['sc-orders'].dataSize).toBeUndefined();
+  });
+
+  it('preserves durationMs from previous sync when not provided in update', () => {
+    const state = makeState({
+      syncState: makeSyncState({
+        endpointOverrides: { 'sc-orders': { status: 'synced', lastSync: '2025-01-14T08:00:00Z', durationMs: 500, dataSize: 1000 } }
+      })
+    });
+    const result = appReducer(state, {
+      type: 'SYNC_ENDPOINT_UPDATE',
+      endpoint: 'sc-orders',
+      status: 'synced',
+      lastSync: '2025-01-15T10:00:00Z'
+    });
+    expect(result.syncState.endpoints['sc-orders'].durationMs).toBe(500);
+    expect(result.syncState.endpoints['sc-orders'].dataSize).toBe(1000);
+  });
+
+  it('stores httpStatus and error on error status', () => {
+    const state = makeState();
+    const result = appReducer(state, {
+      type: 'SYNC_ENDPOINT_UPDATE',
+      endpoint: 'sc-orders',
+      status: 'error',
+      httpStatus: 401,
+      error: 'Unauthorized'
+    });
+    expect(result.syncState.endpoints['sc-orders'].httpStatus).toBe(401);
+    expect(result.syncState.endpoints['sc-orders'].error).toBe('Unauthorized');
+  });
+
+  it('clears httpStatus and error when status transitions to syncing', () => {
+    const state = makeState({
+      syncState: makeSyncState({
+        endpointOverrides: {
+          'sc-orders': { status: 'error', lastSync: '2025-01-14T08:00:00Z', httpStatus: 401, error: 'Unauthorized' }
+        }
+      })
+    });
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    expect(result.syncState.endpoints['sc-orders'].httpStatus).toBeUndefined();
+    expect(result.syncState.endpoints['sc-orders'].error).toBeUndefined();
+  });
+
+  it('preserves httpStatus from previous sync when not provided in update', () => {
+    const state = makeState({
+      syncState: makeSyncState({
+        endpointOverrides: {
+          'sc-orders': { status: 'error', lastSync: '2025-01-14T08:00:00Z', httpStatus: 403, error: 'Forbidden' }
+        }
+      })
+    });
+    const result = appReducer(state, {
+      type: 'SYNC_ENDPOINT_UPDATE',
+      endpoint: 'sc-orders',
+      status: 'error'
+    });
+    expect(result.syncState.endpoints['sc-orders'].httpStatus).toBe(403);
+    expect(result.syncState.endpoints['sc-orders'].error).toBe('Forbidden');
+  });
 });
 
 // =============================================================================
@@ -409,6 +531,54 @@ describe('SYNC_FINISHED', () => {
     const result = appReducer(state, { type: 'SYNC_FINISHED' });
     expect(result.syncState.endpoints['sc-orders'].status).toBe('synced');
     expect(result.syncState.endpoints['sc-direct-ship'].status).toBe('error');
+  });
+});
+
+// =============================================================================
+// BOOTH_REFRESH_STARTED
+// =============================================================================
+
+describe('BOOTH_REFRESH_STARTED', () => {
+  it('sets refreshingBooths to true', () => {
+    const state = makeState();
+    const result = appReducer(state, { type: 'BOOTH_REFRESH_STARTED' });
+    expect(result.syncState.refreshingBooths).toBe(true);
+  });
+
+  it('does not affect syncing state', () => {
+    const state = makeState({ syncState: makeSyncState({ syncing: true }) });
+    const result = appReducer(state, { type: 'BOOTH_REFRESH_STARTED' });
+    expect(result.syncState.syncing).toBe(true);
+    expect(result.syncState.refreshingBooths).toBe(true);
+  });
+
+  it('preserves endpoint states', () => {
+    const state = makeState({
+      syncState: makeSyncState({
+        endpointOverrides: { 'sc-orders': { status: 'synced', lastSync: '2025-01-14T08:00:00Z' } }
+      })
+    });
+    const result = appReducer(state, { type: 'BOOTH_REFRESH_STARTED' });
+    expect(result.syncState.endpoints['sc-orders'].status).toBe('synced');
+  });
+});
+
+// =============================================================================
+// BOOTH_REFRESH_FINISHED
+// =============================================================================
+
+describe('BOOTH_REFRESH_FINISHED', () => {
+  it('sets refreshingBooths to false', () => {
+    const state = makeState({ syncState: makeSyncState({ refreshingBooths: true }) });
+    const result = appReducer(state, { type: 'BOOTH_REFRESH_FINISHED' });
+    expect(result.syncState.refreshingBooths).toBe(false);
+  });
+
+  it('does not affect syncing state', () => {
+    const state = makeState({ syncState: makeSyncState({ syncing: true, refreshingBooths: true }) });
+    const result = appReducer(state, { type: 'BOOTH_REFRESH_FINISHED' });
+    expect(result.syncState.syncing).toBe(true);
+    expect(result.syncState.refreshingBooths).toBe(false);
   });
 });
 

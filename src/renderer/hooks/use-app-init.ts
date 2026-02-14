@@ -15,8 +15,17 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
       // so timestamps must be in state first to avoid a spurious full sync.
       try {
         const timestamps = await ipcInvoke('load-timestamps');
-        for (const [endpoint, lastSync] of Object.entries(timestamps.endpoints)) {
-          dispatch({ type: 'SYNC_ENDPOINT_UPDATE', endpoint, status: 'synced', lastSync });
+        for (const [endpoint, meta] of Object.entries(timestamps.endpoints)) {
+          dispatch({
+            type: 'SYNC_ENDPOINT_UPDATE',
+            endpoint,
+            status: meta.status,
+            lastSync: meta.lastSync ?? undefined,
+            durationMs: meta.durationMs,
+            dataSize: meta.dataSize,
+            httpStatus: meta.httpStatus,
+            error: meta.error
+          });
         }
       } catch {
         // Non-fatal — endpoints start as idle, auto-sync will catch them
