@@ -106,7 +106,9 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
 
   return (
     <div class="report-visual">
-      <h3>Troop Inventory</h3>
+      <div class="report-header-row">
+        <h3>Troop Inventory</h3>
+      </div>
 
       <StatCards stats={stats} />
       <DataTable columns={['Variety', 'Packages', '']}>

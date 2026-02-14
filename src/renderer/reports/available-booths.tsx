@@ -236,7 +236,9 @@ export function AvailableBoothsReport({
 
   return (
     <div class="report-visual">
-      <h3>Booth Finder</h3>
+      <div class="report-header-row">
+        <h3>Booth Finder</h3>
+      </div>
 
       {/* Control panel — filters collapsible, button + status below */}
       <div class="filter-card">

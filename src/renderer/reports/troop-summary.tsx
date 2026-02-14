@@ -65,7 +65,7 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
 
   const stats: Stat[] = [
     {
-      label: 'Total Sold',
+      label: 'Total Sales',
       value: totalSold,
       description: 'All channels combined',
       color: '#2E7D32',

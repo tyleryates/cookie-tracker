@@ -21,7 +21,9 @@ export function VarietyReport({ data }: { data: UnifiedDataset }) {
 
   return (
     <div class="report-visual">
-      <h3>Cookie Popularity Report</h3>
+      <div class="report-header-row">
+        <h3>Cookie Popularity Report</h3>
+      </div>
       <p class="meta-text">Total: {varieties.total} packages sold</p>
       <DataTable columns={['Variety', 'Packages', '% of Sales']}>
         {rows.map(([variety, count]) => {
