@@ -213,9 +213,14 @@ export function AvailableBoothsReport({
     return { day, label: DAY_LABELS[day], slots: slotLabels.join(', ') };
   });
 
-  // Build store name list for expanded view
+  // Build store name → count map for expanded view
   const selectedBooths = boothIds.map((id) => boothLocations.find((loc) => loc.id === id)).filter(Boolean);
-  const uniqueStoreNames = [...new Set(selectedBooths.map((loc) => loc!.storeName).filter(Boolean))].sort();
+  const storeNameCounts = new Map<string, number>();
+  for (const loc of selectedBooths) {
+    const name = loc!.storeName;
+    if (name) storeNameCounts.set(name, (storeNameCounts.get(name) || 0) + 1);
+  }
+  const sortedStoreNames = [...storeNameCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 
   // Sync status display
   let syncStatusText: string;
@@ -257,10 +262,13 @@ export function AvailableBoothsReport({
                   Select Booths
                 </button>
               </div>
-              {boothCount > 0 ? (
-                <div class="config-value">
-                  {uniqueStoreNames.join(', ')}
-                  {boothCount > 1 && <span class="muted-text"> ({boothCount} locations)</span>}
+              {sortedStoreNames.length > 0 ? (
+                <div class="config-day-list">
+                  {sortedStoreNames.map(([name, count]) => (
+                    <span key={name} class="config-day-chip">
+                      <strong>{name}</strong> {count > 1 ? `${count} locations` : '1 location'}
+                    </span>
+                  ))}
                 </div>
               ) : (
                 <div class="config-value muted-text">No booths selected</div>
