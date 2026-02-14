@@ -160,7 +160,7 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
                 description: `${troopSales} troop + ${girlDelivery} girl`,
                 color: '#2E7D32'
               },
-              { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls', color: '#F57F17' }
+              { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'Unsold inventory with girls', color: '#F57F17' }
             ]}
           />
         );
