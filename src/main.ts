@@ -436,6 +436,15 @@ ipcMain.handle(
   })
 );
 
+ipcMain.handle(
+  'check-for-updates',
+  handleIpcError(async () => {
+    if (app.isPackaged) {
+      autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
+    }
+  })
+);
+
 // Handle export diagnostics zip
 ipcMain.handle(
   'export-diagnostics',

@@ -17,7 +17,8 @@ const initialState: AppState = {
   activeReport: null,
   activePage: 'dashboard',
   statusMessage: null,
-  syncState: createInitialSyncState()
+  syncState: createInitialSyncState(),
+  updateReady: null
 };
 
 // ============================================================================
@@ -222,6 +223,14 @@ export function App() {
           />
         )}
       </div>
+      {state.updateReady && (
+        <div class="update-banner">
+          Version {state.updateReady} downloaded —{' '}
+          <button type="button" class="update-banner-btn" onClick={() => ipcInvoke('quit-and-install')}>
+            Restart to update
+          </button>
+        </div>
+      )}
       {state.statusMessage && (
         <div class="toast-container">
           <div class={`toast ${state.statusMessage.type}`}>{state.statusMessage.msg}</div>

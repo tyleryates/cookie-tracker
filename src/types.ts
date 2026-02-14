@@ -581,6 +581,10 @@ export interface IpcChannelMap {
     request: undefined;
     response: undefined;
   };
+  'check-for-updates': {
+    request: undefined;
+    response: undefined;
+  };
 }
 
 export interface IpcEventMap {

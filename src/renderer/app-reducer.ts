@@ -21,6 +21,7 @@ export interface AppState {
   activePage: 'dashboard' | 'settings' | 'welcome';
   statusMessage: StatusMessage | null;
   syncState: SyncState;
+  updateReady: string | null; // version string when update downloaded
 }
 
 // ============================================================================
@@ -43,7 +44,8 @@ export type Action =
   | { type: 'SYNC_FINISHED' }
   | { type: 'UPDATE_BOOTH_LOCATIONS'; boothLocations: UnifiedDataset['boothLocations'] }
   | { type: 'IGNORE_SLOT'; config: AppConfig }
-  | { type: 'WIPE_DATA'; syncState: SyncState };
+  | { type: 'WIPE_DATA'; syncState: SyncState }
+  | { type: 'UPDATE_DOWNLOADED'; version: string };
 
 // ============================================================================
 // REDUCER
@@ -114,6 +116,9 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'WIPE_DATA':
       return { ...state, unified: null, appConfig: null, activeReport: null, syncState: action.syncState };
+
+    case 'UPDATE_DOWNLOADED':
+      return { ...state, updateReady: action.version };
 
     default:
       return state;

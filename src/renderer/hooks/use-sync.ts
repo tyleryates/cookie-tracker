@@ -43,6 +43,9 @@ export function useSync(
       dispatch({ type: 'SYNC_STARTED' });
       showStatus('Starting API sync for both platforms...', 'success');
 
+      // Also check for app updates (fire-and-forget)
+      ipcInvoke('check-for-updates').catch(() => {});
+
       const result = await ipcInvokeRaw('scrape-websites');
       const errors: string[] = [];
       const parts: string[] = [];
@@ -150,7 +153,7 @@ export function useSync(
     });
 
     const cleanupUpdateDownloaded = onIpcEvent('update-downloaded', (info) => {
-      showStatus(`Version ${info.version} downloaded — restart to update`, 'warning');
+      dispatch({ type: 'UPDATE_DOWNLOADED', version: info.version });
     });
 
     return () => {
