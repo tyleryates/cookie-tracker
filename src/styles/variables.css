@@ -13,6 +13,7 @@
   --gray-400: #a1a1a6;
   --gray-600: #6e6e73;
   --gray-700: #48484a;
+  --gray-800: #333336;
   --gray-900: #1c1c1e;
 
   /* Semantic colors - softer tones */
@@ -28,12 +29,15 @@
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.12);
+
+  /* Layout */
+  --header-height: 48px;
+  --tab-bar-height: 40px;
+  --app-padding-x: 24px;
 
   /* Border radius */
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
   /* Surfaces (for dark mode swap) */
   --surface: #ffffff;

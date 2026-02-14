@@ -107,7 +107,7 @@ export function BoothDayFilter({ currentFilters, onSave, onCancel }: BoothDayFil
     <div class="report-visual">
       <h3>Select Days & Times</h3>
       <p class="muted-text" style={{ marginTop: '-16px', marginBottom: '16px' }}>
-        Choose which days and time slots to show in Available Booths.
+        Choose which days and time slots to show in Booth Finder.
       </p>
 
       <table class="day-filter-grid">

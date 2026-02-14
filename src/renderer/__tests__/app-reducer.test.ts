@@ -293,24 +293,6 @@ describe('CLOSE_SETTINGS', () => {
 });
 
 // =============================================================================
-// WIPE_LOGINS
-// =============================================================================
-
-describe('WIPE_LOGINS', () => {
-  it('sets activePage to welcome', () => {
-    const state = makeState({ activePage: 'dashboard' });
-    const result = appReducer(state, { type: 'WIPE_LOGINS' });
-    expect(result.activePage).toBe('welcome');
-  });
-
-  it('sets activePage to welcome from settings', () => {
-    const state = makeState({ activePage: 'settings' });
-    const result = appReducer(state, { type: 'WIPE_LOGINS' });
-    expect(result.activePage).toBe('welcome');
-  });
-});
-
-// =============================================================================
 // SYNC_ENDPOINT_UPDATE
 // =============================================================================
 

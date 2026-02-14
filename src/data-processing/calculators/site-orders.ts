@@ -54,11 +54,6 @@ function buildSiteOrdersDataset(store: ReadonlyDataStore, scoutDataset: Record<s
     boothSale: buildCategory(siteOrdersByType.boothSale, allocations.boothSales)
   };
 
-  // Set flag for scout-summary to control site row display and warning
-  if (siteScout) {
-    siteScout.$hasUnallocatedSiteOrders = result.directShip.hasWarning || result.girlDelivery.hasWarning || result.boothSale.hasWarning;
-  }
-
   return result;
 }
 

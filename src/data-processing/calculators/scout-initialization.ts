@@ -76,7 +76,6 @@ function createScoutStructure(name: string, girlId: number | null, isSiteOrder: 
       },
       $inventoryDisplay: {}, // Net inventory by variety
       $salesByVariety: {},
-      $shippedByVariety: {},
       $allocationSummary: {
         booth: { packages: 0, donations: 0, varieties: {} },
         directShip: { packages: 0, donations: 0, varieties: {} },

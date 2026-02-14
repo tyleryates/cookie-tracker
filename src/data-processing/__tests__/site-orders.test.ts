@@ -128,17 +128,6 @@ describe('buildSiteOrdersDataset', () => {
     expect(result.boothSale.allocated).toBe(3);
   });
 
-  it('sets $hasUnallocatedSiteOrders flag on site scout', () => {
-    const store = createDataStore();
-    const site = makeScout('Troop Site');
-    site.isSiteOrder = true;
-    site.orders = [makeOrder({ orderNumber: '1', physicalPackages: 5, orderType: ORDER_TYPE.DELIVERY })];
-    // No allocations → unallocated > 0 → hasWarning
-    const scouts = { 'Troop Site': site };
-    buildSiteOrdersDataset(store, scouts);
-    expect(site.$hasUnallocatedSiteOrders).toBe(true);
-  });
-
   it('unallocated clamps to zero (over-allocated)', () => {
     const store = createDataStore() as DataStore;
     store.allocations = [{ channel: ALLOCATION_CHANNEL.DIRECT_SHIP, girlId: 1, packages: 20, donations: 0, varieties: {} }];

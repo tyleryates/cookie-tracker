@@ -99,7 +99,8 @@ function buildOrderObject(
   basicInfo: ReturnType<typeof extractBasicOrderInfo>,
   varieties: Varieties,
   classification: { owner: Owner; orderType: OrderType | null },
-  paymentMethod: PaymentMethod | null
+  paymentMethod: PaymentMethod | null,
+  rawRow: RawDataRow
 ): Order {
   return {
     orderNumber: basicInfo.orderNumber,
@@ -117,7 +118,7 @@ function buildOrderObject(
     paymentStatus: basicInfo.paymentStatus,
     paymentMethod: paymentMethod,
     sources: [DATA_SOURCES.DIGITAL_COOKIE],
-    metadata: { dc: null, sc: null, scReport: null, scApi: null }
+    metadata: { dc: rawRow, sc: null, scReport: null, scApi: null }
   };
 }
 
@@ -163,7 +164,7 @@ function parseAndClassifyOrder(row: RawDataRow, lastName: string, warnings: Warn
     });
   }
 
-  return buildOrderObject(basicInfo, varieties, classification, paymentMethod);
+  return buildOrderObject(basicInfo, varieties, classification, paymentMethod, row);
 }
 
 /** Add and classify orders from Digital Cookie */

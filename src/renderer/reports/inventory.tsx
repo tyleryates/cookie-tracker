@@ -1,5 +1,5 @@
 import { PACKAGES_PER_CASE, SC_TRANSFER_STATUS, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
-import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
+import { COOKIE_TYPE, getCookieColor, getCookieDisplayName } from '../../cookie-constants';
 import type { Transfer, UnifiedDataset, Varieties } from '../../types';
 import { DataTable } from '../components/data-table';
 import { StatCards } from '../components/stat-cards';
@@ -122,9 +122,18 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
           else if (cases > 0) breakdown = `${cases} case${cases !== 1 ? 's' : ''}`;
           else breakdown = `${remaining} pkg${remaining !== 1 ? 's' : ''}`;
 
+          const color = getCookieColor(variety);
           return (
             <tr key={variety}>
-              <td>{getCookieDisplayName(variety)}</td>
+              <td>
+                {color && (
+                  <span
+                    class="inventory-chip-dot"
+                    style={{ background: color, display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}
+                  />
+                )}
+                {getCookieDisplayName(variety)}
+              </td>
               <td>{count}</td>
               <td class="meta-text">{breakdown}</td>
             </tr>

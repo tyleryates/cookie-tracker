@@ -144,8 +144,7 @@ export const SC_TRANSFER_STATUS = {
 export const ALLOCATION_METHOD = {
   VIRTUAL_BOOTH_DIVIDER: 'VIRTUAL_BOOTH_DIVIDER', // For TROOP DELIVERY orders
   DIRECT_SHIP_DIVIDER: 'DIRECT_SHIP_DIVIDER', // For TROOP DIRECT_SHIP orders
-  BOOTH_SALES_DIVIDER: 'BOOTH_SALES_DIVIDER', // For TROOP BOOTH orders (Smart Booth Divider API)
-  MANUAL: 'MANUAL' // For manual allocation (fallback)
+  BOOTH_SALES_DIVIDER: 'BOOTH_SALES_DIVIDER' // For TROOP BOOTH orders (Smart Booth Divider API)
 } as const;
 
 // ============================================================================
@@ -164,7 +163,6 @@ export const DC_COLUMNS = {
   CURRENT_SALE_AMOUNT: 'Current Sale Amount',
   ORDER_STATUS: 'Order Status',
   PAYMENT_STATUS: 'Payment Status',
-  SHIP_STATUS: 'Ship Status',
   DONATION: 'Donation'
 } as const;
 
@@ -177,10 +175,7 @@ export const SC_REPORT_COLUMNS = {
   GSUSA_ID: 'GSUSAID',
   GRADE_LEVEL: 'GradeLevel',
   ORDER_DATE: 'OrderDate',
-  ORDER_TYPE_DESC: 'OrderTypeDesc',
   TOTAL: 'Total',
-  INCLUDED_IN_IO: 'IncludedInIO',
-  CSHARE_VIRTUAL: 'CShareVirtual',
   TROOP_ID: 'TroopID',
   SERVICE_UNIT_DESC: 'ServiceUnitDesc',
   COUNCIL_DESC: 'CouncilDesc',
@@ -205,8 +200,7 @@ export const SC_API_COLUMNS = {
 export const DISPLAY_STRINGS: Record<string, string> = {
   [ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]: 'Troop Girl Delivered',
   [ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]: 'Troop Direct Ship',
-  [ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]: 'Booth Sales',
-  [ALLOCATION_METHOD.MANUAL]: 'Manual Allocation'
+  [ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]: 'Booth Sales'
 };
 
 // ============================================================================
@@ -326,7 +320,7 @@ export const SYNC_ENDPOINTS = [
   {
     id: 'sc-booth-availability',
     source: 'SC',
-    name: 'Booth Availability',
+    name: 'Booth Finder',
     maxAgeMs: 900_000,
     syncAction: 'refreshBooths',
     group: 'booth-availability'

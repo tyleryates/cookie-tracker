@@ -43,7 +43,6 @@ export type Action =
   | { type: 'SYNC_FINISHED' }
   | { type: 'UPDATE_BOOTH_LOCATIONS'; boothLocations: UnifiedDataset['boothLocations'] }
   | { type: 'IGNORE_SLOT'; config: AppConfig }
-  | { type: 'WIPE_LOGINS' }
   | { type: 'WIPE_DATA'; syncState: SyncState };
 
 // ============================================================================
@@ -112,9 +111,6 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'IGNORE_SLOT':
       return { ...state, appConfig: action.config };
-
-    case 'WIPE_LOGINS':
-      return { ...state, activePage: 'welcome' };
 
     case 'WIPE_DATA':
       return { ...state, unified: null, appConfig: null, activeReport: null, syncState: action.syncState };

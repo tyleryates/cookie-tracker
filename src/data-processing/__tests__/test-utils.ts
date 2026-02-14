@@ -20,7 +20,6 @@ export function makeScout(name: string, girlId?: number): Scout {
       $financials: { cashCollected: 0, electronicPayments: 0, inventoryValue: 0, unsoldValue: 0, cashOwed: 0 },
       $inventoryDisplay: {},
       $salesByVariety: {},
-      $shippedByVariety: {},
       $allocationSummary: {
         booth: { packages: 0, donations: 0, varieties: {} },
         directShip: { packages: 0, donations: 0, varieties: {} },

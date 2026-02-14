@@ -104,24 +104,3 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-
-/* Dataset Selector */
-.dataset-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.dataset-selector label {
-  font-size: 0.9em;
-  font-weight: 600;
-  color: var(--gray-700);
-  white-space: nowrap;
-}
-
-.dataset-selector .form-input {
-  width: auto;
-  display: inline-block;
-  padding: 6px 10px;
-  font-size: 0.9em;
-}

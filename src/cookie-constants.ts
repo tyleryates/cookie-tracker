@@ -13,6 +13,7 @@ interface CookieRegistryEntry {
   type: CookieType;
   displayName: string;
   price: number;
+  color: string; // Brand color from SC API
   isPhysical: boolean;
   dcColumnName: string | null; // DC Excel column header (null = not in DC export)
   scApiId: number | null; // SC API numeric ID
@@ -27,6 +28,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'THIN_MINTS',
     displayName: 'Thin Mints',
     price: 6,
+    color: '#009f4d',
     isPhysical: true,
     dcColumnName: 'Thin Mints',
     scApiId: 4,
@@ -39,6 +41,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'CARAMEL_DELITES',
     displayName: 'Caramel deLites',
     price: 6,
+    color: '#8f368f',
     isPhysical: true,
     dcColumnName: 'Caramel deLites',
     scApiId: 1,
@@ -51,6 +54,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'PEANUT_BUTTER_PATTIES',
     displayName: 'Peanut Butter Patties',
     price: 6,
+    color: '#ea2d30',
     isPhysical: true,
     dcColumnName: 'Peanut Butter Patties',
     scApiId: 2,
@@ -63,6 +67,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'PEANUT_BUTTER_SANDWICH',
     displayName: 'Peanut Butter Sandwich',
     price: 6,
+    color: '#ed8b00',
     isPhysical: true,
     dcColumnName: 'Peanut Butter Sandwich',
     scApiId: 5,
@@ -75,6 +80,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'TREFOILS',
     displayName: 'Trefoils',
     price: 6,
+    color: '#009cd7',
     isPhysical: true,
     dcColumnName: 'Trefoils',
     scApiId: 3,
@@ -87,6 +93,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'ADVENTUREFULS',
     displayName: 'Adventurefuls',
     price: 6,
+    color: '#D5CB9F',
     isPhysical: true,
     dcColumnName: 'Adventurefuls',
     scApiId: 48,
@@ -99,6 +106,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'LEMONADES',
     displayName: 'Lemonades',
     price: 6,
+    color: '#f2cd00',
     isPhysical: true,
     dcColumnName: 'Lemonades',
     scApiId: 34,
@@ -111,6 +119,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'EXPLOREMORES',
     displayName: 'Exploremores',
     price: 6,
+    color: '#851704',
     isPhysical: true,
     dcColumnName: 'Exploremores',
     scApiId: 56,
@@ -123,6 +132,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'CARAMEL_CHOCOLATE_CHIP',
     displayName: 'Caramel Chocolate Chip',
     price: 7,
+    color: '#002f6c',
     isPhysical: true,
     dcColumnName: 'Caramel Chocolate Chip',
     scApiId: 52,
@@ -135,6 +145,7 @@ const COOKIE_REGISTRY: readonly CookieRegistryEntry[] = [
     type: 'COOKIE_SHARE',
     displayName: 'Cookie Share',
     price: 6,
+    color: '#db2727',
     isPhysical: false,
     dcColumnName: null,
     scApiId: 37,
@@ -195,6 +206,12 @@ const COOKIE_PRICES: Record<CookieType, number> = Object.fromEntries(COOKIE_REGI
   number
 >;
 
+// Brand colors (internal, used by getCookieColor)
+const COOKIE_COLORS: Record<CookieType, string> = Object.fromEntries(COOKIE_REGISTRY.map((e) => [e.type, e.color])) as Record<
+  CookieType,
+  string
+>;
+
 // Name normalization map (internal, used by normalizeCookieName)
 const COOKIE_NAME_NORMALIZATION: Record<string, CookieType> = Object.fromEntries(
   COOKIE_REGISTRY.flatMap((e) => e.nameVariations.map((v) => [v, e.type]))
@@ -235,6 +252,15 @@ export function normalizeCookieName(rawName: string): CookieType | null {
  */
 export function getCookieDisplayName(cookieType: string): string {
   return COOKIE_DISPLAY_NAMES[cookieType as CookieType] || cookieType;
+}
+
+/**
+ * Get the brand color for a cookie type
+ * @param cookieType - COOKIE_TYPE constant
+ * @returns Hex color string or null if unknown
+ */
+export function getCookieColor(cookieType: string): string | null {
+  return COOKIE_COLORS[cookieType as CookieType] || null;
 }
 
 /**

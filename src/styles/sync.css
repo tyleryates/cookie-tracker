@@ -1,84 +1,10 @@
-/* Sync status indicators, endpoint table, dataset selector */
-
-/* Sync Summary Bar */
-.sync-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--gray-200);
-  background: var(--surface-raised);
-  cursor: pointer;
-  font-size: 0.9em;
-  font-weight: 500;
-  color: var(--gray-700);
-  transition: all var(--transition-fast);
-}
-
-.sync-summary:hover {
-  border-color: var(--gray-300);
-}
-
-.sync-summary.synced {
-  border-color: var(--primary);
-  background: var(--success-light);
-  color: var(--primary);
-}
-
-.sync-summary.syncing {
-  border-color: var(--warning);
-  background: var(--warning-light);
-  color: var(--warning);
-}
-
-.sync-summary.partial {
-  border-color: var(--warning);
-  background: var(--warning-light);
-  color: var(--status-warning-dark);
-}
-
-.sync-summary.error {
-  border-color: var(--error);
-  background: var(--error-light);
-  color: var(--error);
-}
-
-.sync-summary-icon {
-  font-size: 1.1em;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.sync-summary-text {
-  flex-shrink: 0;
-}
-
-.sync-summary-time {
-  color: inherit;
-  opacity: 0.7;
-  font-weight: 400;
-  font-size: 0.9em;
-}
-
-.sync-summary-chevron {
-  margin-left: auto;
-  font-size: 0.8em;
-  color: var(--primary);
-  transition: transform var(--transition-fast);
-}
-
-.sync-summary-chevron.expanded {
-  transform: rotate(90deg);
-}
+/* Sync tab — endpoint table, status indicators, controls */
 
 /* Endpoint Table */
 .endpoint-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875em;
-  margin-top: 12px;
 }
 
 .endpoint-table td {
@@ -198,41 +124,9 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-top: 12px;
+  margin-top: 16px;
 }
 
 .sync-controls .btn {
   margin: 0;
-}
-
-/* Status Messages */
-.sync-status-message {
-  margin-top: 16px;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  font-size: 0.875em;
-  font-weight: 500;
-  display: none;
-  animation: slideIn var(--transition-base);
-}
-
-.sync-status-message.success {
-  background: var(--success-light);
-  color: var(--primary);
-  border: 1px solid var(--primary);
-  display: block;
-}
-
-.sync-status-message.error {
-  background: var(--error-light);
-  color: var(--error);
-  border: 1px solid var(--error);
-  display: block;
-}
-
-.sync-status-message.warning {
-  background: var(--warning-light);
-  color: var(--warning);
-  border: 1px solid var(--warning);
-  display: block;
 }

@@ -1,10 +1,8 @@
-// SyncSection — High-level sync summary with collapsible endpoint detail
-// Sub-components defined in-file since they're small and only used here.
+// SyncSection — Sync utilities + SyncTab component for the Sync tab
 
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useState } from 'preact/hooks';
 import { formatMaxAge, SYNC_ENDPOINTS } from '../../constants';
 import type { EndpointSyncState, SyncState } from '../../types';
-import type { StatusMessage } from '../app-reducer';
 import { DateFormatter } from '../format-utils';
 
 // ============================================================================
@@ -21,7 +19,7 @@ export function createInitialSyncState(): SyncState {
 
 type OverallStatus = 'idle' | 'syncing' | 'synced' | 'partial' | 'error';
 
-function computeOverallStatus(endpoints: Record<string, EndpointSyncState>): {
+export function computeOverallStatus(endpoints: Record<string, EndpointSyncState>): {
   status: OverallStatus;
   syncedCount: number;
   errorCount: number;
@@ -52,18 +50,6 @@ function computeOverallStatus(endpoints: Record<string, EndpointSyncState>): {
   else if (syncedCount > 0) status = 'partial';
 
   return { status, syncedCount, errorCount, syncingCount, total, lastSync };
-}
-
-// ============================================================================
-// PROPS
-// ============================================================================
-
-interface SyncSectionProps {
-  syncState: SyncState;
-  autoSyncEnabled: boolean;
-  statusMessage: StatusMessage | null;
-  onSync: () => void;
-  onToggleAutoSync: (enabled: boolean) => void;
 }
 
 // ============================================================================
@@ -130,7 +116,7 @@ function EndpointRow({
 
 const ENDPOINT_GROUPS = [
   { key: 'reports', label: 'Reports' },
-  { key: 'booth-availability', label: 'Booth Availability' }
+  { key: 'booth-availability', label: 'Booth Finder' }
 ] as const;
 
 function EndpointTable({ endpoints, autoSyncEnabled }: { endpoints: Record<string, EndpointSyncState>; autoSyncEnabled: boolean }) {
@@ -165,115 +151,32 @@ function EndpointTable({ endpoints, autoSyncEnabled }: { endpoints: Record<strin
   );
 }
 
-function SyncSummary({
-  overall,
-  expanded,
-  onToggle
-}: {
-  overall: ReturnType<typeof computeOverallStatus>;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  let statusIcon: preact.ComponentChild;
-  let statusText: string;
-  let statusClass: string;
+// ============================================================================
+// SYNC TAB
+// ============================================================================
 
-  switch (overall.status) {
-    case 'syncing':
-      statusIcon = <span class="spinner" />;
-      statusText = `Syncing\u2026 (${overall.syncedCount}/${overall.total})`;
-      statusClass = 'syncing';
-      break;
-    case 'synced':
-      statusIcon = '\u2713';
-      statusText = 'All synced';
-      statusClass = 'synced';
-      break;
-    case 'partial':
-      statusIcon = '!';
-      statusText = `${overall.syncedCount} of ${overall.total} synced`;
-      statusClass = 'partial';
-      break;
-    case 'error':
-      statusIcon = '\u2717';
-      statusText = 'Sync failed';
-      statusClass = 'error';
-      break;
-    default:
-      statusIcon = '\u2014';
-      statusText = 'Not synced yet';
-      statusClass = 'idle';
-  }
-
-  return (
-    <button type="button" class={`sync-summary ${statusClass}`} onClick={onToggle}>
-      <span class="sync-summary-icon">{statusIcon}</span>
-      <span class="sync-summary-text">{statusText}</span>
-      {overall.lastSync && <span class="sync-summary-time">{DateFormatter.toFriendly(overall.lastSync)}</span>}
-      <span class={`sync-summary-chevron ${expanded ? 'expanded' : ''}`}>{'\u25B6'}</span>
-    </button>
-  );
-}
-
-function SyncControls({
-  syncing,
-  autoSyncEnabled,
-  onSync,
-  onToggleAutoSync
-}: {
-  syncing: boolean;
+interface SyncTabProps {
+  syncState: SyncState;
   autoSyncEnabled: boolean;
   onSync: () => void;
   onToggleAutoSync: (enabled: boolean) => void;
-}) {
-  return (
-    <div class="sync-controls">
-      <button type="button" class="btn btn-secondary active" disabled={syncing} onClick={onSync}>
-        Sync Now
-      </button>
-      <label class="toggle-switch" title="Enable automatic hourly sync">
-        <input type="checkbox" checked={autoSyncEnabled} onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)} />
-        <span class="toggle-slider" />
-        <span class="toggle-label">Auto Sync</span>
-      </label>
-    </div>
-  );
 }
 
-// ============================================================================
-// MAIN COMPONENT
-// ============================================================================
-
-export function SyncSection({ syncState, autoSyncEnabled, statusMessage, onSync, onToggleAutoSync }: SyncSectionProps) {
-  const overall = computeOverallStatus(syncState.endpoints);
-  const [manualToggle, setManualToggle] = useState<boolean | null>(null);
-
-  // Auto-expand when syncing or errors; auto-collapse when all synced
-  const autoExpanded = overall.status === 'syncing' || overall.status === 'error' || overall.status === 'partial';
-  const expanded = manualToggle ?? autoExpanded;
-
-  // Reset manual toggle when auto-state changes (so auto-behavior takes over again)
-  const prevAuto = useRef(autoExpanded);
-  useEffect(() => {
-    if (prevAuto.current !== autoExpanded) {
-      prevAuto.current = autoExpanded;
-      setManualToggle(null);
-    }
-  }, [autoExpanded]);
-
+export function SyncTab({ syncState, autoSyncEnabled, onSync, onToggleAutoSync }: SyncTabProps) {
   return (
-    <>
-      <SyncSummary overall={overall} expanded={expanded} onToggle={() => setManualToggle(!expanded)} />
-
-      {expanded && <EndpointTable endpoints={syncState.endpoints} autoSyncEnabled={autoSyncEnabled} />}
-
-      <SyncControls syncing={syncState.syncing} autoSyncEnabled={autoSyncEnabled} onSync={onSync} onToggleAutoSync={onToggleAutoSync} />
-
-      {statusMessage && (
-        <div class={`sync-status-message ${statusMessage.type}`} style={{ display: 'block' }}>
-          {statusMessage.msg}
-        </div>
-      )}
-    </>
+    <div class="report-visual">
+      <h3>Sync Status</h3>
+      <EndpointTable endpoints={syncState.endpoints} autoSyncEnabled={autoSyncEnabled} />
+      <div class="sync-controls">
+        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing} onClick={onSync}>
+          Sync Now
+        </button>
+        <label class="toggle-switch" title="Enable automatic hourly sync">
+          <input type="checkbox" checked={autoSyncEnabled} onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)} />
+          <span class="toggle-slider" />
+          <span class="toggle-label">Auto Sync</span>
+        </label>
+      </div>
+    </div>
   );
 }

@@ -94,60 +94,38 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
   });
 
   return (
-    <div class="report-visual">
-      <h3>Troop Summary</h3>
+    <div class="report-visual dashboard-layout">
+      <div class="dashboard-section">
+        <h4 class="report-section-header">Sales by Channel</h4>
+        <StatCards
+          stats={[
+            {
+              label: 'Troop Package Sales',
+              value: troopSales,
+              description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
+              color: '#7B1FA2'
+            },
+            { label: 'Girl Package Sales', value: girlDelivery, description: `${dcDelivery} DC + ${inPerson} in person`, color: '#00838F' },
+            { label: 'Direct Ship', value: totalShipped, description: `${troopShipped} troop + ${girlShipped} girl`, color: '#37474F' },
+            {
+              label: 'Donations',
+              value: troopTotals.donations,
+              description: `${troopTotals.donations - girlDonations} troop + ${girlDonations} girl`,
+              color: '#E91E63'
+            },
+            { label: 'Total Sold', value: totalSold, description: 'All channels', color: '#2E7D32' }
+          ]}
+        />
+      </div>
 
-      <h4 class="report-section-header">Sales by Channel</h4>
-      <StatCards
-        stats={[
-          {
-            label: 'Troop Package Sales',
-            value: troopSales,
-            description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
-            color: '#7B1FA2'
-          },
-          { label: 'Girl Package Sales', value: girlDelivery, description: `${dcDelivery} DC + ${inPerson} in person`, color: '#00838F' },
-          { label: 'Direct Ship', value: totalShipped, description: `${troopShipped} troop + ${girlShipped} girl`, color: '#37474F' },
-          {
-            label: 'Donations',
-            value: troopTotals.donations,
-            description: `${troopTotals.donations - girlDonations} troop + ${girlDonations} girl`,
-            color: '#E91E63'
-          },
-          { label: 'Total Sold', value: totalSold, description: 'All channels', color: '#2E7D32' }
-        ]}
-      />
+      <div class="dashboard-section">
+        <h4 class="report-section-header">Inventory</h4>
+        <StatCards stats={inventoryStats} />
+      </div>
 
-      <h4 class="report-section-header">Inventory</h4>
-      <StatCards stats={inventoryStats} />
-
-      <h4 class="report-section-header">Finances</h4>
-      <StatCards stats={financialStats} />
-
-      <div class="info-box info-box-info">
-        <p class="meta-text">
-          <strong>Other Reports:</strong>
-        </p>
-        <ul class="info-box-list">
-          <li>
-            <strong>Scouts:</strong> Per-scout sales, inventory, credited booth/direct ship allocations, and cash owed
-          </li>
-          <li>
-            <strong>Donations:</strong> Cookie Share reconciliation between Digital Cookie and Smart Cookie
-          </li>
-          <li>
-            <strong>Booths:</strong> Booth reservations, distribution status, and per-scout booth sale allocations
-          </li>
-          <li>
-            <strong>Available Booths:</strong> Upcoming booth locations with available time slots
-          </li>
-          <li>
-            <strong>Inventory:</strong> Troop inventory by variety and all transfers
-          </li>
-          <li>
-            <strong>Cookies:</strong> Sales breakdown by cookie type with percentages
-          </li>
-        </ul>
+      <div class="dashboard-section">
+        <h4 class="report-section-header">Finances</h4>
+        <StatCards stats={financialStats} />
       </div>
     </div>
   );

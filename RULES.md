@@ -391,11 +391,11 @@ Site orders fulfilled from troop stock MUST reduce troop inventory:
 
 TCMs use three divider types to allocate troop orders to individual scouts:
 
-**1. Smart Virtual Booth Divider** — Allocates online troop site delivery sales. Creates T2G transfers with category `VIRTUAL_BOOTH_ALLOCATION`. Credits scouts without physical transfer.
+**1. Smart Virtual Booth Divider** — Allocates online troop site delivery sales (Girl Delivery site orders). Creates T2G transfers with category `VIRTUAL_BOOTH_ALLOCATION`. Credits scouts without physical transfer. **How to access:** In Smart Cookie, go to **Booth → My Reservations**, scroll right on the "Virtual Delivery" / "Online Booth Sales for delivery" row (TYPE: `VIRTUAL_DELIVERY`), and click the "..." menu.
 
-**2. Smart Direct Ship Divider** — Allocates troop direct ship orders. Stores separate allocation records. Credits scouts (supplier handles fulfillment).
+**2. Troop Direct Ship Orders Divider** — Allocates troop direct ship orders. Stores separate allocation records. Credits scouts (supplier handles fulfillment). **How to access:** In Smart Cookie, go to **Orders → Troop Direct Ship Orders**, scroll down, and click **"Distribute orders to girls"**.
 
-**3. Smart Booth Divider** — Allocates physical booth sales per-reservation. Creates T2G transfers with category `BOOTH_SALES_ALLOCATION` plus booth details. Credits scouts per-booth-session.
+**3. Smart Booth Divider** — Allocates physical booth sales per-reservation. Creates T2G transfers with category `BOOTH_SALES_ALLOCATION` plus booth details. Credits scouts per-booth-session. **How to access:** In Smart Cookie, go to **Booth → My Reservations**, find the specific booth reservation row, and click the "..." menu.
 
 ### Allocation Traceability
 
@@ -538,12 +538,12 @@ When a new cookie variety, order type, payment method, or transfer type appears:
 
 ## Reports
 
-The app provides seven reports (button labels in parentheses):
+The app provides seven reports (tab labels in parentheses):
 
-1. **Troop Summary** (Troop) — Total packages sold, revenue, troop proceeds, inventory, booth stats
-2. **Scout Summary** (Scouts) — Per-scout sales, inventory, credited allocations, cash owed, variety breakdowns
+1. **Troop Summary** (Summary) — Total packages sold by channel, inventory, troop proceeds — dashboard layout, no scrolling
+2. **Scout Summary** (Scouts) — Per-scout sales, inventory, credited allocations, cash owed, variety breakdowns. Shows "Unallocated Troop Orders" warning banner when site orders need allocation.
 3. **Cookie Share Reconciliation** (Donations) — DC vs SC Cookie Share comparison, adjustments needed per scout
 4. **Booth Reservations & Sales** (Booths) — Booth reservations, distribution status, per-scout allocations
-5. **Available Booths** (Available Booths) — Upcoming booth locations with available time slots
+5. **Booth Finder** (Find Booths) — Upcoming booth locations with available time slots
 6. **Inventory Report** (Inventory) — C2T pickups, T2G allocations, per-variety troop and scout inventory
-7. **Cookie Popularity Report** (Cookies) — Sales breakdown by cookie variety with percentages
+7. **Cookie Popularity** (Cookie Popularity) — Sales breakdown by cookie variety with percentages

@@ -227,7 +227,7 @@ scout.breakdown           // Ambiguous: breakdown of what?
 
 - **Regular fields:** `packages`, `varieties`, `amount`
 - **Computed fields:** `physicalPackages`, `physicalVarieties`, `category`
-- **Derived aggregates ($ prefix):** `$financials`, `$inventoryDisplay`, `$salesByVariety`, `$shippedByVariety`, `$allocationSummary`, `$orderStatusCounts`, `$issues`, `$hasUnallocatedSiteOrders`
+- **Derived aggregates ($ prefix):** `$financials`, `$inventoryDisplay`, `$salesByVariety`, `$allocationSummary`, `$allocationsByChannel`, `$orderStatusCounts`, `$issues`
 
 ---
 

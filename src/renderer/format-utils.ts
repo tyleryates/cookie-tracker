@@ -1,7 +1,7 @@
 // HTML Builder Utilities
 
 import { COOKIE_ORDER, getCookieDisplayName } from '../cookie-constants';
-import type { BoothTimeSlot, CookieType, Varieties } from '../types';
+import type { BoothReservationImported, BoothTimeSlot, CookieType, Varieties } from '../types';
 
 /** Sort varieties entries by preferred display order */
 function sortVarietiesByOrder(entries: [string, number][]): [string, number][] {
@@ -195,10 +195,24 @@ function formatBoothDate(dateStr: string): string {
   return dateStr;
 }
 
+/** Count past non-virtual booth reservations that haven't been distributed */
+function countBoothsNeedingDistribution(boothReservations: BoothReservationImported[]): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return boothReservations.filter((r) => {
+    const type = (r.booth.reservationType || '').toLowerCase();
+    if (type.includes('virtual')) return false;
+    if (r.booth.isDistributed) return false;
+    const d = r.timeslot.date ? new Date(r.timeslot.date) : null;
+    return !d || d < today;
+  }).length;
+}
+
 export {
   buildVarietyTooltip,
   sortVarietiesByOrder,
   getCompleteVarieties,
+  countBoothsNeedingDistribution,
   DateFormatter,
   formatDate,
   formatCurrency,

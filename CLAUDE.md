@@ -13,7 +13,7 @@ NEVER create git commits, push, build, or publish without explicit user request.
 - `make format` to auto-format (biome)
 - `make lint` to check formatting/lint without changes
 - `make typecheck` for TypeScript type checking
-- `make test` to run unit tests (vitest, 456 tests across 23 files)
+- `make test` to run unit tests (vitest)
 - `make knip` to find unused exports/files
 - When deleting or renaming a source file, manually remove the corresponding `.js` file from `dist/`
 
@@ -28,7 +28,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **7 reports** — Troop Summary, Scout Summary, Cookie Share Reconciliation, Booth Reservations, Available Booths, Inventory, Cookie Popularity
+- **7 reports** — Summary, Scouts, Booths, Donations, Inventory, Cookie Popularity, Find Booths (tool)
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
 ## How the Code Is Organized
@@ -37,7 +37,7 @@ Three layers with strict boundaries:
 
 **Main process** (`src/main.ts`, `src/data-pipeline.ts`) — IPC handlers, scraper orchestration, credentials, file system. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
 
-**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports are in `renderer/reports/`, components in `renderer/components/`.
+**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports are in `renderer/reports/`, components in `renderer/components/`, hooks in `renderer/hooks/`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
 
 **Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Sub-directories: `importers/` (parse raw files into DataStore), `calculators/` (compute UnifiedDataset from DataStore).
 
@@ -63,13 +63,16 @@ Three layers with strict boundaries:
 
 | Component | Purpose |
 |---|---|
-| `reports-section.tsx` | Report tab navigation, health banner, report rendering |
-| `sync-section.tsx` | Sync button, progress display, endpoint status |
+| `reports-section.tsx` | TabBar + ReportContent components, health banner, report rendering |
+| `sync-section.tsx` | Sync state utilities, SyncTab component (sync button, auto-sync toggle, endpoint status) |
 | `settings-page.tsx` | Credential setup, DC role selection, SC verification |
 | `booth-selector.tsx` | Multi-select UI for choosing booth locations to track |
 | `booth-day-filter.tsx` | Day/time filter configuration for Available Booths report |
-| `scout-detail.tsx` | Expandable scout detail panel (orders, allocations, inventory) |
+| `scout-detail.tsx` | Expandable scout detail panel (orders, inventory, allocations) |
 | `data-table.tsx` | Reusable sortable table component |
+| `stat-cards.tsx` | Reusable stat card grid component |
+| `expandable-row.tsx` | Expandable/collapsible table row component |
+| `tooltip-cell.tsx` | Tooltip component for table cells |
 
 ### Layer Rules
 

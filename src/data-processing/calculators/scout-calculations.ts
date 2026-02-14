@@ -5,7 +5,7 @@ import { ALLOCATION_CHANNEL, ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../con
 import { calculateRevenue, PHYSICAL_COOKIE_TYPES } from '../../cookie-constants';
 import { classifyOrderStatus } from '../../order-classification';
 import type { CookieType, Order, Scout, Varieties } from '../../types';
-import { accumulateVarieties, buildPhysicalVarieties } from '../utils';
+import { buildPhysicalVarieties } from '../utils';
 import { calculateSalesByVariety, channelTotals, needsInventory, totalCredited } from './helpers';
 
 /** Check single variety for negative inventory */
@@ -140,17 +140,6 @@ function calculateInventoryDisplay(scout: Scout, salesByVariety: Varieties): voi
   detectNegativeInventory(scout, salesByVariety);
 }
 
-/** Pre-compute shipped-by-variety from direct ship orders */
-function computeShippedByVariety(scout: Scout): Varieties {
-  const shipped: Varieties = {};
-  for (const order of scout.orders) {
-    if (order.owner === OWNER.GIRL && order.orderType === ORDER_TYPE.DIRECT_SHIP) {
-      accumulateVarieties(order.varieties, shipped, { excludeCookieShare: true });
-    }
-  }
-  return shipped;
-}
-
 /** Count order statuses for a scout */
 function countOrderStatuses(scout: Scout): { needsApproval: number; pending: number; completed: number } {
   let needsApproval = 0;
@@ -183,7 +172,6 @@ function calculateVarietyTotals(scout: Scout): void {
   const salesByVariety = calculateSalesByVariety(scout);
   scout.totals.$salesByVariety = salesByVariety;
   calculateInventoryDisplay(scout, salesByVariety);
-  scout.totals.$shippedByVariety = computeShippedByVariety(scout);
   scout.$allocationsByChannel = {
     booth: scout.allocations.filter((a) => a.channel === ALLOCATION_CHANNEL.BOOTH),
     directShip: scout.allocations.filter((a) => a.channel === ALLOCATION_CHANNEL.DIRECT_SHIP),

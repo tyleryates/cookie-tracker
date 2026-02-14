@@ -37,64 +37,32 @@ function InventoryCell({
   actualNet: number;
 }) {
   if (negativeVarieties && negativeVarieties.length > 0) {
-    const varietyList = negativeVarieties.map((v) => `${getCookieDisplayName(v.variety)}: -${v.shortfall}`).join('\n');
-    const display = netInventory > 0 ? `+${netInventory}` : actualNet;
+    const varietyList = negativeVarieties.map((v) => `${getCookieDisplayName(v.variety)}: - ${v.shortfall}`).join('\n');
+    const display = netInventory > 0 ? `+ ${netInventory}` : `- ${Math.abs(actualNet)}`;
     return (
       <TooltipCell tooltip={varietyList} tag="span" className="tooltip-cell status-error">
         {display} ⚠️
       </TooltipCell>
     );
   }
-  if (netInventory < 0) return <span class="warning-text">{netInventory}</span>;
-  if (netInventory > 0) return <span class="success-text">+{netInventory}</span>;
+  if (netInventory < 0) return <span class="status-error">- {Math.abs(netInventory)}</span>;
+  if (netInventory > 0) return <span class="pkg-in">+ {netInventory}</span>;
   return <span>—</span>;
 }
 
-function CreditedCell({ isSiteRow, scout, siteOrders }: { isSiteRow: boolean; scout: Scout; siteOrders: SiteOrdersDataset }) {
+function CreditedCell({ scout }: { scout: Scout }) {
   const total = scout.totals.credited;
   if (total === 0) return <>{'—'}</>;
 
   const { virtualBooth: vb, directShip: ds, booth: bs } = scout.totals.$allocationSummary;
 
   const sources: string[] = [];
-  // Virtual booth
-  if (vb.packages + vb.donations > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vb.packages + vb.donations}`);
-    scout.$allocationsByChannel.virtualBooth.forEach((a) => {
-      const order = a.orderNumber ? `#${a.orderNumber}` : 'Unknown';
-      const date = a.date ? ` (${a.date})` : '';
-      sources.push(`  ${order}${date}: ${a.packages} pkg`);
-    });
-  }
-  // Direct ship
-  if (ds.packages + ds.donations > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${ds.packages + ds.donations}`);
-    const n = scout.$allocationsByChannel.directShip.length;
-    if (n > 0) sources.push(`  (${n} allocation${n === 1 ? '' : 's'} from SC divider)`);
-  }
-  // Booth sales
-  if (bs.packages + bs.donations > 0) {
-    sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bs.packages + bs.donations}`);
-    scout.$allocationsByChannel.booth.forEach((a) => {
-      const store = a.storeName || 'Booth';
-      const date = a.date ? ` (${a.date})` : '';
-      const parts = [`${a.packages} pkg`];
-      if (a.donations > 0) parts.push(`${a.donations} Donations`);
-      sources.push(`  ${store}${date}: ${parts.join(', ')}`);
-    });
-  }
-
-  if (isSiteRow && siteOrders) {
-    const hasSiteOrders =
-      (siteOrders.directShip?.orders?.length || 0) > 0 ||
-      (siteOrders.girlDelivery?.orders?.length || 0) > 0 ||
-      (siteOrders.boothSale?.orders?.length || 0) > 0;
-    if (hasSiteOrders) {
-      sources.push(
-        `\nNote: Troop booth sales and direct ship orders are allocated to scouts in Smart Cookie. See site orders in scout details.`
-      );
-    }
-  }
+  if (vb.packages > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vb.packages} pkg`);
+  if (vb.donations > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vb.donations} donations`);
+  if (ds.packages > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${ds.packages} pkg`);
+  if (ds.donations > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${ds.donations} donations`);
+  if (bs.packages > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bs.packages} pkg`);
+  if (bs.donations > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bs.donations} donations`);
 
   return (
     <TooltipCell tooltip={sources.join('\n')} tag="span">
@@ -103,36 +71,7 @@ function CreditedCell({ isSiteRow, scout, siteOrders }: { isSiteRow: boolean; sc
   );
 }
 
-function DeliveredCell({
-  sales,
-  isSiteRow,
-  scout,
-  siteOrders
-}: {
-  sales: number;
-  isSiteRow: boolean;
-  scout: Scout;
-  siteOrders: SiteOrdersDataset;
-}) {
-  if (!isSiteRow || !scout.$hasUnallocatedSiteOrders || !siteOrders) return <>{sales}</>;
-
-  const dsUnalloc = siteOrders.directShip.unallocated || 0;
-  const gdUnalloc = siteOrders.girlDelivery.unallocated || 0;
-  const bsUnalloc = siteOrders.boothSale.unallocated || 0;
-  const parts: string[] = [];
-  if (bsUnalloc > 0) parts.push(`Booth Sales: ${bsUnalloc}`);
-  if (gdUnalloc > 0) parts.push(`Troop Girl Delivered: ${gdUnalloc}`);
-  if (dsUnalloc > 0) parts.push(`Troop Direct Ship: ${dsUnalloc}`);
-  parts.push('\nAllocate in Smart Cookie');
-  return (
-    <TooltipCell tooltip={parts.join('\n')} tag="span" className="tooltip-cell status-warning">
-      {sales} ⚠️
-    </TooltipCell>
-  );
-}
-
-function ProceedsCell({ isSiteRow, totals, proceedsRate }: { isSiteRow: boolean; totals: Scout['totals']; proceedsRate: number }) {
-  if (isSiteRow) return <>-</>;
+function ProceedsCell({ totals, proceedsRate }: { totals: Scout['totals']; proceedsRate: number }) {
   const totalSold = totals.totalSold || 0;
   const exemptPackages = totalSold > 0 ? Math.min(totalSold, PROCEEDS_EXEMPT_PACKAGES) : 0;
   const deduction = exemptPackages * proceedsRate;
@@ -151,8 +90,7 @@ function ProceedsCell({ isSiteRow, totals, proceedsRate }: { isSiteRow: boolean;
   return <span class={className}>{proceedsRounded > 0 ? `$${proceedsRounded}` : '$0'}</span>;
 }
 
-function CashOwedCell({ isSiteRow, totals }: { isSiteRow: boolean; totals: Scout['totals'] }) {
-  if (isSiteRow) return <>-</>;
+function CashOwedCell({ totals }: { totals: Scout['totals'] }) {
   const financials = totals.$financials;
   const cashOwed = Math.round(financials?.cashOwed || 0);
   const className = cashOwed > 0 ? 'status-error-dark' : 'success-text';
@@ -168,6 +106,50 @@ function CashOwedCell({ isSiteRow, totals }: { isSiteRow: boolean; totals: Scout
     <TooltipCell tooltip={tooltipParts.join('\n')} tag="span" className={`tooltip-cell ${className}`}>
       {cashOwed > 0 ? `$${cashOwed}` : '$0'}
     </TooltipCell>
+  );
+}
+
+// ============================================================================
+// Troop site order warning banner
+// ============================================================================
+
+function SiteOrderWarning({ siteOrders }: { siteOrders: SiteOrdersDataset }) {
+  const { directShip, girlDelivery, boothSale } = siteOrders;
+  const hasUnallocated = directShip.hasWarning || girlDelivery.hasWarning || boothSale.hasWarning;
+  if (!hasUnallocated) return null;
+
+  return (
+    <div
+      style={{
+        padding: '12px 16px',
+        borderRadius: '8px',
+        background: '#FFF8E1',
+        borderLeft: '4px solid #F57F17',
+        marginBottom: '16px'
+      }}
+    >
+      <strong style={{ color: '#E65100' }}>Unallocated Troop Orders</strong>
+      <ul style={{ margin: '8px 0 0', paddingLeft: '20px', listStyle: 'none' }}>
+        {girlDelivery.hasWarning && (
+          <li>
+            <strong>Girl Delivery:</strong> {girlDelivery.unallocated} of {girlDelivery.total} packages — use{' '}
+            <strong>Virtual Booth Divider</strong> (Booth &rarr; My Reservations &rarr; "Virtual Delivery" row &rarr; "...")
+          </li>
+        )}
+        {directShip.hasWarning && (
+          <li>
+            <strong>Direct Ship:</strong> {directShip.unallocated} of {directShip.total} packages — use{' '}
+            <strong>Troop Direct Ship Orders Divider</strong> (Orders &rarr; Troop Direct Ship Orders &rarr; "Distribute orders to girls")
+          </li>
+        )}
+        {boothSale.hasWarning && (
+          <li>
+            <strong>Booth Sale:</strong> {boothSale.unallocated} of {boothSale.total} packages — use <strong>Booth Divider</strong> (Booth
+            &rarr; My Reservations &rarr; booth row &rarr; "...")
+          </li>
+        )}
+      </ul>
+    </div>
   );
 }
 
@@ -189,7 +171,7 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
   const proceedsRate = data.troopTotals.proceedsRate;
 
   const sortedScouts = Object.entries(scouts)
-    .filter(([_name, scout]) => (scout.isSiteOrder ? scout.$hasUnallocatedSiteOrders : (scout.totals.totalSold || 0) > 0))
+    .filter(([_name, scout]) => !scout.isSiteOrder && (scout.totals.totalSold || 0) > 0)
     .sort((a, b) => a[0].localeCompare(b[0]));
 
   const COLUMN_COUNT = 10;
@@ -197,18 +179,19 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
   return (
     <div class="report-visual">
       <h3>Scout Summary</h3>
+      <SiteOrderWarning siteOrders={siteOrders} />
       <p class="table-hint">
-        Click on any scout to see detailed breakdown. <strong>Delivered</strong> = packages for in-person delivery.{' '}
-        <strong>Inventory</strong> = net on hand. <strong>Credited</strong> = troop booth sales + direct ship allocated to scout.{' '}
-        <strong>Shipped</strong> = scout's own direct ship orders. <strong>Proceeds</strong> = ${proceedsRate.toFixed(2)}/pkg after first 50
-        exempt. <strong>Cash Due</strong> = pickup value minus electronic DC payments.
+        Click on any scout to see detailed breakdown. <strong>Inventory</strong> = net packages on hand (picked up minus sold).{' '}
+        <strong>Delivered</strong> = in-person delivery orders. <strong>Shipped</strong> = direct ship orders. <strong>Credited</strong> =
+        troop booth sales + direct ship allocated to scout via SC dividers. <strong>Total</strong> = delivered + shipped + donations +
+        credited. <strong>Proceeds</strong> = ${proceedsRate.toFixed(2)}/pkg after first {PROCEEDS_EXEMPT_PACKAGES} exempt.{' '}
+        <strong>Cash Due</strong> = pickup value minus electronic payments.
       </p>
       <DataTable
-        columns={['Scout', 'Orders', 'Inventory', 'Delivered', 'Shipped', 'Donations', 'Credited', 'Total Sold', 'Proceeds', 'Cash Due']}
+        columns={['Scout', 'Orders', 'Inventory', 'Delivered', 'Shipped', 'Donations', 'Credited', 'Total', 'Proceeds', 'Cash Due']}
         className="table-normal scout-table"
       >
         {sortedScouts.map(([name, scout]) => {
-          const isSiteRow = name.endsWith(' Site');
           const { totals } = scout;
           const sales = totals.delivered || 0;
           const totalCreditedCount = totals.credited;
@@ -241,15 +224,15 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
                   negativeVarieties={scout.$issues?.negativeInventory}
                   actualNet={totals.inventory || 0}
                 />,
-                <DeliveredCell sales={sales} isSiteRow={isSiteRow} scout={scout} siteOrders={siteOrders} />,
+                sales,
                 totals.shipped || 0,
                 totals.donations || 0,
-                <CreditedCell isSiteRow={isSiteRow} scout={scout} siteOrders={siteOrders} />,
+                <CreditedCell scout={scout} />,
                 <TooltipCell tooltip={soldTooltip} tag="span">
                   {totalSold}
                 </TooltipCell>,
-                <ProceedsCell isSiteRow={isSiteRow} totals={totals} proceedsRate={proceedsRate} />,
-                <CashOwedCell isSiteRow={isSiteRow} totals={totals} />
+                <ProceedsCell totals={totals} proceedsRate={proceedsRate} />,
+                <CashOwedCell totals={totals} />
               ]}
               detail={<ScoutDetailBreakdown scout={scout} />}
               colSpan={COLUMN_COUNT}

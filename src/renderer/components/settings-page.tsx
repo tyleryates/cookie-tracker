@@ -1,6 +1,7 @@
 // SettingsPage — Full page for credential management with verification
 
 import { useEffect, useState } from 'preact/hooks';
+import * as packageJson from '../../../package.json';
 import Logger from '../../logger';
 import type { DCRole } from '../../seasonal-data';
 import type { AppConfig, CredentialPatch } from '../../types';
@@ -190,18 +191,9 @@ export function SettingsPage({ mode, appConfig, onBack, onRecalculate, onExport,
     ]);
   };
 
-  const bothVerified = !!scVerified && dcConfirmed;
-
   return (
     <div class="settings-page">
-      <div class="section-header-row">
-        <h2>{mode === 'welcome' ? 'Welcome' : 'Settings'}</h2>
-        {mode === 'settings' && (
-          <button type="button" class="btn btn-secondary" disabled={!bothVerified} onClick={onBack}>
-            Back
-          </button>
-        )}
-      </div>
+      <h2>{mode === 'welcome' ? 'Welcome' : 'Settings'}</h2>
       {mode === 'welcome' && (
         <p class="settings-welcome-message">
           One-time setup — enter your Smart Cookie and Digital Cookie logins below. Credentials are encrypted on disk using your OS
@@ -348,7 +340,7 @@ export function SettingsPage({ mode, appConfig, onBack, onRecalculate, onExport,
               checked={appConfig?.availableBoothsEnabled ?? false}
               onChange={(e) => onUpdateConfig({ availableBoothsEnabled: (e.target as HTMLInputElement).checked })}
             />
-            Available Booths monitoring
+            Booth Finder monitoring
           </label>
         </div>
       )}
@@ -368,6 +360,7 @@ export function SettingsPage({ mode, appConfig, onBack, onRecalculate, onExport,
           </div>
         </div>
       )}
+      <div style={{ marginTop: '32px', color: 'var(--gray-400)', fontSize: '0.75em' }}>v{packageJson.version}</div>
     </div>
   );
 }

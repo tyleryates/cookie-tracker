@@ -193,6 +193,39 @@
   margin-top: 5px;
 }
 
+/* Dashboard layout — fills viewport, no scroll */
+.app-content:has(.dashboard-layout) {
+  overflow-y: hidden;
+}
+
+.app-content:has(.dashboard-layout) .report-container {
+  height: 100%;
+}
+
+.dashboard-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.dashboard-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dashboard-layout .stat-cards {
+  flex: 1;
+  margin: 4px 0;
+  align-content: center;
+}
+
+.dashboard-layout .report-section-header {
+  margin: 8px 0 0 0;
+  flex-shrink: 0;
+}
+
 /* Fixed-position tooltips (appended to document.body, immune to overflow:hidden) */
 .tooltip-fixed {
   position: fixed;
@@ -234,11 +267,6 @@
   margin-top: 10px;
 }
 
-.info-box-info {
-  background: var(--info-light);
-  border-left-color: var(--status-info);
-}
-
 .info-box-success {
   background: var(--success-light);
   border-left-color: var(--status-success-dark);
@@ -262,12 +290,6 @@
   border-left-color: transparent;
 }
 
-.info-box-list {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 0.9em;
-}
-
 /* Utility Classes */
 .success-text {
   color: var(--success);
@@ -280,17 +302,6 @@
 .muted-text {
   color: var(--gray-400);
   font-style: italic;
-}
-
-.section-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.section-header-row h2 {
-  margin: 0;
 }
 
 .meta-text {
@@ -331,10 +342,6 @@
   color: var(--status-error-dark);
   font-weight: 600;
 }
-.status-warning-dark {
-  color: var(--status-warning-dark);
-}
-
 .section-break {
   margin-top: 24px;
 }

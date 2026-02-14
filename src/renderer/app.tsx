@@ -1,12 +1,12 @@
 // App — Root Preact component. Owns all state, delegates logic to hooks.
 
 import { useCallback, useReducer, useRef } from 'preact/hooks';
-import * as packageJson from '../../package.json';
 import type { DayFilter } from '../types';
 import { type AppState, appReducer } from './app-reducer';
-import { ReportsSection } from './components/reports-section';
+import { ReportContent, TabBar } from './components/reports-section';
 import { SettingsPage } from './components/settings-page';
-import { createInitialSyncState, SyncSection } from './components/sync-section';
+import { computeOverallStatus, createInitialSyncState, SyncTab } from './components/sync-section';
+import { DateFormatter } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
 
@@ -20,6 +20,69 @@ const initialState: AppState = {
   syncState: createInitialSyncState()
 };
 
+// ============================================================================
+// APP HEADER
+// ============================================================================
+
+function AppHeader({
+  syncing,
+  overallStatus,
+  onSync,
+  onOpenSettings,
+  showBackButton,
+  onBack,
+  isWelcome
+}: {
+  syncing: boolean;
+  overallStatus: ReturnType<typeof computeOverallStatus>;
+  onSync: () => void;
+  onOpenSettings: () => void;
+  showBackButton: boolean;
+  onBack: () => void;
+  isWelcome: boolean;
+}) {
+  let syncStatusText = '';
+  if (!isWelcome && !showBackButton) {
+    if (overallStatus.status === 'syncing') {
+      syncStatusText = `Syncing\u2026 (${overallStatus.syncedCount}/${overallStatus.total})`;
+    } else if (overallStatus.lastSync) {
+      syncStatusText = DateFormatter.toFriendly(overallStatus.lastSync);
+    }
+  }
+
+  return (
+    <div class="app-header">
+      {showBackButton && (
+        <div class="app-header-actions" style={{ marginRight: '12px' }}>
+          <button type="button" class="icon-btn" onClick={onBack} title="Back">
+            {'\u2190'}
+          </button>
+        </div>
+      )}
+      <span class="app-header-title">{'\uD83C\uDF6A'} Cookie Tracker</span>
+      {!isWelcome && (
+        <div class="app-header-actions">
+          {syncStatusText && <span class="app-header-sync-status">{syncStatusText}</span>}
+          {!showBackButton && (
+            <button type="button" class="icon-btn" disabled={syncing} onClick={onSync} title="Sync now">
+              {syncing ? <span class="spinner" /> : '\u21BB'}
+            </button>
+          )}
+          {!showBackButton && (
+            <button type="button" class="icon-btn" onClick={onOpenSettings} title="Settings">
+              {'\u2699'}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// APP
+// ============================================================================
+
 export function App() {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
@@ -32,7 +95,9 @@ export function App() {
   const { sync, refreshBooths } = useSync(dispatch, showStatus, loadData, state.appConfig, state.syncState, state.autoSyncEnabled);
   useAppInit(dispatch, loadData);
 
-  // Remaining inline callbacks (too small to extract)
+  // Booth reset key — bumped when user re-clicks "Available Booths" tab
+  const boothResetKeyRef = useRef(0);
+
   const handleToggleAutoSync = useCallback(
     (enabled: boolean) => {
       dispatch({ type: 'TOGGLE_AUTO_SYNC', enabled });
@@ -43,6 +108,9 @@ export function App() {
   );
 
   const handleSelectReport = useCallback((type: string) => {
+    if (type === 'available-booths' && stateRef.current.activeReport === 'available-booths') {
+      boothResetKeyRef.current += 1;
+    }
     dispatch({ type: 'SET_ACTIVE_REPORT', report: type });
   }, []);
 
@@ -102,75 +170,63 @@ export function App() {
     dispatch({ type: 'LOAD_CONFIG', config: updatedConfig });
   }, []);
 
-  if (state.activePage === 'settings' || state.activePage === 'welcome') {
-    return (
-      <div class="container">
-        <header>
-          <h1>{'\uD83C\uDF6A Girl Scout Cookie Tracker'}</h1>
-          <p>Smart Cookie + Digital Cookie</p>
-        </header>
-        <main>
-          <section class="import-section">
-            <SettingsPage
-              mode={state.activePage === 'welcome' ? 'welcome' : 'settings'}
-              appConfig={state.appConfig}
-              onBack={handleCloseSettings}
-              onRecalculate={recalculate}
-              onExport={exportData}
-              onWipeData={handleWipeData}
-              onUpdateConfig={handleUpdateConfig}
-              hasData={!!state.unified}
-            />
-          </section>
-        </main>
-        <footer class="app-footer">
-          <span>v{packageJson.version}</span>
-        </footer>
-      </div>
-    );
-  }
+  const overall = computeOverallStatus(state.syncState.endpoints);
+  const isSettings = state.activePage === 'settings';
+  const isWelcome = state.activePage === 'welcome';
 
   return (
-    <div class="container">
-      <header>
-        <h1>{'\uD83C\uDF6A Girl Scout Cookie Tracker'}</h1>
-        <p>Smart Cookie + Digital Cookie</p>
-      </header>
-
-      <main>
-        <section class="import-section">
-          <div class="section-header-row">
-            <h2>Data Sync & Status</h2>
-            <button type="button" class="btn btn-secondary" onClick={() => dispatch({ type: 'OPEN_SETTINGS' })}>
-              Settings
-            </button>
-          </div>
-          <SyncSection
+    <div class="app-shell">
+      <AppHeader
+        syncing={state.syncState.syncing}
+        overallStatus={overall}
+        onSync={sync}
+        onOpenSettings={() => dispatch({ type: 'OPEN_SETTINGS' })}
+        showBackButton={isSettings}
+        onBack={handleCloseSettings}
+        isWelcome={isWelcome}
+      />
+      {!isSettings && !isWelcome && (
+        <TabBar activeReport={state.activeReport} unified={state.unified} appConfig={state.appConfig} onSelectReport={handleSelectReport} />
+      )}
+      <div class="app-content">
+        {isSettings || isWelcome ? (
+          <SettingsPage
+            mode={isWelcome ? 'welcome' : 'settings'}
+            appConfig={state.appConfig}
+            onBack={handleCloseSettings}
+            onRecalculate={recalculate}
+            onExport={exportData}
+            onWipeData={handleWipeData}
+            onUpdateConfig={handleUpdateConfig}
+            hasData={!!state.unified}
+          />
+        ) : state.activeReport === 'sync' ? (
+          <SyncTab
             syncState={state.syncState}
             autoSyncEnabled={state.autoSyncEnabled}
-            statusMessage={state.statusMessage}
             onSync={sync}
             onToggleAutoSync={handleToggleAutoSync}
           />
-        </section>
-
-        <ReportsSection
-          activeReport={state.activeReport}
-          unified={state.unified}
-          appConfig={state.appConfig}
-          boothSyncing={state.syncState.endpoints['sc-booth-availability']?.status === 'syncing'}
-          onSelectReport={handleSelectReport}
-          onIgnoreSlot={handleIgnoreSlot}
-          onResetIgnored={handleResetIgnored}
-          onRefreshBooths={refreshBooths}
-          onSaveBoothIds={handleSaveBoothIds}
-          onSaveDayFilters={handleSaveDayFilters}
-        />
-      </main>
-
-      <footer class="app-footer">
-        <span>v{packageJson.version}</span>
-      </footer>
+        ) : (
+          <ReportContent
+            activeReport={state.activeReport}
+            unified={state.unified}
+            appConfig={state.appConfig}
+            boothSyncing={state.syncState.endpoints['sc-booth-availability']?.status === 'syncing'}
+            boothResetKey={boothResetKeyRef.current}
+            onIgnoreSlot={handleIgnoreSlot}
+            onResetIgnored={handleResetIgnored}
+            onRefreshBooths={refreshBooths}
+            onSaveBoothIds={handleSaveBoothIds}
+            onSaveDayFilters={handleSaveDayFilters}
+          />
+        )}
+      </div>
+      {state.statusMessage && (
+        <div class="toast-container">
+          <div class={`toast ${state.statusMessage.type}`}>{state.statusMessage.msg}</div>
+        </div>
+      )}
     </div>
   );
 }

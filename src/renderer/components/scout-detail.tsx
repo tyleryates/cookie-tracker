@@ -2,10 +2,10 @@
 
 import type preact from 'preact';
 import { ALLOCATION_METHOD, DC_ORDER_STATUS, DISPLAY_STRINGS, ORDER_TYPE } from '../../constants';
-import { COOKIE_TYPE, getCookieDisplayName } from '../../cookie-constants';
+import { COOKIE_TYPE, getCookieColor, getCookieDisplayName } from '../../cookie-constants';
 import { classifyOrderStatus } from '../../order-classification';
 import type { Order, Scout, Varieties } from '../../types';
-import { buildVarietyTooltip, formatDate, formatTimeRange, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
+import { buildVarietyTooltip, formatDate, formatTimeRange, sortVarietiesByOrder } from '../format-utils';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
 
@@ -27,91 +27,54 @@ function getStatusStyle(status: string | undefined): { className: string; text: 
   }
 }
 
-function calculateVarietyBreakdowns(scout: Scout) {
-  const salesVarieties = scout.totals.$salesByVariety || {};
-  const shippedVarieties = scout.totals.$shippedByVariety || {};
-  let totalDonations = 0;
-  scout.orders.forEach((order: Order) => {
-    if (order.donations > 0) totalDonations += order.donations;
-  });
-  return { salesVarieties, shippedVarieties, totalDonations };
-}
-
-function formatNetInventory(net: number, isCookieShare: boolean) {
-  if (isCookieShare) return { html: <span class="muted-text">N/A</span>, className: '' };
-  if (net < 0) return { html: <span class="status-error">{net} ⚠️</span>, className: '' };
-  if (net > 0) return { html: <>+{net}</>, className: 'success-text' };
-  return { html: <>{'—'}</>, className: '' };
-}
-
-function formatCreditedVariety(variety: string, scout: Scout) {
-  const { virtualBooth: vb, directShip: ds, booth: bs } = scout.totals.$allocationSummary;
-  const vbCount = vb.varieties[variety as keyof Varieties] || 0;
-  const dsCount = ds.varieties[variety as keyof Varieties] || 0;
-  const bsCount = bs.varieties[variety as keyof Varieties] || 0;
-  const total = vbCount + dsCount + bsCount;
-  if (total === 0) return <>{'—'}</>;
-
-  const sources: string[] = [];
-  if (vbCount > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${vbCount}`);
-  if (dsCount > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}: ${dsCount}`);
-  if (bsCount > 0) sources.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${bsCount}`);
-  return sources.length > 0 ? (
-    <TooltipCell tooltip={sources.join('\n')} tag="span">
-      {total}
-    </TooltipCell>
-  ) : (
-    total
-  );
+function formatOnHand(net: number): preact.JSX.Element {
+  if (net < 0) return <span class="status-error">- {Math.abs(net)} ⚠️</span>;
+  if (net > 0) return <span class="pkg-in">+ {net}</span>;
+  return <span class="muted-text">0</span>;
 }
 
 // ============================================================================
 // Components
 // ============================================================================
 
-function CookieBreakdownTable({ scout }: { scout: Scout }) {
+function InventoryChips({ scout }: { scout: Scout }) {
   const { inventory } = scout;
-  const { salesVarieties, shippedVarieties, totalDonations } = calculateVarietyBreakdowns(scout);
+  const salesVarieties = scout.totals.$salesByVariety || {};
 
-  const { virtualBooth: vb, directShip: ds, booth: bs } = scout.totals.$allocationSummary;
+  const varietyEntries = sortVarietiesByOrder(
+    Object.entries(inventory.varieties).filter(([variety, count]) => {
+      if (variety === COOKIE_TYPE.COOKIE_SHARE) return false;
+      const sold = salesVarieties[variety as keyof Varieties] || 0;
+      return count > 0 || sold > 0;
+    })
+  );
 
-  const salesWithDonations = { ...salesVarieties };
-  const allCreditedDonations = vb.donations + ds.donations + bs.donations;
-  if (totalDonations > 0 || allCreditedDonations > 0) {
-    salesWithDonations[COOKIE_TYPE.COOKIE_SHARE] = totalDonations + allCreditedDonations;
-  }
-
-  const allVarieties = getCompleteVarieties({
-    ...salesWithDonations,
-    ...shippedVarieties,
-    ...inventory.varieties,
-    ...vb.varieties,
-    ...ds.varieties,
-    ...bs.varieties
-  });
+  if (varietyEntries.length === 0) return null;
 
   return (
     <>
-      <h5>
-        Cookie Breakdown <span class="note-text">(Direct sales only — does not include booth sales)</span>
-      </h5>
-      <DataTable columns={['Variety', 'Inventory', 'Delivered', 'Shipped', 'Credited']} className="table-compact">
-        {sortVarietiesByOrder(Object.entries(allVarieties)).map(([variety]) => {
+      <h5>Inventory on Hand</h5>
+      <DataTable columns={['Variety', 'Picked Up', 'Sold', 'On Hand']} className="table-compact inventory-table">
+        {varietyEntries.map(([variety]) => {
           const pickedUp = inventory.varieties[variety as keyof Varieties] || 0;
           const sold = salesVarieties[variety as keyof Varieties] || 0;
-          const shipped = shippedVarieties[variety as keyof Varieties] || 0;
-          const isCookieShare = variety === COOKIE_TYPE.COOKIE_SHARE;
-          const { html: netHtml, className: netClass } = formatNetInventory(pickedUp - sold, isCookieShare);
+          const onHand = pickedUp - sold;
+          const color = getCookieColor(variety);
 
           return (
             <tr key={variety}>
               <td>
-                <strong>{getCookieDisplayName(variety)}</strong>
+                {color && (
+                  <span
+                    class="inventory-chip-dot"
+                    style={{ background: color, display: 'inline-block', verticalAlign: 'middle', marginRight: '6px' }}
+                  />
+                )}
+                {getCookieDisplayName(variety)}
               </td>
-              <td class={netClass}>{netHtml}</td>
+              <td>{pickedUp}</td>
               <td>{sold}</td>
-              <td>{shipped > 0 ? shipped : '—'}</td>
-              <td>{formatCreditedVariety(variety, scout)}</td>
+              <td>{formatOnHand(onHand)}</td>
             </tr>
           );
         })}
@@ -128,7 +91,6 @@ function PackagesCell({ varieties, packages }: { varieties: Varieties; packages:
 }
 
 function AllocationDetails({ scout }: { scout: Scout }) {
-  const { virtualBooth: vbTotals, directShip: dsTotals, booth: bsTotals } = scout.totals.$allocationSummary;
   const vbAllocs = scout.$allocationsByChannel.virtualBooth;
   const dsAllocs = scout.$allocationsByChannel.directShip;
   const bsAllocs = scout.$allocationsByChannel.booth;
@@ -187,10 +149,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
 
   return (
     <div class="section-break">
-      <h5>
-        Credit Details —{' '}
-        {vbTotals.packages + dsTotals.packages + bsTotals.packages + vbTotals.donations + dsTotals.donations + bsTotals.donations} Credits
-      </h5>
+      <h5>Credit Details</h5>
       <div class="section-break-sm">
         <DataTable columns={['Date', 'Type', 'Detail', 'Packages', 'Donations']} className="table-compact">
           {rows}
@@ -200,12 +159,33 @@ function AllocationDetails({ scout }: { scout: Scout }) {
   );
 }
 
+function buildOrderTooltip(order: Order): string {
+  const dc = order.metadata.dc as Record<string, string> | null;
+  if (!dc) return '';
+  const lines: string[] = [];
+
+  const shipFirst = dc['Shipping First Name'] || '';
+  const shipLast = dc['Shipping Last Name'] || '';
+  const shipName = `${shipFirst} ${shipLast}`.trim();
+  if (shipName) lines.push(shipName);
+
+  // Fall back to billing name if no shipping name (e.g. donations)
+  if (!shipName) {
+    const billFirst = dc['Billing First Name'] || '';
+    const billLast = dc['Billing Last Name'] || '';
+    const billName = `${billFirst} ${billLast}`.trim();
+    if (billName) lines.push(billName);
+  }
+
+  return lines.join('\n');
+}
+
 const PAYMENT_LABELS: Record<string, string> = { CREDIT_CARD: 'Credit Card', VENMO: 'Venmo', CASH: 'Cash' };
 
 function OrdersTable({ scout }: { scout: Scout }) {
   return (
     <div class="section-break">
-      <h5>Order Details — {scout.orders.length} Orders</h5>
+      <h5>Order Details</h5>
       <div class="section-break-sm">
         <DataTable columns={['Date', 'Order #', 'Packages', 'Amount', 'Type', 'Payment', 'Status']} className="table-compact">
           {scout.orders.map((order: Order) => {
@@ -233,7 +213,11 @@ function OrdersTable({ scout }: { scout: Scout }) {
                   </td>
                 )}
                 <td>${Math.round(order.amount)}</td>
-                <td>{String(order.dcOrderType || '-')}</td>
+                {(() => {
+                  const orderTip = buildOrderTooltip(order);
+                  const typeText = String(order.dcOrderType || '-');
+                  return orderTip ? <TooltipCell tooltip={orderTip}>{typeText}</TooltipCell> : <td>{typeText}</td>;
+                })()}
                 <td>{paymentDisplay}</td>
                 <td class={statusClass}>{String(statusText)}</td>
               </tr>
@@ -248,7 +232,7 @@ function OrdersTable({ scout }: { scout: Scout }) {
 export function ScoutDetailBreakdown({ scout }: { scout: Scout }) {
   return (
     <div class="scout-breakdown">
-      {!scout.isSiteOrder && <CookieBreakdownTable scout={scout} />}
+      {!scout.isSiteOrder && <InventoryChips scout={scout} />}
       <OrdersTable scout={scout} />
     </div>
   );

@@ -200,7 +200,7 @@ export function AvailableBoothsReport({
 
   return (
     <div class="report-visual">
-      <h3>Available Booths</h3>
+      <h3>Booth Finder</h3>
       <div class="available-booths-config">
         <div class="config-section">
           <div class="config-section-header">
@@ -252,7 +252,7 @@ export function AvailableBoothsReport({
         {isFullyConfigured && (
           <div class="config-section config-section-action">
             <button type="button" class="btn btn-primary btn-sm" disabled={refreshing} onClick={onRefresh}>
-              {refreshing ? 'Refreshing...' : 'Refresh'}
+              {refreshing ? 'Finding...' : 'Find Booths'}
             </button>
           </div>
         )}

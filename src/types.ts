@@ -182,7 +182,6 @@ export interface ScoutTotals {
   };
   $inventoryDisplay: Varieties;
   $salesByVariety: Varieties;
-  $shippedByVariety: Varieties;
   $allocationSummary: AllocationSummary;
   $orderStatusCounts: { needsApproval: number; pending: number; completed: number };
 }
@@ -209,7 +208,6 @@ export interface Scout {
     virtualBooth: Allocation[];
   };
   orders: Order[];
-  $hasUnallocatedSiteOrders?: boolean;
   $issues?: {
     negativeInventory?: Array<{
       variety: CookieType;

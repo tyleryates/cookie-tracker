@@ -5,7 +5,7 @@ import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, formatDate, formatTimeRange } from '../format-utils';
+import { buildVarietyTooltip, countBoothsNeedingDistribution, formatBoothDate, formatTimeRange } from '../format-utils';
 
 function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImported; scouts: Record<string, Scout> }) {
   if (!scouts) return null;
@@ -37,17 +37,13 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
 
   return (
     <div class="booth-detail-content">
-      <table class="booth-allocation-table">
-        {scoutsForBooth.map(({ name, packages, donations }) => (
-          <tr key={name}>
-            <td class="booth-allocation-name">
-              <strong>{name}</strong>
-            </td>
-            <td class="booth-allocation-detail">{packages} packages</td>
-            <td class="booth-allocation-detail">{donations > 0 ? `${donations} donations` : ''}</td>
-          </tr>
-        ))}
-      </table>
+      {scoutsForBooth.map(({ name, packages, donations }) => (
+        <div key={name} class="booth-allocation-chip">
+          <strong>{name}</strong>
+          <span class="booth-chip-stat">{packages} pkg</span>
+          {donations > 0 && <span class="booth-chip-stat">{donations} donations</span>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -71,13 +67,9 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
 
   const totalReservations = nonVirtualReservations.length;
   const distributed = nonVirtualReservations.filter((r: BoothReservationImported) => r.booth.isDistributed).length;
+  const pastNotDistributed = countBoothsNeedingDistribution(boothReservations);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const pastNotDistributed = nonVirtualReservations.filter((r: BoothReservationImported) => {
-    if (r.booth.isDistributed) return false;
-    const d = r.timeslot.date ? new Date(r.timeslot.date) : null;
-    return !d || d < today;
-  }).length;
 
   const totalBoothPackages = data.troopTotals.boothSalesPackages;
   const totalBoothDonations = data.troopTotals.boothSalesDonations;
@@ -124,74 +116,71 @@ export function BoothReport({ data }: { data: UnifiedDataset }) {
       />
 
       {nonVirtualReservations.length > 0 && (
-        <>
-          <h4>Booth Reservations</h4>
-          <DataTable
-            columns={['', 'Store', 'Date', 'Time', 'Type', 'Packages', 'Donations', 'Status']}
-            className="table-normal booth-table"
-            hint="Click on any booth to see scout allocations for that booth."
-          >
-            {sorted.map((r, idx) => {
-              const timeDisplay = formatTimeRange(r.timeslot.startTime, r.timeslot.endTime);
+        <DataTable
+          columns={['', 'Store', 'Date', 'Time', 'Type', 'Packages', 'Donations', 'Status']}
+          className="table-normal booth-table"
+          hint="Click on any booth to see scout allocations for that booth."
+        >
+          {sorted.map((r, idx) => {
+            const timeDisplay = formatTimeRange(r.timeslot.startTime, r.timeslot.endTime);
 
-              const boothDate = r.timeslot.date ? new Date(r.timeslot.date) : null;
-              const isFuture = boothDate && boothDate >= today;
+            const boothDate = r.timeslot.date ? new Date(r.timeslot.date) : null;
+            const isFuture = boothDate && boothDate >= today;
 
-              let statusText: string, statusClass: string;
-              if (r.booth.isDistributed) {
-                statusText = 'Distributed';
-                statusClass = 'status-success';
-              } else if (isFuture) {
-                statusText = 'Upcoming';
-                statusClass = 'muted-text';
-              } else {
-                statusText = 'Not Distributed';
-                statusClass = 'status-warning';
-              }
+            let statusText: string, statusClass: string;
+            if (r.booth.isDistributed) {
+              statusText = 'Distributed';
+              statusClass = 'status-success';
+            } else if (isFuture) {
+              statusText = 'Upcoming';
+              statusClass = 'muted-text';
+            } else {
+              statusText = 'Not Distributed';
+              statusClass = 'status-warning';
+            }
 
-              const donations = r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
-              const physicalPackages = r.physicalPackages;
-              const physicalCookies = { ...r.cookies };
-              delete physicalCookies[COOKIE_TYPE.COOKIE_SHARE];
-              const tip = buildVarietyTooltip(physicalCookies);
+            const donations = r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
+            const physicalPackages = r.physicalPackages;
+            const physicalCookies = { ...r.cookies };
+            delete physicalCookies[COOKIE_TYPE.COOKIE_SHARE];
+            const tip = buildVarietyTooltip(physicalCookies);
 
-              return (
-                <ExpandableRow
-                  key={idx}
-                  rowClass="booth-row"
-                  separateCaret
-                  firstCell={
-                    <>
-                      <strong>{r.booth.storeName || '-'}</strong>
-                      {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
-                    </>
-                  }
-                  cells={[
-                    formatDate(r.timeslot.date),
-                    timeDisplay,
-                    <span
-                      class={`booth-type-badge ${r.booth.reservationType === BOOTH_RESERVATION_TYPE.LOTTERY ? 'type-lottery' : r.booth.reservationType === BOOTH_RESERVATION_TYPE.FCFS ? 'type-fcfs' : 'type-default'}`}
-                    >
-                      {r.booth.reservationType || '-'}
-                    </span>,
-                    tip ? (
-                      <TooltipCell tooltip={tip} tag="span" className="tooltip-cell">
-                        {physicalPackages}
-                      </TooltipCell>
-                    ) : (
-                      physicalPackages
-                    ),
-                    donations > 0 ? donations : '—',
-                    <span class={statusClass}>{statusText}</span>
-                  ]}
-                  detail={<BoothScoutAllocations booth={r} scouts={scouts} />}
-                  colSpan={8}
-                  detailClass="detail-row"
-                />
-              );
-            })}
-          </DataTable>
-        </>
+            return (
+              <ExpandableRow
+                key={idx}
+                rowClass="booth-row"
+                separateCaret
+                firstCell={
+                  <>
+                    <strong>{r.booth.storeName || '-'}</strong>
+                    {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
+                  </>
+                }
+                cells={[
+                  r.timeslot.date ? formatBoothDate(r.timeslot.date) : '-',
+                  timeDisplay,
+                  <span
+                    class={`booth-type-badge ${r.booth.reservationType === BOOTH_RESERVATION_TYPE.LOTTERY ? 'type-lottery' : r.booth.reservationType === BOOTH_RESERVATION_TYPE.FCFS ? 'type-fcfs' : 'type-default'}`}
+                  >
+                    {r.booth.reservationType || '-'}
+                  </span>,
+                  tip ? (
+                    <TooltipCell tooltip={tip} tag="span" className="tooltip-cell">
+                      {physicalPackages}
+                    </TooltipCell>
+                  ) : (
+                    physicalPackages
+                  ),
+                  donations > 0 ? donations : '—',
+                  <span class={statusClass}>{statusText}</span>
+                ]}
+                detail={<BoothScoutAllocations booth={r} scouts={scouts} />}
+                colSpan={8}
+                detailClass="detail-row"
+              />
+            );
+          })}
+        </DataTable>
       )}
     </div>
   );

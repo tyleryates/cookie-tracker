@@ -21,7 +21,7 @@ This guide explains how to distribute updates to users who have the Cookie Track
    ```
 4. Find the installers in `release/` folder:
    - macOS: `Cookie Tracker-1.0.1-arm64.dmg` + `.zip`
-   - Windows: `Cookie Tracker Setup 1.0.1.exe`
+   - Windows: `Cookie Tracker-1.0.1-win.zip`
 5. Share the file via email, Dropbox, Google Drive, etc.
 
 **Quick Tip:** Run `make` to see all available commands!
@@ -302,10 +302,9 @@ spctl -a -t exec -vv "release/mac-arm64/Cookie Tracker.app"
 
 ### Windows:
 
-1. Download `Cookie Tracker Setup {version}.exe`
-2. Double-click to run installer
-3. Follow installation wizard
-4. Launch from Start Menu or Desktop shortcut
+1. Download `Cookie Tracker-{version}-win.zip`
+2. Extract the zip file
+3. Run `Cookie Tracker.exe` from the extracted folder
 
 ---
 
