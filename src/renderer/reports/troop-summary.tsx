@@ -62,7 +62,6 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
   const c2tTransfers = data.transferBreakdowns?.c2t || [];
   const t2tInTotal = c2tTransfers.filter((t) => t.type === TRANSFER_TYPE.T2T).reduce((sum, t) => sum + (t.physicalPackages || 0), 0);
   const pureC2T = troopTotals.c2tReceived - t2tInTotal;
-  const totalPackages = troopTotals.c2tReceived - troopTotals.t2tOut;
 
   const stats: Stat[] = [
     {
@@ -102,24 +101,38 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
       )
     },
     {
-      label: 'Total Packages',
-      value: totalPackages,
-      description: 'Physical inventory',
-      color: '#1565C0',
-      detail: (
-        <DetailCards
-          items={[
-            { label: 'Council to Troop', value: pureC2T, description: 'C2T transfers', color: '#1565C0' },
-            ...(t2tInTotal > 0 ? [{ label: 'T2T In', value: t2tInTotal, description: 'From other troops' }] : []),
-            ...(troopTotals.t2tOut > 0
-              ? [{ label: 'T2T Out', value: `-${troopTotals.t2tOut}`, description: 'To other troops', color: '#f44336' }]
-              : []),
-            { label: 'Sold from Stock', value: soldFromStock, description: `${troopSales} troop + ${girlDelivery} girl`, color: '#2E7D32' },
-            { label: 'Troop Inventory', value: troopTotals.inventory, description: 'On hand', color: '#E65100' },
-            { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls', color: '#F57F17' }
-          ]}
-        />
-      )
+      label: 'Troop Inventory',
+      value: troopTotals.inventory,
+      description: 'Packages on hand',
+      color: '#E65100',
+      detail: (() => {
+        const t2tNet = t2tInTotal - troopTotals.t2tOut;
+        const hasT2T = t2tInTotal > 0 || troopTotals.t2tOut > 0;
+        return (
+          <DetailCards
+            items={[
+              { label: 'Council to Troop', value: pureC2T, description: 'C2T transfers', color: '#1565C0' },
+              ...(hasT2T
+                ? [
+                    {
+                      label: 'Troop to Troop',
+                      value: t2tNet >= 0 ? `+${t2tNet}` : `${t2tNet}`,
+                      description: `${t2tInTotal} in \u2212 ${troopTotals.t2tOut} out`,
+                      color: t2tNet >= 0 ? '#0277bd' : '#f44336'
+                    }
+                  ]
+                : []),
+              {
+                label: 'Sold from Stock',
+                value: soldFromStock,
+                description: `${troopSales} troop + ${girlDelivery} girl`,
+                color: '#2E7D32'
+              },
+              { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'With girls', color: '#F57F17' }
+            ]}
+          />
+        );
+      })()
     },
     {
       label: 'Troop Proceeds',

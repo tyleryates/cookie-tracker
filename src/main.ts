@@ -170,12 +170,16 @@ autoUpdater.on('update-available', (info) => {
 });
 
 autoUpdater.on('update-downloaded', (info) => {
-  Logger.debug('Update downloaded:', info.version);
+  Logger.debug(`Update downloaded: ${info.version} files: ${info.files?.map((f) => f.url).join(', ')}`);
   mainWindow?.webContents.send('update-downloaded', { version: info.version });
 });
 
+autoUpdater.on('download-progress', (progress) => {
+  Logger.debug(`Update download: ${Math.round(progress.percent)}% (${progress.transferred}/${progress.total})`);
+});
+
 autoUpdater.on('error', (err) => {
-  Logger.error('Update check error:', err);
+  Logger.error('Update error:', err.message);
 });
 
 app.whenReady().then(() => {
@@ -516,7 +520,18 @@ ipcMain.handle(
 ipcMain.handle(
   'quit-and-install',
   handleIpcError(async () => {
-    autoUpdater.quitAndInstall(false, true);
+    Logger.debug('quit-and-install: starting');
+    // macOS workaround: remove window-all-closed listener, close windows, then quit.
+    // See: https://github.com/electron-userland/electron-builder/issues/1604
+    setImmediate(() => {
+      app.removeAllListeners('window-all-closed');
+      autoUpdater.autoInstallOnAppQuit = false;
+      if (mainWindow) {
+        mainWindow.removeAllListeners('close');
+        mainWindow.close();
+      }
+      autoUpdater.quitAndInstall(false, true);
+    });
   })
 );
 

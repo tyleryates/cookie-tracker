@@ -233,7 +233,11 @@ export function App() {
       {state.updateReady && (
         <div class="update-banner">
           Version {state.updateReady} downloaded —{' '}
-          <button type="button" class="update-banner-btn" onClick={() => ipcInvoke('quit-and-install').catch(() => {})}>
+          <button
+            type="button"
+            class="update-banner-btn"
+            onClick={() => ipcInvoke('quit-and-install').catch((e) => console.error('quit-and-install failed:', e))}
+          >
             Restart to update
           </button>
         </div>
