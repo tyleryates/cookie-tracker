@@ -40,7 +40,7 @@ export function VarietyReport({ data }: { data: UnifiedDataset }) {
         <h3>Cookie Popularity Report</h3>
       </div>
       <p class="meta-text">Total: {varieties.total} packages sold</p>
-      <DataTable columns={hasBooth ? ['Variety', 'Packages', '% of Sales', 'Booth %'] : ['Variety', 'Packages', '% of Sales']}>
+      <DataTable columns={hasBooth ? ['Variety', 'Packages', 'Sales %', 'Booth Sales %'] : ['Variety', 'Packages', 'Sales %']}>
         {rows.map(([variety, count]) => {
           const percent = varieties.total > 0 ? `${((count / varieties.total) * 100).toFixed(1)}%` : '0%';
           const boothCount = boothVarieties[variety as CookieType] || 0;

@@ -267,9 +267,17 @@ button.stat-card-active {
 /* Detail cards — mini stat cards inside drill-down panels */
 .detail-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 12px;
   padding: 4px 0;
+}
+
+.detail-operator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4em;
+  font-weight: 400;
+  color: var(--gray-300);
 }
 
 .detail-card {

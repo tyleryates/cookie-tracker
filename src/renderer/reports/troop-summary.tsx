@@ -4,17 +4,41 @@ import type { Stat } from '../components/stat-cards';
 import { StatCards } from '../components/stat-cards';
 
 /** Sub-cards rendered inside a drill-down panel */
-function DetailCards({ items }: { items: Array<{ label: string; value: string | number; description: string; color?: string }> }) {
+interface DetailItem {
+  label: string;
+  value: string | number;
+  description: string;
+  color?: string;
+  operator?: string;
+}
+
+function DetailCards({ items }: { items: DetailItem[] }) {
+  const hasOperators = items.some((item) => item.operator);
+  let columns: string;
+  if (hasOperators) {
+    const parts: string[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].operator) parts.push('auto');
+      parts.push('1fr');
+    }
+    columns = parts.join(' ');
+  } else {
+    columns = `repeat(${items.length}, 1fr)`;
+  }
+
   return (
-    <div class="detail-cards">
+    <div class="detail-cards" style={{ gridTemplateColumns: columns }}>
       {items.map((item, i) => (
-        <div key={i} class="detail-card">
-          <div class="detail-card-label">{item.label}</div>
-          <div class="detail-card-value" style={{ color: item.color || 'var(--gray-800)' }}>
-            {item.value}
+        <>
+          {item.operator && <div class="detail-operator">{item.operator}</div>}
+          <div key={i} class="detail-card">
+            <div class="detail-card-label">{item.label}</div>
+            <div class="detail-card-value" style={{ color: item.color || 'var(--gray-800)' }}>
+              {item.value}
+            </div>
+            <div class="detail-card-desc">{item.description}</div>
           </div>
-          <div class="detail-card-desc">{item.description}</div>
-        </div>
+        </>
       ))}
     </div>
   );
@@ -55,7 +79,6 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
   const troopDonations = troopTotals.donations - girlDonations;
 
   const totalSold = troopSales + girlDelivery + totalShipped + troopTotals.donations;
-  const soldFromStock = troopTotals.boothDividerT2G + troopTotals.girlDelivery;
   const packagesCredited = troopTotals.packagesCredited;
   const grossProceeds = troopTotals.grossProceeds;
 
@@ -82,19 +105,22 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
               label: 'Girl Package Sales',
               value: girlDelivery,
               description: `${dcDelivery} DC delivery + ${inPerson} in person`,
-              color: '#00838F'
+              color: '#00838F',
+              operator: '+'
             },
             {
               label: 'Direct Ship',
               value: totalShipped,
               description: `${troopShipped} troop + ${girlShipped} girl`,
-              color: '#37474F'
+              color: '#37474F',
+              operator: '+'
             },
             {
               label: 'Donations',
               value: troopTotals.donations,
               description: `${troopDonations} troop + ${girlDonations} girl`,
-              color: '#E91E63'
+              color: '#E91E63',
+              operator: '+'
             }
           ]}
         />
@@ -153,14 +179,28 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
         return (
           <DetailCards
             items={[
-              { label: 'Total Packages', value: totalPackages, description: pkgParts.join(' '), color: '#1565C0' },
+              { label: 'Physical Packages', value: totalPackages, description: pkgParts.join(' '), color: '#1565C0' },
               {
-                label: 'Sold from Stock',
-                value: soldFromStock,
-                description: `${troopSales} troop + ${girlDelivery} girl`,
-                color: '#2E7D32'
+                label: 'Troop Package Sales',
+                value: troopSales,
+                description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
+                color: '#7B1FA2',
+                operator: '\u2212'
               },
-              { label: 'Girl Inventory', value: troopTotals.girlInventory, description: 'Unsold inventory with girls', color: '#F57F17' }
+              {
+                label: 'Girl Package Sales',
+                value: girlDelivery,
+                description: `${dcDelivery} DC delivery + ${inPerson} in person`,
+                color: '#00838F',
+                operator: '\u2212'
+              },
+              {
+                label: 'Girl Inventory',
+                value: troopTotals.girlInventory,
+                description: 'Unsold inventory with girls',
+                color: '#F57F17',
+                operator: '\u2212'
+              }
             ]}
           />
         );

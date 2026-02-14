@@ -81,15 +81,15 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   const t2gDescription = totalReturned > 0 ? `${totalAllocated} out − ${totalReturned} returned` : 'Allocated to scouts';
 
   const stats: Array<{ label: string; value: number; description: string; color: string; operator?: string }> = [
-    { label: 'Total Packages', value: totalPackages, description: packagesDesc, color: '#1565C0' },
-    { label: 'Girl Transfers', value: netT2G, description: t2gDescription, color: '#00838F', operator: '\u2212' },
+    { label: 'Physical Packages', value: totalPackages, description: packagesDesc, color: '#1565C0' },
     {
-      label: 'Troop Sales',
+      label: 'Troop Package Sales',
       value: troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G,
       description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
       color: '#7B1FA2',
       operator: '\u2212'
     },
+    { label: 'Girl Transfers', value: netT2G, description: t2gDescription, color: '#00838F', operator: '\u2212' },
     { label: 'Troop Inventory', value: netInventory, description: 'Packages on hand', color: '#E65100', operator: '=' }
   ];
 
