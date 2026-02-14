@@ -235,6 +235,15 @@ export function SettingsPage({
             <span class="toggle-slider" />
             <span class="toggle-label">Booth Finder</span>
           </label>
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              checked={appConfig?.autoUpdateEnabled ?? false}
+              onChange={(e) => onUpdateConfig({ autoUpdateEnabled: (e.target as HTMLInputElement).checked })}
+            />
+            <span class="toggle-slider" />
+            <span class="toggle-label">Check for Updates</span>
+          </label>
         </div>
       )}
       <div class="settings-cards">

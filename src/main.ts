@@ -1,4 +1,6 @@
+import { execSync, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import archiver from 'archiver';
 import { app, BrowserWindow, dialog, ipcMain, autoUpdater as nativeUpdater } from 'electron';
@@ -20,6 +22,7 @@ import type { AppConfig, CredentialPatch, Credentials, CredentialsSummary, Endpo
 
 let mainWindow: BrowserWindow | null = null;
 let activeOrchestrator: ScraperOrchestrator | null = null;
+let downloadedUpdateFile: string | null = null;
 
 // Use app.getPath('userData') for data storage (works with packaged app)
 // Production (packaged): ~/Library/Application Support/Cookie Tracker on macOS (uses productName)
@@ -212,6 +215,7 @@ autoUpdater.on('update-downloaded', (info) => {
     Logger.info('Update was cached (no download-progress events received) — file from previous download');
   }
   downloadProgressReceived = false;
+  downloadedUpdateFile = downloadedFile || null;
   mainWindow?.webContents.send('update-downloaded', { version: info.version });
 });
 
@@ -255,14 +259,19 @@ app.whenReady().then(() => {
 
   createWindow();
 
-  // Check for updates on startup only (only in production)
+  // Check for updates on startup (only if enabled in config and packaged)
   if (!app.isPackaged) {
     Logger.info('Skipping update check in development');
   } else {
-    Logger.info('Will check for updates in 3 seconds');
-    setTimeout(() => {
-      autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
-    }, 3000); // Check 3 seconds after app starts
+    const config = configManager.loadConfig();
+    if (config.autoUpdateEnabled) {
+      Logger.info('Will check for updates in 3 seconds');
+      setTimeout(() => {
+        autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
+      }, 3000);
+    } else {
+      Logger.info('Auto-update disabled in config, skipping update check');
+    }
   }
 });
 
@@ -593,30 +602,66 @@ ipcMain.handle(
   'quit-and-install',
   handleIpcError(async () => {
     Logger.info('IPC: quit-and-install — starting');
-    Logger.info(`quit-and-install: mainWindow=${!!mainWindow}, platform=${process.platform}`);
-    // macOS workaround: remove lifecycle listeners that prevent quit, then let
-    // Squirrel.Mac handle the quit+relaunch via the native updater.
-    // See: https://github.com/electron-userland/electron-builder/issues/1604
-    Logger.info('quit-and-install: removing window-all-closed and activate listeners');
+    Logger.info(`quit-and-install: platform=${process.platform}, downloadedFile=${downloadedUpdateFile}`);
+
+    if (process.platform === 'darwin' && downloadedUpdateFile && fs.existsSync(downloadedUpdateFile)) {
+      // Manual install: Squirrel.Mac's "The command is disabled" error means
+      // quitAndInstall() can never work. Instead, extract the downloaded zip,
+      // spawn a detached script to replace the app bundle, and exit.
+      const currentAppPath = app.getAppPath().replace(/\/Contents\/Resources\/app(\.asar)?$/, '');
+      Logger.info(`quit-and-install: manual install — currentApp=${currentAppPath}`);
+
+      const tempDir = path.join(os.tmpdir(), 'cookie-tracker-update');
+      try {
+        // Extract the update zip
+        Logger.info(`quit-and-install: extracting ${downloadedUpdateFile} to ${tempDir}`);
+        execSync(`rm -rf "${tempDir}" && mkdir -p "${tempDir}" && ditto -xk "${downloadedUpdateFile}" "${tempDir}"`);
+
+        // Find the .app bundle in the extracted dir
+        const entries = fs.readdirSync(tempDir).filter((f) => f.endsWith('.app'));
+        if (entries.length === 0) {
+          Logger.error('quit-and-install: no .app found in extracted zip');
+          throw new Error('No .app bundle found in update zip');
+        }
+        const newAppPath = path.join(tempDir, entries[0]);
+        Logger.info(`quit-and-install: found ${entries[0]}, spawning update script`);
+
+        // Spawn a detached shell script that waits for this process to exit,
+        // replaces the app bundle, relaunches, and cleans up.
+        const script = [
+          `while kill -0 ${process.pid} 2>/dev/null; do sleep 0.5; done`,
+          `rm -rf "${currentAppPath}"`,
+          `mv "${newAppPath}" "${currentAppPath}"`,
+          `open "${currentAppPath}"`,
+          `rm -rf "${tempDir}"`
+        ].join(' && ');
+
+        spawn('bash', ['-c', script], { detached: true, stdio: 'ignore' }).unref();
+        Logger.info('quit-and-install: update script spawned, exiting app');
+        Logger.close();
+        app.exit(0);
+      } catch (err) {
+        Logger.error('quit-and-install: manual install failed:', err);
+        // Fall through to Squirrel attempt
+      }
+    }
+
+    // Non-macOS or manual install failed: try Squirrel/standard approach
+    Logger.info('quit-and-install: trying standard quitAndInstall()');
     app.removeAllListeners('window-all-closed');
     app.removeAllListeners('activate');
-    if (mainWindow) {
-      Logger.info('quit-and-install: removing close listeners from mainWindow');
-      mainWindow.removeAllListeners('close');
-    }
-    // Hook into native Squirrel updater's quit event to force exit —
-    // without this, macOS often closes windows but refuses to actually quit.
+    if (mainWindow) mainWindow.removeAllListeners('close');
+
     nativeUpdater.once('before-quit-for-update', () => {
       Logger.info('quit-and-install: before-quit-for-update fired, calling app.exit()');
       app.exit();
     });
-    Logger.info('quit-and-install: calling autoUpdater.quitAndInstall()');
+
     autoUpdater.quitAndInstall();
-    Logger.info('quit-and-install: quitAndInstall() returned, setting 5s fallback');
-    // Fallback: if Squirrel fails to quit (before-quit-for-update never fires),
-    // force exit after 5s. The update installs on next launch.
+
+    // Fallback: force exit after 5s if nothing happened
     setTimeout(() => {
-      Logger.info('quit-and-install: fallback timeout reached, calling app.exit(0)');
+      Logger.info('quit-and-install: fallback timeout, calling app.exit(0)');
       app.exit(0);
     }, 5000);
   })
@@ -625,7 +670,7 @@ ipcMain.handle(
 ipcMain.handle(
   'check-for-updates',
   handleIpcError(async () => {
-    if (app.isPackaged) {
+    if (app.isPackaged && configManager.loadConfig().autoUpdateEnabled) {
       autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
     }
   })

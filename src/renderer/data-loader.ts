@@ -65,6 +65,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
   } catch (err) {
     Logger.error('Failed to load config:', err);
     return {
+      autoUpdateEnabled: false,
       autoSyncEnabled: true,
       autoRefreshBoothsEnabled: true,
       availableBoothsEnabled: false,

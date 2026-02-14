@@ -12,6 +12,7 @@ class ConfigManager {
 
   getDefaults(): AppConfig {
     return {
+      autoUpdateEnabled: false,
       autoSyncEnabled: true,
       autoRefreshBoothsEnabled: true,
       availableBoothsEnabled: false,

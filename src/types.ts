@@ -504,6 +504,7 @@ export interface IgnoredTimeSlot {
 }
 
 export interface AppConfig {
+  autoUpdateEnabled: boolean;
   autoSyncEnabled: boolean;
   autoRefreshBoothsEnabled: boolean;
   availableBoothsEnabled: boolean;
