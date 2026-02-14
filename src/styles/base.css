@@ -42,6 +42,12 @@ body {
   margin-right: auto;
 }
 
+.app-header-version {
+  font-weight: 400;
+  font-size: 0.75em;
+  opacity: 0.5;
+}
+
 .app-header-actions {
   display: flex;
   align-items: center;
@@ -77,6 +83,32 @@ body {
 .icon-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.icon-btn.has-tooltip {
+  position: relative;
+}
+
+.btn-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  font-size: 0.75em;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms;
+}
+
+.icon-btn.has-tooltip:hover .btn-tooltip {
+  opacity: 1;
+  transition-delay: 600ms;
 }
 
 /* Tab Bar */

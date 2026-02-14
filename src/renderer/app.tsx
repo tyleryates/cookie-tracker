@@ -1,6 +1,7 @@
 // App — Root Preact component. Owns all state, delegates logic to hooks.
 
 import { useCallback, useReducer, useRef } from 'preact/hooks';
+import * as packageJson from '../../package.json';
 import type { DayFilter } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { ReportContent, TabBar } from './components/reports-section';
@@ -60,18 +61,22 @@ function AppHeader({
           </button>
         </div>
       )}
-      <span class="app-header-title">{'\uD83C\uDF6A'} Cookie Tracker</span>
+      <span class="app-header-title">
+        {'\uD83C\uDF6A'} Cookie Tracker <span class="app-header-version">v{packageJson.version}</span>
+      </span>
       {!isWelcome && (
         <div class="app-header-actions">
           {syncStatusText && <span class="app-header-sync-status">{syncStatusText}</span>}
           {!showBackButton && (
-            <button type="button" class="icon-btn" disabled={syncing} onClick={onSync} title="Sync now">
+            <button type="button" class="icon-btn has-tooltip" disabled={syncing} onClick={onSync}>
               {syncing ? <span class="spinner" /> : '\u21BB'}
+              <span class="btn-tooltip">Refresh Data</span>
             </button>
           )}
           {!showBackButton && (
-            <button type="button" class="icon-btn" onClick={onOpenSettings} title="Settings">
+            <button type="button" class="icon-btn has-tooltip" onClick={onOpenSettings}>
               {'\u2699'}
+              <span class="btn-tooltip">Settings</span>
             </button>
           )}
         </div>

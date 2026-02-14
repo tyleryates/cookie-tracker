@@ -1,7 +1,6 @@
 // SettingsPage — Full page for credential management with verification
 
 import { useEffect, useState } from 'preact/hooks';
-import * as packageJson from '../../../package.json';
 import Logger from '../../logger';
 import type { DCRole } from '../../seasonal-data';
 import type { AppConfig, CredentialPatch } from '../../types';
@@ -360,7 +359,6 @@ export function SettingsPage({ mode, appConfig, onBack, onRecalculate, onExport,
           </div>
         </div>
       )}
-      <div style={{ marginTop: '32px', color: 'var(--gray-400)', fontSize: '0.75em' }}>v{packageJson.version}</div>
     </div>
   );
 }

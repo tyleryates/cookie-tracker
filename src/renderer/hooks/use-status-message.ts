@@ -3,7 +3,7 @@
 import { useCallback, useEffect } from 'preact/hooks';
 import type { Action, StatusMessage } from '../app-reducer';
 
-const STATUS_MESSAGE_TIMEOUT_MS = 5000;
+const STATUS_MESSAGE_TIMEOUT_MS = 3000;
 
 export function useStatusMessage(dispatch: (action: Action) => void, statusMessage: StatusMessage | null) {
   const showStatus = useCallback(
@@ -15,7 +15,7 @@ export function useStatusMessage(dispatch: (action: Action) => void, statusMessa
 
   // Auto-hide success messages
   useEffect(() => {
-    if (!statusMessage || statusMessage.type !== 'success') return;
+    if (!statusMessage) return;
 
     const timeout = setTimeout(() => {
       dispatch({ type: 'CLEAR_STATUS' });
