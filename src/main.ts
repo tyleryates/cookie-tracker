@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import archiver from 'archiver';
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, autoUpdater as nativeUpdater } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import ConfigManager from './config-manager';
 import { PIPELINE_FILES } from './constants';
@@ -522,26 +522,20 @@ ipcMain.handle(
   handleIpcError(async () => {
     Logger.debug('quit-and-install: starting');
     // macOS workaround: remove lifecycle listeners that prevent quit, then let
-    // Squirrel.Mac handle the quit+relaunch. Do NOT destroy the window manually
-    // or set autoInstallOnAppQuit=false — both interfere with MacUpdater internals.
+    // Squirrel.Mac handle the quit+relaunch via the native updater.
     // See: https://github.com/electron-userland/electron-builder/issues/1604
     app.removeAllListeners('window-all-closed');
     app.removeAllListeners('activate');
     if (mainWindow) {
       mainWindow.removeAllListeners('close');
     }
-    // setImmediate lets the IPC response and any pending dialogs/sheets complete
-    // before the quit sequence begins (recommended by electron-builder maintainer).
-    setImmediate(() => {
-      autoUpdater.quitAndInstall();
-      // Fallback: if Squirrel fails to quit (known macOS issue on some hardware),
-      // force exit after 5s. The update will install on next launch since
-      // autoInstallOnAppQuit is true.
-      setTimeout(() => {
-        Logger.debug('quit-and-install: fallback app.exit()');
-        app.exit(0);
-      }, 5000);
+    // Hook into native Squirrel updater's quit event to force exit —
+    // without this, macOS often closes windows but refuses to actually quit.
+    nativeUpdater.once('before-quit-for-update', () => {
+      Logger.debug('quit-and-install: before-quit-for-update, calling app.exit()');
+      app.exit();
     });
+    autoUpdater.quitAndInstall();
   })
 );
 
