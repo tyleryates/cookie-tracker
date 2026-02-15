@@ -16,6 +16,7 @@ interface SettingsPageProps {
   appConfig: AppConfig | null;
   autoSyncEnabled: boolean;
   autoRefreshBoothsEnabled: boolean;
+  isDefaultProfile?: boolean;
   onBack: () => void;
   onUpdateConfig: (patch: Partial<AppConfig>) => void;
   onToggleAutoSync: (enabled: boolean) => void;
@@ -27,6 +28,7 @@ export function SettingsPage({
   appConfig,
   autoSyncEnabled,
   autoRefreshBoothsEnabled,
+  isDefaultProfile = true,
   onBack,
   onUpdateConfig,
   onToggleAutoSync,
@@ -221,7 +223,12 @@ export function SettingsPage({
       {mode === 'settings' && (
         <div class="settings-toggles">
           <label class="toggle-switch">
-            <input type="checkbox" checked={autoSyncEnabled} onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)} />
+            <input
+              type="checkbox"
+              checked={autoSyncEnabled}
+              disabled={!isDefaultProfile}
+              onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)}
+            />
             <span class="toggle-slider" />
             <span class="toggle-label">Auto Sync Reports</span>
           </label>
@@ -240,6 +247,7 @@ export function SettingsPage({
                 <input
                   type="checkbox"
                   checked={autoRefreshBoothsEnabled}
+                  disabled={!isDefaultProfile}
                   onChange={(e) => onToggleAutoRefreshBooths((e.target as HTMLInputElement).checked)}
                 />
                 <span class="toggle-slider" />

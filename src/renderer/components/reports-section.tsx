@@ -1,6 +1,6 @@
 // ReportsSection — TabBar and ReportContent components, health banner, report rendering
 
-import type { AppConfig, DayFilter, EndpointSyncState, UnifiedDataset } from '../../types';
+import type { AppConfig, EndpointSyncState, UnifiedDataset } from '../../types';
 import { countBoothsNeedingDistribution } from '../format-utils';
 import { AvailableBoothsReport, countAvailableSlots } from '../reports/available-booths';
 import { BoothReport } from '../reports/booth';
@@ -32,7 +32,7 @@ interface ReportContentProps {
   onResetNotified: () => void;
   onRefreshBooths: () => void;
   onSaveBoothIds: (ids: number[]) => void;
-  onSaveDayFilters: (filters: DayFilter[]) => void;
+  onSaveDayFilters: (filters: string[]) => void;
 }
 
 interface ReportButton {
@@ -140,7 +140,7 @@ function renderReport(
   onResetNotified: () => void,
   onRefreshBooths: () => void,
   onSaveBoothIds: (ids: number[]) => void,
-  onSaveDayFilters: (filters: DayFilter[]) => void,
+  onSaveDayFilters: (filters: string[]) => void,
   boothResetKey?: number
 ) {
   switch (type) {

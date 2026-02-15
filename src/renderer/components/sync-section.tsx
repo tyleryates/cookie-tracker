@@ -2,7 +2,8 @@
 
 import { useState } from 'preact/hooks';
 import { formatMaxAge, SYNC_ENDPOINTS } from '../../constants';
-import type { EndpointSyncState, SyncState } from '../../types';
+import type { EndpointSyncState, ProfileInfo, SyncState } from '../../types';
+import type { ActiveProfile } from '../app-reducer';
 import { DateFormatter } from '../format-utils';
 
 // ============================================================================
@@ -18,39 +19,6 @@ export function createInitialSyncState(): SyncState {
 }
 
 type OverallStatus = 'idle' | 'syncing' | 'synced' | 'partial' | 'error';
-
-export function computeOverallStatus(endpoints: Record<string, EndpointSyncState>): {
-  status: OverallStatus;
-  syncedCount: number;
-  errorCount: number;
-  syncingCount: number;
-  total: number;
-  lastSync: string | null;
-} {
-  let syncedCount = 0;
-  let errorCount = 0;
-  let syncingCount = 0;
-  let lastSync: string | null = null;
-  const total = SYNC_ENDPOINTS.length;
-
-  for (const ep of SYNC_ENDPOINTS) {
-    const s = endpoints[ep.id];
-    if (!s) continue;
-    if (s.status === 'synced') syncedCount++;
-    else if (s.status === 'error') errorCount++;
-    else if (s.status === 'syncing') syncingCount++;
-    if (s.lastSync && (!lastSync || s.lastSync > lastSync)) lastSync = s.lastSync;
-  }
-
-  let status: OverallStatus = 'idle';
-  if (syncingCount > 0) status = 'syncing';
-  else if (syncedCount === total) status = 'synced';
-  else if (errorCount > 0 && syncedCount > 0) status = 'partial';
-  else if (errorCount > 0) status = 'error';
-  else if (syncedCount > 0) status = 'partial';
-
-  return { status, syncedCount, errorCount, syncingCount, total, lastSync };
-}
 
 export interface GroupStatus {
   status: OverallStatus;
@@ -255,6 +223,11 @@ interface SyncTabProps {
   onExport: () => void;
   onWipeData: () => void;
   hasData: boolean;
+  activeProfile: ActiveProfile | null;
+  profiles: ProfileInfo[];
+  onSwitchProfile: (dirName: string) => void;
+  onImportProfile: (name: string) => void;
+  onDeleteProfile: (dirName: string) => void;
 }
 
 export function SyncTab({
@@ -265,18 +238,71 @@ export function SyncTab({
   onRecalculate,
   onExport,
   onWipeData,
-  hasData
+  hasData,
+  activeProfile,
+  profiles,
+  onSwitchProfile,
+  onImportProfile,
+  onDeleteProfile
 }: SyncTabProps) {
+  const [importName, setImportName] = useState('');
+  const isDefault = activeProfile?.isDefault ?? true;
+  const syncDisabled = !isDefault;
+
   return (
     <div class="report-visual">
+      {profiles.length > 0 && (
+        <div class="profile-section">
+          <h3>Profile</h3>
+          <div class="profile-controls">
+            <select
+              class="form-input profile-select"
+              value={activeProfile?.dirName || 'default'}
+              onChange={(e) => onSwitchProfile((e.target as HTMLSelectElement).value)}
+            >
+              {profiles.map((p) => (
+                <option key={p.dirName} value={p.dirName}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            {syncDisabled && <span class="profile-hint">Imported snapshot — syncing disabled</span>}
+          </div>
+          <div class="profile-import">
+            <input
+              type="text"
+              class="form-input"
+              placeholder="New profile name"
+              value={importName}
+              onInput={(e) => setImportName((e.target as HTMLInputElement).value)}
+            />
+            <button
+              type="button"
+              class="btn btn-secondary"
+              disabled={!importName.trim()}
+              onClick={() => {
+                onImportProfile(importName.trim());
+                setImportName('');
+              }}
+            >
+              Import Data
+            </button>
+          </div>
+        </div>
+      )}
       <h3>Data</h3>
       <EndpointTable endpoints={syncState.endpoints} availableBoothsEnabled={availableBoothsEnabled} showFrequency={false} />
       <div class="sync-controls">
-        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing} onClick={onSyncReports}>
+        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing || syncDisabled} onClick={onSyncReports}>
           {syncState.syncing ? 'Refreshing\u2026' : 'Refresh Reports'}
         </button>
         {availableBoothsEnabled && (
-          <button type="button" class="btn btn-secondary active" disabled={syncState.refreshingBooths} onClick={onRefreshBooths}>
+          <button
+            type="button"
+            class="btn btn-secondary active"
+            disabled={syncState.refreshingBooths || syncDisabled}
+            onClick={onRefreshBooths}
+          >
             {syncState.refreshingBooths ? 'Refreshing\u2026' : 'Refresh Booths'}
           </button>
         )}
@@ -287,11 +313,16 @@ export function SyncTab({
             Recalculate
           </button>
           <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
-            Export Diagnostics
+            Export Data
           </button>
           <button type="button" class="btn btn-secondary" onClick={onWipeData}>
             Wipe Data
           </button>
+          {!isDefault && (
+            <button type="button" class="btn btn-secondary" onClick={() => activeProfile && onDeleteProfile(activeProfile.dirName)}>
+              Delete Profile
+            </button>
+          )}
         </div>
       </div>
     </div>

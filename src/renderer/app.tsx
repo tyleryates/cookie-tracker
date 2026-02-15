@@ -3,11 +3,12 @@
 import { useCallback, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
 import Logger from '../logger';
-import type { DayFilter } from '../types';
+import type { ProfilesConfig } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { ReportContent, TabBar } from './components/reports-section';
 import { SettingsPage } from './components/settings-page';
 import { computeGroupStatuses, createInitialSyncState, type GroupStatus, SyncTab } from './components/sync-section';
+import { loadAppConfig } from './data-loader';
 import { DateFormatter } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
@@ -22,7 +23,9 @@ const initialState: AppState = {
   activePage: 'dashboard',
   statusMessage: null,
   syncState: createInitialSyncState(),
-  updateReady: null
+  updateReady: null,
+  activeProfile: null,
+  profiles: []
 };
 
 // ============================================================================
@@ -54,6 +57,7 @@ function SyncPill({ label, group }: { label: string; group: GroupStatus }) {
 
 function AppHeader({
   syncing,
+  syncDisabled,
   groups,
   showBooths,
   onSync,
@@ -63,6 +67,7 @@ function AppHeader({
   isWelcome
 }: {
   syncing: boolean;
+  syncDisabled: boolean;
   groups: ReturnType<typeof computeGroupStatuses>;
   showBooths: boolean;
   onSync: () => void;
@@ -94,7 +99,7 @@ function AppHeader({
             </div>
           )}
           {!showBackButton && (
-            <button type="button" class="icon-btn has-tooltip" disabled={syncing} onClick={onSync}>
+            <button type="button" class="icon-btn has-tooltip" disabled={syncing || syncDisabled} onClick={onSync}>
               {syncing ? <span class="spinner" /> : '\u21BB'}
               <span class="btn-tooltip">Refresh Data</span>
             </button>
@@ -188,7 +193,7 @@ export function App() {
   );
 
   const handleSaveDayFilters = useCallback(
-    (filters: DayFilter[]) => {
+    (filters: string[]) => {
       const current = stateRef.current.appConfig;
       if (current) dispatch({ type: 'LOAD_CONFIG', config: { ...current, boothDayFilters: filters } });
       showStatus('Booth day filters saved', 'success');
@@ -232,6 +237,73 @@ export function App() {
     ipcInvoke('update-config', patch);
   }, []);
 
+  const dispatchProfiles = useCallback(
+    (pc: ProfilesConfig) => {
+      const active = pc.profiles.find((p) => p.dirName === pc.activeProfile);
+      if (active) {
+        dispatch({
+          type: 'SET_PROFILES',
+          profiles: pc.profiles,
+          activeProfile: { dirName: active.dirName, name: active.name, isDefault: active.dirName === 'default' }
+        });
+      }
+    },
+    [dispatch]
+  );
+
+  const reloadAfterSwitch = useCallback(async () => {
+    dispatch({ type: 'WIPE_DATA', syncState: createInitialSyncState() });
+    const config = await loadAppConfig();
+    dispatch({ type: 'LOAD_CONFIG', config });
+    await loadData({ showMessages: false });
+  }, [dispatch, loadData]);
+
+  const handleSwitchProfile = useCallback(
+    async (dirName: string) => {
+      try {
+        const pc = await ipcInvoke('switch-profile', { dirName });
+        dispatchProfiles(pc);
+        await reloadAfterSwitch();
+        showStatus(`Switched to profile: ${pc.profiles.find((p) => p.dirName === dirName)?.name || dirName}`, 'success');
+      } catch (error) {
+        showStatus(`Profile switch failed: ${(error as Error).message}`, 'error');
+      }
+    },
+    [dispatchProfiles, reloadAfterSwitch, showStatus]
+  );
+
+  const handleImportProfile = useCallback(
+    async (name: string) => {
+      try {
+        const pc = await ipcInvoke('import-profile', { name });
+        if (!pc) return; // user cancelled file dialog
+        dispatchProfiles(pc);
+        // Switch to the newly imported profile
+        const imported = pc.profiles.find((p) => p.name === name);
+        if (imported) await handleSwitchProfile(imported.dirName);
+        showStatus(`Profile "${name}" imported`, 'success');
+      } catch (error) {
+        showStatus(`Import failed: ${(error as Error).message}`, 'error');
+      }
+    },
+    [dispatchProfiles, handleSwitchProfile, showStatus]
+  );
+
+  const handleDeleteProfile = useCallback(
+    async (dirName: string) => {
+      try {
+        const wasActive = stateRef.current.activeProfile?.dirName === dirName;
+        const pc = await ipcInvoke('delete-profile', { dirName });
+        dispatchProfiles(pc);
+        if (wasActive) await reloadAfterSwitch();
+        showStatus('Profile deleted', 'success');
+      } catch (error) {
+        showStatus(`Delete failed: ${(error as Error).message}`, 'error');
+      }
+    },
+    [dispatchProfiles, reloadAfterSwitch, showStatus]
+  );
+
   const groups = computeGroupStatuses(state.syncState.endpoints, state.syncState);
   const isSettings = state.activePage === 'settings';
   const isWelcome = state.activePage === 'welcome';
@@ -255,6 +327,7 @@ export function App() {
       )}
       <AppHeader
         syncing={state.syncState.syncing}
+        syncDisabled={!!state.activeProfile && !state.activeProfile.isDefault}
         groups={groups}
         showBooths={!!state.appConfig?.availableBoothsEnabled}
         onSync={handleHeaderSync}
@@ -273,6 +346,7 @@ export function App() {
             appConfig={state.appConfig}
             autoSyncEnabled={state.autoSyncEnabled}
             autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
+            isDefaultProfile={state.activeProfile?.isDefault ?? true}
             onBack={handleCloseSettings}
             onUpdateConfig={handleUpdateConfig}
             onToggleAutoSync={handleToggleAutoSync}
@@ -288,6 +362,11 @@ export function App() {
             onExport={exportData}
             onWipeData={handleWipeData}
             hasData={!!state.unified}
+            activeProfile={state.activeProfile}
+            profiles={state.profiles}
+            onSwitchProfile={handleSwitchProfile}
+            onImportProfile={handleImportProfile}
+            onDeleteProfile={handleDeleteProfile}
           />
         ) : (
           <ReportContent

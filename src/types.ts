@@ -486,16 +486,23 @@ export interface UnifiedDataset {
 }
 
 // ============================================================================
-// APP CONFIG TYPES
+// PROFILE TYPES
 // ============================================================================
 
-export interface DayFilter {
-  day: number;
-  timeAfter?: string;
-  timeBefore?: string;
-  excludeAfter?: string;
-  excludeBefore?: string;
+export interface ProfileInfo {
+  name: string;
+  dirName: string;
+  createdAt: string;
 }
+
+export interface ProfilesConfig {
+  activeProfile: string;
+  profiles: ProfileInfo[];
+}
+
+// ============================================================================
+// APP CONFIG TYPES
+// ============================================================================
 
 export interface AppConfig {
   autoUpdateEnabled: boolean;
@@ -506,7 +513,7 @@ export interface AppConfig {
   boothAlertRecipient: string;
   boothNotifiedSlots: string[];
   boothIds: number[];
-  boothDayFilters: DayFilter[];
+  boothDayFilters: string[];
   ignoredTimeSlots: string[];
 }
 
@@ -570,7 +577,7 @@ export interface IpcChannelMap {
   'cancel-sync': { request: undefined; response: undefined };
   'refresh-booth-locations': { request: undefined; response: BoothLocation[] };
   'fetch-booth-catalog': { request: undefined; response: BoothLocation[] };
-  'export-diagnostics': { request: undefined; response: { path: string } | null };
+  'export-data': { request: undefined; response: { path: string } | null };
   'verify-sc': {
     request: { username: string; password: string };
     response: { troop: SCMeResponse; cookies: SCCookieMapEntry[] };
@@ -589,6 +596,10 @@ export interface IpcChannelMap {
   };
   'load-timestamps': { request: undefined; response: Timestamps };
   'record-unified-build': { request: undefined; response: undefined };
+  'load-profiles': { request: undefined; response: ProfilesConfig };
+  'switch-profile': { request: { dirName: string }; response: ProfilesConfig };
+  'delete-profile': { request: { dirName: string }; response: ProfilesConfig };
+  'import-profile': { request: { name: string }; response: ProfilesConfig | null };
   'wipe-logins': {
     request: undefined;
     response: undefined;

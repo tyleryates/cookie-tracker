@@ -3,15 +3,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import { BOOTH_RESERVATION_TYPE, BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
-import type {
-  AppConfig,
-  BoothAvailableDate,
-  BoothLocation,
-  BoothTimeSlot,
-  DayFilter,
-  EndpointSyncState,
-  UnifiedDataset
-} from '../../types';
+import type { AppConfig, BoothAvailableDate, BoothLocation, EndpointSyncState, UnifiedDataset } from '../../types';
 import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
 import { DateFormatter, formatBoothDate, formatTime12h, haversineDistance, slotOverlapsRange } from '../format-utils';
@@ -23,15 +15,33 @@ export function encodeSlotKey(boothId: number, date: string, startTime: string):
 }
 
 interface AvailableBoothsConfig {
-  filters: DayFilter[];
+  filters: string[];
   ignoredTimeSlots: string[];
+}
+
+/** Build a lookup: day number → Set of allowed start times. Empty set means no filter for that day. */
+function parseFiltersByDay(filters: string[]): Map<number, Set<string>> {
+  const byDay = new Map<number, Set<string>>();
+  for (const f of filters) {
+    const [dayStr, start] = f.split('|');
+    const day = Number(dayStr);
+    if (!byDay.has(day)) byDay.set(day, new Set());
+    if (start) byDay.get(day)!.add(start);
+  }
+  return byDay;
+}
+
+/** Look up end time from BOOTH_TIME_SLOTS for a given start time */
+function slotEndTime(start: string): string | undefined {
+  return BOOTH_TIME_SLOTS.find((s) => s.start === start)?.end;
 }
 
 function isSlotIgnored(boothId: number, date: string, startTime: string, ignored: Set<string>): boolean {
   return ignored.has(encodeSlotKey(boothId, date, startTime));
 }
 
-function filterAvailableDates(dates: BoothAvailableDate[], filters: DayFilter[]): BoothAvailableDate[] {
+function filterAvailableDates(dates: BoothAvailableDate[], filters: string[]): BoothAvailableDate[] {
+  const byDay = parseFiltersByDay(filters);
   const now = new Date();
   const todayInt = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
   const result: BoothAvailableDate[] = [];
@@ -44,26 +54,18 @@ function filterAvailableDates(dates: BoothAvailableDate[], filters: DayFilter[])
 
     const dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
     const dayOfWeek = dateObj.getDay();
-    const matchingFilters = filters.filter((f) => f.day === dayOfWeek);
-    if (matchingFilters.length === 0) continue;
+    const allowedStarts = byDay.get(dayOfWeek);
+    if (!allowedStarts) continue;
 
-    let slots: BoothTimeSlot[] = [];
-    for (const mf of matchingFilters) {
-      let filtered = d.timeSlots;
-      if (mf.timeAfter && mf.timeBefore) {
-        filtered = filtered.filter((s) => slotOverlapsRange(s, mf.timeAfter!, mf.timeBefore!));
-      }
-      if (mf.excludeAfter && mf.excludeBefore) {
-        filtered = filtered.filter((s) => !slotOverlapsRange(s, mf.excludeAfter!, mf.excludeBefore!));
-      }
-      for (const s of filtered) slots.push(s);
-    }
-    // Deduplicate by startTime
-    const seen = new Set<string>();
-    slots = slots.filter((s) => {
-      if (seen.has(s.startTime)) return false;
-      seen.add(s.startTime);
-      return true;
+    const slots = d.timeSlots.filter((s) => {
+      if (allowedStarts.size === 0) return true; // day with no time constraint
+      return (
+        allowedStarts.has(s.startTime) ||
+        [...allowedStarts].some((start) => {
+          const end = slotEndTime(start);
+          return end ? slotOverlapsRange(s, start, end) : false;
+        })
+      );
     });
     if (slots.length > 0) result.push({ date: d.date, timeSlots: slots });
   }
@@ -81,7 +83,7 @@ function removeIgnoredSlots(dates: BoothAvailableDate[], boothId: number, ignore
 }
 
 /** Count total available (non-ignored) slots across all booths */
-export function countAvailableSlots(boothLocations: BoothLocation[], filters: DayFilter[], ignored: string[]): number {
+export function countAvailableSlots(boothLocations: BoothLocation[], filters: string[], ignored: string[]): number {
   const ignoredSet = new Set(ignored);
   let count = 0;
   for (const loc of boothLocations) {
@@ -107,7 +109,7 @@ export interface BoothSlotSummary {
 }
 
 /** Summarize available slots per booth for notification messages */
-export function summarizeAvailableSlots(boothLocations: BoothLocation[], filters: DayFilter[], ignored: string[]): BoothSlotSummary[] {
+export function summarizeAvailableSlots(boothLocations: BoothLocation[], filters: string[], ignored: string[]): BoothSlotSummary[] {
   const ignoredSet = new Set(ignored);
   const result: BoothSlotSummary[] = [];
   for (const loc of boothLocations) {
@@ -143,7 +145,7 @@ interface AvailableBoothsProps {
   onResetNotified: () => void;
   onRefresh: () => void;
   onSaveBoothIds: (ids: number[]) => void;
-  onSaveDayFilters: (filters: DayFilter[]) => void;
+  onSaveDayFilters: (filters: string[]) => void;
 }
 
 export function AvailableBoothsReport({
@@ -241,7 +243,8 @@ export function AvailableBoothsReport({
     .sort((a, b) => (boothDistanceMap.get(a.id) ?? Number.POSITIVE_INFINITY) - (boothDistanceMap.get(b.id) ?? Number.POSITIVE_INFINITY));
 
   // Build collapsed summary text
-  const filterDays = [...new Set(filters.map((f) => f.day))].sort();
+  const filtersByDay = parseFiltersByDay(filters);
+  const filterDays = [...filtersByDay.keys()].sort();
   const summaryParts: string[] = [];
   if (boothCount > 0) summaryParts.push(`${boothCount} booth${boothCount === 1 ? '' : 's'}`);
   if (filterDays.length > 0) summaryParts.push(filterDays.map((d) => DAY_LABELS[d]).join(', '));
@@ -249,13 +252,13 @@ export function AvailableBoothsReport({
 
   // Build per-day time slot detail for expanded view
   const dayTimeDetails = filterDays.map((day) => {
-    const dayFilters = filters.filter((f) => f.day === day);
-    const allSlots = dayFilters.some((f) => !f.timeAfter && !f.timeBefore);
+    const startTimes = filtersByDay.get(day)!;
+    const allSlots = startTimes.size === BOOTH_TIME_SLOTS.length;
     if (allSlots) return { day, label: DAY_LABELS[day], slots: 'All times' };
-    const slotLabels = dayFilters
-      .map((f) => {
-        const match = BOOTH_TIME_SLOTS.find((s) => s.start === f.timeAfter && s.end === f.timeBefore);
-        return match?.label || `${f.timeAfter}\u2013${f.timeBefore}`;
+    const slotLabels = [...startTimes]
+      .map((start) => {
+        const match = BOOTH_TIME_SLOTS.find((s) => s.start === start);
+        return match?.label || start;
       })
       .sort();
     return { day, label: DAY_LABELS[day], slots: slotLabels.join(', ') };

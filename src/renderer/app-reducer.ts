@@ -2,7 +2,7 @@
 // Side effects (IPC calls, timers) stay in the component; only pure state
 // transitions live here.
 
-import type { AppConfig, EndpointSyncState, SyncState, UnifiedDataset } from '../types';
+import type { AppConfig, EndpointSyncState, ProfileInfo, SyncState, UnifiedDataset } from '../types';
 
 // ============================================================================
 // STATE
@@ -11,6 +11,12 @@ import type { AppConfig, EndpointSyncState, SyncState, UnifiedDataset } from '..
 export interface StatusMessage {
   msg: string;
   type: 'success' | 'warning' | 'error';
+}
+
+export interface ActiveProfile {
+  dirName: string;
+  name: string;
+  isDefault: boolean;
 }
 
 export interface AppState {
@@ -23,6 +29,8 @@ export interface AppState {
   statusMessage: StatusMessage | null;
   syncState: SyncState;
   updateReady: string | null; // version string when update downloaded
+  activeProfile: ActiveProfile | null;
+  profiles: ProfileInfo[];
 }
 
 // ============================================================================
@@ -60,7 +68,8 @@ export type Action =
   | { type: 'UPDATE_BOOTH_LOCATIONS'; boothLocations: UnifiedDataset['boothLocations'] }
   | { type: 'IGNORE_SLOT'; config: AppConfig }
   | { type: 'WIPE_DATA'; syncState: SyncState }
-  | { type: 'UPDATE_DOWNLOADED'; version: string };
+  | { type: 'UPDATE_DOWNLOADED'; version: string }
+  | { type: 'SET_PROFILES'; profiles: ProfileInfo[]; activeProfile: ActiveProfile };
 
 // ============================================================================
 // REDUCER
@@ -77,13 +86,15 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'SET_WELCOME':
       return { ...state, activePage: 'welcome' };
 
-    case 'LOAD_CONFIG':
+    case 'LOAD_CONFIG': {
+      const isNonDefault = state.activeProfile != null && !state.activeProfile.isDefault;
       return {
         ...state,
         appConfig: action.config,
-        autoSyncEnabled: action.config.autoSyncEnabled ?? true,
-        autoRefreshBoothsEnabled: action.config.autoRefreshBoothsEnabled ?? true
+        autoSyncEnabled: isNonDefault ? false : (action.config.autoSyncEnabled ?? true),
+        autoRefreshBoothsEnabled: isNonDefault ? false : (action.config.autoRefreshBoothsEnabled ?? true)
       };
+    }
 
     case 'UPDATE_CONFIG': {
       if (!state.appConfig) return state;
@@ -165,6 +176,9 @@ export function appReducer(state: AppState, action: Action): AppState {
 
     case 'UPDATE_DOWNLOADED':
       return { ...state, updateReady: action.version };
+
+    case 'SET_PROFILES':
+      return { ...state, profiles: action.profiles, activeProfile: action.activeProfile };
 
     default:
       return state;

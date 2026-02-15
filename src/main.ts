@@ -11,6 +11,7 @@ import CredentialsManager from './credentials-manager';
 import { loadData } from './data-pipeline';
 import { normalizeBoothLocation } from './data-processing/importers';
 import Logger from './logger';
+import ProfileManager from './profile-manager';
 import ScraperOrchestrator from './scrapers';
 import { savePipelineFile } from './scrapers/base-scraper';
 import BoothCache from './scrapers/booth-cache';
@@ -30,22 +31,38 @@ let downloadedUpdateFile: string | null = null;
 // Windows production: %APPDATA%/Cookie Tracker
 // Windows development: %APPDATA%/cookie-tracker
 const userDataPath = app.getPath('userData');
-const dataDir = path.join(userDataPath, 'data');
+const rootDataDir = path.join(userDataPath, 'data');
 
-// Initialize file logger — truncates on each launch so we always have current session logs
-Logger.init(dataDir);
+// Initialize logger at root level first so migration logs go to a file
+Logger.init(rootDataDir);
 
-const credentialsManager = new CredentialsManager(dataDir);
-const configManager = new ConfigManager(dataDir);
-const boothCache = new BoothCache(dataDir);
-const seasonalData = new SeasonalData(dataDir);
+// Credentials + profiles live at root (shared across profiles)
+const credentialsManager = new CredentialsManager(rootDataDir);
+const profileManager = new ProfileManager(rootDataDir);
+
+// Profile-specific managers (reinitialized on profile switch)
+let profileDir: string;
+let configManager: ConfigManager;
+let boothCache: BoothCache;
+let seasonalData: SeasonalData;
+let timestampsPath: string;
+
+function initializeProfileManagers(dir: string): void {
+  profileDir = dir;
+  configManager = new ConfigManager(profileDir);
+  boothCache = new BoothCache(profileDir);
+  seasonalData = new SeasonalData(profileDir);
+  timestampsPath = path.join(profileDir, 'timestamps.json');
+  Logger.init(profileDir);
+}
+
+// Run migration + initialize before any IPC handlers fire
+profileManager.migrate();
+initializeProfileManagers(profileManager.getActiveProfileDir());
 
 // Long-lived sessions — reused across syncs and booth API calls
 const scSession = new SmartCookieSession();
 const dcSession = new DigitalCookieSession();
-
-// Timestamps — persisted to disk so auto-sync knows what's fresh after restart
-const timestampsPath = path.join(dataDir, 'timestamps.json');
 
 const KNOWN_ENDPOINT_KEYS = new Set(['lastSync', 'status', 'durationMs', 'dataSize', 'httpStatus', 'error']);
 
@@ -109,7 +126,7 @@ function loadTimestamps(): Timestamps {
 }
 
 function saveTimestamps(timestamps: Timestamps): void {
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(profileDir)) fs.mkdirSync(profileDir, { recursive: true });
   fs.writeFileSync(timestampsPath, JSON.stringify(timestamps, null, 2));
 }
 
@@ -294,7 +311,7 @@ ipcMain.handle(
   'load-data',
   handleIpcError(async () => {
     Logger.info('IPC: load-data');
-    const result = await loadData(dataDir);
+    const result = await loadData(profileDir);
     Logger.info(`IPC: load-data complete — ${result ? `${Object.keys(result.unified?.scouts || {}).length} scouts` : 'no data'}`);
     return result;
   })
@@ -304,7 +321,7 @@ ipcMain.handle(
 ipcMain.handle(
   'save-file',
   handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { filename, content }: { filename: string; content: string }) => {
-    const currentDir = path.join(dataDir, 'current');
+    const currentDir = path.join(profileDir, 'current');
     if (!fs.existsSync(currentDir)) fs.mkdirSync(currentDir, { recursive: true });
 
     // Sanitize filename to prevent path traversal
@@ -392,7 +409,7 @@ ipcMain.handle(
 
     Logger.info('IPC: scrape-websites — starting sync');
     // Initialize scraper orchestrator with long-lived sessions
-    const scraper = new ScraperOrchestrator(dataDir, seasonalData, boothCache, scSession, dcSession);
+    const scraper = new ScraperOrchestrator(profileDir, seasonalData, boothCache, scSession, dcSession);
     activeOrchestrator = scraper;
 
     // Set up progress callback
@@ -451,7 +468,7 @@ ipcMain.handle(
     const progressCallback = (progress: import('./types').ScrapeProgress) => event.sender.send('scrape-progress', progress);
 
     await ensureSCSession();
-    const scraper = new SmartCookieScraper(dataDir, null, scSession);
+    const scraper = new SmartCookieScraper(profileDir, null, scSession);
 
     // Track catalog fetch with timing/size — skip cache on manual refresh
     progressCallback({ endpoint: 'sc-booth-catalog', status: 'syncing' });
@@ -478,7 +495,7 @@ ipcMain.handle(
 
     // Persist enriched booth locations to disk for the pipeline
     if (boothLocations.length > 0 && config.boothIds.length > 0) {
-      savePipelineFile(dataDir, PIPELINE_FILES.SC_BOOTH_LOCATIONS, boothLocations);
+      savePipelineFile(profileDir, PIPELINE_FILES.SC_BOOTH_LOCATIONS, boothLocations);
     }
 
     // Persist booth sync metadata
@@ -500,7 +517,7 @@ ipcMain.handle(
     if (!config.availableBoothsEnabled) return [];
 
     await ensureSCSession();
-    const scraper = new SmartCookieScraper(dataDir, null, scSession);
+    const scraper = new SmartCookieScraper(profileDir, null, scSession);
     const catalog = await scraper.fetchBoothCatalog(boothCache);
     return catalog.map(normalizeBoothLocation);
   })
@@ -572,7 +589,7 @@ ipcMain.handle(
   handleIpcError(async () => {
     scSession.reset();
     dcSession.reset();
-    const credPath = path.join(dataDir, 'credentials.enc');
+    const credPath = path.join(rootDataDir, 'credentials.enc');
     if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
   })
 );
@@ -580,12 +597,12 @@ ipcMain.handle(
 ipcMain.handle(
   'wipe-data',
   handleIpcError(async () => {
-    // Keep only login-related files (credentials + seasonal data used for verification)
-    const KEEP_FILES = new Set(['credentials.enc', 'sc-troop.json', 'sc-cookies.json', 'dc-roles.json']);
-    if (fs.existsSync(dataDir)) {
-      for (const entry of fs.readdirSync(dataDir)) {
+    // Keep only login-related files (seasonal data used for verification)
+    const KEEP_FILES = new Set(['sc-troop.json', 'sc-cookies.json', 'dc-roles.json']);
+    if (fs.existsSync(profileDir)) {
+      for (const entry of fs.readdirSync(profileDir)) {
         if (KEEP_FILES.has(entry)) continue;
-        const fullPath = path.join(dataDir, entry);
+        const fullPath = path.join(profileDir, entry);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
           fs.rmSync(fullPath, { recursive: true, force: true });
@@ -700,9 +717,9 @@ end tell`;
   })
 );
 
-// Handle export diagnostics zip
+// Handle export data zip (exports current profile)
 ipcMain.handle(
-  'export-diagnostics',
+  'export-data',
   handleIpcError(async () => {
     if (!mainWindow) throw new Error('No main window');
 
@@ -711,7 +728,7 @@ ipcMain.handle(
     const showSave: (w: BrowserWindow, o: Electron.SaveDialogOptions) => Promise<Electron.SaveDialogReturnValue> =
       dialog.showSaveDialog.bind(dialog);
     const saveResult = await showSave(mainWindow, {
-      defaultPath: `cookie-tracker-diagnostics-${timestamp}.zip`,
+      defaultPath: `cookie-tracker-export-${timestamp}.zip`,
       filters: [{ name: 'Zip Archives', extensions: ['zip'] }]
     });
 
@@ -730,11 +747,11 @@ ipcMain.handle(
 
     archive.pipe(output);
 
-    // Add everything in dataDir except credentials
-    if (fs.existsSync(dataDir)) {
-      for (const entry of fs.readdirSync(dataDir)) {
+    // Add everything in profileDir except credentials
+    if (fs.existsSync(profileDir)) {
+      for (const entry of fs.readdirSync(profileDir)) {
         if (EXCLUDED_FILES.has(entry)) continue;
-        const fullPath = path.join(dataDir, entry);
+        const fullPath = path.join(profileDir, entry);
         const stat = fs.statSync(fullPath);
         if (stat.isDirectory()) {
           archive.directory(fullPath, entry);
@@ -748,5 +765,79 @@ ipcMain.handle(
     await done;
 
     return { path: filePath };
+  })
+);
+
+// ============================================================================
+// PROFILE IPC HANDLERS
+// ============================================================================
+
+ipcMain.handle(
+  'load-profiles',
+  handleIpcError(async () => {
+    return profileManager.loadProfiles();
+  })
+);
+
+ipcMain.handle(
+  'switch-profile',
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { dirName }: { dirName: string }) => {
+    Logger.info(`IPC: switch-profile to ${dirName}`);
+    // Cancel any active sync
+    if (activeOrchestrator) {
+      activeOrchestrator.cancel();
+      activeOrchestrator = null;
+    }
+    const result = profileManager.switchProfile(dirName);
+    initializeProfileManagers(result.profileDir);
+    return result.config;
+  })
+);
+
+ipcMain.handle(
+  'delete-profile',
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { dirName }: { dirName: string }) => {
+    Logger.info(`IPC: delete-profile ${dirName}`);
+    const wasActive = profileManager.loadProfiles().activeProfile === dirName;
+    const config = profileManager.deleteProfile(dirName);
+    if (wasActive) {
+      initializeProfileManagers(path.join(rootDataDir, 'default'));
+    }
+    return config;
+  })
+);
+
+ipcMain.handle(
+  'import-profile',
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { name }: { name: string }) => {
+    if (!mainWindow) throw new Error('No main window');
+    Logger.info(`IPC: import-profile "${name}"`);
+
+    const showOpen: (w: BrowserWindow, o: Electron.OpenDialogOptions) => Promise<Electron.OpenDialogReturnValue> =
+      dialog.showOpenDialog.bind(dialog);
+    const openResult = await showOpen(mainWindow, {
+      properties: ['openFile'],
+      filters: [{ name: 'Zip Archives', extensions: ['zip'] }]
+    });
+
+    if (openResult.canceled || openResult.filePaths.length === 0) return null;
+    const zipPath = openResult.filePaths[0];
+
+    const { profile, config } = profileManager.createProfile(name);
+    const newProfileDir = path.join(rootDataDir, profile.dirName);
+
+    // Extract ZIP into the new profile directory
+    await new Promise<void>((resolve, reject) => {
+      execFile('ditto', ['-xk', zipPath, newProfileDir], (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+
+    // Remove credentials if they were included in the ZIP (security)
+    const credInZip = path.join(newProfileDir, 'credentials.enc');
+    if (fs.existsSync(credInZip)) fs.unlinkSync(credInZip);
+
+    return config;
   })
 );

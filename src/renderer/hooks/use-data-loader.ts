@@ -54,8 +54,8 @@ export function useDataLoader(
 
   const exportData = useCallback(async () => {
     try {
-      const result = await ipcInvoke('export-diagnostics');
-      if (result) showStatus('Diagnostics exported', 'success');
+      const result = await ipcInvoke('export-data');
+      if (result) showStatus('Data exported', 'success');
     } catch (error) {
       showStatus(`Export failed: ${(error as Error).message}`, 'error');
     }

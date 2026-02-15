@@ -2,68 +2,20 @@
 
 import { useState } from 'preact/hooks';
 import { BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
-import type { DayFilter } from '../../types';
-import { slotOverlapsRange } from '../format-utils';
 
 interface BoothDayFilterProps {
-  currentFilters: DayFilter[];
-  onSave: (filters: DayFilter[]) => void;
+  currentFilters: string[];
+  onSave: (filters: string[]) => void;
   onCancel: () => void;
 }
 
-/** Build a key like "3-14:00" (day + slot start time) */
+/** Key format: "day|startTime" e.g. "3|14:00" */
 function slotKey(day: number, start: string): string {
-  return `${day}-${start}`;
-}
-
-/** Initialize selection set from existing DayFilter array */
-function initFromFilters(filters: DayFilter[]): Set<string> {
-  const selected = new Set<string>();
-  for (const f of filters) {
-    if (!f.timeAfter && !f.timeBefore && !f.excludeAfter && !f.excludeBefore) {
-      // No time constraint — all slots for this day
-      for (const slot of BOOTH_TIME_SLOTS) {
-        selected.add(slotKey(f.day, slot.start));
-      }
-    } else {
-      // Determine which of the 6 fixed slots this filter covers
-      for (const slot of BOOTH_TIME_SLOTS) {
-        const fakeSlot = { startTime: slot.start, endTime: slot.end };
-        let included = true;
-        if (f.timeAfter && f.timeBefore) {
-          included = slotOverlapsRange(fakeSlot, f.timeAfter, f.timeBefore);
-        }
-        if (included && f.excludeAfter && f.excludeBefore) {
-          included = !slotOverlapsRange(fakeSlot, f.excludeAfter, f.excludeBefore);
-        }
-        if (included) selected.add(slotKey(f.day, slot.start));
-      }
-    }
-  }
-  return selected;
-}
-
-/** Convert selection set back to DayFilter[] */
-function toFilters(selected: Set<string>): DayFilter[] {
-  const filters: DayFilter[] = [];
-  for (let day = 0; day < 7; day++) {
-    const daySlots = BOOTH_TIME_SLOTS.filter((s) => selected.has(slotKey(day, s.start)));
-    if (daySlots.length === 0) continue;
-    if (daySlots.length === BOOTH_TIME_SLOTS.length) {
-      // All slots — emit with no time constraint
-      filters.push({ day });
-    } else {
-      // One entry per selected slot
-      for (const s of daySlots) {
-        filters.push({ day, timeAfter: s.start, timeBefore: s.end });
-      }
-    }
-  }
-  return filters;
+  return `${day}|${start}`;
 }
 
 export function BoothDayFilter({ currentFilters, onSave, onCancel }: BoothDayFilterProps) {
-  const [selected, setSelected] = useState<Set<string>>(() => initFromFilters(currentFilters));
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(currentFilters));
 
   const totalSelected = selected.size;
 
@@ -141,7 +93,7 @@ export function BoothDayFilter({ currentFilters, onSave, onCancel }: BoothDayFil
       </table>
 
       <div class="report-toolbar" style={{ marginTop: '16px' }}>
-        <button type="button" class="btn btn-primary" onClick={() => onSave(toFilters(selected))}>
+        <button type="button" class="btn btn-primary" onClick={() => onSave([...selected])}>
           Save Filters ({totalSelected} slot{totalSelected === 1 ? '' : 's'})
         </button>
         <button type="button" class="btn btn-secondary" onClick={onCancel}>

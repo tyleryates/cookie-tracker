@@ -8,6 +8,21 @@ import { ipcInvoke } from '../ipc';
 export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?: { showMessages?: boolean }) => Promise<boolean>) {
   useEffect(() => {
     (async () => {
+      // Load profile info first — reducer uses it to force auto-sync off for non-default
+      try {
+        const profilesConfig = await ipcInvoke('load-profiles');
+        const active = profilesConfig.profiles.find((p) => p.dirName === profilesConfig.activeProfile);
+        if (active) {
+          dispatch({
+            type: 'SET_PROFILES',
+            profiles: profilesConfig.profiles,
+            activeProfile: { dirName: active.dirName, name: active.name, isDefault: active.dirName === 'default' }
+          });
+        }
+      } catch {
+        // Non-fatal — profiles default to empty
+      }
+
       const config = await loadAppConfig();
 
       // Hydrate per-endpoint sync timestamps BEFORE enabling auto-sync.
