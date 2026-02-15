@@ -205,6 +205,12 @@ export function App() {
     showStatus('Ignored time slots cleared', 'success');
   }, [showStatus]);
 
+  const handleResetNotified = useCallback(() => {
+    dispatch({ type: 'UPDATE_CONFIG', patch: { boothNotifiedSlots: [] } });
+    ipcInvoke('update-config', { boothNotifiedSlots: [] });
+    showStatus('Message notifications reset', 'success');
+  }, [showStatus]);
+
   const handleWipeData = useCallback(async () => {
     await ipcInvoke('wipe-data');
     dispatch({ type: 'WIPE_DATA', syncState: createInitialSyncState() });
@@ -213,16 +219,16 @@ export function App() {
 
   const handleIgnoreSlot = useCallback(async (boothId: number, date: string, startTime: string) => {
     const config = stateRef.current.appConfig;
-    const ignored = [...(config?.ignoredTimeSlots || []), { boothId, date, startTime }];
+    const ignored = [...(config?.ignoredTimeSlots || []), `${boothId}|${date}|${startTime}`];
     if (config) {
       dispatch({ type: 'IGNORE_SLOT', config: { ...config, ignoredTimeSlots: ignored } });
     }
     await ipcInvoke('update-config', { ignoredTimeSlots: ignored });
   }, []);
 
-  const handleUpdateConfig = useCallback(async (patch: Partial<import('../types').AppConfig>) => {
-    const updatedConfig = await ipcInvoke('update-config', patch);
-    dispatch({ type: 'LOAD_CONFIG', config: updatedConfig });
+  const handleUpdateConfig = useCallback((patch: Partial<import('../types').AppConfig>) => {
+    dispatch({ type: 'UPDATE_CONFIG', patch });
+    ipcInvoke('update-config', patch);
   }, []);
 
   const groups = computeGroupStatuses(state.syncState.endpoints, state.syncState);
@@ -291,6 +297,7 @@ export function App() {
             boothResetKey={boothResetKeyRef.current}
             onIgnoreSlot={handleIgnoreSlot}
             onResetIgnored={handleResetIgnored}
+            onResetNotified={handleResetNotified}
             onRefreshBooths={refreshBooths}
             onSaveBoothIds={handleSaveBoothIds}
             onSaveDayFilters={handleSaveDayFilters}

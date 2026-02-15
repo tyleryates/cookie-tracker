@@ -39,6 +39,11 @@ export function SettingsPage({
   const [scVerified, setScVerified] = useState<SCVerifyResult | null>(null);
   const [scError, setScError] = useState<string | null>(null);
 
+  // iMessage alert fields
+  const [imessageRecipient, setImessageRecipient] = useState('');
+  const [imessageSending, setImessageSending] = useState(false);
+  const [imessageError, setImessageError] = useState<string | null>(null);
+
   // Digital Cookie fields
   const [dcUsername, setDcUsername] = useState('');
   const [dcPassword, setDcPassword] = useState('');
@@ -47,6 +52,11 @@ export function SettingsPage({
   const [dcSelectedRole, setDcSelectedRole] = useState('');
   const [dcConfirmed, setDcConfirmed] = useState(false);
   const [dcError, setDcError] = useState<string | null>(null);
+
+  // Seed iMessage recipient from saved config
+  useEffect(() => {
+    if (appConfig?.boothAlertRecipient) setImessageRecipient(appConfig.boothAlertRecipient);
+  }, [appConfig?.boothAlertRecipient]);
 
   // Load existing credentials + seasonal data on mount
   useEffect(() => {
@@ -215,17 +225,6 @@ export function SettingsPage({
             <span class="toggle-slider" />
             <span class="toggle-label">Auto Sync Reports</span>
           </label>
-          {appConfig?.availableBoothsEnabled && (
-            <label class="toggle-switch">
-              <input
-                type="checkbox"
-                checked={autoRefreshBoothsEnabled}
-                onChange={(e) => onToggleAutoRefreshBooths((e.target as HTMLInputElement).checked)}
-              />
-              <span class="toggle-slider" />
-              <span class="toggle-label">Auto Refresh Booths</span>
-            </label>
-          )}
           <label class="toggle-switch">
             <input
               type="checkbox"
@@ -235,6 +234,84 @@ export function SettingsPage({
             <span class="toggle-slider" />
             <span class="toggle-label">Booth Finder</span>
           </label>
+          {appConfig?.availableBoothsEnabled && (
+            <div class="settings-toggle-sub">
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={autoRefreshBoothsEnabled}
+                  onChange={(e) => onToggleAutoRefreshBooths((e.target as HTMLInputElement).checked)}
+                />
+                <span class="toggle-slider" />
+                <span class="toggle-label">Auto Refresh</span>
+              </label>
+            </div>
+          )}
+          {appConfig?.availableBoothsEnabled && (
+            <div class="settings-toggle-sub">
+              <label class="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={appConfig?.boothAlertImessage ?? false}
+                  onChange={(e) => onUpdateConfig({ boothAlertImessage: (e.target as HTMLInputElement).checked })}
+                />
+                <span class="toggle-slider" />
+                <span class="toggle-label">iMessage Alerts</span>
+              </label>
+              {appConfig?.boothAlertImessage && (
+                <div style={{ marginTop: '8px' }}>
+                  <input
+                    type="text"
+                    class="form-input"
+                    placeholder="Your phone number or Apple ID"
+                    value={appConfig.boothAlertRecipient ? appConfig.boothAlertRecipient : imessageRecipient}
+                    disabled={!!appConfig.boothAlertRecipient || imessageSending}
+                    onInput={(e) => setImessageRecipient((e.target as HTMLInputElement).value)}
+                  />
+                  <div class="settings-verify-row" style={{ marginTop: '8px' }}>
+                    {!appConfig.boothAlertRecipient ? (
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        disabled={!imessageRecipient.trim() || imessageSending}
+                        onClick={async () => {
+                          setImessageSending(true);
+                          setImessageError(null);
+                          try {
+                            await ipcInvoke('send-imessage', {
+                              recipient: imessageRecipient.trim(),
+                              message: 'Cookie Tracker iMessage alerts are now active!'
+                            });
+                            onUpdateConfig({ boothAlertRecipient: imessageRecipient.trim() });
+                          } catch (err) {
+                            setImessageError((err as Error).message);
+                          } finally {
+                            setImessageSending(false);
+                          }
+                        }}
+                      >
+                        {imessageSending ? 'Sending...' : 'Confirm'}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        class="btn btn-secondary"
+                        onClick={() => {
+                          setImessageRecipient('');
+                          setImessageError(null);
+                          onUpdateConfig({ boothAlertRecipient: '' });
+                        }}
+                      >
+                        Clear
+                      </button>
+                    )}
+                    {imessageError && <span class="settings-error">{imessageError}</span>}
+                  </div>
+                  {!appConfig.boothAlertRecipient && <span class="settings-role-hint">A test message will be sent to verify delivery</span>}
+                </div>
+              )}
+            </div>
+          )}
           <label class="toggle-switch">
             <input
               type="checkbox"

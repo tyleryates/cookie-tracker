@@ -34,6 +34,7 @@ export type Action =
   | { type: 'CLEAR_STATUS' }
   | { type: 'SET_WELCOME' }
   | { type: 'LOAD_CONFIG'; config: AppConfig }
+  | { type: 'UPDATE_CONFIG'; patch: Partial<AppConfig> }
   | { type: 'SET_UNIFIED'; unified: UnifiedDataset }
   | { type: 'SET_ACTIVE_REPORT'; report: string | null }
   | { type: 'DEFAULT_REPORT' }
@@ -83,6 +84,17 @@ export function appReducer(state: AppState, action: Action): AppState {
         autoSyncEnabled: action.config.autoSyncEnabled ?? true,
         autoRefreshBoothsEnabled: action.config.autoRefreshBoothsEnabled ?? true
       };
+
+    case 'UPDATE_CONFIG': {
+      if (!state.appConfig) return state;
+      const merged = { ...state.appConfig, ...action.patch };
+      return {
+        ...state,
+        appConfig: merged,
+        autoSyncEnabled: merged.autoSyncEnabled ?? state.autoSyncEnabled,
+        autoRefreshBoothsEnabled: merged.autoRefreshBoothsEnabled ?? state.autoRefreshBoothsEnabled
+      };
+    }
 
     case 'SET_UNIFIED':
       return { ...state, unified: action.unified };

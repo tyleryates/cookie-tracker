@@ -24,6 +24,7 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
   'wipe-data',
   'quit-and-install',
   'check-for-updates',
+  'send-imessage',
   'log-message'
 ]);
 

@@ -497,20 +497,17 @@ export interface DayFilter {
   excludeBefore?: string;
 }
 
-export interface IgnoredTimeSlot {
-  boothId: number;
-  date: string;
-  startTime: string;
-}
-
 export interface AppConfig {
   autoUpdateEnabled: boolean;
   autoSyncEnabled: boolean;
   autoRefreshBoothsEnabled: boolean;
   availableBoothsEnabled: boolean;
+  boothAlertImessage: boolean;
+  boothAlertRecipient: string;
+  boothNotifiedSlots: string[];
   boothIds: number[];
   boothDayFilters: DayFilter[];
-  ignoredTimeSlots: IgnoredTimeSlot[];
+  ignoredTimeSlots: string[];
 }
 
 // ============================================================================
@@ -606,6 +603,10 @@ export interface IpcChannelMap {
   };
   'check-for-updates': {
     request: undefined;
+    response: undefined;
+  };
+  'send-imessage': {
+    request: { recipient: string; message: string };
     response: undefined;
   };
 }

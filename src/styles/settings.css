@@ -63,12 +63,21 @@
 
 .settings-toggles {
   display: flex;
-  gap: 24px;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 20px;
   padding: 16px 20px;
   background: var(--surface-raised);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
+}
+
+.settings-toggle-sub {
+  padding-left: 28px;
+}
+
+.settings-toggle-sub .form-input {
+  max-width: 300px;
 }
 
 .settings-danger-zone {

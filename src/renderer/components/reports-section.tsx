@@ -29,6 +29,7 @@ interface ReportContentProps {
   boothResetKey: number;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
   onResetIgnored: () => void;
+  onResetNotified: () => void;
   onRefreshBooths: () => void;
   onSaveBoothIds: (ids: number[]) => void;
   onSaveDayFilters: (filters: DayFilter[]) => void;
@@ -136,6 +137,7 @@ function renderReport(
   boothSyncState: EndpointSyncState,
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void,
   onResetIgnored: () => void,
+  onResetNotified: () => void,
   onRefreshBooths: () => void,
   onSaveBoothIds: (ids: number[]) => void,
   onSaveDayFilters: (filters: DayFilter[]) => void,
@@ -167,6 +169,7 @@ function renderReport(
           syncState={boothSyncState}
           onIgnoreSlot={onIgnoreSlot}
           onResetIgnored={onResetIgnored}
+          onResetNotified={onResetNotified}
           onRefresh={onRefreshBooths}
           onSaveBoothIds={onSaveBoothIds}
           onSaveDayFilters={onSaveDayFilters}
@@ -244,6 +247,7 @@ export function ReportContent({
   boothResetKey,
   onIgnoreSlot,
   onResetIgnored,
+  onResetNotified,
   onRefreshBooths,
   onSaveBoothIds,
   onSaveDayFilters
@@ -284,6 +288,7 @@ export function ReportContent({
         boothSyncState,
         onIgnoreSlot,
         onResetIgnored,
+        onResetNotified,
         onRefreshBooths,
         onSaveBoothIds,
         onSaveDayFilters,

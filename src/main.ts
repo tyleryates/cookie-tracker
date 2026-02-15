@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'node:child_process';
+import { execFile, execSync, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -673,6 +673,30 @@ ipcMain.handle(
     if (app.isPackaged && configManager.loadConfig().autoUpdateEnabled) {
       autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
     }
+  })
+);
+
+// Handle send iMessage via AppleScript
+ipcMain.handle(
+  'send-imessage',
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { recipient, message }: { recipient: string; message: string }) => {
+    Logger.info(`IPC: send-imessage to ${recipient}`);
+    const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const escapedRecipient = recipient.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const script = `tell application "Messages"
+  send "${escapedMessage}" to buddy "${escapedRecipient}" of (service 1 whose service type is iMessage)
+end tell`;
+    await new Promise<void>((resolve, reject) => {
+      execFile('osascript', ['-e', script], (error) => {
+        if (error) {
+          Logger.error('iMessage send failed:', error.message);
+          reject(error);
+        } else {
+          Logger.info('iMessage sent successfully');
+          resolve();
+        }
+      });
+    });
   })
 );
 

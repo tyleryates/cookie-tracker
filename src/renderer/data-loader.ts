@@ -69,6 +69,9 @@ export async function loadAppConfig(): Promise<AppConfig> {
       autoSyncEnabled: true,
       autoRefreshBoothsEnabled: true,
       availableBoothsEnabled: false,
+      boothAlertImessage: false,
+      boothAlertRecipient: '',
+      boothNotifiedSlots: [],
       boothIds: [],
       boothDayFilters: [],
       ignoredTimeSlots: []

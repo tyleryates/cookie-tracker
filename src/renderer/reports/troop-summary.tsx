@@ -135,7 +135,7 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
         <DetailCards
           items={[
             {
-              label: 'Packages Credited',
+              label: 'Sales Credited',
               value: packagesCredited,
               description: `${troopTotals.c2tReceived - troopTotals.t2tOut} pkg + ${troopTotals.donations} donations + ${totalShipped} shipped`,
               color: '#1565C0'

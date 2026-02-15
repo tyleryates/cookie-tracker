@@ -10,22 +10,25 @@ import type {
   BoothTimeSlot,
   DayFilter,
   EndpointSyncState,
-  IgnoredTimeSlot,
   UnifiedDataset
 } from '../../types';
 import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
-import { DateFormatter, formatBoothDate, formatTime12h, haversineDistance, parseTimeToMinutes, slotOverlapsRange } from '../format-utils';
+import { DateFormatter, formatBoothDate, formatTime12h, haversineDistance, slotOverlapsRange } from '../format-utils';
 import { ipcInvoke } from '../ipc';
+
+/** Encode a slot as "boothId|date|startTime" for ignored/notified tracking */
+export function encodeSlotKey(boothId: number, date: string, startTime: string): string {
+  return `${boothId}|${date}|${startTime}`;
+}
 
 interface AvailableBoothsConfig {
   filters: DayFilter[];
-  ignoredTimeSlots: IgnoredTimeSlot[];
+  ignoredTimeSlots: string[];
 }
 
-function isSlotIgnored(boothId: number, date: string, startTime: string, ignored: IgnoredTimeSlot[]): boolean {
-  const startMinutes = parseTimeToMinutes(startTime);
-  return ignored.some((i) => i.boothId === boothId && i.date === date && parseTimeToMinutes(i.startTime) === startMinutes);
+function isSlotIgnored(boothId: number, date: string, startTime: string, ignored: Set<string>): boolean {
+  return ignored.has(encodeSlotKey(boothId, date, startTime));
 }
 
 function filterAvailableDates(dates: BoothAvailableDate[], filters: DayFilter[]): BoothAvailableDate[] {
@@ -67,8 +70,8 @@ function filterAvailableDates(dates: BoothAvailableDate[], filters: DayFilter[])
   return result;
 }
 
-function removeIgnoredSlots(dates: BoothAvailableDate[], boothId: number, ignored: IgnoredTimeSlot[]): BoothAvailableDate[] {
-  if (ignored.length === 0) return dates;
+function removeIgnoredSlots(dates: BoothAvailableDate[], boothId: number, ignored: Set<string>): BoothAvailableDate[] {
+  if (ignored.size === 0) return dates;
   const result: BoothAvailableDate[] = [];
   for (const d of dates) {
     const slots = d.timeSlots.filter((s) => !isSlotIgnored(boothId, d.date, s.startTime, ignored));
@@ -78,14 +81,56 @@ function removeIgnoredSlots(dates: BoothAvailableDate[], boothId: number, ignore
 }
 
 /** Count total available (non-ignored) slots across all booths */
-export function countAvailableSlots(boothLocations: BoothLocation[], filters: DayFilter[], ignored: IgnoredTimeSlot[]): number {
+export function countAvailableSlots(boothLocations: BoothLocation[], filters: DayFilter[], ignored: string[]): number {
+  const ignoredSet = new Set(ignored);
   let count = 0;
   for (const loc of boothLocations) {
     const filtered = filterAvailableDates(loc.availableDates || [], filters);
-    const visible = removeIgnoredSlots(filtered, loc.id, ignored);
+    const visible = removeIgnoredSlots(filtered, loc.id, ignoredSet);
     for (const d of visible) count += d.timeSlots.length;
   }
   return count;
+}
+
+export interface SlotDetail {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface BoothSlotSummary {
+  id: number;
+  storeName: string;
+  address: string;
+  slotCount: number;
+  slots: SlotDetail[];
+}
+
+/** Summarize available slots per booth for notification messages */
+export function summarizeAvailableSlots(boothLocations: BoothLocation[], filters: DayFilter[], ignored: string[]): BoothSlotSummary[] {
+  const ignoredSet = new Set(ignored);
+  const result: BoothSlotSummary[] = [];
+  for (const loc of boothLocations) {
+    const filtered = filterAvailableDates(loc.availableDates || [], filters);
+    const visible = removeIgnoredSlots(filtered, loc.id, ignoredSet);
+    const slots: SlotDetail[] = [];
+    for (const d of visible) {
+      for (const s of d.timeSlots) {
+        slots.push({ date: d.date, startTime: s.startTime, endTime: s.endTime });
+      }
+    }
+    if (slots.length > 0) {
+      const addr = loc.address;
+      result.push({
+        id: loc.id,
+        storeName: loc.storeName,
+        address: `${addr.street}, ${addr.city}, ${addr.state} ${addr.zip}`,
+        slotCount: slots.length,
+        slots
+      });
+    }
+  }
+  return result;
 }
 
 interface AvailableBoothsProps {
@@ -95,6 +140,7 @@ interface AvailableBoothsProps {
   syncState: EndpointSyncState;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
   onResetIgnored: () => void;
+  onResetNotified: () => void;
   onRefresh: () => void;
   onSaveBoothIds: (ids: number[]) => void;
   onSaveDayFilters: (filters: DayFilter[]) => void;
@@ -107,6 +153,7 @@ export function AvailableBoothsReport({
   syncState,
   onIgnoreSlot,
   onResetIgnored,
+  onResetNotified,
   onRefresh,
   onSaveBoothIds,
   onSaveDayFilters
@@ -116,6 +163,7 @@ export function AvailableBoothsReport({
   const [troopCoords, setTroopCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   const { filters, ignoredTimeSlots } = config;
+  const ignoredSet = new Set(ignoredTimeSlots);
   const boothIds = appConfig?.boothIds || [];
   const boothCount = boothIds.length;
   const filterCount = filters.length;
@@ -188,7 +236,7 @@ export function AvailableBoothsReport({
   const boothsWithDates = boothLocations
     .filter((loc) => {
       const filtered = filterAvailableDates(loc.availableDates || [], filters);
-      return removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots).length > 0;
+      return removeIgnoredSlots(filtered, loc.id, ignoredSet).length > 0;
     })
     .sort((a, b) => (boothDistanceMap.get(a.id) ?? Number.POSITIVE_INFINITY) - (boothDistanceMap.get(b.id) ?? Number.POSITIVE_INFINITY));
 
@@ -305,6 +353,18 @@ export function AvailableBoothsReport({
                 </div>
               </div>
             )}
+            {appConfig?.boothAlertImessage && (appConfig?.boothNotifiedSlots?.length ?? 0) > 0 && (
+              <div class="config-section">
+                <div class="config-section-header">
+                  <span class="config-value">
+                    {appConfig!.boothNotifiedSlots.length} notified slot{appConfig!.boothNotifiedSlots.length === 1 ? '' : 's'}
+                  </span>
+                  <button type="button" class="btn btn-secondary btn-sm" onClick={onResetNotified}>
+                    Reset
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -346,7 +406,7 @@ export function AvailableBoothsReport({
                   : 'type-default';
 
             const filtered = filterAvailableDates(loc.availableDates || [], filters);
-            const dates = removeIgnoredSlots(filtered, loc.id, ignoredTimeSlots);
+            const dates = removeIgnoredSlots(filtered, loc.id, ignoredSet);
 
             return (
               <div key={loc.id} class="booth-card">

@@ -16,6 +16,9 @@ class ConfigManager {
       autoSyncEnabled: true,
       autoRefreshBoothsEnabled: true,
       availableBoothsEnabled: false,
+      boothAlertImessage: false,
+      boothAlertRecipient: '',
+      boothNotifiedSlots: [],
       boothIds: [],
       boothDayFilters: [],
       ignoredTimeSlots: []
@@ -44,7 +47,7 @@ class ConfigManager {
           const defaultType = Array.isArray(defaults[key]) ? 'array' : typeof defaults[key];
           const diskType = Array.isArray(disk[key]) ? 'array' : typeof disk[key];
           if (diskType === defaultType) {
-            result[key] = disk[key];
+            (result as any)[key] = disk[key];
           } else {
             healed = true;
           }

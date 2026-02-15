@@ -639,7 +639,7 @@ describe('UPDATE_BOOTH_LOCATIONS', () => {
 describe('IGNORE_SLOT', () => {
   it('sets appConfig from action', () => {
     const config = makeAppConfig({
-      ignoredTimeSlots: [{ boothId: 42, date: '2025-02-01', startTime: '10:00' }]
+      ignoredTimeSlots: ['42|2025-02-01|10:00']
     });
     const state = makeState();
     const result = appReducer(state, { type: 'IGNORE_SLOT', config });

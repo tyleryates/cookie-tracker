@@ -5,8 +5,9 @@ import { SYNC_ENDPOINTS } from '../../constants';
 import Logger from '../../logger';
 import type { AppConfig, SyncState } from '../../types';
 import type { Action } from '../app-reducer';
+import { formatTime12h } from '../format-utils';
 import { ipcInvoke, ipcInvokeRaw, onIpcEvent } from '../ipc';
-import { countAvailableSlots } from '../reports/available-booths';
+import { type BoothSlotSummary, summarizeAvailableSlots } from '../reports/available-booths';
 
 // ============================================================================
 // AUTO-SYNC — staleness-based polling
@@ -17,6 +18,98 @@ const CHECK_INTERVAL_MS = 60_000;
 function isStale(lastSync: string | undefined | null, maxAgeMs: number): boolean {
   if (!lastSync) return true;
   return Date.now() - new Date(lastSync).getTime() > maxAgeMs;
+}
+
+// ============================================================================
+// NOTIFICATION FORMATTING
+// ============================================================================
+
+/** Format date as "Mon 3/15" (no year, no leading zeros) */
+function formatShortDate(dateStr: string): string {
+  const parts = dateStr.split(/[-/]/);
+  if (parts.length >= 3) {
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
+    return `${dayName} ${Number(parts[1])}/${Number(parts[2])}`;
+  }
+  return dateStr;
+}
+
+/** Compact time like "4pm" or "10am" — drops :00 minutes, no space */
+function formatCompactTime(time: string): { hour: string; period: string } {
+  const full = formatTime12h(time); // e.g. "4:00 pm"
+  const match = full.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (!match) return { hour: full, period: '' };
+  const hour = match[2] === '00' ? match[1] : `${match[1]}:${match[2]}`;
+  return { hour, period: match[3] };
+}
+
+/** Format range like "4-6pm" or "10am-12pm" */
+function formatCompactRange(startTime: string, endTime: string): string {
+  const start = formatCompactTime(startTime);
+  const end = formatCompactTime(endTime);
+  if (start.period === end.period) return `${start.hour}-${end.hour}${end.period}`;
+  return `${start.hour}${start.period}-${end.hour}${end.period}`;
+}
+
+function formatSlotTime(slot: { date: string; startTime: string; endTime: string }): string {
+  return `${formatShortDate(slot.date)} ${formatCompactRange(slot.startTime, slot.endTime)}`;
+}
+
+function formatBoothCompact(b: BoothSlotSummary): string {
+  return b.slotCount === 1 ? `${b.storeName} ${formatSlotTime(b.slots[0])}` : `${b.storeName} (${b.slotCount} slots)`;
+}
+
+/** Short body for OS notification banner — verbose times when single location, capped at 2 */
+function formatNotificationBody(booths: BoothSlotSummary[]): string {
+  if (booths.length === 1 && booths[0].slotCount > 1) {
+    const b = booths[0];
+    const shown = b.slots
+      .slice(0, 2)
+      .map((s) => formatSlotTime(s))
+      .join(', ');
+    const remaining = b.slotCount - 2;
+    return remaining > 0 ? `${b.storeName}: ${shown} +${remaining} more` : `${b.storeName}: ${shown}`;
+  }
+  return booths.map(formatBoothCompact).join(', ');
+}
+
+function slotKey(boothId: number, slot: { date: string; startTime: string }): string {
+  return `${boothId}|${slot.date}|${slot.startTime}`;
+}
+
+/** Filter booth summaries to only slots not yet notified, returns new summaries (or empty) */
+function filterNewSlots(booths: BoothSlotSummary[], notified: Set<string>): BoothSlotSummary[] {
+  const result: BoothSlotSummary[] = [];
+  for (const b of booths) {
+    const newSlots = b.slots.filter((s) => !notified.has(slotKey(b.id, s)));
+    if (newSlots.length > 0) {
+      result.push({ ...b, slotCount: newSlots.length, slots: newSlots });
+    }
+  }
+  return result;
+}
+
+/** Mark all slots in the summaries as notified */
+function markNotified(booths: BoothSlotSummary[], notified: Set<string>): void {
+  for (const b of booths) {
+    for (const s of b.slots) notified.add(slotKey(b.id, s));
+  }
+}
+
+/** Detailed body for iMessage — verbose with address when single location */
+function formatImessageBody(booths: BoothSlotSummary[]): string {
+  const total = booths.reduce((sum, b) => sum + b.slotCount, 0);
+  const header = `${total} booth opening${total === 1 ? '' : 's'}`;
+  if (booths.length === 1) {
+    const b = booths[0];
+    const lines = [header, '', b.storeName, b.address, ''];
+    for (const s of b.slots) lines.push(formatSlotTime(s));
+    return lines.join('\n');
+  }
+  const lines = [header, ''];
+  for (const b of booths) lines.push(`${formatBoothCompact(b)} — ${b.address}`);
+  return lines.join('\n');
 }
 
 // ============================================================================
@@ -123,13 +216,26 @@ export function useSync(
       dispatch({ type: 'UPDATE_BOOTH_LOCATIONS', boothLocations: updated });
 
       if (appConfig) {
-        const count = countAvailableSlots(updated, appConfig.boothDayFilters, appConfig.ignoredTimeSlots);
+        const booths = summarizeAvailableSlots(updated, appConfig.boothDayFilters, appConfig.ignoredTimeSlots);
+        const count = booths.reduce((sum, b) => sum + b.slotCount, 0);
         if (count > 0) {
-          const msg = `${count} time slot${count === 1 ? '' : 's'} found`;
+          const notifBody = formatNotificationBody(booths);
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification('Booths Available', { body: msg, tag: 'booth-availability', requireInteraction: true });
+            new Notification('Booths Available', { body: notifBody, tag: 'booth-availability', requireInteraction: true });
           } else {
-            showStatus(`Booths available: ${msg}`, 'success');
+            showStatus(`Booths available: ${notifBody}`, 'success');
+          }
+          if (appConfig.boothAlertImessage && appConfig.boothAlertRecipient) {
+            const notified = new Set(appConfig.boothNotifiedSlots ?? []);
+            const newBooths = filterNewSlots(booths, notified);
+            if (newBooths.length > 0) {
+              markNotified(newBooths, notified);
+              ipcInvoke('send-imessage', {
+                recipient: appConfig.boothAlertRecipient,
+                message: formatImessageBody(newBooths)
+              }).catch(() => {});
+              ipcInvoke('update-config', { boothNotifiedSlots: [...notified] }).catch(() => {});
+            }
           }
         } else {
           showStatus('No available booth slots found', 'success');
