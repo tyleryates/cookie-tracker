@@ -11,6 +11,7 @@ import { computeGroupStatuses, createInitialSyncState, type GroupStatus, SyncTab
 import { DateFormatter } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
+import { encodeSlotKey } from './reports/available-booths';
 
 const initialState: AppState = {
   unified: null,
@@ -219,7 +220,7 @@ export function App() {
 
   const handleIgnoreSlot = useCallback(async (boothId: number, date: string, startTime: string) => {
     const config = stateRef.current.appConfig;
-    const ignored = [...(config?.ignoredTimeSlots || []), `${boothId}|${date}|${startTime}`];
+    const ignored = [...(config?.ignoredTimeSlots || []), encodeSlotKey(boothId, date, startTime)];
     if (config) {
       dispatch({ type: 'IGNORE_SLOT', config: { ...config, ignoredTimeSlots: ignored } });
     }

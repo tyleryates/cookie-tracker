@@ -7,7 +7,7 @@ import type { AppConfig, SyncState } from '../../types';
 import type { Action } from '../app-reducer';
 import { formatTime12h } from '../format-utils';
 import { ipcInvoke, ipcInvokeRaw, onIpcEvent } from '../ipc';
-import { type BoothSlotSummary, summarizeAvailableSlots } from '../reports/available-booths';
+import { type BoothSlotSummary, encodeSlotKey, summarizeAvailableSlots } from '../reports/available-booths';
 
 // ============================================================================
 // AUTO-SYNC — staleness-based polling
@@ -74,15 +74,11 @@ function formatNotificationBody(booths: BoothSlotSummary[]): string {
   return booths.map(formatBoothCompact).join(', ');
 }
 
-function slotKey(boothId: number, slot: { date: string; startTime: string }): string {
-  return `${boothId}|${slot.date}|${slot.startTime}`;
-}
-
 /** Filter booth summaries to only slots not yet notified, returns new summaries (or empty) */
 function filterNewSlots(booths: BoothSlotSummary[], notified: Set<string>): BoothSlotSummary[] {
   const result: BoothSlotSummary[] = [];
   for (const b of booths) {
-    const newSlots = b.slots.filter((s) => !notified.has(slotKey(b.id, s)));
+    const newSlots = b.slots.filter((s) => !notified.has(encodeSlotKey(b.id, s.date, s.startTime)));
     if (newSlots.length > 0) {
       result.push({ ...b, slotCount: newSlots.length, slots: newSlots });
     }
@@ -93,7 +89,7 @@ function filterNewSlots(booths: BoothSlotSummary[], notified: Set<string>): Boot
 /** Mark all slots in the summaries as notified */
 function markNotified(booths: BoothSlotSummary[], notified: Set<string>): void {
   for (const b of booths) {
-    for (const s of b.slots) notified.add(slotKey(b.id, s));
+    for (const s of b.slots) notified.add(encodeSlotKey(b.id, s.date, s.startTime));
   }
 }
 
@@ -101,14 +97,11 @@ function markNotified(booths: BoothSlotSummary[], notified: Set<string>): void {
 function formatImessageBody(booths: BoothSlotSummary[]): string {
   const total = booths.reduce((sum, b) => sum + b.slotCount, 0);
   const header = `${total} booth opening${total === 1 ? '' : 's'}`;
-  if (booths.length === 1) {
-    const b = booths[0];
-    const lines = [header, '', b.storeName, b.address, ''];
+  const lines = [header];
+  for (const b of booths) {
+    lines.push('', b.storeName, b.address, '');
     for (const s of b.slots) lines.push(formatSlotTime(s));
-    return lines.join('\n');
   }
-  const lines = [header, ''];
-  for (const b of booths) lines.push(`${formatBoothCompact(b)} — ${b.address}`);
   return lines.join('\n');
 }
 
@@ -208,6 +201,7 @@ export function useSync(
   }, [dispatch, showStatus, loadData]);
 
   const refreshBooths = useCallback(async () => {
+    const config = appConfigRef.current;
     try {
       Logger.info('Booth refresh: starting');
       dispatch({ type: 'BOOTH_REFRESH_STARTED' });
@@ -215,8 +209,8 @@ export function useSync(
       const updated = await ipcInvoke('refresh-booth-locations');
       dispatch({ type: 'UPDATE_BOOTH_LOCATIONS', boothLocations: updated });
 
-      if (appConfig) {
-        const booths = summarizeAvailableSlots(updated, appConfig.boothDayFilters, appConfig.ignoredTimeSlots);
+      if (config) {
+        const booths = summarizeAvailableSlots(updated, config.boothDayFilters, config.ignoredTimeSlots);
         const count = booths.reduce((sum, b) => sum + b.slotCount, 0);
         if (count > 0) {
           const notifBody = formatNotificationBody(booths);
@@ -225,16 +219,18 @@ export function useSync(
           } else {
             showStatus(`Booths available: ${notifBody}`, 'success');
           }
-          if (appConfig.boothAlertImessage && appConfig.boothAlertRecipient) {
-            const notified = new Set(appConfig.boothNotifiedSlots ?? []);
+          if (config.boothAlertImessage && config.boothAlertRecipient) {
+            const notified = new Set(config.boothNotifiedSlots ?? []);
             const newBooths = filterNewSlots(booths, notified);
             if (newBooths.length > 0) {
               markNotified(newBooths, notified);
               ipcInvoke('send-imessage', {
-                recipient: appConfig.boothAlertRecipient,
+                recipient: config.boothAlertRecipient,
                 message: formatImessageBody(newBooths)
               }).catch(() => {});
-              ipcInvoke('update-config', { boothNotifiedSlots: [...notified] }).catch(() => {});
+              const updatedSlots = [...notified];
+              dispatch({ type: 'UPDATE_CONFIG', patch: { boothNotifiedSlots: updatedSlots } });
+              ipcInvoke('update-config', { boothNotifiedSlots: updatedSlots }).catch(() => {});
             }
           }
         } else {
@@ -247,7 +243,7 @@ export function useSync(
     } finally {
       dispatch({ type: 'BOOTH_REFRESH_FINISHED' });
     }
-  }, [dispatch, showStatus, appConfig]);
+  }, [dispatch, showStatus]);
   refreshBoothsRef.current = refreshBooths;
 
   // IPC event listeners
