@@ -42,9 +42,13 @@ function makeState(overrides?: Partial<AppState>): AppState {
 
 function makeAppConfig(overrides?: Partial<AppConfig>): AppConfig {
   return {
+    autoUpdateEnabled: false,
     autoSyncEnabled: true,
     autoRefreshBoothsEnabled: true,
     availableBoothsEnabled: false,
+    boothAlertImessage: false,
+    boothAlertRecipient: '',
+    boothNotifiedSlots: [],
     boothIds: [],
     boothDayFilters: [],
     ignoredTimeSlots: [],
@@ -80,7 +84,7 @@ function makeUnifiedDataset(overrides?: Partial<UnifiedDataset>): UnifiedDataset
       grossProceeds: 0,
       scouts: { total: 0, active: 0, inactive: 0, withNegativeInventory: 0 }
     },
-    transferBreakdowns: { c2t: [], t2g: [], g2t: [], totals: { c2t: 0, t2gPhysical: 0, g2t: 0 } },
+    transferBreakdowns: { c2t: [], t2tOut: [], t2g: [], g2t: [], totals: { c2t: 0, t2tOut: 0, t2gPhysical: 0, g2t: 0 } },
     varieties: { byCookie: {}, inventory: {}, total: 0 },
     cookieShare: {
       digitalCookie: { total: 0, manualEntry: 0 },

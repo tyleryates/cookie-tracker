@@ -5,10 +5,10 @@ import * as path from 'node:path';
 import Logger from '../logger';
 import type { ProgressCallback } from '../types';
 
-/** Save data to current/{filename} as raw JSON (no envelope) */
+/** Save data to sync/{filename} as raw JSON (no envelope) */
 export function savePipelineFile(dataDir: string, filename: string, data: unknown): void {
   try {
-    const dir = path.join(dataDir, 'current');
+    const dir = path.join(dataDir, 'sync');
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
@@ -25,7 +25,7 @@ export abstract class BaseScraper {
 
   constructor(dataDir: string, progressCallback: ProgressCallback = null) {
     this.dataDir = dataDir;
-    this.currentDir = path.join(dataDir, 'current');
+    this.currentDir = path.join(dataDir, 'sync');
     this.progressCallback = progressCallback;
   }
 

@@ -22,7 +22,8 @@ export function importSmartCookieReport(store: DataStore, reportData: RawDataRow
     const totalParts = String(row[SC_REPORT_COLUMNS.TOTAL] || '0/0').split('/');
     const fieldCases = parseInt(totalParts[0], 10) || 0;
     const fieldPkgs = parseInt(totalParts[1], 10) || 0;
-    const totalFromField = fieldCases * PACKAGES_PER_CASE + fieldPkgs || totalPackages;
+    const computed = fieldCases * PACKAGES_PER_CASE + fieldPkgs;
+    const totalFromField = computed > 0 ? computed : totalPackages;
 
     const orderData = {
       orderNumber: orderNum,

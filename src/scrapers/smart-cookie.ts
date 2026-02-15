@@ -70,9 +70,9 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   /** Initialize orders page context */
-  private async initializeOrdersContext(): Promise<void> {
+  private async initializeOrdersContext(signal?: AbortSignal): Promise<void> {
     try {
-      await this.session.apiGet('/webapi/api/orders/dashboard', 'Orders dashboard');
+      await this.session.apiGet('/webapi/api/orders/dashboard', 'Orders dashboard', signal);
     } catch (error) {
       Logger.warn('Warning: Could not initialize orders context:', (error as Error).message);
     }
@@ -81,7 +81,7 @@ class SmartCookieScraper extends BaseScraper {
   async fetchOrders(signal?: AbortSignal): Promise<SCOrdersResponse> {
     this.checkAborted(signal);
 
-    await this.initializeOrdersContext();
+    await this.initializeOrdersContext(signal);
 
     const searchPayload = {
       transfer_types: ['ALL'],
@@ -92,7 +92,7 @@ class SmartCookieScraper extends BaseScraper {
     };
 
     try {
-      return await this.session.apiPost<SCOrdersResponse>('/webapi/api/orders/search', searchPayload, 'Orders search');
+      return await this.session.apiPost<SCOrdersResponse>('/webapi/api/orders/search', searchPayload, 'Orders search', signal);
     } catch (error: unknown) {
       if (isAxiosError(error) && error.response) {
         Logger.error('Orders API Error Response:', {
@@ -106,11 +106,11 @@ class SmartCookieScraper extends BaseScraper {
 
   async fetchDirectShipDivider(signal?: AbortSignal): Promise<SCDirectShipDivider> {
     this.checkAborted(signal);
-    return this.session.apiGet<SCDirectShipDivider>('/webapi/api/troops/directship/smart-directship-divider', 'Direct ship');
+    return this.session.apiGet<SCDirectShipDivider>('/webapi/api/troops/directship/smart-directship-divider', 'Direct ship', signal);
   }
 
-  async fetchVirtualCookieShare(orderId: string): Promise<SCVirtualCookieShare> {
-    return this.session.apiGet<SCVirtualCookieShare>(`/webapi/api/cookie-shares/virtual/${orderId}`, 'Cookie shares');
+  async fetchVirtualCookieShare(orderId: string, signal?: AbortSignal): Promise<SCVirtualCookieShare> {
+    return this.session.apiGet<SCVirtualCookieShare>(`/webapi/api/cookie-shares/virtual/${orderId}`, 'Cookie shares', signal);
   }
 
   async fetchAllVirtualCookieShares(ordersData: SCOrdersResponse, signal?: AbortSignal): Promise<Record<string, SCVirtualCookieShare>> {
@@ -129,7 +129,7 @@ class SmartCookieScraper extends BaseScraper {
       const orderId = String(order.id || order.order_id || '');
       if (orderId) {
         try {
-          keyedShares[orderId] = await this.fetchVirtualCookieShare(orderId);
+          keyedShares[orderId] = await this.fetchVirtualCookieShare(orderId, signal);
         } catch (error) {
           Logger.warn(`Warning: Could not fetch virtual cookie share ${orderId}:`, (error as Error).message);
         }
@@ -155,21 +155,25 @@ class SmartCookieScraper extends BaseScraper {
     return cookieMap;
   }
 
-  async fetchCookieIdMap(): Promise<Record<string, string>> {
-    const data = await this.session.apiGet<SCCookieMapEntry[]>('/webapi/api/me/cookies', 'Cookie map fetch');
+  async fetchCookieIdMap(signal?: AbortSignal): Promise<Record<string, string>> {
+    const data = await this.session.apiGet<SCCookieMapEntry[]>('/webapi/api/me/cookies', 'Cookie map fetch', signal);
     return this.buildCookieIdMap(data || []);
   }
 
-  async fetchReservations(): Promise<SCReservationsResponse | null> {
+  async fetchReservations(signal?: AbortSignal): Promise<SCReservationsResponse | null> {
     if (!this.session.troopId) {
       Logger.warn('Warning: No troopId available, skipping reservations fetch');
       return null;
     }
-    return this.session.apiGet<SCReservationsResponse>(`/webapi/api/troops/reservations?troop_id=${this.session.troopId}`, 'Reservations');
+    return this.session.apiGet<SCReservationsResponse>(
+      `/webapi/api/troops/reservations?troop_id=${this.session.troopId}`,
+      'Reservations',
+      signal
+    );
   }
 
-  async fetchSmartBoothDivider(reservationId: string): Promise<{ girls?: SCDividerGirl[] } | null> {
-    return this.session.apiGet(`/webapi/api/troops/reservations/smart-booth-divider/${reservationId}`, 'Booth allocations');
+  async fetchSmartBoothDivider(reservationId: string, signal?: AbortSignal): Promise<{ girls?: SCDividerGirl[] } | null> {
+    return this.session.apiGet(`/webapi/api/troops/reservations/smart-booth-divider/${reservationId}`, 'Booth allocations', signal);
   }
 
   /**
@@ -199,7 +203,7 @@ class SmartCookieScraper extends BaseScraper {
           if (!reservationId) return null;
 
           try {
-            const divider = await this.fetchSmartBoothDivider(reservationId);
+            const divider = await this.fetchSmartBoothDivider(reservationId, signal);
             return {
               reservationId,
               booth: reservation.booth || {},
@@ -224,7 +228,7 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   /** Fetch booth catalog only, using cache if available */
-  async fetchBoothCatalog(cache?: BoothCache): Promise<SCBoothLocationRaw[]> {
+  async fetchBoothCatalog(cache?: BoothCache, signal?: AbortSignal): Promise<SCBoothLocationRaw[]> {
     if (cache?.isCatalogFresh()) {
       return cache.getCatalog() || [];
     }
@@ -235,7 +239,8 @@ class SmartCookieScraper extends BaseScraper {
     const allBooths = await this.session.apiPost<SCBoothLocationRaw[]>(
       '/webapi/api/booths/search',
       { troop_id: this.session.troopId },
-      'Booth catalog'
+      'Booth catalog',
+      signal
     );
     const result = allBooths || [];
     if (cache) cache.setCatalog(result);
@@ -243,7 +248,12 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   /** Fetch booth availability (dates + times) for selected booths, using cache */
-  async fetchBoothAvailability(boothIds: number[], catalog: SCBoothLocationRaw[], cache?: BoothCache): Promise<SCBoothLocationRaw[]> {
+  async fetchBoothAvailability(
+    boothIds: number[],
+    catalog: SCBoothLocationRaw[],
+    cache?: BoothCache,
+    signal?: AbortSignal
+  ): Promise<SCBoothLocationRaw[]> {
     const filtered = boothIds.length > 0 ? catalog.filter((b) => boothIds.includes(b.id || b.booth_id || 0)) : catalog;
 
     if (boothIds.length === 0) return filtered;
@@ -256,7 +266,7 @@ class SmartCookieScraper extends BaseScraper {
       if (cache?.isDatesFresh(boothId)) {
         rawDates = cache.getDates(boothId)!;
       } else {
-        rawDates = await this.fetchBoothDates(boothId);
+        rawDates = await this.fetchBoothDates(boothId, signal);
         cache?.setDates(boothId, rawDates);
       }
       const dates = Array.isArray(rawDates) ? rawDates : rawDates?.dates || [];
@@ -271,7 +281,7 @@ class SmartCookieScraper extends BaseScraper {
         if (cache?.isTimeSlotsFresh(boothId, dateStr)) {
           rawTimes = cache.getTimeSlots(boothId, dateStr)!;
         } else {
-          rawTimes = await this.fetchBoothTimes(boothId, dateStr);
+          rawTimes = await this.fetchBoothTimes(boothId, dateStr, signal);
           cache?.setTimeSlots(boothId, dateStr, rawTimes);
         }
         const slots = Array.isArray(rawTimes) ? rawTimes : rawTimes?.times || rawTimes?.slots || [];
@@ -290,22 +300,28 @@ class SmartCookieScraper extends BaseScraper {
     return filtered;
   }
 
-  async fetchBoothDates(boothId: number): Promise<{ dates?: Array<string | { date: string }> } | Array<string | { date: string }>> {
+  async fetchBoothDates(
+    boothId: number,
+    signal?: AbortSignal
+  ): Promise<{ dates?: Array<string | { date: string }> } | Array<string | { date: string }>> {
     if (!this.session.troopId) throw new Error('No troopId available. Must sync first.');
     return this.session.apiGet(
       `/webapi/api/booths/availability?booth_id=${boothId}&troop_id=${this.session.troopId}`,
-      'Booth availability dates'
+      'Booth availability dates',
+      signal
     );
   }
 
   async fetchBoothTimes(
     boothId: number,
-    date: string
+    date: string,
+    signal?: AbortSignal
   ): Promise<{ times?: SCBoothTimeSlot[]; slots?: SCBoothTimeSlot[] } | SCBoothTimeSlot[]> {
     if (!this.session.troopId) throw new Error('No troopId available. Must sync first.');
     return this.session.apiGet(
       `/webapi/api/booths/availability/times?booth_id=${boothId}&date=${date}&troop_id=${this.session.troopId}`,
-      'Booth availability times'
+      'Booth availability times',
+      signal
     );
   }
 
@@ -364,12 +380,12 @@ class SmartCookieScraper extends BaseScraper {
       const [ordersData, directShipDivider, reservations, catalog, cookieIdMap] = await Promise.all([
         this.fetchEndpoint('sc-orders', () => this.fetchOrders(signal), { fatal: true }),
         this.fetchEndpoint<SCDirectShipDivider | null>('sc-direct-ship', () => this.fetchDirectShipDivider(signal), { fallback: null }),
-        this.fetchEndpoint<SCReservationsResponse | null>('sc-reservations', () => this.fetchReservations(), { fallback: null }),
-        this.fetchEndpoint<SCBoothLocationRaw[]>('sc-booth-catalog', () => this.fetchBoothCatalog(boothCache), {
+        this.fetchEndpoint<SCReservationsResponse | null>('sc-reservations', () => this.fetchReservations(signal), { fallback: null }),
+        this.fetchEndpoint<SCBoothLocationRaw[]>('sc-booth-catalog', () => this.fetchBoothCatalog(boothCache, signal), {
           fallback: [],
           cached: catalogCached
         }),
-        this.fetchEndpoint<Record<string, string> | null>('sc-cookie-map', () => this.fetchCookieIdMap(), {
+        this.fetchEndpoint<Record<string, string> | null>('sc-cookie-map', () => this.fetchCookieIdMap(signal), {
           fallback: null,
           cached: cookieMapCached
         })
@@ -410,7 +426,7 @@ class SmartCookieScraper extends BaseScraper {
             })(),
         this.fetchEndpoint<SCBoothLocationRaw[]>(
           'sc-booth-availability',
-          () => this.fetchBoothAvailability(boothIds, catalog, boothCache),
+          () => this.fetchBoothAvailability(boothIds, catalog, boothCache, signal),
           { fallback: catalog }
         )
       ]);

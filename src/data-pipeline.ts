@@ -111,7 +111,8 @@ function readPipelineFile<T>(currentDir: string, filename: string, validate?: (d
       return null;
     }
     return data as T;
-  } catch {
+  } catch (err) {
+    Logger.error(`Failed to parse pipeline file ${filename}: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
@@ -168,11 +169,11 @@ async function loadExcelFile(
 
 /**
  * Load and build unified dataset from files on disk.
- * Reads sync data from current/ (API responses, DC export) and
+ * Reads sync data from sync/ (API responses, DC export) and
  * legacy manual files from data/in/ (ReportExport, CookieOrders).
  */
 export async function loadData(dataDir: string): Promise<LoadDataResult | null> {
-  const currentDir = path.join(dataDir, 'current');
+  const currentDir = path.join(dataDir, 'sync');
   const inDir = path.join(dataDir, 'in');
 
   const store = createDataStore();

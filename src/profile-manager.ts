@@ -5,6 +5,7 @@ import type { ProfileInfo, ProfilesConfig } from './types';
 
 const FILES_TO_MIGRATE = ['config.json', 'timestamps.json', 'sc-troop.json', 'sc-cookies.json', 'dc-roles.json', 'app.log'];
 const DIRS_TO_MIGRATE = ['current', 'in'];
+const DIRS_TO_RENAME: Array<[string, string]> = [['current', 'sync']];
 const RESERVED_DIR_NAMES = new Set(['default']);
 
 class ProfileManager {
@@ -38,7 +39,10 @@ class ProfileManager {
     for (const dir of DIRS_TO_MIGRATE) {
       const src = path.join(this.rootDataDir, dir);
       if (fs.existsSync(src)) {
-        fs.renameSync(src, path.join(defaultDir, dir));
+        // Apply renames during initial migration (e.g. current → sync)
+        const rename = DIRS_TO_RENAME.find(([from]) => from === dir);
+        const destName = rename ? rename[1] : dir;
+        fs.renameSync(src, path.join(defaultDir, destName));
       }
     }
 
@@ -48,6 +52,23 @@ class ProfileManager {
     };
     this.saveProfiles(config);
     Logger.info('ProfileManager: migration complete');
+  }
+
+  /** Rename legacy subdirectories (e.g. current → sync) in all profile dirs */
+  renameDirs(): void {
+    if (DIRS_TO_RENAME.length === 0) return;
+    const config = this.loadProfiles();
+    for (const profile of config.profiles) {
+      const profileDir = path.join(this.rootDataDir, profile.dirName);
+      for (const [from, to] of DIRS_TO_RENAME) {
+        const src = path.join(profileDir, from);
+        const dest = path.join(profileDir, to);
+        if (fs.existsSync(src) && !fs.existsSync(dest)) {
+          fs.renameSync(src, dest);
+          Logger.info(`ProfileManager: renamed ${profile.dirName}/${from} → ${to}`);
+        }
+      }
+    }
   }
 
   loadProfiles(): ProfilesConfig {

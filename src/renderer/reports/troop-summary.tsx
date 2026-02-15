@@ -62,7 +62,7 @@ export function TroopSummaryReport({ data }: { data: UnifiedDataset }) {
   let dcDelivery = 0;
   let inPerson = 0;
   let girlDonations = 0;
-  for (const scout of Object.values(data.scouts)) {
+  for (const scout of Object.values(data.scouts || {})) {
     if (scout.isSiteOrder) {
       troopShipped += scout.totals.shipped || 0;
     } else {

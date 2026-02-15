@@ -74,6 +74,11 @@ const Logger = {
   init(dataDir: string): void {
     if (!fs || !path) return;
     const logFilePath = path.join(dataDir, 'app.log');
+    // Close previous stream (e.g. root-level → profile-level switch)
+    if (logStream) {
+      logStream.end();
+      logStream = null;
+    }
     // Truncate — fresh log for each session
     try {
       fs.mkdirSync(dataDir, { recursive: true });

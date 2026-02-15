@@ -29,6 +29,7 @@ export class SmartCookieSession {
         baseURL: 'https://app.abcsmartcookies.com',
         jar: this.cookieJar,
         withCredentials: true,
+        timeout: 30_000,
         maxRedirects: 5,
         headers: {
           'User-Agent': this.userAgent,
@@ -159,14 +160,14 @@ export class SmartCookieSession {
   }
 
   /** Authenticated GET request */
-  async apiGet<T = unknown>(url: string, label: string): Promise<T> {
-    return this.authenticatedRequest<T>(() => this.client.get(url, { headers: this.authHeaders }), label);
+  async apiGet<T = unknown>(url: string, label: string, signal?: AbortSignal): Promise<T> {
+    return this.authenticatedRequest<T>(() => this.client.get(url, { headers: this.authHeaders, signal }), label);
   }
 
   /** Authenticated POST request */
-  async apiPost<T = unknown>(url: string, body: Record<string, unknown>, label: string): Promise<T> {
+  async apiPost<T = unknown>(url: string, body: Record<string, unknown>, label: string, signal?: AbortSignal): Promise<T> {
     return this.authenticatedRequest<T>(
-      () => this.client.post(url, body, { headers: { 'Content-Type': 'application/json;charset=UTF-8', ...this.authHeaders } }),
+      () => this.client.post(url, body, { headers: { 'Content-Type': 'application/json;charset=UTF-8', ...this.authHeaders }, signal }),
       label
     );
   }

@@ -61,6 +61,7 @@ function initializeProfileManagers(dir: string): void {
 
 // Run migration + initialize before any IPC handlers fire
 profileManager.migrate();
+profileManager.renameDirs();
 initializeProfileManagers(profileManager.getActiveProfileDir());
 
 // Clean up stale root-level app.log (Logger.init(rootDataDir) creates it for migration,
@@ -336,7 +337,7 @@ ipcMain.handle(
   'save-file',
   handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { filename, content }: { filename: string; content: string }) => {
     if (profileReadOnly) return { path: '' };
-    const currentDir = path.join(profileDir, 'current');
+    const currentDir = path.join(profileDir, 'sync');
     if (!fs.existsSync(currentDir)) fs.mkdirSync(currentDir, { recursive: true });
 
     // Sanitize filename to prevent path traversal
@@ -712,13 +713,14 @@ ipcMain.handle(
   'send-imessage',
   handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { recipient, message }: { recipient: string; message: string }) => {
     Logger.info(`IPC: send-imessage to ${recipient}`);
-    const escapedMessage = message.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    const escapedRecipient = recipient.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    const script = `tell application "Messages"
-  send "${escapedMessage}" to buddy "${escapedRecipient}" of (service 1 whose service type is iMessage)
-end tell`;
+    // Pass message and recipient as arguments to avoid AppleScript string injection
+    const script = `on run {msg, rcpt}
+  tell application "Messages"
+    send msg to buddy rcpt of (service 1 whose service type is iMessage)
+  end tell
+end run`;
     await new Promise<void>((resolve, reject) => {
-      execFile('osascript', ['-e', script], (error) => {
+      execFile('osascript', ['-e', script, message, recipient], (error) => {
         if (error) {
           Logger.error('iMessage send failed:', error.message);
           reject(error);
@@ -757,6 +759,7 @@ ipcMain.handle(
 
     const done = new Promise<void>((resolve, reject) => {
       output.on('close', resolve);
+      output.on('error', reject);
       archive.on('error', reject);
     });
 
@@ -840,17 +843,42 @@ ipcMain.handle(
     const { profile, config } = profileManager.createProfile(name);
     const newProfileDir = path.join(rootDataDir, profile.dirName);
 
-    // Extract ZIP into the new profile directory
-    await new Promise<void>((resolve, reject) => {
-      execFile('ditto', ['-xk', zipPath, newProfileDir], (error) => {
-        if (error) reject(error);
-        else resolve();
+    // Extract ZIP into a temp directory first, then validate paths before moving
+    const tempDir = path.join(rootDataDir, `_import_${Date.now()}`);
+    fs.mkdirSync(tempDir, { recursive: true });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        execFile('ditto', ['-xk', zipPath, tempDir], (error) => {
+          if (error) reject(error);
+          else resolve();
+        });
       });
-    });
 
-    // Remove credentials if they were included in the ZIP (security)
-    const credInZip = path.join(newProfileDir, 'credentials.enc');
-    if (fs.existsSync(credInZip)) fs.unlinkSync(credInZip);
+      // Verify all extracted entries stay within the temp directory (path traversal check)
+      const resolvedTemp = path.resolve(tempDir);
+      const checkEntries = (dir: string) => {
+        for (const entry of fs.readdirSync(dir)) {
+          const fullPath = path.resolve(path.join(dir, entry));
+          if (!fullPath.startsWith(resolvedTemp + path.sep) && fullPath !== resolvedTemp) {
+            throw new Error(`Path traversal detected in ZIP: ${entry}`);
+          }
+          if (fs.statSync(fullPath).isDirectory()) checkEntries(fullPath);
+        }
+      };
+      checkEntries(tempDir);
+
+      // Remove credentials if included in the ZIP (security)
+      const credInTemp = path.join(tempDir, 'credentials.enc');
+      if (fs.existsSync(credInTemp)) fs.unlinkSync(credInTemp);
+
+      // Move validated contents to profile directory
+      for (const entry of fs.readdirSync(tempDir)) {
+        fs.renameSync(path.join(tempDir, entry), path.join(newProfileDir, entry));
+      }
+    } finally {
+      // Clean up temp directory
+      if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+    }
 
     return config;
   })

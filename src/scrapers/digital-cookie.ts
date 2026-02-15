@@ -38,7 +38,8 @@ class DigitalCookieScraper extends BaseScraper {
           troopId,
           serviceUnitId,
           councilId
-        }
+        },
+        signal
       }
     );
 
@@ -61,7 +62,8 @@ class DigitalCookieScraper extends BaseScraper {
     this.checkAborted(signal);
 
     const downloadResponse = await this.session.authenticatedGet<Buffer>(`/ajaxCall/downloadFile/TROOP_ORDER_REPORT/${fileName}`, {
-      responseType: 'arraybuffer'
+      responseType: 'arraybuffer',
+      signal
     });
 
     // Save file

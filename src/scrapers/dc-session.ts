@@ -26,6 +26,7 @@ export class DigitalCookieSession {
         baseURL: 'https://digitalcookie.girlscouts.org',
         jar: jar,
         withCredentials: true,
+        timeout: 30_000,
         maxRedirects: 5,
         headers: {
           'User-Agent': this.userAgent,

@@ -33,7 +33,7 @@ class BoothCache {
   /** Load catalog from the sc-booth-catalog.json pipeline file */
   private hydrateCatalog(): void {
     try {
-      const filePath = path.join(this.dataDir, 'current', PIPELINE_FILES.SC_BOOTH_CATALOG);
+      const filePath = path.join(this.dataDir, 'sync', PIPELINE_FILES.SC_BOOTH_CATALOG);
       if (!fs.existsSync(filePath)) return;
 
       const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));

@@ -250,6 +250,31 @@ export function SyncTab({
 
   return (
     <div class="report-visual">
+      <h3>Data</h3>
+      <EndpointTable endpoints={syncState.endpoints} availableBoothsEnabled={availableBoothsEnabled} showFrequency={false} />
+      <div class="sync-controls">
+        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing || readOnly} onClick={onSyncReports}>
+          {syncState.syncing ? 'Refreshing\u2026' : 'Refresh Reports'}
+        </button>
+        {availableBoothsEnabled && (
+          <button
+            type="button"
+            class="btn btn-secondary active"
+            disabled={syncState.refreshingBooths || readOnly}
+            onClick={onRefreshBooths}
+          >
+            {syncState.refreshingBooths ? 'Refreshing\u2026' : 'Refresh Booths'}
+          </button>
+        )}
+      </div>
+      <div class="button-group" style={{ marginTop: '12px' }}>
+        <button type="button" class="btn btn-secondary" onClick={onRecalculate}>
+          Recalculate
+        </button>
+        <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
+          Export Data
+        </button>
+      </div>
       {profiles.length > 0 && (
         <div class="profile-section">
           <h3>Profile</h3>
@@ -287,43 +312,18 @@ export function SyncTab({
               Import Data
             </button>
           </div>
+          <div class="button-group" style={{ marginTop: '12px' }}>
+            <button type="button" class="btn btn-secondary" disabled={readOnly} onClick={onWipeData}>
+              Wipe Data
+            </button>
+            {readOnly && (
+              <button type="button" class="btn btn-secondary" onClick={() => activeProfile && onDeleteProfile(activeProfile.dirName)}>
+                Delete Profile
+              </button>
+            )}
+          </div>
         </div>
       )}
-      <h3>Data</h3>
-      <EndpointTable endpoints={syncState.endpoints} availableBoothsEnabled={availableBoothsEnabled} showFrequency={false} />
-      <div class="sync-controls">
-        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing || readOnly} onClick={onSyncReports}>
-          {syncState.syncing ? 'Refreshing\u2026' : 'Refresh Reports'}
-        </button>
-        {availableBoothsEnabled && (
-          <button
-            type="button"
-            class="btn btn-secondary active"
-            disabled={syncState.refreshingBooths || readOnly}
-            onClick={onRefreshBooths}
-          >
-            {syncState.refreshingBooths ? 'Refreshing\u2026' : 'Refresh Booths'}
-          </button>
-        )}
-      </div>
-      <div class="settings-danger-zone">
-        <div class="button-group">
-          <button type="button" class="btn btn-secondary" onClick={onRecalculate}>
-            Recalculate
-          </button>
-          <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
-            Export Data
-          </button>
-          <button type="button" class="btn btn-secondary" disabled={readOnly} onClick={onWipeData}>
-            Wipe Data
-          </button>
-          {readOnly && (
-            <button type="button" class="btn btn-secondary" onClick={() => activeProfile && onDeleteProfile(activeProfile.dirName)}>
-              Delete Profile
-            </button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
