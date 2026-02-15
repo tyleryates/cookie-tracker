@@ -82,11 +82,6 @@ class ProfileManager {
     return path.join(this.rootDataDir, config.activeProfile);
   }
 
-  isDefaultProfile(): boolean {
-    const config = this.loadProfiles();
-    return config.activeProfile === 'default';
-  }
-
   createProfile(name: string): { profile: ProfileInfo; config: ProfilesConfig } {
     const config = this.loadProfiles();
     const dirName = this.slugify(name, config.profiles);

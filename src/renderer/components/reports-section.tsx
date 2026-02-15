@@ -27,6 +27,7 @@ interface ReportContentProps {
   appConfig: AppConfig | null;
   boothSyncState: EndpointSyncState;
   boothResetKey: number;
+  readOnly: boolean;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
   onResetIgnored: () => void;
   onResetNotified: () => void;
@@ -135,6 +136,7 @@ function renderReport(
   unified: UnifiedDataset,
   appConfig: AppConfig | null,
   boothSyncState: EndpointSyncState,
+  readOnly: boolean,
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void,
   onResetIgnored: () => void,
   onResetNotified: () => void,
@@ -167,6 +169,7 @@ function renderReport(
           }}
           appConfig={appConfig}
           syncState={boothSyncState}
+          readOnly={readOnly}
           onIgnoreSlot={onIgnoreSlot}
           onResetIgnored={onResetIgnored}
           onResetNotified={onResetNotified}
@@ -245,6 +248,7 @@ export function ReportContent({
   appConfig,
   boothSyncState,
   boothResetKey,
+  readOnly,
   onIgnoreSlot,
   onResetIgnored,
   onResetNotified,
@@ -286,6 +290,7 @@ export function ReportContent({
         unified,
         appConfig,
         boothSyncState,
+        readOnly,
         onIgnoreSlot,
         onResetIgnored,
         onResetNotified,

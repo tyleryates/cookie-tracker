@@ -42,6 +42,7 @@ const profileManager = new ProfileManager(rootDataDir);
 
 // Profile-specific managers (reinitialized on profile switch)
 let profileDir: string;
+let profileReadOnly = false;
 let configManager: ConfigManager;
 let boothCache: BoothCache;
 let seasonalData: SeasonalData;
@@ -49,11 +50,13 @@ let timestampsPath: string;
 
 function initializeProfileManagers(dir: string): void {
   profileDir = dir;
+  profileReadOnly = path.basename(dir) !== 'default';
   configManager = new ConfigManager(profileDir);
   boothCache = new BoothCache(profileDir);
   seasonalData = new SeasonalData(profileDir);
   timestampsPath = path.join(profileDir, 'timestamps.json');
-  Logger.init(profileDir);
+  // Don't write app.log into read-only profile snapshots
+  if (!profileReadOnly) Logger.init(profileDir);
 }
 
 // Run migration + initialize before any IPC handlers fire
@@ -321,6 +324,7 @@ ipcMain.handle(
 ipcMain.handle(
   'save-file',
   handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { filename, content }: { filename: string; content: string }) => {
+    if (profileReadOnly) return { path: '' };
     const currentDir = path.join(profileDir, 'current');
     if (!fs.existsSync(currentDir)) fs.mkdirSync(currentDir, { recursive: true });
 
@@ -386,6 +390,7 @@ ipcMain.handle(
 ipcMain.handle(
   'save-config',
   handleIpcError(async (_event: Electron.IpcMainInvokeEvent, config: AppConfig) => {
+    if (profileReadOnly) return;
     configManager.saveConfig(config);
   })
 );
@@ -393,6 +398,7 @@ ipcMain.handle(
 ipcMain.handle(
   'update-config',
   handleIpcError(async (_event: Electron.IpcMainInvokeEvent, partial: Partial<AppConfig>) => {
+    if (profileReadOnly) return configManager.loadConfig();
     const updated = configManager.updateConfig(partial);
     return updated;
   })
@@ -402,6 +408,7 @@ ipcMain.handle(
 ipcMain.handle(
   'scrape-websites',
   handleIpcError(async (event) => {
+    if (profileReadOnly) throw new Error('Syncing is disabled for imported profiles');
     const auth = loadAndValidateCredentials();
     if (auth.error || !auth.credentials) {
       throw new Error(auth.error || 'No credentials available');
@@ -461,6 +468,7 @@ ipcMain.handle(
 ipcMain.handle(
   'refresh-booth-locations',
   handleIpcError(async (event) => {
+    if (profileReadOnly) return [];
     Logger.info('IPC: refresh-booth-locations');
     const config = configManager.loadConfig();
     if (!config.availableBoothsEnabled) return [];
@@ -553,6 +561,7 @@ ipcMain.handle(
 ipcMain.handle(
   'save-seasonal-data',
   handleIpcError(async (_event: Electron.IpcMainInvokeEvent, data: Partial<SeasonalDataFiles>) => {
+    if (profileReadOnly) return;
     seasonalData.saveAll(data);
   })
 );
@@ -577,6 +586,7 @@ ipcMain.handle(
 ipcMain.handle(
   'record-unified-build',
   handleIpcError(async () => {
+    if (profileReadOnly) return;
     const ts = loadTimestamps();
     ts.lastUnifiedBuild = new Date().toISOString();
     saveTimestamps(ts);
@@ -597,6 +607,7 @@ ipcMain.handle(
 ipcMain.handle(
   'wipe-data',
   handleIpcError(async () => {
+    if (profileReadOnly) return;
     // Keep only login-related files (seasonal data used for verification)
     const KEEP_FILES = new Set(['sc-troop.json', 'sc-cookies.json', 'dc-roles.json']);
     if (fs.existsSync(profileDir)) {

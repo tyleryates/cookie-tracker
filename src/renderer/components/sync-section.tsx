@@ -2,8 +2,7 @@
 
 import { useState } from 'preact/hooks';
 import { formatMaxAge, SYNC_ENDPOINTS } from '../../constants';
-import type { EndpointSyncState, ProfileInfo, SyncState } from '../../types';
-import type { ActiveProfile } from '../app-reducer';
+import type { ActiveProfile, EndpointSyncState, ProfileInfo, SyncState } from '../../types';
 import { DateFormatter } from '../format-utils';
 
 // ============================================================================
@@ -223,6 +222,7 @@ interface SyncTabProps {
   onExport: () => void;
   onWipeData: () => void;
   hasData: boolean;
+  readOnly: boolean;
   activeProfile: ActiveProfile | null;
   profiles: ProfileInfo[];
   onSwitchProfile: (dirName: string) => void;
@@ -239,6 +239,7 @@ export function SyncTab({
   onExport,
   onWipeData,
   hasData,
+  readOnly,
   activeProfile,
   profiles,
   onSwitchProfile,
@@ -246,8 +247,6 @@ export function SyncTab({
   onDeleteProfile
 }: SyncTabProps) {
   const [importName, setImportName] = useState('');
-  const isDefault = activeProfile?.isDefault ?? true;
-  const syncDisabled = !isDefault;
 
   return (
     <div class="report-visual">
@@ -266,7 +265,7 @@ export function SyncTab({
                 </option>
               ))}
             </select>
-            {syncDisabled && <span class="profile-hint">Imported snapshot — syncing disabled</span>}
+            {readOnly && <span class="profile-hint">Imported snapshot — syncing disabled</span>}
           </div>
           <div class="profile-import">
             <input
@@ -293,14 +292,14 @@ export function SyncTab({
       <h3>Data</h3>
       <EndpointTable endpoints={syncState.endpoints} availableBoothsEnabled={availableBoothsEnabled} showFrequency={false} />
       <div class="sync-controls">
-        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing || syncDisabled} onClick={onSyncReports}>
+        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing || readOnly} onClick={onSyncReports}>
           {syncState.syncing ? 'Refreshing\u2026' : 'Refresh Reports'}
         </button>
         {availableBoothsEnabled && (
           <button
             type="button"
             class="btn btn-secondary active"
-            disabled={syncState.refreshingBooths || syncDisabled}
+            disabled={syncState.refreshingBooths || readOnly}
             onClick={onRefreshBooths}
           >
             {syncState.refreshingBooths ? 'Refreshing\u2026' : 'Refresh Booths'}
@@ -315,10 +314,10 @@ export function SyncTab({
           <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
             Export Data
           </button>
-          <button type="button" class="btn btn-secondary" onClick={onWipeData}>
+          <button type="button" class="btn btn-secondary" disabled={readOnly} onClick={onWipeData}>
             Wipe Data
           </button>
-          {!isDefault && (
+          {readOnly && (
             <button type="button" class="btn btn-secondary" onClick={() => activeProfile && onDeleteProfile(activeProfile.dirName)}>
               Delete Profile
             </button>

@@ -500,6 +500,17 @@ export interface ProfilesConfig {
   profiles: ProfileInfo[];
 }
 
+export interface ActiveProfile {
+  dirName: string;
+  name: string;
+  isDefault: boolean;
+}
+
+/** Build an ActiveProfile from a ProfileInfo entry */
+export function toActiveProfile(info: ProfileInfo): ActiveProfile {
+  return { dirName: info.dirName, name: info.name, isDefault: info.dirName === 'default' };
+}
+
 // ============================================================================
 // APP CONFIG TYPES
 // ============================================================================

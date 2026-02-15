@@ -3,7 +3,7 @@
 import { useCallback, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
 import Logger from '../logger';
-import type { ProfilesConfig } from '../types';
+import { type ProfilesConfig, toActiveProfile } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { ReportContent, TabBar } from './components/reports-section';
 import { SettingsPage } from './components/settings-page';
@@ -57,7 +57,7 @@ function SyncPill({ label, group }: { label: string; group: GroupStatus }) {
 
 function AppHeader({
   syncing,
-  syncDisabled,
+  readOnly,
   groups,
   showBooths,
   onSync,
@@ -67,7 +67,7 @@ function AppHeader({
   isWelcome
 }: {
   syncing: boolean;
-  syncDisabled: boolean;
+  readOnly: boolean;
   groups: ReturnType<typeof computeGroupStatuses>;
   showBooths: boolean;
   onSync: () => void;
@@ -99,7 +99,7 @@ function AppHeader({
             </div>
           )}
           {!showBackButton && (
-            <button type="button" class="icon-btn has-tooltip" disabled={syncing || syncDisabled} onClick={onSync}>
+            <button type="button" class="icon-btn has-tooltip" disabled={syncing || readOnly} onClick={onSync}>
               {syncing ? <span class="spinner" /> : '\u21BB'}
               <span class="btn-tooltip">Refresh Data</span>
             </button>
@@ -241,11 +241,7 @@ export function App() {
     (pc: ProfilesConfig) => {
       const active = pc.profiles.find((p) => p.dirName === pc.activeProfile);
       if (active) {
-        dispatch({
-          type: 'SET_PROFILES',
-          profiles: pc.profiles,
-          activeProfile: { dirName: active.dirName, name: active.name, isDefault: active.dirName === 'default' }
-        });
+        dispatch({ type: 'SET_PROFILES', profiles: pc.profiles, activeProfile: toActiveProfile(active) });
       }
     },
     [dispatch]
@@ -330,6 +326,7 @@ export function App() {
   const groups = computeGroupStatuses(state.syncState.endpoints, state.syncState);
   const isSettings = state.activePage === 'settings';
   const isWelcome = state.activePage === 'welcome';
+  const readOnly = !!state.activeProfile && !state.activeProfile.isDefault;
 
   return (
     <div class="app-shell">
@@ -350,7 +347,7 @@ export function App() {
       )}
       <AppHeader
         syncing={state.syncState.syncing}
-        syncDisabled={!!state.activeProfile && !state.activeProfile.isDefault}
+        readOnly={readOnly}
         groups={groups}
         showBooths={!!state.appConfig?.availableBoothsEnabled}
         onSync={handleHeaderSync}
@@ -369,7 +366,7 @@ export function App() {
             appConfig={state.appConfig}
             autoSyncEnabled={state.autoSyncEnabled}
             autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
-            isDefaultProfile={state.activeProfile?.isDefault ?? true}
+            readOnly={readOnly}
             onBack={handleCloseSettings}
             onUpdateConfig={handleUpdateConfig}
             onToggleAutoSync={handleToggleAutoSync}
@@ -385,6 +382,7 @@ export function App() {
             onExport={exportData}
             onWipeData={handleWipeData}
             hasData={!!state.unified}
+            readOnly={readOnly}
             activeProfile={state.activeProfile}
             profiles={state.profiles}
             onSwitchProfile={handleSwitchProfile}
@@ -398,6 +396,7 @@ export function App() {
             appConfig={state.appConfig}
             boothSyncState={state.syncState.endpoints['sc-booth-availability'] || { status: 'idle', lastSync: null }}
             boothResetKey={boothResetKeyRef.current}
+            readOnly={readOnly}
             onIgnoreSlot={handleIgnoreSlot}
             onResetIgnored={handleResetIgnored}
             onResetNotified={handleResetNotified}

@@ -2,7 +2,7 @@
 // Side effects (IPC calls, timers) stay in the component; only pure state
 // transitions live here.
 
-import type { AppConfig, EndpointSyncState, ProfileInfo, SyncState, UnifiedDataset } from '../types';
+import type { ActiveProfile, AppConfig, EndpointSyncState, ProfileInfo, SyncState, UnifiedDataset } from '../types';
 
 // ============================================================================
 // STATE
@@ -11,12 +11,6 @@ import type { AppConfig, EndpointSyncState, ProfileInfo, SyncState, UnifiedDatas
 export interface StatusMessage {
   msg: string;
   type: 'success' | 'warning' | 'error';
-}
-
-export interface ActiveProfile {
-  dirName: string;
-  name: string;
-  isDefault: boolean;
 }
 
 export interface AppState {
@@ -87,12 +81,12 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, activePage: 'welcome' };
 
     case 'LOAD_CONFIG': {
-      const isNonDefault = state.activeProfile != null && !state.activeProfile.isDefault;
+      const readOnly = state.activeProfile != null && !state.activeProfile.isDefault;
       return {
         ...state,
         appConfig: action.config,
-        autoSyncEnabled: isNonDefault ? false : (action.config.autoSyncEnabled ?? true),
-        autoRefreshBoothsEnabled: isNonDefault ? false : (action.config.autoRefreshBoothsEnabled ?? true)
+        autoSyncEnabled: readOnly ? false : (action.config.autoSyncEnabled ?? true),
+        autoRefreshBoothsEnabled: readOnly ? false : (action.config.autoRefreshBoothsEnabled ?? true)
       };
     }
 

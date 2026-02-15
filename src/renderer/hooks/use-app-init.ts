@@ -1,6 +1,7 @@
 // useAppInit — app initialization (load config, data, hydrate sync timestamps)
 
 import { useEffect } from 'preact/hooks';
+import { toActiveProfile } from '../../types';
 import type { Action } from '../app-reducer';
 import { loadAppConfig } from '../data-loader';
 import { ipcInvoke } from '../ipc';
@@ -13,11 +14,7 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
         const profilesConfig = await ipcInvoke('load-profiles');
         const active = profilesConfig.profiles.find((p) => p.dirName === profilesConfig.activeProfile);
         if (active) {
-          dispatch({
-            type: 'SET_PROFILES',
-            profiles: profilesConfig.profiles,
-            activeProfile: { dirName: active.dirName, name: active.name, isDefault: active.dirName === 'default' }
-          });
+          dispatch({ type: 'SET_PROFILES', profiles: profilesConfig.profiles, activeProfile: toActiveProfile(active) });
         }
       } catch {
         // Non-fatal — profiles default to empty

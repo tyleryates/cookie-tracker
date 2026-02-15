@@ -16,7 +16,7 @@ interface SettingsPageProps {
   appConfig: AppConfig | null;
   autoSyncEnabled: boolean;
   autoRefreshBoothsEnabled: boolean;
-  isDefaultProfile?: boolean;
+  readOnly?: boolean;
   onBack: () => void;
   onUpdateConfig: (patch: Partial<AppConfig>) => void;
   onToggleAutoSync: (enabled: boolean) => void;
@@ -28,7 +28,7 @@ export function SettingsPage({
   appConfig,
   autoSyncEnabled,
   autoRefreshBoothsEnabled,
-  isDefaultProfile = true,
+  readOnly = false,
   onBack,
   onUpdateConfig,
   onToggleAutoSync,
@@ -226,7 +226,7 @@ export function SettingsPage({
             <input
               type="checkbox"
               checked={autoSyncEnabled}
-              disabled={!isDefaultProfile}
+              disabled={readOnly}
               onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)}
             />
             <span class="toggle-slider" />
@@ -236,6 +236,7 @@ export function SettingsPage({
             <input
               type="checkbox"
               checked={appConfig?.availableBoothsEnabled ?? false}
+              disabled={readOnly}
               onChange={(e) => onUpdateConfig({ availableBoothsEnabled: (e.target as HTMLInputElement).checked })}
             />
             <span class="toggle-slider" />
@@ -247,7 +248,7 @@ export function SettingsPage({
                 <input
                   type="checkbox"
                   checked={autoRefreshBoothsEnabled}
-                  disabled={!isDefaultProfile}
+                  disabled={readOnly}
                   onChange={(e) => onToggleAutoRefreshBooths((e.target as HTMLInputElement).checked)}
                 />
                 <span class="toggle-slider" />
@@ -261,6 +262,7 @@ export function SettingsPage({
                 <input
                   type="checkbox"
                   checked={appConfig?.boothAlertImessage ?? false}
+                  disabled={readOnly}
                   onChange={(e) => onUpdateConfig({ boothAlertImessage: (e.target as HTMLInputElement).checked })}
                 />
                 <span class="toggle-slider" />
@@ -324,6 +326,7 @@ export function SettingsPage({
             <input
               type="checkbox"
               checked={appConfig?.autoUpdateEnabled ?? false}
+              disabled={readOnly}
               onChange={(e) => onUpdateConfig({ autoUpdateEnabled: (e.target as HTMLInputElement).checked })}
             />
             <span class="toggle-slider" />

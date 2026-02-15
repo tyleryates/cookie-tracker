@@ -140,6 +140,7 @@ interface AvailableBoothsProps {
   config: AvailableBoothsConfig;
   appConfig: AppConfig | null;
   syncState: EndpointSyncState;
+  readOnly: boolean;
   onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
   onResetIgnored: () => void;
   onResetNotified: () => void;
@@ -153,6 +154,7 @@ export function AvailableBoothsReport({
   config,
   appConfig,
   syncState,
+  readOnly,
   onIgnoreSlot,
   onResetIgnored,
   onResetNotified,
@@ -309,9 +311,11 @@ export function AvailableBoothsReport({
             <div class="config-section">
               <div class="config-section-header">
                 <span class="config-label">Booths</span>
-                <button type="button" class="btn btn-secondary btn-sm" onClick={() => setSelecting(true)}>
-                  Select Booths
-                </button>
+                {!readOnly && (
+                  <button type="button" class="btn btn-secondary btn-sm" onClick={() => setSelecting(true)}>
+                    Select Booths
+                  </button>
+                )}
               </div>
               {sortedStoreNames.length > 0 ? (
                 <div class="config-day-list">
@@ -328,9 +332,11 @@ export function AvailableBoothsReport({
             <div class="config-section">
               <div class="config-section-header">
                 <span class="config-label">Days & Times</span>
-                <button type="button" class="btn btn-secondary btn-sm" onClick={() => setFiltering(true)}>
-                  Select Days & Times
-                </button>
+                {!readOnly && (
+                  <button type="button" class="btn btn-secondary btn-sm" onClick={() => setFiltering(true)}>
+                    Select Days & Times
+                  </button>
+                )}
               </div>
               {dayTimeDetails.length > 0 ? (
                 <div class="config-day-list">
@@ -344,7 +350,7 @@ export function AvailableBoothsReport({
                 <div class="config-value muted-text">No days selected</div>
               )}
             </div>
-            {ignoredTimeSlots.length > 0 && (
+            {!readOnly && ignoredTimeSlots.length > 0 && (
               <div class="config-section">
                 <div class="config-section-header">
                   <span class="config-value">
@@ -356,7 +362,7 @@ export function AvailableBoothsReport({
                 </div>
               </div>
             )}
-            {appConfig?.boothAlertImessage && (appConfig?.boothNotifiedSlots?.length ?? 0) > 0 && (
+            {!readOnly && appConfig?.boothAlertImessage && (appConfig?.boothNotifiedSlots?.length ?? 0) > 0 && (
               <div class="config-section">
                 <div class="config-section-header">
                   <span class="config-value">
@@ -371,28 +377,30 @@ export function AvailableBoothsReport({
           </div>
         )}
 
-        <div class="booth-action-row">
-          {isFullyConfigured ? (
-            <button type="button" class="btn btn-primary btn-sm" disabled={refreshing} onClick={onRefresh}>
-              Find Booths
-            </button>
-          ) : (
-            <span class="booth-sync-status">
-              {boothCount === 0 && filterCount === 0
-                ? 'Select booths and days to get started'
-                : boothCount === 0
-                  ? 'Select booths to get started'
-                  : 'Select days to get started'}
-            </span>
-          )}
-          {isFullyConfigured && (
-            <span class="booth-sync-status">
-              {refreshing && <span class="spinner" />}
-              {syncStatusText}
-              {syncStatusIcon && ` ${syncStatusIcon}`}
-            </span>
-          )}
-        </div>
+        {!readOnly && (
+          <div class="booth-action-row">
+            {isFullyConfigured ? (
+              <button type="button" class="btn btn-primary btn-sm" disabled={refreshing} onClick={onRefresh}>
+                Find Booths
+              </button>
+            ) : (
+              <span class="booth-sync-status">
+                {boothCount === 0 && filterCount === 0
+                  ? 'Select booths and days to get started'
+                  : boothCount === 0
+                    ? 'Select booths to get started'
+                    : 'Select days to get started'}
+              </span>
+            )}
+            {isFullyConfigured && (
+              <span class="booth-sync-status">
+                {refreshing && <span class="spinner" />}
+                {syncStatusText}
+                {syncStatusIcon && ` ${syncStatusIcon}`}
+              </span>
+            )}
+          </div>
+        )}
       </div>
       {isFullyConfigured &&
         (boothsWithDates.length === 0 ? (
@@ -446,17 +454,19 @@ export function AvailableBoothsReport({
                             return (
                               <span key={`${d.date}-${slot.startTime}`} title={raw} class="booth-time-slot">
                                 {friendly}
-                                <button
-                                  type="button"
-                                  class="booth-slot-dismiss"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onIgnoreSlot(loc.id, d.date, slot.startTime);
-                                  }}
-                                  title="Ignore this time slot"
-                                >
-                                  &times;
-                                </button>
+                                {!readOnly && (
+                                  <button
+                                    type="button"
+                                    class="booth-slot-dismiss"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onIgnoreSlot(loc.id, d.date, slot.startTime);
+                                    }}
+                                    title="Ignore this time slot"
+                                  >
+                                    &times;
+                                  </button>
+                                )}
                               </span>
                             );
                           })}

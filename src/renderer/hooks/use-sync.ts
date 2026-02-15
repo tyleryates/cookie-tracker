@@ -93,6 +93,18 @@ function markNotified(booths: BoothSlotSummary[], notified: Set<string>): void {
   }
 }
 
+/** Check if the date portion of a slot key (boothId|date|startTime) is before today */
+function isSlotDatePast(slotKey: string): boolean {
+  const parts = slotKey.split('|');
+  if (parts.length < 2) return false;
+  const dateParts = parts[1].split(/[-/]/);
+  if (dateParts.length < 3) return false;
+  const dateInt = Number(dateParts[0]) * 10000 + Number(dateParts[1]) * 100 + Number(dateParts[2]);
+  const now = new Date();
+  const todayInt = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  return dateInt < todayInt;
+}
+
 /** Detailed body for iMessage — verbose with address when single location */
 function formatImessageBody(booths: BoothSlotSummary[]): string {
   const total = booths.reduce((sum, b) => sum + b.slotCount, 0);
@@ -210,7 +222,29 @@ export function useSync(
       dispatch({ type: 'UPDATE_BOOTH_LOCATIONS', boothLocations: updated });
 
       if (config) {
-        const booths = summarizeAvailableSlots(updated, config.boothDayFilters, config.ignoredTimeSlots);
+        // Prune past ignored time slots (by date, not time)
+        const prunedIgnored = config.ignoredTimeSlots.filter((key) => !isSlotDatePast(key));
+        if (prunedIgnored.length !== config.ignoredTimeSlots.length) {
+          dispatch({ type: 'UPDATE_CONFIG', patch: { ignoredTimeSlots: prunedIgnored } });
+          ipcInvoke('update-config', { ignoredTimeSlots: prunedIgnored }).catch(() => {});
+        }
+
+        // Build set of currently available slot keys from raw booth data
+        const currentlyAvailable = new Set<string>();
+        for (const loc of updated) {
+          for (const d of loc.availableDates || []) {
+            for (const s of d.timeSlots) {
+              currentlyAvailable.add(encodeSlotKey(loc.id, d.date, s.startTime));
+            }
+          }
+        }
+
+        // Prune notified slots no longer available — reopened slots will re-trigger
+        const prevNotifiedSlots = config.boothNotifiedSlots ?? [];
+        const notified = new Set(prevNotifiedSlots.filter((key) => currentlyAvailable.has(key)));
+        let notifiedDirty = notified.size !== prevNotifiedSlots.length;
+
+        const booths = summarizeAvailableSlots(updated, config.boothDayFilters, prunedIgnored);
         const count = booths.reduce((sum, b) => sum + b.slotCount, 0);
         if (count > 0) {
           const notifBody = formatNotificationBody(booths);
@@ -220,21 +254,25 @@ export function useSync(
             showStatus(`Booths available: ${notifBody}`, 'success');
           }
           if (config.boothAlertImessage && config.boothAlertRecipient) {
-            const notified = new Set(config.boothNotifiedSlots ?? []);
             const newBooths = filterNewSlots(booths, notified);
             if (newBooths.length > 0) {
               markNotified(newBooths, notified);
+              notifiedDirty = true;
               ipcInvoke('send-imessage', {
                 recipient: config.boothAlertRecipient,
                 message: formatImessageBody(newBooths)
               }).catch(() => {});
-              const updatedSlots = [...notified];
-              dispatch({ type: 'UPDATE_CONFIG', patch: { boothNotifiedSlots: updatedSlots } });
-              ipcInvoke('update-config', { boothNotifiedSlots: updatedSlots }).catch(() => {});
             }
           }
         } else {
           showStatus('No available booth slots found', 'success');
+        }
+
+        // Persist notified set if changed (pruned stale entries or added new ones)
+        if (notifiedDirty) {
+          const updatedSlots = [...notified];
+          dispatch({ type: 'UPDATE_CONFIG', patch: { boothNotifiedSlots: updatedSlots } });
+          ipcInvoke('update-config', { boothNotifiedSlots: updatedSlots }).catch(() => {});
         }
       }
     } catch (error) {
