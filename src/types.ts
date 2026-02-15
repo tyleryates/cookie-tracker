@@ -582,7 +582,6 @@ export interface IpcChannelMap {
   'load-credentials': { request: undefined; response: CredentialsSummary };
   'save-credentials': { request: CredentialPatch; response: undefined };
   'load-config': { request: undefined; response: AppConfig };
-  'save-config': { request: AppConfig; response: undefined };
   'update-config': { request: Partial<AppConfig>; response: AppConfig };
   'scrape-websites': { request: undefined; response: ScrapeResults };
   'cancel-sync': { request: undefined; response: undefined };

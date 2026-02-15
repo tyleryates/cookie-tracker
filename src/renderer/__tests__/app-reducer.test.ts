@@ -732,6 +732,48 @@ describe('LOAD_CONFIG with non-default profile', () => {
 });
 
 // =============================================================================
+// TOGGLE guards for non-default profiles
+// =============================================================================
+
+describe('TOGGLE actions on non-default profile', () => {
+  it('TOGGLE_AUTO_SYNC stays false on non-default profile', () => {
+    const state = makeState({
+      activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false },
+      autoSyncEnabled: false
+    });
+    const result = appReducer(state, { type: 'TOGGLE_AUTO_SYNC', enabled: true });
+    expect(result.autoSyncEnabled).toBe(false);
+  });
+
+  it('TOGGLE_AUTO_REFRESH_BOOTHS stays false on non-default profile', () => {
+    const state = makeState({
+      activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false },
+      autoRefreshBoothsEnabled: false
+    });
+    const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: true });
+    expect(result.autoRefreshBoothsEnabled).toBe(false);
+  });
+
+  it('TOGGLE_AUTO_SYNC works on default profile', () => {
+    const state = makeState({
+      activeProfile: { dirName: 'default', name: 'default', isDefault: true },
+      autoSyncEnabled: false
+    });
+    const result = appReducer(state, { type: 'TOGGLE_AUTO_SYNC', enabled: true });
+    expect(result.autoSyncEnabled).toBe(true);
+  });
+
+  it('TOGGLE_AUTO_REFRESH_BOOTHS works on default profile', () => {
+    const state = makeState({
+      activeProfile: { dirName: 'default', name: 'default', isDefault: true },
+      autoRefreshBoothsEnabled: false
+    });
+    const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: true });
+    expect(result.autoRefreshBoothsEnabled).toBe(true);
+  });
+});
+
+// =============================================================================
 // IMMUTABILITY
 // =============================================================================
 

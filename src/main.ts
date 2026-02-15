@@ -63,6 +63,17 @@ function initializeProfileManagers(dir: string): void {
 profileManager.migrate();
 initializeProfileManagers(profileManager.getActiveProfileDir());
 
+// Clean up stale root-level app.log (Logger.init(rootDataDir) creates it for migration,
+// then initializeProfileManagers supersedes it with the profile-level log)
+const rootLogPath = path.join(rootDataDir, 'app.log');
+if (fs.existsSync(rootLogPath)) {
+  try {
+    fs.unlinkSync(rootLogPath);
+  } catch {
+    /* ignore */
+  }
+}
+
 // Long-lived sessions — reused across syncs and booth API calls
 const scSession = new SmartCookieSession();
 const dcSession = new DigitalCookieSession();
@@ -384,14 +395,6 @@ ipcMain.handle(
   'load-config',
   handleIpcError(async () => {
     return configManager.loadConfig();
-  })
-);
-
-ipcMain.handle(
-  'save-config',
-  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, config: AppConfig) => {
-    if (profileReadOnly) return;
-    configManager.saveConfig(config);
   })
 );
 

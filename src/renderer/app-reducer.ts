@@ -110,11 +110,15 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'DEFAULT_REPORT':
       return state.activeReport ? state : { ...state, activeReport: 'troop' };
 
-    case 'TOGGLE_AUTO_SYNC':
-      return { ...state, autoSyncEnabled: action.enabled };
+    case 'TOGGLE_AUTO_SYNC': {
+      const readOnly = state.activeProfile != null && !state.activeProfile.isDefault;
+      return { ...state, autoSyncEnabled: readOnly ? false : action.enabled };
+    }
 
-    case 'TOGGLE_AUTO_REFRESH_BOOTHS':
-      return { ...state, autoRefreshBoothsEnabled: action.enabled };
+    case 'TOGGLE_AUTO_REFRESH_BOOTHS': {
+      const readOnly = state.activeProfile != null && !state.activeProfile.isDefault;
+      return { ...state, autoRefreshBoothsEnabled: readOnly ? false : action.enabled };
+    }
 
     case 'OPEN_SETTINGS':
       return { ...state, activePage: 'settings' };

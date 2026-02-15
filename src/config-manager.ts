@@ -3,6 +3,14 @@ import * as path from 'node:path';
 import Logger from './logger';
 import type { AppConfig } from './types';
 
+/** Expected element types for array config fields (defaults are empty, so we declare explicitly) */
+const ARRAY_ELEMENT_TYPES: Partial<Record<keyof AppConfig, string>> = {
+  boothIds: 'number',
+  boothDayFilters: 'string',
+  boothNotifiedSlots: 'string',
+  ignoredTimeSlots: 'string'
+};
+
 class ConfigManager {
   configPath: string;
 
@@ -47,7 +55,13 @@ class ConfigManager {
           const defaultType = Array.isArray(defaults[key]) ? 'array' : typeof defaults[key];
           const diskType = Array.isArray(disk[key]) ? 'array' : typeof disk[key];
           if (diskType === defaultType) {
-            (result as any)[key] = disk[key];
+            // For arrays, validate element types match expected schema
+            const expectedEl = ARRAY_ELEMENT_TYPES[key];
+            if (expectedEl && Array.isArray(disk[key]) && !disk[key].every((el: unknown) => typeof el === expectedEl)) {
+              healed = true;
+            } else {
+              (result as any)[key] = disk[key];
+            }
           } else {
             healed = true;
           }

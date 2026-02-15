@@ -7,7 +7,6 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
   'load-credentials',
   'save-credentials',
   'load-config',
-  'save-config',
   'update-config',
   'scrape-websites',
   'cancel-sync',

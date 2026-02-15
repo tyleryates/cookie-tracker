@@ -23,6 +23,7 @@ interface AvailableBoothsConfig {
 function parseFiltersByDay(filters: string[]): Map<number, Set<string>> {
   const byDay = new Map<number, Set<string>>();
   for (const f of filters) {
+    if (typeof f !== 'string') continue;
     const [dayStr, start] = f.split('|');
     const day = Number(dayStr);
     if (!byDay.has(day)) byDay.set(day, new Set());
