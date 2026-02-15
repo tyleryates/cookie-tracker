@@ -735,6 +735,7 @@ ipcMain.handle(
     if (saveResult.canceled || !saveResult.filePath) return null;
     const filePath = saveResult.filePath;
 
+    // Defensive: exclude credentials even though they live at root, not in profile dirs
     const EXCLUDED_FILES = new Set(['credentials.enc']);
 
     const output = fs.createWriteStream(filePath);
@@ -747,7 +748,6 @@ ipcMain.handle(
 
     archive.pipe(output);
 
-    // Add everything in profileDir except credentials
     if (fs.existsSync(profileDir)) {
       for (const entry of fs.readdirSync(profileDir)) {
         if (EXCLUDED_FILES.has(entry)) continue;

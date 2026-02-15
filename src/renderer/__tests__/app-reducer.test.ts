@@ -34,6 +34,8 @@ function makeState(overrides?: Partial<AppState>): AppState {
     statusMessage: null,
     syncState: makeSyncState(),
     updateReady: null,
+    activeProfile: null,
+    profiles: [],
     ...overrides
   };
 }
@@ -653,6 +655,79 @@ describe('IGNORE_SLOT', () => {
     const result = appReducer(state, { type: 'IGNORE_SLOT', config: newConfig });
     expect(result.appConfig).toBe(newConfig);
     expect(result.appConfig!.boothIds).toEqual([1, 2, 3]);
+  });
+});
+
+// =============================================================================
+// SET_PROFILES
+// =============================================================================
+
+describe('SET_PROFILES', () => {
+  it('sets profiles and activeProfile', () => {
+    const state = makeState();
+    const profiles = [
+      { name: 'default', dirName: 'default', createdAt: '2025-01-01T00:00:00Z' },
+      { name: 'snapshot', dirName: 'snapshot', createdAt: '2025-01-02T00:00:00Z' }
+    ];
+    const result = appReducer(state, {
+      type: 'SET_PROFILES',
+      profiles,
+      activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false }
+    });
+    expect(result.profiles).toEqual(profiles);
+    expect(result.activeProfile).toEqual({ dirName: 'snapshot', name: 'snapshot', isDefault: false });
+  });
+
+  it('sets default profile', () => {
+    const state = makeState();
+    const profiles = [{ name: 'default', dirName: 'default', createdAt: '2025-01-01T00:00:00Z' }];
+    const result = appReducer(state, {
+      type: 'SET_PROFILES',
+      profiles,
+      activeProfile: { dirName: 'default', name: 'default', isDefault: true }
+    });
+    expect(result.activeProfile?.isDefault).toBe(true);
+  });
+});
+
+// =============================================================================
+// LOAD_CONFIG with non-default profile
+// =============================================================================
+
+describe('LOAD_CONFIG with non-default profile', () => {
+  it('forces autoSyncEnabled to false on non-default profile', () => {
+    const config = makeAppConfig({ autoSyncEnabled: true });
+    const state = makeState({
+      activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false }
+    });
+    const result = appReducer(state, { type: 'LOAD_CONFIG', config });
+    expect(result.autoSyncEnabled).toBe(false);
+  });
+
+  it('forces autoRefreshBoothsEnabled to false on non-default profile', () => {
+    const config = makeAppConfig({ autoRefreshBoothsEnabled: true });
+    const state = makeState({
+      activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false }
+    });
+    const result = appReducer(state, { type: 'LOAD_CONFIG', config });
+    expect(result.autoRefreshBoothsEnabled).toBe(false);
+  });
+
+  it('respects config values on default profile', () => {
+    const config = makeAppConfig({ autoSyncEnabled: true, autoRefreshBoothsEnabled: true });
+    const state = makeState({
+      activeProfile: { dirName: 'default', name: 'default', isDefault: true }
+    });
+    const result = appReducer(state, { type: 'LOAD_CONFIG', config });
+    expect(result.autoSyncEnabled).toBe(true);
+    expect(result.autoRefreshBoothsEnabled).toBe(true);
+  });
+
+  it('respects config values when activeProfile is null', () => {
+    const config = makeAppConfig({ autoSyncEnabled: true });
+    const state = makeState({ activeProfile: null });
+    const result = appReducer(state, { type: 'LOAD_CONFIG', config });
+    expect(result.autoSyncEnabled).toBe(true);
   });
 });
 

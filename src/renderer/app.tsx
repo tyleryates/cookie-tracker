@@ -253,6 +253,26 @@ export function App() {
 
   const reloadAfterSwitch = useCallback(async () => {
     dispatch({ type: 'WIPE_DATA', syncState: createInitialSyncState() });
+
+    // Hydrate the new profile's endpoint timestamps
+    try {
+      const timestamps = await ipcInvoke('load-timestamps');
+      for (const [endpoint, meta] of Object.entries(timestamps.endpoints)) {
+        dispatch({
+          type: 'SYNC_ENDPOINT_UPDATE',
+          endpoint,
+          status: meta.status,
+          lastSync: meta.lastSync ?? undefined,
+          durationMs: meta.durationMs,
+          dataSize: meta.dataSize,
+          httpStatus: meta.httpStatus,
+          error: meta.error
+        });
+      }
+    } catch {
+      // Non-fatal — endpoints start as idle
+    }
+
     const config = await loadAppConfig();
     dispatch({ type: 'LOAD_CONFIG', config });
     await loadData({ showMessages: false });
@@ -277,10 +297,13 @@ export function App() {
       try {
         const pc = await ipcInvoke('import-profile', { name });
         if (!pc) return; // user cancelled file dialog
-        dispatchProfiles(pc);
-        // Switch to the newly imported profile
+        // Switch to the newly imported profile (dispatches profiles + reloads data)
         const imported = pc.profiles.find((p) => p.name === name);
-        if (imported) await handleSwitchProfile(imported.dirName);
+        if (imported) {
+          await handleSwitchProfile(imported.dirName);
+        } else {
+          dispatchProfiles(pc);
+        }
         showStatus(`Profile "${name}" imported`, 'success');
       } catch (error) {
         showStatus(`Import failed: ${(error as Error).message}`, 'error');

@@ -5,6 +5,7 @@ import type { ProfileInfo, ProfilesConfig } from './types';
 
 const FILES_TO_MIGRATE = ['config.json', 'timestamps.json', 'sc-troop.json', 'sc-cookies.json', 'dc-roles.json', 'app.log'];
 const DIRS_TO_MIGRATE = ['current', 'in'];
+const RESERVED_DIR_NAMES = new Set(['default']);
 
 class ProfileManager {
   private rootDataDir: string;
@@ -17,8 +18,12 @@ class ProfileManager {
 
   /** One-time migration: move flat data/ files into data/default/ */
   migrate(): void {
+    // Use profiles.json (written last) as the completion marker — NOT data/default/.
+    // If migration crashes after creating the dir but before finishing,
+    // the next launch will re-run and move any remaining files.
+    if (fs.existsSync(this.profilesPath)) return; // already migrated
+
     const defaultDir = path.join(this.rootDataDir, 'default');
-    if (fs.existsSync(defaultDir)) return; // already migrated
 
     Logger.info('ProfileManager: migrating to profile-based layout');
     fs.mkdirSync(defaultDir, { recursive: true });
@@ -129,7 +134,7 @@ class ProfileManager {
     if (!slug) slug = 'profile';
 
     const existingDirs = new Set(existing.map((p) => p.dirName));
-    if (!existingDirs.has(slug)) return slug;
+    if (!existingDirs.has(slug) && !RESERVED_DIR_NAMES.has(slug)) return slug;
 
     let i = 2;
     while (existingDirs.has(`${slug}-${i}`)) i++;
