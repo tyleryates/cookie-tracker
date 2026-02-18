@@ -3,57 +3,11 @@
 import type preact from 'preact';
 import { useState } from 'preact/hooks';
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
-import { classifyOrderStatus } from '../../order-classification';
 import type { Order, Scout, Varieties } from '../../types';
 import { buildVarietyTooltip, formatShortDate, formatTimeRange } from '../format-utils';
+import { buildOrderTooltip, getStatusStyle, isActionRequired } from '../order-helpers';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
-
-// ============================================================================
-// Internal helpers
-// ============================================================================
-
-function getStatusStyle(status: string | undefined): { className: string; text: string } {
-  switch (classifyOrderStatus(status)) {
-    case 'NEEDS_APPROVAL':
-      return { className: 'status-pill status-pill-error', text: 'Needs Approval ⚠️' };
-    case 'COMPLETED':
-      return { className: 'status-pill status-pill-success', text: 'Complete' };
-    case 'PENDING':
-      return { className: 'status-pill status-pill-warning', text: 'Pending Delivery' };
-    default:
-      return { className: '', text: status || '' };
-  }
-}
-
-// ============================================================================
-// Components
-// ============================================================================
-
-function titleCase(s: string): string {
-  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function buildOrderTooltip(order: Order): string {
-  const dc = order.metadata.dc as Record<string, string> | null;
-  if (!dc) return '';
-  const lines: string[] = [];
-
-  const shipFirst = dc['Shipping First Name'] || '';
-  const shipLast = dc['Shipping Last Name'] || '';
-  const shipName = `${shipFirst} ${shipLast}`.trim();
-  if (shipName) lines.push(titleCase(shipName));
-
-  // Fall back to billing name if no shipping name (e.g. donations)
-  if (!shipName) {
-    const billFirst = dc['Billing First Name'] || '';
-    const billLast = dc['Billing Last Name'] || '';
-    const billName = `${billFirst} ${billLast}`.trim();
-    if (billName) lines.push(titleCase(billName));
-  }
-
-  return lines.join('\n');
-}
 
 /** Render a packages cell with variety tooltip if available */
 function PackagesCell({ varieties, packages }: { varieties: Varieties; packages: number }) {
@@ -133,11 +87,6 @@ function AllocationDetails({ scout }: { scout: Scout }) {
 }
 
 const INITIAL_ORDER_LIMIT = 10;
-
-function isActionRequired(status: string | undefined): boolean {
-  const s = classifyOrderStatus(status);
-  return s === 'NEEDS_APPROVAL' || s === 'PENDING';
-}
 
 function renderOrderRow(order: Order) {
   const tip = buildVarietyTooltip(order.varieties);

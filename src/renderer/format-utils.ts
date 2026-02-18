@@ -2,7 +2,7 @@
 
 import { BOOTH_RESERVATION_TYPE } from '../constants';
 import { COOKIE_ORDER, getCookieColor, getCookieDisplayName } from '../cookie-constants';
-import type { BoothReservationImported, BoothTimeSlot, CookieType, Varieties } from '../types';
+import type { BoothReservationImported, BoothTimeSlot, CookieType, Scout, Varieties } from '../types';
 
 /** Sort varieties entries by preferred display order */
 function sortVarietiesByOrder(entries: [string, number][]): [string, number][] {
@@ -344,10 +344,18 @@ function pruneExpiredSlots(slots: string[]): string[] {
   });
 }
 
+/** Filter out site-order scouts, sort alphabetically by name */
+function getActiveScouts(scouts: Record<string, Scout>): Array<[string, Scout]> {
+  return Object.entries(scouts)
+    .filter(([, s]) => !s.isSiteOrder)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+}
+
 export {
   boothTypeClass,
   buildVarietyTooltip,
   sortVarietiesByOrder,
+  getActiveScouts,
   getCompleteVarieties,
   countBoothsNeedingDistribution,
   DateFormatter,

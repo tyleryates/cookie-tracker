@@ -7,7 +7,7 @@ import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { STAT_COLORS, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, formatShortDate, isPhysicalVariety } from '../format-utils';
+import { buildVarietyTooltip, formatShortDate, getActiveScouts, isPhysicalVariety } from '../format-utils';
 
 // ============================================================================
 // Helpers
@@ -244,9 +244,7 @@ export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; b
 
   const hasNegativeInventory = (data.troopTotals.scouts.withNegativeInventory ?? 0) > 0;
 
-  const sortedScouts = Object.entries(data.scouts)
-    .filter(([_name, scout]) => !scout.isSiteOrder && scout.inventory.total > 0)
-    .sort((a, b) => a[0].localeCompare(b[0]));
+  const sortedScouts = getActiveScouts(data.scouts).filter(([, scout]) => scout.inventory.total > 0);
 
   let totalSold = 0;
   let totalOnHand = 0;
@@ -262,12 +260,12 @@ export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; b
 
   const stats = [
     { label: 'Transfers to Girls', value: netT2G, description: t2gDescription, color: STAT_COLORS.TEAL },
-    { label: 'Packages Sold', value: totalSold, description: 'Packages sold by scouts', color: STAT_COLORS.GREEN, operator: '\u2212' },
+    { label: 'Packages Sold', value: totalSold, description: 'Packages sold by scouts', color: STAT_COLORS.BLUE, operator: '\u2212' },
     {
       label: 'Girl Inventory',
       value: totalOnHand,
       description: 'Packages with scouts',
-      color: totalOnHand > 0 ? STAT_COLORS.ORANGE : STAT_COLORS.GREEN,
+      color: STAT_COLORS.GREEN,
       operator: '=',
       highlight: true
     }

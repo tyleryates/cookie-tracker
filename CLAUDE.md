@@ -28,7 +28,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **12 reports in 6 tab groups** — Inventory (Troop Inventory & Transfers, Scout Inventory), Sales (Troop Online Orders, Scout Orders & Credits), Booths (Completed, Upcoming, Booth Finder), Finances (Troop Proceeds, Scout Cash Report), Donations, Cookie Popularity, plus Inventory History tool
+- **12 reports in 5 tab groups** — Troop (Inventory & Transfers, Online Orders, Proceeds), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, Booth Finder), Donations, Cookie Popularity, plus Inventory History tool
 - **Profile management** — Import, switch, and delete data profiles for managing multiple troops
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 

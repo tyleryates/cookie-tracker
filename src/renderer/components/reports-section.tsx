@@ -288,10 +288,6 @@ export function TabBar({ activeReport, unified, appConfig, onSelectReport }: Tab
     <nav class="tab-bar">
       {REPORT_TABS.map((tab) => {
         const isActive = activeReport !== null && tab.types.includes(activeReport);
-        const showDot =
-          hasData &&
-          ((tab.id === 'donations' && unified?.cookieShare?.reconciled === false) ||
-            (tab.id === 'scout' && (unified?.troopTotals?.scouts?.withNegativeInventory ?? 0) > 0));
         const isPaired = tab.types.length > 1;
         const disabled = !hasData || isBlocked;
 
@@ -311,7 +307,6 @@ export function TabBar({ activeReport, unified, appConfig, onSelectReport }: Tab
                 onClick={() => toggleDropdown(tab.id)}
               >
                 {tab.label}
-                {showDot && <span class="tab-warning-dot" />}
                 <span style={{ marginLeft: '4px', fontSize: '0.7em' }}>{'\u25BE'}</span>
               </button>
               {openDropdown === tab.id && dropdownPos && (
@@ -331,9 +326,6 @@ export function TabBar({ activeReport, unified, appConfig, onSelectReport }: Tab
                       >
                         {REPORT_TYPE_LABELS[type] || type}
                         {count != null && <span class="tab-dropdown-count">{count}</span>}
-                        {type === 'scout-inventory' && (unified?.troopTotals?.scouts?.withNegativeInventory ?? 0) > 0 && (
-                          <span class="tab-warning-dot" />
-                        )}
                       </button>
                     );
                   })}
@@ -352,7 +344,6 @@ export function TabBar({ activeReport, unified, appConfig, onSelectReport }: Tab
             onClick={() => onSelectReport(tab.types[0])}
           >
             {tab.label}
-            {showDot && <span class="tab-warning-dot" />}
           </button>
         );
       })}

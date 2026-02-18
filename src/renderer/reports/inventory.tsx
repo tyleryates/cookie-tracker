@@ -30,15 +30,12 @@ export function describeTransfer(transfer: Transfer): { typeLabel: string; from:
     case TRANSFER_CATEGORY.TROOP_OUTGOING:
       return { typeLabel: 'T2T Out', from: 'Troop', to: `Troop ${transfer.to}`, direction: 'out' };
     case TRANSFER_CATEGORY.GIRL_PICKUP:
+    case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
+    case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
+    case TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION:
       return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
     case TRANSFER_CATEGORY.GIRL_RETURN:
       return { typeLabel: 'G2T', from: transfer.from || '-', to: 'Troop', direction: 'in' };
-    case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
-      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
-    case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
-      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
-    case TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION:
-      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
     default:
       return { typeLabel: transfer.type || '-', from: transfer.from || '-', to: transfer.to || '-', direction: 'out' };
   }
@@ -95,7 +92,7 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
       label: 'Troop Inventory',
       value: netInventory,
       description: 'Packages on hand',
-      color: STAT_COLORS.ORANGE,
+      color: STAT_COLORS.GREEN,
       operator: '=',
       highlight: true
     }

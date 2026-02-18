@@ -89,7 +89,7 @@ tbody tr:hover {
 
 /* Scout table — Total column emphasis (direct rows only, not nested detail tables) */
 .scout-table > tbody > tr > td:nth-child(7) {
-  background: rgba(0, 0, 0, 0.03);
+  background: rgba(0, 0, 0, 0.04);
   font-weight: 700;
 }
 .scout-table > thead > tr > th:nth-child(7) {
@@ -162,7 +162,6 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
-.booth-table > thead > tr > th:first-child,
 .booth-table > tbody > tr > td.expand-cell {
   width: 16px;
   min-width: 16px;

@@ -1,12 +1,13 @@
 import type { ComponentChildren } from 'preact';
 import { ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
-import { classifyOrderStatus } from '../../order-classification';
 import type { Order, Scout, SiteOrderCategory, SiteOrdersDataset, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
+import { ScoutCreditChips } from '../components/scout-credit-chips';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
 import { buildVarietyTooltip, formatShortDate } from '../format-utils';
+import { buildOrderTooltip, getStatusStyle } from '../order-helpers';
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   [ORDER_TYPE.DELIVERY]: 'Girl Delivery',
@@ -46,40 +47,6 @@ function SiteOrderWarning({ siteOrders }: { siteOrders: SiteOrdersDataset }) {
       </ul>
     </div>
   );
-}
-
-// ============================================================================
-// Status helpers
-// ============================================================================
-
-function getStatusStyle(status: string | undefined): { className: string; text: string } {
-  switch (classifyOrderStatus(status)) {
-    case 'NEEDS_APPROVAL':
-      return { className: 'status-pill status-pill-error', text: 'Needs Approval ⚠️' };
-    case 'COMPLETED':
-      return { className: 'status-pill status-pill-success', text: 'Complete' };
-    case 'PENDING':
-      return { className: 'status-pill status-pill-warning', text: 'Approved' };
-    default:
-      return { className: '', text: status || '' };
-  }
-}
-
-function titleCase(s: string): string {
-  return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function buildOrderTooltip(order: Order): string {
-  const dc = order.metadata.dc as Record<string, string> | null;
-  if (!dc) return '';
-  const shipFirst = dc['Shipping First Name'] || '';
-  const shipLast = dc['Shipping Last Name'] || '';
-  const shipName = `${shipFirst} ${shipLast}`.trim();
-  if (shipName) return titleCase(shipName);
-  const billFirst = dc['Billing First Name'] || '';
-  const billLast = dc['Billing Last Name'] || '';
-  const billName = `${billFirst} ${billLast}`.trim();
-  return billName ? titleCase(billName) : '';
 }
 
 // ============================================================================
@@ -138,23 +105,7 @@ function OrderScoutAllocations({
     }
   }
 
-  if (scoutCredits.length === 0) {
-    return (
-      <div class="booth-detail-content muted-text">No scout allocations yet. Distribute in Smart Cookie to see per-scout breakdown.</div>
-    );
-  }
-
-  scoutCredits.sort((a, b) => a.name.localeCompare(b.name));
-  return (
-    <div class="booth-detail-content">
-      {scoutCredits.map(({ name, total }) => (
-        <div key={name} class="booth-allocation-chip">
-          <strong>{name}</strong>
-          <span class="booth-allocation-credit">{total} credited</span>
-        </div>
-      ))}
-    </div>
-  );
+  return <ScoutCreditChips credits={scoutCredits} unit="credited" />;
 }
 
 function OrdersTable({
@@ -286,7 +237,7 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
       label: 'Total',
       value: totalPackages,
       description: `${totalAllocated} allocated, ${totalUnallocated} unallocated`,
-      color: STAT_COLORS.ORANGE,
+      color: STAT_COLORS.GREEN,
       operator: '=',
       highlight: true
     }

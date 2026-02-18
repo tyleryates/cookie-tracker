@@ -178,7 +178,7 @@ export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; ba
     label: 'Total Donations',
     value: totalCookieShare,
     description: 'All Cookie Share',
-    color: STAT_COLORS.PINK,
+    color: STAT_COLORS.GREEN,
     operator: '=',
     highlight: true
   });

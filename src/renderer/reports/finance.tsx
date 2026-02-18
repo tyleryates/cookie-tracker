@@ -3,7 +3,7 @@ import type { Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { STAT_COLORS, StatCards } from '../components/stat-cards';
-import { formatCurrency, formatShortDate } from '../format-utils';
+import { formatCurrency, formatShortDate, getActiveScouts } from '../format-utils';
 
 // ============================================================================
 // Detail breakdown for each scout's expandable row
@@ -98,13 +98,10 @@ export function FinanceReport({ data, banner }: { data: UnifiedDataset; banner?:
     );
   }
 
-  const sortedScouts = Object.entries(data.scouts)
-    .filter(([_name, scout]) => {
-      if (scout.isSiteOrder) return false;
-      const f = scout.totals.$financials;
-      return f.cashOwed > 0 || f.paymentsTurnedIn > 0;
-    })
-    .sort((a, b) => a[0].localeCompare(b[0]));
+  const sortedScouts = getActiveScouts(data.scouts).filter(([, scout]) => {
+    const f = scout.totals.$financials;
+    return f.cashOwed > 0 || f.paymentsTurnedIn > 0;
+  });
 
   // Troop-wide totals
   let totalCashOwed = 0;
@@ -128,14 +125,14 @@ export function FinanceReport({ data, banner }: { data: UnifiedDataset; banner?:
       label: 'Cash Turned In',
       value: formatCurrency(totalPayments),
       description: 'Money received from scouts',
-      color: STAT_COLORS.GREEN,
+      color: STAT_COLORS.PINK,
       operator: '\u2212'
     },
     {
       label: 'Cash Due',
       value: formatCurrency(totalCashDue),
       description: 'Still owed to the troop',
-      color: totalCashDue > 0 ? STAT_COLORS.DARK_RED : STAT_COLORS.GREEN,
+      color: totalCashDue > 0 ? STAT_COLORS.RED : STAT_COLORS.GREEN,
       operator: '=',
       highlight: true
     }

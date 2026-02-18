@@ -5,6 +5,7 @@ import { COOKIE_TYPE } from '../../cookie-constants';
 import type { BoothReservationImported, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
+import { ScoutCreditChips } from '../components/scout-credit-chips';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
 import {
@@ -85,24 +86,7 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
     }
   }
 
-  if (scoutCredits.length === 0) {
-    return (
-      <div class="booth-detail-content muted-text">No scout allocations yet. Distribute in Smart Cookie to see per-scout breakdown.</div>
-    );
-  }
-
-  scoutCredits.sort((a, b) => a.name.localeCompare(b.name));
-
-  return (
-    <div class="booth-detail-content">
-      {scoutCredits.map(({ name, total }) => (
-        <div key={name} class="booth-allocation-chip">
-          <strong>{name}</strong>
-          <span class="booth-allocation-credit">{total} sales</span>
-        </div>
-      ))}
-    </div>
-  );
+  return <ScoutCreditChips credits={scoutCredits} unit="sales" />;
 }
 
 function CompletedBoothsSection({ booths, scouts }: { booths: BoothReservationImported[]; scouts: Record<string, Scout> }) {
@@ -204,7 +188,7 @@ export function CompletedBoothsReport({ data, banner }: { data: UnifiedDataset; 
   const totalDonations = booths.completed.reduce((sum, r) => sum + (r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0), 0);
 
   const stats: Stat[] = [
-    { label: 'Completed', value: booths.completed.length, description: 'Distributed booths', color: STAT_COLORS.GREEN },
+    { label: 'Completed', value: booths.completed.length, description: 'Distributed booths', color: STAT_COLORS.TEAL },
     { label: 'Packages Sold', value: totalPackages, description: 'Total booth packages', color: STAT_COLORS.BLUE },
     ...(totalDonations > 0
       ? [{ label: 'Donations', value: totalDonations, description: 'Booth cookie shares', color: STAT_COLORS.DEEP_PURPLE }]

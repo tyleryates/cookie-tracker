@@ -67,6 +67,10 @@ export type Action =
 // REDUCER
 // ============================================================================
 
+function isReadOnly(state: AppState): boolean {
+  return state.activeProfile != null && !state.activeProfile.isDefault;
+}
+
 export function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'SET_STATUS':
@@ -79,7 +83,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, activePage: 'welcome' };
 
     case 'LOAD_CONFIG': {
-      const readOnly = state.activeProfile != null && !state.activeProfile.isDefault;
+      const readOnly = isReadOnly(state);
       return {
         ...state,
         appConfig: action.config,
@@ -108,15 +112,11 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'DEFAULT_REPORT':
       return state.activeReport ? state : { ...state, activeReport: 'inventory' };
 
-    case 'TOGGLE_AUTO_SYNC': {
-      const readOnly = state.activeProfile != null && !state.activeProfile.isDefault;
-      return { ...state, autoSyncEnabled: readOnly ? false : action.enabled };
-    }
+    case 'TOGGLE_AUTO_SYNC':
+      return { ...state, autoSyncEnabled: isReadOnly(state) ? false : action.enabled };
 
-    case 'TOGGLE_AUTO_REFRESH_BOOTHS': {
-      const readOnly = state.activeProfile != null && !state.activeProfile.isDefault;
-      return { ...state, autoRefreshBoothsEnabled: readOnly ? false : action.enabled };
-    }
+    case 'TOGGLE_AUTO_REFRESH_BOOTHS':
+      return { ...state, autoRefreshBoothsEnabled: isReadOnly(state) ? false : action.enabled };
 
     case 'SYNC_ENDPOINT_UPDATE': {
       const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };

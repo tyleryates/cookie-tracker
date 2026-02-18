@@ -425,25 +425,14 @@ export function App() {
         <TabBar activeReport={state.activeReport} unified={state.unified} appConfig={state.appConfig} onSelectReport={handleSelectReport} />
       )}
       <div class="app-content" ref={contentRef}>
-        {isWelcome ? (
+        {isWelcome || state.activeReport === 'settings' ? (
           <SettingsPage
-            mode="welcome"
+            mode={isWelcome ? 'welcome' : 'settings'}
             appConfig={state.appConfig}
             autoSyncEnabled={state.autoSyncEnabled}
             autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
             readOnly={readOnly}
-            onComplete={handleWelcomeComplete}
-            onUpdateConfig={handleUpdateConfig}
-            onToggleAutoSync={handleToggleAutoSync}
-            onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
-          />
-        ) : state.activeReport === 'settings' ? (
-          <SettingsPage
-            mode="settings"
-            appConfig={state.appConfig}
-            autoSyncEnabled={state.autoSyncEnabled}
-            autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
-            readOnly={readOnly}
+            onComplete={isWelcome ? handleWelcomeComplete : undefined}
             onUpdateConfig={handleUpdateConfig}
             onToggleAutoSync={handleToggleAutoSync}
             onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}

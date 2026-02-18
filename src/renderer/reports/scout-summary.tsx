@@ -6,6 +6,7 @@ import { ExpandableRow } from '../components/expandable-row';
 import { ScoutDetailBreakdown } from '../components/scout-detail';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
+import { getActiveScouts } from '../format-utils';
 
 // ============================================================================
 // Helper functions
@@ -102,11 +103,7 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
     );
   }
 
-  const scouts = data.scouts;
-
-  const sortedScouts = Object.entries(scouts)
-    .filter(([_name, scout]) => !scout.isSiteOrder && (scout.totals.totalSold || 0) > 0)
-    .sort((a, b) => a[0].localeCompare(b[0]));
+  const sortedScouts = getActiveScouts(data.scouts).filter(([, scout]) => (scout.totals.totalSold || 0) > 0);
 
   let totalDelivered = 0;
   let totalShipped = 0;
@@ -124,10 +121,10 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
 
   const stats: Stat[] = [
     { label: 'Delivered', value: totalDelivered, description: 'DC orders delivered by scouts', color: STAT_COLORS.BLUE },
-    { label: 'In Person', value: totalInHand, description: 'Door-to-door sales', color: STAT_COLORS.GREEN, operator: '+' },
+    { label: 'In Person', value: totalInHand, description: 'Door-to-door sales', color: STAT_COLORS.PINK, operator: '+' },
     { label: 'Shipped', value: totalShipped, description: 'Direct ship orders', color: STAT_COLORS.TEAL, operator: '+' },
     { label: 'Credits', value: totalCredits, description: 'Booth + troop online', color: STAT_COLORS.PURPLE, operator: '+' },
-    { label: 'Total Sales', value: totalSoldAll, description: 'All scout sales', color: STAT_COLORS.ORANGE, operator: '=', highlight: true }
+    { label: 'Total Sales', value: totalSoldAll, description: 'All scout sales', color: STAT_COLORS.GREEN, operator: '=', highlight: true }
   ];
 
   const COLUMN_COUNT = 9;

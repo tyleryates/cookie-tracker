@@ -538,24 +538,22 @@ When a new cookie variety, order type, payment method, or transfer type appears:
 
 ## Reports
 
-The app provides twelve reports in six tab groups:
+The app provides twelve reports in five tab groups plus tools:
 
-**Inventory** tab:
-1. **Troop Inventory & Transfers** — C2T pickups, T2G allocations, per-variety troop inventory
-2. **Scout Inventory** — Per-scout inventory balances, variety breakdowns, sales vs inventory comparison
+**Troop** tab (dropdown):
+1. **Inventory & Transfers** — C2T pickups, T2G allocations, per-variety troop inventory
+2. **Online Orders** — Troop-level delivery/direct-ship orders with per-scout allocation tracking
+3. **Proceeds** — Total packages credited, credit tier, gross/net troop proceeds
 
-**Sales** tab:
-3. **Troop Online Orders** — Troop-level booth/delivery orders with per-scout allocation tracking
-4. **Scout Orders & Credits** — Per-scout sales, credited allocations, cash owed, variety breakdowns
+**Scout** tab (dropdown):
+4. **Sales Summary** — Per-scout sales, credited allocations, variety breakdowns
+5. **Inventory** — Per-scout inventory balances, variety breakdowns, transfers
+6. **Cash Report** — Per-scout cash collected, electronic payments, cash due
 
-**Booths** tab:
-5. **Completed Booths** — Distributed booths, needs-distribution status, per-scout allocations
-6. **Upcoming Booths** — Reserved booths that haven't happened yet
-7. **Booth Finder** — Available time slots at selected booth locations with day/time filters
-
-**Finances** tab:
-8. **Troop Proceeds** — Total packages credited, credit tier, gross/net troop proceeds
-9. **Scout Cash Report** — Per-scout cash collected, electronic payments, cash due
+**Booths** tab (dropdown):
+7. **Completed Booths** — Distributed booths, needs-distribution status, per-scout allocations
+8. **Upcoming Booths** — Reserved booths that haven't happened yet
+9. **Booth Finder** — Available time slots at selected booth locations with day/time filters
 
 **Donations** tab:
 10. **Cookie Share Reconciliation** — DC vs SC Cookie Share comparison, adjustments needed per scout

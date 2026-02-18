@@ -250,16 +250,6 @@ body {
   border-bottom-color: var(--primary);
 }
 
-.tab-warning-dot {
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--warning);
-  margin-left: 5px;
-  vertical-align: middle;
-}
-
 .tab-bar-item:disabled {
   opacity: 0.4;
   cursor: not-allowed;

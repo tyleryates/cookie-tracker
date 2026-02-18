@@ -405,4 +405,35 @@ If a new cookie type appears in the data, the app should warn loudly rather than
 
 ---
 
+## #8: Extract Shared Helpers Judiciously
+
+**Principle:** When 2+ files duplicate the same logic, extract to a shared helper. When only one file uses it, keep it local. Don't abstract for marginal savings.
+
+### Where Shared Renderer Helpers Live
+
+| Kind | Location | Example |
+|------|----------|---------|
+| Data formatting, date/number utilities | `renderer/format-utils.ts` | `getActiveScouts()`, `formatShortDate()` |
+| Order display (status pills, tooltips) | `renderer/order-helpers.ts` | `getStatusStyle()`, `buildOrderTooltip()` |
+| Shared UI fragments | `renderer/components/` | `ScoutCreditChips`, `TooltipCell` |
+
+These are renderer-layer helpers — they must NOT import from `data-processing/`.
+
+### When to Extract
+
+- The same logic appears in **2+ files** (not just similar — actually identical)
+- The extraction **reduces total code** (call site + helper < duplicated code)
+- The helper has a **clear, descriptive name** that reads naturally at the call site
+
+### When NOT to Extract
+
+- Only one file uses it — keep it local as a file-scoped function
+- The "duplication" does **subtly different things** in each context (e.g., different filter criteria, different edge case handling)
+- Abstracting requires **so many parameters** that the call site is more complex than the original code
+- The abstraction would be **used once** and exist only to "reduce duplication" on paper
+
+Three similar lines of code is better than a premature abstraction. The goal is eliminating genuine duplication, not creating indirection.
+
+---
+
 See also: [DOMAIN.md](DOMAIN.md) for data format reference and domain knowledge.
