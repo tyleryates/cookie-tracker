@@ -1,4 +1,4 @@
-// DataTable — Preact replacement for startTable/createTableHeader/createTableRow/endTable
+// DataTable — reusable table with thead/tbody
 
 import type { ComponentChildren, JSX } from 'preact';
 

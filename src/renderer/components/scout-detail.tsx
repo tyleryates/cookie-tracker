@@ -1,6 +1,7 @@
 // Scout detail breakdown — expandable content inside each scout row
 
 import type preact from 'preact';
+import { useState } from 'preact/hooks';
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
 import { classifyOrderStatus } from '../../order-classification';
 import type { Order, Scout, Varieties } from '../../types';
@@ -19,7 +20,7 @@ function getStatusStyle(status: string | undefined): { className: string; text: 
     case 'COMPLETED':
       return { className: 'status-pill status-pill-success', text: 'Complete' };
     case 'PENDING':
-      return { className: 'status-pill status-pill-warning', text: 'Approved' };
+      return { className: 'status-pill status-pill-warning', text: 'Pending Delivery' };
     default:
       return { className: '', text: status || '' };
   }
@@ -105,10 +106,11 @@ function AllocationDetails({ scout }: { scout: Scout }) {
 
   datedRows.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
-  // DS rows first, then dated rows sorted newest-first
-  const rows: preact.JSX.Element[] = dsAllocs.map((a, i) => {
+  // Dated rows sorted newest-first, then DS rows (no date) at the bottom
+  const rows: preact.JSX.Element[] = datedRows.map(({ row }) => row);
+  for (const [i, a] of dsAllocs.entries()) {
     const credits = a.packages + (a.donations || 0);
-    return (
+    rows.push(
       <tr key={`ds-${i}`}>
         <td class="muted-text">{'\u2014'}</td>
         <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}</td>
@@ -116,8 +118,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
         <PackagesCell varieties={a.varieties} packages={credits} />
       </tr>
     );
-  });
-  for (const { row } of datedRows) rows.push(row);
+  }
 
   return (
     <div class="section-break">
@@ -131,52 +132,71 @@ function AllocationDetails({ scout }: { scout: Scout }) {
   );
 }
 
+const INITIAL_ORDER_LIMIT = 10;
+
+function isActionRequired(status: string | undefined): boolean {
+  const s = classifyOrderStatus(status);
+  return s === 'NEEDS_APPROVAL' || s === 'PENDING';
+}
+
+function renderOrderRow(order: Order) {
+  const tip = buildVarietyTooltip(order.varieties);
+  const { className: statusClass, text: statusText } = getStatusStyle(order.status);
+  const isCash = order.paymentMethod === PAYMENT_METHOD.CASH;
+  const isDigital = order.paymentMethod && order.paymentMethod !== PAYMENT_METHOD.CASH;
+  const amountClass = isCash ? 'cash-amount' : isDigital ? 'digital-amount' : undefined;
+  const paymentPillClass = isCash ? 'payment-pill payment-pill-cash' : isDigital ? 'payment-pill payment-pill-digital' : undefined;
+
+  return (
+    <tr key={order.orderNumber}>
+      <td>{formatShortDate(order.date)}</td>
+      <td>{String(order.orderNumber)}</td>
+      {(() => {
+        const orderTip = buildOrderTooltip(order);
+        const typeText = String(order.dcOrderType || '-');
+        return orderTip ? <TooltipCell tooltip={orderTip}>{typeText}</TooltipCell> : <td>{typeText}</td>;
+      })()}
+      {order.physicalPackages > 0 && tip ? (
+        <TooltipCell tooltip={tip}>{order.physicalPackages}</TooltipCell>
+      ) : (
+        <td>{order.physicalPackages || '\u2014'}</td>
+      )}
+      <td>{order.donations || '\u2014'}</td>
+      <td class={amountClass}>${Math.round(order.amount)}</td>
+      <td>{paymentPillClass ? <span class={paymentPillClass}>{isCash ? 'Cash' : 'Digital'}</span> : '-'}</td>
+      <td>
+        <span class={statusClass}>{statusText}</span>
+      </td>
+    </tr>
+  );
+}
+
 function OrdersTable({ scout }: { scout: Scout }) {
   const orders = scout.orders.filter((o) => o.orderType !== ORDER_TYPE.DONATION);
+  const [expanded, setExpanded] = useState(false);
 
   if (orders.length === 0) return null;
+
+  // Always show action-required orders; fill remaining slots from the rest
+  const required = orders.filter((o) => isActionRequired(o.status));
+  const rest = orders.filter((o) => !isActionRequired(o.status));
+  const minVisible = Math.max(INITIAL_ORDER_LIMIT, required.length);
+  const needsTruncation = orders.length > minVisible;
+  const visibleOrders = expanded || !needsTruncation ? orders : [...required, ...rest.slice(0, minVisible - required.length)];
+  const hiddenCount = orders.length - visibleOrders.length;
 
   return (
     <div class="section-break">
       <h5>Order Details</h5>
       <div class="section-break-sm">
         <DataTable columns={['Date', 'Order #', 'Type', 'Packages', 'Donations', 'Amount', 'Payment', 'Status']} className="table-compact">
-          {orders.map((order: Order) => {
-            const tip = buildVarietyTooltip(order.varieties);
-            const { className: statusClass, text: statusText } = getStatusStyle(order.status);
-            const isCash = order.paymentMethod === PAYMENT_METHOD.CASH;
-            const isDigital = order.paymentMethod && order.paymentMethod !== PAYMENT_METHOD.CASH;
-            const amountClass = isCash ? 'cash-amount' : isDigital ? 'digital-amount' : undefined;
-            const paymentPillClass = isCash
-              ? 'payment-pill payment-pill-cash'
-              : isDigital
-                ? 'payment-pill payment-pill-digital'
-                : undefined;
-
-            return (
-              <tr key={order.orderNumber}>
-                <td>{formatShortDate(order.date)}</td>
-                <td>{String(order.orderNumber)}</td>
-                {(() => {
-                  const orderTip = buildOrderTooltip(order);
-                  const typeText = String(order.dcOrderType || '-');
-                  return orderTip ? <TooltipCell tooltip={orderTip}>{typeText}</TooltipCell> : <td>{typeText}</td>;
-                })()}
-                {order.physicalPackages > 0 && tip ? (
-                  <TooltipCell tooltip={tip}>{order.physicalPackages}</TooltipCell>
-                ) : (
-                  <td>{order.physicalPackages || '\u2014'}</td>
-                )}
-                <td>{order.donations || '\u2014'}</td>
-                <td class={amountClass}>${Math.round(order.amount)}</td>
-                <td>{paymentPillClass ? <span class={paymentPillClass}>{isCash ? 'Cash' : 'Digital'}</span> : '-'}</td>
-                <td>
-                  <span class={statusClass}>{statusText}</span>
-                </td>
-              </tr>
-            );
-          })}
+          {visibleOrders.map(renderOrderRow)}
         </DataTable>
+        {needsTruncation && !expanded && (
+          <button type="button" class="btn-link" style={{ marginTop: '8px' }} onClick={() => setExpanded(true)}>
+            Show {hiddenCount} more order{hiddenCount !== 1 ? 's' : ''}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -185,8 +205,8 @@ function OrdersTable({ scout }: { scout: Scout }) {
 export function ScoutDetailBreakdown({ scout }: { scout: Scout }) {
   return (
     <div class="scout-breakdown">
-      <AllocationDetails scout={scout} />
       <OrdersTable scout={scout} />
+      <AllocationDetails scout={scout} />
     </div>
   );
 }

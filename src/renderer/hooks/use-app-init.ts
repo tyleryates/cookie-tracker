@@ -4,6 +4,7 @@ import { useEffect } from 'preact/hooks';
 import { toActiveProfile } from '../../types';
 import type { Action } from '../app-reducer';
 import { loadAppConfig } from '../data-loader';
+import { pruneExpiredSlots } from '../format-utils';
 import { ipcInvoke } from '../ipc';
 
 export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?: { showMessages?: boolean }) => Promise<boolean>) {
@@ -41,6 +42,13 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
         }
       } catch {
         // Non-fatal — endpoints start as idle, auto-sync will catch them
+      }
+
+      // Prune past ignored time slots on startup
+      const pruned = pruneExpiredSlots(config.ignoredTimeSlots);
+      if (pruned.length !== config.ignoredTimeSlots.length) {
+        config.ignoredTimeSlots = pruned;
+        ipcInvoke('update-config', { ignoredTimeSlots: pruned }).catch(() => {});
       }
 
       dispatch({ type: 'LOAD_CONFIG', config });

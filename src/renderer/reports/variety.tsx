@@ -141,17 +141,7 @@ function EstimateDistributionModal({
                     <td class="text-center">{count !== null ? count : '—'}</td>
                     {showInventory && <td class="text-center">{inv}</td>}
                     {showInventory && (
-                      <td
-                        class="text-center"
-                        style={
-                          diff !== null
-                            ? {
-                                color: diff < 0 ? 'var(--error)' : diff > 0 ? 'var(--success)' : undefined,
-                                fontWeight: diff !== 0 ? 600 : undefined
-                              }
-                            : undefined
-                        }
-                      >
+                      <td class={`text-center${diff !== null && diff < 0 ? ' pkg-out' : diff !== null && diff > 0 ? ' pkg-in' : ''}`}>
                         {diff !== null ? (diff > 0 ? `+${diff}` : diff) : '—'}
                       </td>
                     )}
@@ -170,12 +160,7 @@ function EstimateDistributionModal({
                     const totalDiff = estimatedTotal > 0 ? invTotal - estimatedTotal : null;
                     return (
                       <td
-                        class="text-center"
-                        style={
-                          totalDiff !== null
-                            ? { color: totalDiff < 0 ? 'var(--error)' : totalDiff > 0 ? 'var(--success)' : undefined }
-                            : undefined
-                        }
+                        class={`text-center${totalDiff !== null && totalDiff < 0 ? ' pkg-out' : totalDiff !== null && totalDiff > 0 ? ' pkg-in' : ''}`}
                       >
                         {totalDiff !== null ? (totalDiff > 0 ? `+${totalDiff}` : totalDiff) : '—'}
                       </td>

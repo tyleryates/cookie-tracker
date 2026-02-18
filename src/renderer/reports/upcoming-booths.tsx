@@ -28,9 +28,9 @@ export function UpcomingBoothsReport({ data, banner }: { data: UnifiedDataset; b
         <p class="muted-text">No upcoming booths.</p>
       ) : (
         <DataTable
-          columns={['Store', 'Date', 'Time', 'Type']}
-          columnAligns={[undefined, undefined, undefined, 'center']}
-          className="table-normal"
+          columns={['Store', 'Type', 'Date', 'Time']}
+          columnAligns={[undefined, 'center', undefined, undefined]}
+          className="table-normal booth-table"
         >
           {upcoming.map((r) => {
             return (
@@ -39,11 +39,11 @@ export function UpcomingBoothsReport({ data, banner }: { data: UnifiedDataset; b
                   <strong>{r.booth.storeName || '-'}</strong>
                   {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
                 </td>
-                <td>{r.timeslot.date ? formatShortDate(r.timeslot.date) : '-'}</td>
-                <td>{formatBoothTime(r.timeslot.startTime, r.timeslot.endTime)}</td>
                 <td class="text-center">
                   <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>
                 </td>
+                <td>{r.timeslot.date ? formatShortDate(r.timeslot.date) : '-'}</td>
+                <td>{formatBoothTime(r.timeslot.startTime, r.timeslot.endTime)}</td>
               </tr>
             );
           })}

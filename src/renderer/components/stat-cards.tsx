@@ -1,5 +1,4 @@
-// StatCards — Preact replacement for createHorizontalStats()
-// Supports optional drill-down: click a card to expand detail below the row.
+// StatCards — stat card grid with optional drill-down detail
 
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';

@@ -224,45 +224,6 @@ body {
   overflow-x: auto;
 }
 
-.segmented-control {
-  display: inline-flex;
-  align-items: center;
-  align-self: center;
-  border: 1px solid var(--gray-300);
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-}
-
-.segment {
-  padding: 6px 20px;
-  font-size: 0.85em;
-  font-weight: 600;
-  border: none;
-  background: var(--gray-50);
-  color: var(--gray-500);
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast);
-}
-
-.segment:hover:not(:disabled):not(.segment-active) {
-  background: var(--gray-100);
-  color: var(--gray-700);
-}
-
-.segment:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.segment-active {
-  background: var(--primary);
-  color: #fff;
-}
-
 .tab-bar-item {
   display: inline-flex;
   align-items: center;
@@ -314,12 +275,13 @@ body {
 .tab-dropdown {
   position: fixed;
   background: var(--surface);
-  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
   min-width: 160px;
   z-index: 5000;
   overflow: hidden;
   animation: fadeIn 0.12s ease;
+  margin-top: 0;
 }
 
 .tab-dropdown-item {
@@ -336,11 +298,11 @@ body {
 }
 
 .tab-dropdown-item:hover {
-  background: var(--gray-50);
+  background: var(--surface-raised);
 }
 
 .tab-dropdown-item.active {
-  color: var(--primary);
+  background: var(--surface-raised);
   font-weight: 600;
 }
 
@@ -349,10 +311,11 @@ body {
 }
 
 .tab-dropdown-count {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 18px;
   height: 18px;
-  line-height: 18px;
   padding: 0 5px;
   margin-left: 8px;
   border-radius: 9px;
@@ -360,7 +323,6 @@ body {
   color: var(--gray-600);
   font-size: 0.75em;
   font-weight: 600;
-  text-align: center;
 }
 
 /* Scrollable Content Area */

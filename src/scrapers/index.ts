@@ -26,10 +26,11 @@ class ScraperOrchestrator {
     seasonalData?: SeasonalData,
     boothCache?: BoothCache,
     scSession?: SmartCookieSession,
-    dcSession?: DigitalCookieSession
+    dcSession?: DigitalCookieSession,
+    progressCallback?: ProgressCallback
   ) {
     this.dataDir = dataDir;
-    this.progressCallback = null;
+    this.progressCallback = progressCallback ?? null;
     this.seasonalData = seasonalData;
     this.boothCache = boothCache;
     this.scSession = scSession;

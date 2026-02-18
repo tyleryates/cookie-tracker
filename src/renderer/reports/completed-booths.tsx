@@ -109,8 +109,8 @@ function CompletedBoothsSection({ booths, scouts }: { booths: BoothReservationIm
   if (booths.length === 0) return null;
   return (
     <DataTable
-      columns={['', 'Store', 'Date', 'Time', 'Type', 'Packages', 'Donations']}
-      columnAligns={[undefined, undefined, undefined, undefined, 'center', 'center', 'center']}
+      columns={['', 'Store', 'Type', 'Date', 'Time', 'Packages', 'Donations', '']}
+      columnAligns={[undefined, undefined, 'center', undefined, undefined, 'center', 'center', undefined]}
       className="table-normal booth-table"
       hint="Click on any booth to see scouts who attended that booth."
     >
@@ -134,9 +134,9 @@ function CompletedBoothsSection({ booths, scouts }: { booths: BoothReservationIm
               </>
             }
             cells={[
+              <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>,
               r.timeslot.date ? formatShortDate(r.timeslot.date) : '-',
               timeDisplay,
-              <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>,
               tip ? (
                 <TooltipCell tooltip={tip} tag="span" className="tooltip-cell">
                   {physicalPackages}
@@ -144,11 +144,12 @@ function CompletedBoothsSection({ booths, scouts }: { booths: BoothReservationIm
               ) : (
                 physicalPackages
               ),
-              donations > 0 ? donations : '\u2014'
+              donations > 0 ? donations : '\u2014',
+              ''
             ]}
-            cellAligns={[undefined, undefined, 'center', 'center', 'center']}
+            cellAligns={['center', undefined, undefined, 'center', 'center', undefined]}
             detail={<BoothScoutAllocations booth={r} scouts={scouts} />}
-            colSpan={7}
+            colSpan={8}
             detailClass="detail-row"
           />
         );
@@ -163,9 +164,9 @@ function NeedsDistributionSection({ booths }: { booths: BoothReservationImported
     <>
       <h4>Needs Distribution</h4>
       <DataTable
-        columns={['Store', 'Date', 'Time', 'Type', 'Status']}
-        columnAligns={[undefined, undefined, undefined, 'center', 'center']}
-        className="table-normal"
+        columns={['Store', 'Type', 'Date', 'Time', 'Status']}
+        columnAligns={[undefined, 'center', undefined, undefined, 'center']}
+        className="table-normal booth-table"
         hint="These booths are past but haven't been distributed in Smart Cookie."
       >
         {booths.map((r) => {
@@ -176,11 +177,11 @@ function NeedsDistributionSection({ booths }: { booths: BoothReservationImported
                 <strong>{r.booth.storeName || '-'}</strong>
                 {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
               </td>
-              <td>{r.timeslot.date ? formatShortDate(r.timeslot.date) : '-'}</td>
-              <td>{timeDisplay}</td>
               <td class="text-center">
                 <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>
               </td>
+              <td>{r.timeslot.date ? formatShortDate(r.timeslot.date) : '-'}</td>
+              <td>{timeDisplay}</td>
               <td class="text-center">
                 <span class="status-pill status-pill-warning">Needs Distribution</span>
               </td>

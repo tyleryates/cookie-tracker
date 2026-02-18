@@ -545,7 +545,7 @@ The app provides twelve reports in six tab groups:
 2. **Scout Inventory** — Per-scout inventory balances, variety breakdowns, sales vs inventory comparison
 
 **Sales** tab:
-3. **Troop Site Orders** — Troop-level booth/delivery orders with per-scout allocation tracking
+3. **Troop Online Orders** — Troop-level booth/delivery orders with per-scout allocation tracking
 4. **Scout Orders & Credits** — Per-scout sales, credited allocations, cash owed, variety breakdowns
 
 **Booths** tab:

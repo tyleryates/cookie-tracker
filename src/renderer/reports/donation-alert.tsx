@@ -158,13 +158,18 @@ export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; ba
   const totalCookieShare = totalGirlDonations + totalTroopDonations;
 
   const stats: Stat[] = [
-    { label: 'Girl Donations', value: totalGirlDonations, description: `${girlDC} DC + ${girlInPerson} in person`, color: STAT_COLORS.TEAL }
+    {
+      label: 'Girl Donations',
+      value: totalGirlDonations,
+      description: `${girlInPerson} in person + ${girlDC} online`,
+      color: STAT_COLORS.TEAL
+    }
   ];
   if (totalTroopDonations > 0) {
     stats.push({
       label: 'Troop Donations',
       value: totalTroopDonations,
-      description: `${totalBoothCookieShare} booth + ${siteDonations} site`,
+      description: `${totalBoothCookieShare} booth + ${siteDonations} online`,
       color: STAT_COLORS.PURPLE,
       operator: '+'
     });
@@ -199,7 +204,7 @@ export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; ba
         <span
           class={`report-status-badge ${isReconciled ? 'report-status-ok' : adjustmentNeeded > 0 ? 'report-status-warning' : 'report-status-error'}`}
         >
-          {isReconciled ? 'Reconciled' : 'Needs Attention'}
+          {isReconciled ? 'Up to Date' : 'Needs Attention'}
         </span>
       </div>
       {banner}

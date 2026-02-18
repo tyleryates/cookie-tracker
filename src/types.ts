@@ -79,7 +79,7 @@ export interface Order {
 // TRANSFER TYPES
 // ============================================================================
 
-export interface TransferActions {
+interface TransferActions {
   submittable?: boolean;
   approvable?: boolean;
   saveable?: boolean;
@@ -114,8 +114,8 @@ export type TransferInput = Partial<Transfer> & {
 // ALLOCATION TYPES
 // ============================================================================
 
-export type AllocationChannel = (typeof ALLOCATION_CHANNEL)[keyof typeof ALLOCATION_CHANNEL];
-export type AllocationSource = (typeof ALLOCATION_SOURCE)[keyof typeof ALLOCATION_SOURCE];
+type AllocationChannel = (typeof ALLOCATION_CHANNEL)[keyof typeof ALLOCATION_CHANNEL];
+type AllocationSource = (typeof ALLOCATION_SOURCE)[keyof typeof ALLOCATION_SOURCE];
 
 /**
  * Unified allocation record. Every credited allocation across all channels
@@ -268,12 +268,7 @@ export interface RawScoutData {
 // WARNING TYPE
 // ============================================================================
 
-export type WarningType =
-  | 'UNKNOWN_ORDER_TYPE'
-  | 'UNKNOWN_PAYMENT_METHOD'
-  | 'UNKNOWN_TRANSFER_TYPE'
-  | 'UNKNOWN_COOKIE_ID'
-  | 'SC_TRANSFER_SKIPPED';
+type WarningType = 'UNKNOWN_ORDER_TYPE' | 'UNKNOWN_PAYMENT_METHOD' | 'UNKNOWN_TRANSFER_TYPE' | 'UNKNOWN_COOKIE_ID' | 'SC_TRANSFER_SKIPPED';
 
 export interface Warning {
   type: WarningType;

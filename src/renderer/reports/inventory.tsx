@@ -1,11 +1,11 @@
 import type { ComponentChildren } from 'preact';
-import { PACKAGES_PER_CASE, SC_TRANSFER_STATUS, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
-import { getCookieColor, getCookieDisplayName } from '../../cookie-constants';
-import type { Transfer, UnifiedDataset } from '../../types';
+import { SC_TRANSFER_STATUS, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
+import { COOKIE_ORDER, getCookieAbbreviation, getCookieColor } from '../../cookie-constants';
+import type { Transfer, UnifiedDataset, Varieties } from '../../types';
 import { DataTable } from '../components/data-table';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, formatShortDate, getCompleteVarieties, isPhysicalVariety, sortVarietiesByOrder } from '../format-utils';
+import { buildVarietyTooltip, formatShortDate, isPhysicalVariety } from '../format-utils';
 
 /** Normalize date strings to YYYY-MM-DD for consistent grouping and sorting */
 export function normalizeDate(dateStr: string): string {
@@ -87,7 +87,7 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
     {
       label: 'Troop Package Sales',
       value: troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G,
-      description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
+      description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} online`,
       color: STAT_COLORS.PURPLE,
       operator: '\u2212'
     },
@@ -101,9 +101,7 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
     }
   ];
 
-  const inventoryRows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(inventoryVarieties))).filter(([variety]) =>
-    isPhysicalVariety(variety)
-  );
+  const physicalVarieties = COOKIE_ORDER.filter(isPhysicalVariety);
 
   // Combine all transfers into one sorted list
   const allTransfers = [...c2tTransfers, ...t2tOutTransfers, ...t2gTransfers, ...g2tTransfers].sort(
@@ -120,29 +118,33 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
       {banner}
 
       <StatCards stats={stats} />
-      <DataTable columns={['Variety', 'Packages', '']} columnAligns={[undefined, 'center']}>
-        {inventoryRows.map(([variety, count]) => {
-          const cases = Math.floor(count / PACKAGES_PER_CASE);
-          const remaining = count % PACKAGES_PER_CASE;
-          let breakdown = '';
-          if (cases > 0 && remaining > 0)
-            breakdown = `${cases} case${cases !== 1 ? 's' : ''} + ${remaining} pkg${remaining !== 1 ? 's' : ''}`;
-          else if (cases > 0) breakdown = `${cases} case${cases !== 1 ? 's' : ''}`;
-          else breakdown = `${remaining} pkg${remaining !== 1 ? 's' : ''}`;
-
-          const color = getCookieColor(variety);
-          return (
-            <tr key={variety}>
-              <td>
-                {color && <span class="inventory-chip-dot" style={{ background: color }} />}
-                <strong>{getCookieDisplayName(variety)}</strong>
-              </td>
-              <td class="text-center">{count}</td>
-              <td class="meta-text">{breakdown}</td>
-            </tr>
-          );
-        })}
-      </DataTable>
+      <table class="table-normal" style={{ marginTop: '20px' }}>
+        <thead>
+          <tr>
+            {physicalVarieties.map((v) => {
+              const color = getCookieColor(v);
+              return (
+                <th key={v} class="text-center" style={{ fontSize: '0.85em', whiteSpace: 'nowrap' }}>
+                  {color && <span class="inventory-chip-dot" style={{ background: color }} />}
+                  {getCookieAbbreviation(v)}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {physicalVarieties.map((v) => {
+              const count = (inventoryVarieties as Varieties)?.[v as keyof Varieties] || 0;
+              return (
+                <td key={v} class="text-center">
+                  <strong>{count}</strong>
+                </td>
+              );
+            })}
+          </tr>
+        </tbody>
+      </table>
 
       {allTransfers.length > 0 && (
         <>
@@ -160,7 +162,7 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
 
               const { typeLabel, from, to, direction } = describeTransfer(transfer);
               const packages = transfer.packages || 0;
-              const pkgDisplay = direction === 'out' ? `- ${packages}` : `+ ${packages}`;
+              const pkgDisplay = direction === 'out' ? `-${packages}` : `+${packages}`;
               const pkgClass = direction === 'out' ? 'pkg-out' : 'pkg-in';
               const tip = buildVarietyTooltip(transfer.varieties);
 

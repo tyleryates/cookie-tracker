@@ -16,7 +16,7 @@ function FinanceDetail({ scout }: { scout: Scout }) {
   return (
     <div class="scout-breakdown">
       <div class="section-break-sm">
-        <DataTable columns={['', '']} className="table-compact finance-mini-table">
+        <DataTable columns={['', '']} className="table-compact">
           <tr>
             <td>Pickup value</td>
             <td>{formatCurrency(f.inventoryValue)}</td>

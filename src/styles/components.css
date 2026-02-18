@@ -76,6 +76,20 @@
   font-size: 0.85em;
 }
 
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font: inherit;
+  font-size: 0.88em;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+.btn-link:hover {
+  text-decoration: underline;
+}
+
 /* Toggle Switch */
 .toggle-switch {
   display: inline-flex;
@@ -168,8 +182,8 @@
 
 .stat-cards {
   display: grid;
-  gap: 20px;
-  padding: 20px;
+  gap: 10px;
+  padding: 10px;
   background: var(--surface-raised);
   border-radius: 8px;
 }
@@ -177,6 +191,9 @@
 .stat-card {
   text-align: center;
   font-family: inherit;
+  padding: 6px 6px;
+  border-radius: 8px;
+  background: transparent;
 }
 
 button.stat-card {
@@ -187,19 +204,11 @@ button.stat-card {
 
 .stat-card-expandable {
   cursor: pointer;
-  border-radius: 6px;
-  padding: 8px 4px;
-  margin: -8px -4px;
   transition: background var(--transition-fast);
 }
 
 .stat-card-expandable:hover {
   background: rgba(0, 0, 0, 0.04);
-}
-
-.stat-card-active:hover,
-button.stat-card-active:hover {
-  background: var(--success-light);
 }
 
 .stat-card-active,
@@ -228,22 +237,15 @@ button.stat-card-active {
 }
 
 .stat-card-highlight {
-  background: var(--gray-200);
-  margin: -20px 0;
-  padding: 20px 12px;
-}
-
-.stat-card-highlight.stat-card-expandable {
-  margin: -20px 0;
-  padding: 20px 12px;
+  background: rgba(22, 163, 74, 0.06);
 }
 
 .stat-card-highlight.stat-card-expandable:hover {
-  background: rgba(0, 0, 0, 0.08);
+  background: rgba(22, 163, 74, 0.1);
 }
 
 .stat-card-highlight.stat-card-active {
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(22, 163, 74, 0.1);
 }
 
 .stat-card-detail {
@@ -251,88 +253,17 @@ button.stat-card-active {
   border: 1px solid var(--gray-200);
   border-radius: 0 0 8px 8px;
   padding: 12px 20px;
-  margin-top: -4px;
+  margin-top: -4px; /* overlap stat-cards bottom padding to appear attached */
   animation: fadeIn 0.15s ease;
 }
 
 .stat-operator {
   display: flex;
-  align-items: start;
+  align-items: center;
   justify-content: center;
   font-size: 2.2em;
   font-weight: 400;
   color: var(--gray-300);
-  /* Align with .stat-card-value (label ~14px + 8px margin) */
-  padding-top: 22px;
-}
-
-/* Detail list — key/value rows inside drill-down panels */
-.detail-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.detail-list-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 4px 0;
-}
-
-.detail-list-row + .detail-list-row {
-  border-top: 1px solid var(--gray-100);
-}
-
-.detail-list-label {
-  font-size: 0.9em;
-  color: var(--gray-600);
-}
-
-.detail-list-value {
-  font-size: 0.9em;
-  font-weight: 600;
-  color: var(--gray-800);
-}
-
-/* Dashboard layout — fills viewport, no scroll */
-.app-content:has(.dashboard-layout) {
-  overflow-y: hidden;
-}
-
-.app-content:has(.dashboard-layout) .report-container {
-  height: 100%;
-}
-
-.dashboard-layout {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.dashboard-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-.dashboard-layout .stat-cards-wrapper {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  margin: 4px 0;
-}
-
-.dashboard-layout .stat-cards {
-  flex: 1;
-  align-content: center;
-}
-
-.dashboard-layout .report-section-header {
-  margin: 8px 0 0 0;
-  flex-shrink: 0;
 }
 
 /* Fixed-position tooltips (appended to document.body, immune to overflow:hidden) */
@@ -387,12 +318,6 @@ button.stat-card-active {
   margin-top: 10px;
 }
 
-.info-box-success {
-  background: var(--success-light);
-  border-left-color: var(--status-success-dark);
-  color: var(--status-success-dark);
-}
-
 .info-box-warning {
   background: var(--warning-light);
   border-left-color: var(--warning);
@@ -419,8 +344,7 @@ button.stat-card-active {
   margin-bottom: 20px;
 }
 
-.report-header-row h3,
-.report-visual .report-header-row h3 {
+.report-header-row h3 {
   margin: 0;
 }
 
@@ -454,10 +378,6 @@ button.stat-card-active {
   color: var(--success);
 }
 
-.warning-text {
-  color: var(--warning);
-}
-
 .muted-text {
   color: var(--gray-400);
   font-style: italic;
@@ -475,40 +395,27 @@ button.stat-card-active {
   font-weight: normal;
 }
 
-.report-visual .report-section-header,
-.report-section-header {
-  margin: 18px 0 4px 0;
-  font-size: 0.85em;
-  color: var(--gray-400);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 500;
+.status-success,
+.status-info,
+.status-warning,
+.status-error,
+.status-error-dark {
+  font-weight: 600;
 }
-
 .status-success {
   color: var(--status-success-dark);
-  font-weight: 600;
 }
 .status-info {
   color: var(--status-info);
-  font-weight: 600;
 }
 .status-warning {
   color: var(--warning);
-  font-weight: 600;
 }
 .status-error {
   color: var(--error);
-  font-weight: 600;
 }
 .status-error-dark {
   color: var(--status-error-dark);
-  font-weight: 600;
-}
-.section-divider {
-  border: none;
-  border-top: 1px solid var(--gray-200);
-  margin: 4px 0 16px 0;
 }
 
 .section-break {
@@ -631,12 +538,6 @@ button.stat-card-active {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-}
-
-.config-section-action {
-  padding-top: 4px;
-  border-top: none;
-  align-items: flex-start;
 }
 
 .config-label {

@@ -156,45 +156,6 @@
   color: var(--gray-600);
 }
 
-/* Sync controls */
-.sync-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 16px;
-}
-
-.sync-controls .btn {
-  margin: 0;
-}
-
-/* Auto-sync toggle row */
-.sync-auto-controls {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-left: auto;
-}
-
-.toggle-inline {
-  font-size: 1rem;
-  gap: 6px;
-}
-
-.toggle-inline .toggle-slider {
-  width: 32px;
-  height: 16px;
-}
-
-.toggle-inline .toggle-slider::after {
-  width: 12px;
-  height: 12px;
-}
-
-.toggle-inline input[type="checkbox"]:checked + .toggle-slider::after {
-  transform: translateX(16px);
-}
-
 /* Reduce gap between Sync Status header and first endpoint table */
 .report-visual > h3 + .endpoint-table .endpoint-group-label:first-child td {
   padding-top: 0;

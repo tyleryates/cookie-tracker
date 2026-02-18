@@ -73,7 +73,7 @@ for (const tab of REPORT_TABS) {
 // Display names for dropdown items in paired tabs
 const REPORT_TYPE_LABELS: Record<string, string> = {
   inventory: 'Inventory & Transfers',
-  'troop-sales': 'Site Orders',
+  'troop-sales': 'Online Orders',
   proceeds: 'Proceeds',
   'scout-inventory': 'Inventory',
   summary: 'Sales Summary',
@@ -221,8 +221,8 @@ export function TabBar({ activeReport, unified, appConfig, onSelectReport }: Tab
       .reduce((sum, s) => sum + s.totals.inventory, 0);
     if (scoutInvTotal > 0) counts['scout-inventory'] = scoutInvTotal;
 
-    // Site order counts (packages, excluding booth sales)
-    const siteOrderCount = unified.siteOrders.directShip.total + unified.siteOrders.girlDelivery.total;
+    // Site order counts (number of orders, excluding booth sales)
+    const siteOrderCount = unified.siteOrders.directShip.orders.length + unified.siteOrders.girlDelivery.orders.length;
     if (siteOrderCount > 0) counts['troop-sales'] = siteOrderCount;
 
     // Scout order counts

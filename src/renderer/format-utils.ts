@@ -1,4 +1,4 @@
-// HTML Builder Utilities
+// Formatting and display utilities
 
 import { BOOTH_RESERVATION_TYPE } from '../constants';
 import { COOKIE_ORDER, getCookieColor, getCookieDisplayName } from '../cookie-constants';
@@ -331,6 +331,19 @@ function todayMidnight(): Date {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+/** Remove expired slot keys (boothId|YYYY-MM-DD|startTime) whose date is before today */
+function pruneExpiredSlots(slots: string[]): string[] {
+  const now = new Date();
+  const todayInt = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  return slots.filter((key) => {
+    const parts = key.split('|');
+    if (parts.length < 2) return false;
+    const d = parts[1].split(/[-/]/);
+    if (d.length < 3) return false;
+    return Number(d[0]) * 10000 + Number(d[1]) * 100 + Number(d[2]) >= todayInt;
+  });
+}
+
 export {
   boothTypeClass,
   buildVarietyTooltip,
@@ -355,5 +368,6 @@ export {
   slotOverlapsRange,
   parseLocalDate,
   todayMidnight,
-  haversineDistance
+  haversineDistance,
+  pruneExpiredSlots
 };

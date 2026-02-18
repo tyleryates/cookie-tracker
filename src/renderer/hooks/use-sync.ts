@@ -5,7 +5,7 @@ import { CHECK_INTERVAL_MS, SYNC_ENDPOINTS } from '../../constants';
 import Logger from '../../logger';
 import type { AppConfig, SyncState } from '../../types';
 import type { Action } from '../app-reducer';
-import { formatCompactRange, formatShortDate } from '../format-utils';
+import { formatCompactRange, formatShortDate, pruneExpiredSlots } from '../format-utils';
 import { ipcInvoke, ipcInvokeRaw, onIpcEvent } from '../ipc';
 import { type BoothSlotSummary, encodeSlotKey, summarizeAvailableSlots } from '../reports/available-booths-utils';
 
@@ -61,18 +61,6 @@ function markNotified(booths: BoothSlotSummary[], notified: Set<string>): void {
   for (const b of booths) {
     for (const s of b.slots) notified.add(encodeSlotKey(b.id, s.date, s.startTime));
   }
-}
-
-/** Check if the date portion of a slot key (boothId|date|startTime) is before today */
-function isSlotDatePast(slotKey: string): boolean {
-  const parts = slotKey.split('|');
-  if (parts.length < 2) return false;
-  const dateParts = parts[1].split(/[-/]/);
-  if (dateParts.length < 3) return false;
-  const dateInt = Number(dateParts[0]) * 10000 + Number(dateParts[1]) * 100 + Number(dateParts[2]);
-  const now = new Date();
-  const todayInt = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
-  return dateInt < todayInt;
 }
 
 /** Detailed body for iMessage — verbose with address when single location */
@@ -193,7 +181,7 @@ export function useSync(
 
       if (config) {
         // Prune past ignored time slots (by date, not time)
-        const prunedIgnored = config.ignoredTimeSlots.filter((key) => !isSlotDatePast(key));
+        const prunedIgnored = pruneExpiredSlots(config.ignoredTimeSlots);
         if (prunedIgnored.length !== config.ignoredTimeSlots.length) {
           dispatch({ type: 'UPDATE_CONFIG', patch: { ignoredTimeSlots: prunedIgnored } });
           ipcInvoke('update-config', { ignoredTimeSlots: prunedIgnored }).catch(() => {});

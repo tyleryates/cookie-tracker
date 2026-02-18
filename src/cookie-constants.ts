@@ -206,6 +206,11 @@ const COOKIE_PRICES: Record<CookieType, number> = Object.fromEntries(COOKIE_REGI
   number
 >;
 
+// Abbreviations (internal, used by getCookieAbbreviation)
+const COOKIE_ABBREVIATIONS: Record<CookieType, string> = Object.fromEntries(
+  COOKIE_REGISTRY.filter((e) => e.scTransferAbbr !== null).map((e) => [e.type, e.scTransferAbbr!])
+) as Record<CookieType, string>;
+
 // Brand colors (internal, used by getCookieColor)
 const COOKIE_COLORS: Record<CookieType, string> = Object.fromEntries(COOKIE_REGISTRY.map((e) => [e.type, e.color])) as Record<
   CookieType,
@@ -261,6 +266,13 @@ export function getCookieDisplayName(cookieType: string): string {
  */
 export function getCookieColor(cookieType: string): string | null {
   return COOKIE_COLORS[cookieType as CookieType] || null;
+}
+
+/**
+ * Get the abbreviation for a cookie type (e.g. "TM" for Thin Mints)
+ */
+export function getCookieAbbreviation(cookieType: string): string {
+  return COOKIE_ABBREVIATIONS[cookieType as CookieType] || cookieType;
 }
 
 /**

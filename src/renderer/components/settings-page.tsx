@@ -212,7 +212,7 @@ export function SettingsPage({
   };
 
   return (
-    <div class="settings-page">
+    <div>
       <h2>{mode === 'welcome' ? 'Welcome' : 'Settings'}</h2>
       {mode === 'welcome' && (
         <p class="settings-welcome-message">

@@ -126,7 +126,7 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
     { label: 'Delivered', value: totalDelivered, description: 'DC orders delivered by scouts', color: STAT_COLORS.BLUE },
     { label: 'In Person', value: totalInHand, description: 'Door-to-door sales', color: STAT_COLORS.GREEN, operator: '+' },
     { label: 'Shipped', value: totalShipped, description: 'Direct ship orders', color: STAT_COLORS.TEAL, operator: '+' },
-    { label: 'Credits', value: totalCredits, description: 'Booth + troop site', color: STAT_COLORS.PURPLE, operator: '+' },
+    { label: 'Credits', value: totalCredits, description: 'Booth + troop online', color: STAT_COLORS.PURPLE, operator: '+' },
     { label: 'Total Sales', value: totalSoldAll, description: 'All scout sales', color: STAT_COLORS.ORANGE, operator: '=', highlight: true }
   ];
 

@@ -295,7 +295,7 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
   return (
     <div class="report-visual">
       <div class="report-header-row">
-        <h3>Troop Site Orders</h3>
+        <h3>Troop Online Orders</h3>
         <span class={`report-status-badge ${hasUnallocated ? 'report-status-warning' : 'report-status-ok'}`}>
           {hasUnallocated ? 'Needs Attention' : 'All Distributed'}
         </span>

@@ -1,4 +1,4 @@
-// ExpandableRow — Preact replacement for event delegation scout/booth row toggle
+// ExpandableRow — expandable table row with toggle detail
 
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
