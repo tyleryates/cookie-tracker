@@ -86,7 +86,7 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
     }
   }
 
-  return <ScoutCreditChips credits={scoutCredits} unit="sales" />;
+  return <ScoutCreditChips credits={scoutCredits} unit="sale" />;
 }
 
 function CompletedBoothsSection({ booths, scouts }: { booths: BoothReservationImported[]; scouts: Record<string, Scout> }) {
@@ -191,7 +191,7 @@ export function CompletedBoothsReport({ data, banner }: { data: UnifiedDataset; 
     { label: 'Completed', value: booths.completed.length, description: 'Distributed booths', color: STAT_COLORS.TEAL },
     { label: 'Packages Sold', value: totalPackages, description: 'Total booth packages', color: STAT_COLORS.BLUE },
     ...(totalDonations > 0
-      ? [{ label: 'Donations', value: totalDonations, description: 'Booth cookie shares', color: STAT_COLORS.DEEP_PURPLE }]
+      ? [{ label: 'Donations', value: totalDonations, description: 'Booth cookie shares', color: STAT_COLORS.PURPLE }]
       : []),
     ...(booths.needsDistribution.length > 0
       ? [

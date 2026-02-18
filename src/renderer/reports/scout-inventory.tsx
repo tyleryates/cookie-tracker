@@ -2,16 +2,24 @@ import type preact from 'preact';
 import type { ComponentChildren } from 'preact';
 import { ORDER_TYPE, OWNER } from '../../constants';
 import { COOKIE_ORDER, getCookieAbbreviation, getCookieColor, getCookieDisplayName } from '../../cookie-constants';
+import { classifyOrderStatus } from '../../order-classification';
 import type { CookieType, Scout, Transfer, TransferBreakdowns, UnifiedDataset, Varieties } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { STAT_COLORS, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
 import { buildVarietyTooltip, formatShortDate, getActiveScouts, isPhysicalVariety } from '../format-utils';
+import { buildOrderTooltip } from '../order-helpers';
 
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/** Strip trailing status words from dcOrderType (e.g. "Girl Delivery Completed" → "Girl Delivery") */
+function stripOrderStatus(dcOrderType: string | undefined): string {
+  if (!dcOrderType) return '-';
+  return dcOrderType.replace(/\s*(Completed|Complete|Pending|Needs Approval)\s*$/i, '').trim() || dcOrderType;
+}
 
 function formatOnHand(net: number): preact.JSX.Element {
   if (net < 0) return <span class="pkg-out">-{Math.abs(net)} ⚠️</span>;
@@ -46,20 +54,22 @@ function InventoryCell({
 // Detail breakdown — variety-level inventory for a single scout
 // ============================================================================
 
-/** Split sales by variety into in-person (IN_HAND) vs DC delivery (DELIVERY) */
-function splitSalesByType(scout: Scout): { inPerson: Varieties; delivery: Varieties } {
+/** Split sales by variety into in-person vs delivery, and sold vs requested (needs approval) */
+function splitSalesByType(scout: Scout): { inPerson: Varieties; delivery: Varieties; requested: Varieties } {
   const inPerson: Varieties = {};
   const delivery: Varieties = {};
+  const requested: Varieties = {};
   for (const order of scout.orders) {
     if (order.owner !== OWNER.GIRL) continue;
-    const target = order.orderType === ORDER_TYPE.IN_HAND ? inPerson : order.orderType === ORDER_TYPE.DELIVERY ? delivery : null;
-    if (!target) continue;
+    if (order.orderType !== ORDER_TYPE.IN_HAND && order.orderType !== ORDER_TYPE.DELIVERY) continue;
+    const isRequested = classifyOrderStatus(order.status) === 'NEEDS_APPROVAL';
+    const target = isRequested ? requested : order.orderType === ORDER_TYPE.IN_HAND ? inPerson : delivery;
     for (const [v, count] of Object.entries(order.varieties)) {
       if (!isPhysicalVariety(v)) continue;
       target[v as CookieType] = (target[v as CookieType] || 0) + count;
     }
   }
-  return { inPerson, delivery };
+  return { inPerson, delivery, requested };
 }
 
 function getScoutTransfers(scoutName: string, breakdowns: TransferBreakdowns): Array<Transfer & { direction: 'in' | 'out' }> {
@@ -76,52 +86,95 @@ function getScoutTransfers(scoutName: string, breakdowns: TransferBreakdowns): A
 
 function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transferBreakdowns: TransferBreakdowns }) {
   const { inventory } = scout;
-  const salesVarieties = scout.totals.$salesByVariety || {};
-  const { inPerson, delivery } = splitSalesByType(scout);
+  const allSalesVarieties = scout.totals.$salesByVariety || {};
+  const physicalVarieties = COOKIE_ORDER.filter(isPhysicalVariety);
 
   const hasActivity = Object.entries(inventory.varieties).some(
-    ([variety, count]) => isPhysicalVariety(variety) && (count > 0 || (salesVarieties[variety as keyof Varieties] || 0) > 0)
+    ([variety, count]) => isPhysicalVariety(variety) && (count > 0 || (allSalesVarieties[variety as keyof Varieties] || 0) > 0)
   );
 
   if (!hasActivity) {
     return <div class="scout-breakdown muted-text">No inventory activity.</div>;
   }
 
-  const hasDelivery = Object.values(delivery).some((v) => v > 0);
-  const hasInPerson = Object.values(inPerson).some((v) => v > 0);
-  const showSplitTip = hasDelivery || hasInPerson;
-
-  const physicalVarieties = COOKIE_ORDER.filter(isPhysicalVariety);
-
   const varietyHeaderStyle = { fontSize: '0.75em', whiteSpace: 'nowrap' };
   const totalShares = physicalVarieties.length + 2;
+  const twoShare = `${(2 * 100) / totalShares}%`;
   const oneShare = `${100 / totalShares}%`;
-  const twoShare = `${200 / totalShares}%`;
-  const cookieCols = physicalVarieties.map((v) => <col key={v} style={{ width: oneShare }} />);
+
+  const renderCookieCols = () => physicalVarieties.map((v) => <col key={v} style={{ width: oneShare }} />);
+  const renderCookieHeaders = () =>
+    physicalVarieties.map((v) => {
+      const color = getCookieColor(v);
+      return (
+        <th key={v} class="text-center" style={varietyHeaderStyle}>
+          {color && <span class="inventory-chip-dot" style={{ background: color }} />}
+          {getCookieAbbreviation(v)}
+        </th>
+      );
+    });
+
+  // Girl's delivery/in-hand orders split by status
+  const girlOrders = scout.orders.filter(
+    (o) => o.owner === OWNER.GIRL && (o.orderType === ORDER_TYPE.DELIVERY || o.orderType === ORDER_TYPE.IN_HAND)
+  );
+  const completeOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === 'COMPLETED');
+  const pendingOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === 'PENDING');
+  const requestedOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === 'NEEDS_APPROVAL');
+
+  // Complete varieties + in-person/delivery split for tooltip
+  const completeVarieties: Varieties = {};
+  const completeInPerson: Varieties = {};
+  const completeDelivery: Varieties = {};
+  for (const o of completeOrders) {
+    const target = o.orderType === ORDER_TYPE.IN_HAND ? completeInPerson : completeDelivery;
+    for (const [v, count] of Object.entries(o.varieties)) {
+      if (!isPhysicalVariety(v)) continue;
+      const key = v as CookieType;
+      completeVarieties[key] = (completeVarieties[key] || 0) + count;
+      target[key] = (target[key] || 0) + count;
+    }
+  }
+  const hasCompleteDelivery = Object.values(completeDelivery).some((v) => v > 0);
+  const hasCompleteInPerson = Object.values(completeInPerson).some((v) => v > 0);
+  const showCompleteTip = hasCompleteDelivery || hasCompleteInPerson;
+
+  // Requested variety totals (for Order Requests total row)
+  const requestedVarieties: Varieties = {};
+  for (const o of requestedOrders) {
+    for (const [v, count] of Object.entries(o.varieties)) {
+      if (!isPhysicalVariety(v)) continue;
+      requestedVarieties[v as CookieType] = (requestedVarieties[v as CookieType] || 0) + count;
+    }
+  }
+
+  // Sold = all sales minus needs-approval (for Remaining Inventory)
+  const soldVarieties: Varieties = {};
+  for (const v of COOKIE_ORDER) {
+    if (!isPhysicalVariety(v)) continue;
+    const total = allSalesVarieties[v as keyof Varieties] || 0;
+    const req = requestedVarieties[v as keyof Varieties] || 0;
+    if (total - req > 0) soldVarieties[v as keyof Varieties] = total - req;
+  }
+
+  const transfers = getScoutTransfers(scout.name, transferBreakdowns);
 
   return (
     <div class="scout-breakdown">
-      <h5 style={{ margin: '0 0 4px' }}>Inventory</h5>
+      {/* Summary table */}
       <table class="table-compact">
         <colgroup>
           <col style={{ width: twoShare }} />
-          {cookieCols}
+          {renderCookieCols()}
         </colgroup>
         <thead>
           <tr>
             <th />
-            {physicalVarieties.map((v) => {
-              const color = getCookieColor(v);
-              return (
-                <th key={v} class="text-center" style={varietyHeaderStyle}>
-                  {color && <span class="inventory-chip-dot" style={{ background: color }} />}
-                  {getCookieAbbreviation(v)}
-                </th>
-              );
-            })}
+            {renderCookieHeaders()}
           </tr>
         </thead>
         <tbody>
+          {/* Picked Up */}
           <tr>
             <td>Picked Up</td>
             {physicalVarieties.map((v) => {
@@ -133,14 +186,18 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
               );
             })}
           </tr>
+
+          {/* Sold (Complete) */}
           <tr>
-            <td>Sold</td>
+            <td>
+              <span class="status-pill status-pill-success">Complete</span> Orders
+            </td>
             {physicalVarieties.map((v) => {
-              const count = salesVarieties[v as keyof Varieties] || 0;
-              const ip = inPerson[v as keyof Varieties] || 0;
-              const dl = delivery[v as keyof Varieties] || 0;
+              const count = completeVarieties[v as keyof Varieties] || 0;
+              const ip = completeInPerson[v as keyof Varieties] || 0;
+              const dl = completeDelivery[v as keyof Varieties] || 0;
               const tip =
-                showSplitTip && (ip > 0 || dl > 0)
+                showCompleteTip && (ip > 0 || dl > 0)
                   ? [ip > 0 ? `In Person: ${ip}` : '', dl > 0 ? `Delivery: ${dl}` : ''].filter(Boolean).join('\n')
                   : '';
               return tip ? (
@@ -154,11 +211,69 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
               );
             })}
           </tr>
+
+          {/* Pending orders — one row each */}
+          {pendingOrders.map((o) => {
+            const orderTip = buildOrderTooltip(o);
+            const typeText = stripOrderStatus(o.dcOrderType);
+            return (
+              <tr key={o.orderNumber}>
+                <td>
+                  <span class="status-pill status-pill-warning">Pending</span>{' '}
+                  {orderTip ? (
+                    <TooltipCell tooltip={orderTip} tag="span" className="tooltip-cell">
+                      {typeText}
+                    </TooltipCell>
+                  ) : (
+                    typeText
+                  )}
+                </td>
+                {physicalVarieties.map((v) => {
+                  const count = o.varieties[v as keyof Varieties] || 0;
+                  return (
+                    <td key={v} class="text-center">
+                      {count > 0 ? count : <span class="muted-text">—</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+
+          {/* Needs Approval orders — one row each */}
+          {requestedOrders.map((o) => {
+            const orderTip = buildOrderTooltip(o);
+            const typeText = stripOrderStatus(o.dcOrderType);
+            return (
+              <tr key={o.orderNumber}>
+                <td>
+                  <span class="status-pill status-pill-error">Needs Approval</span>{' '}
+                  {orderTip ? (
+                    <TooltipCell tooltip={orderTip} tag="span" className="tooltip-cell">
+                      {typeText}
+                    </TooltipCell>
+                  ) : (
+                    typeText
+                  )}
+                </td>
+                {physicalVarieties.map((v) => {
+                  const count = o.varieties[v as keyof Varieties] || 0;
+                  return (
+                    <td key={v} class="text-center">
+                      {count > 0 ? count : <span class="muted-text">—</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+
+          {/* Remaining Inventory */}
           <tr>
-            <td>On Hand</td>
+            <td>Remaining Inventory</td>
             {physicalVarieties.map((v) => {
               const pickedUp = inventory.varieties[v as keyof Varieties] || 0;
-              const sold = salesVarieties[v as keyof Varieties] || 0;
+              const sold = soldVarieties[v as keyof Varieties] || 0;
               const onHand = pickedUp - sold;
               return (
                 <td key={v} class="text-center">
@@ -169,62 +284,52 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
           </tr>
         </tbody>
       </table>
-      {(() => {
-        const transfers = getScoutTransfers(scout.name, transferBreakdowns);
-        if (transfers.length === 0) return null;
-        return (
-          <>
-            <h5 style={{ margin: '12px 0 4px' }}>Transfers</h5>
-            <table class="table-compact">
-              <colgroup>
-                <col style={{ width: oneShare }} />
-                <col style={{ width: oneShare }} />
-                {cookieCols}
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th class="text-center">Type</th>
-                  {physicalVarieties.map((v) => {
-                    const color = getCookieColor(v);
-                    return (
-                      <th key={v} class="text-center" style={varietyHeaderStyle}>
-                        {color && <span class="inventory-chip-dot" style={{ background: color }} />}
-                        {getCookieAbbreviation(v)}
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {transfers.map((t, i) => {
-                  const varieties = t.physicalVarieties || t.varieties || {};
-                  const sign = t.direction === 'in' ? '+' : '\u2212';
-                  const cls = t.direction === 'in' ? 'pkg-in' : 'pkg-out';
-                  return (
-                    <tr key={`${t.date}-${t.type}-${i}`}>
-                      <td>{formatShortDate(t.date)}</td>
-                      <td class="text-center">
-                        <span class={`transfer-type-label ${t.direction === 'in' ? 'transfer-type-t2g' : 'transfer-type-g2t'}`}>
-                          {t.direction === 'in' ? 'Pickup' : 'Return'}
-                        </span>
-                      </td>
-                      {physicalVarieties.map((v) => {
-                        const count = varieties[v] || 0;
-                        return (
-                          <td key={v} class="text-center">
-                            {count > 0 ? <span class={cls}>{`${sign}${count}`}</span> : <span class="muted-text">—</span>}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </>
-        );
-      })()}
+
+      {/* Transfers table */}
+      {transfers.length > 0 && (
+        <>
+          <h5 style={{ margin: '12px 0 4px' }}>Transfers</h5>
+          <table class="table-compact">
+            <colgroup>
+              <col style={{ width: oneShare }} />
+              <col style={{ width: oneShare }} />
+              {renderCookieCols()}
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th class="text-center">Type</th>
+                {renderCookieHeaders()}
+              </tr>
+            </thead>
+            <tbody>
+              {transfers.map((t, i) => {
+                const varieties = t.physicalVarieties || t.varieties || {};
+                const sign = t.direction === 'in' ? '+' : '\u2212';
+                const cls = t.direction === 'in' ? 'pkg-in' : 'pkg-out';
+                return (
+                  <tr key={`${t.date}-${t.type}-${i}`}>
+                    <td>{formatShortDate(t.date)}</td>
+                    <td class="text-center">
+                      <span class={`transfer-type-label ${t.direction === 'in' ? 'transfer-type-t2g' : 'transfer-type-g2t'}`}>
+                        {t.direction === 'in' ? 'Pickup' : 'Return'}
+                      </span>
+                    </td>
+                    {physicalVarieties.map((v) => {
+                      const count = varieties[v] || 0;
+                      return (
+                        <td key={v} class="text-center">
+                          {count > 0 ? <span class={cls}>{`${sign}${count}`}</span> : <span class="muted-text">—</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </>
+      )}
     </div>
   );
 }
@@ -283,12 +388,12 @@ export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; b
       </div>
       {banner}
 
-      {hasNegativeInventory && <div class="info-box info-box-warning">Scouts are missing cookies for placed orders.</div>}
+      {hasNegativeInventory && <div class="info-box info-box-warning">Scouts are missing cookies for accepted orders.</div>}
 
       <StatCards stats={stats} />
 
       <DataTable
-        columns={['Scout', 'Picked Up', 'Packages Sold', 'On Hand']}
+        columns={['Scout', 'Picked Up', 'Packages Sold', 'Inventory']}
         columnAligns={[undefined, 'center', 'center', 'center']}
         className="table-normal scout-table"
         hint="Click a row to see inventory breakdown and transfers."

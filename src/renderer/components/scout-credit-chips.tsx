@@ -15,7 +15,7 @@ export function ScoutCreditChips({ credits, unit }: { credits: Array<{ name: str
         <div key={name} class="booth-allocation-chip">
           <strong>{name}</strong>
           <span class="booth-allocation-credit">
-            {total} {unit}
+            {total} {total === 1 ? unit : `${unit}s`}
           </span>
         </div>
       ))}

@@ -22,24 +22,8 @@ function AllocationDetails({ scout }: { scout: Scout }) {
 
   if (vbAllocs.length === 0 && dsAllocs.length === 0 && bsAllocs.length === 0) return null;
 
-  // Collect dated rows (VB + Booth), sort newest first
+  // Booth rows: one per reservation, sorted newest first
   const datedRows: Array<{ date: string; row: preact.JSX.Element }> = [];
-
-  for (const a of vbAllocs) {
-    const detail = a.orderNumber ? `#${a.orderNumber} from ${a.from || '-'}` : String(a.from || '-');
-    const credits = a.packages + (a.donations || 0);
-    datedRows.push({
-      date: a.date || '',
-      row: (
-        <tr key={`vb-${datedRows.length}`}>
-          <td>{formatShortDate(a.date)}</td>
-          <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}</td>
-          <td>{detail}</td>
-          <PackagesCell varieties={a.varieties} packages={credits} />
-        </tr>
-      )
-    });
-  }
 
   for (const a of bsAllocs) {
     const time = formatTimeRange(a.startTime, a.endTime);
@@ -60,19 +44,45 @@ function AllocationDetails({ scout }: { scout: Scout }) {
 
   datedRows.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
 
-  // Dated rows sorted newest-first, then DS rows (no date) at the bottom
-  const rows: preact.JSX.Element[] = datedRows.map(({ row }) => row);
-  for (const [i, a] of dsAllocs.entries()) {
-    const credits = a.packages + (a.donations || 0);
+  // VB and DS summary rows first, then booth rows sorted newest-first
+  const rows: preact.JSX.Element[] = [];
+
+  // Virtual booth: single summary row (divider is aggregate, not per-order)
+  if (vbAllocs.length > 0) {
+    const vbTotal = vbAllocs.reduce((sum, a) => sum + a.packages + (a.donations || 0), 0);
+    const vbVarieties: Varieties = {};
+    for (const a of vbAllocs)
+      for (const [v, n] of Object.entries(a.varieties))
+        vbVarieties[v as keyof Varieties] = (vbVarieties[v as keyof Varieties] || 0) + (n || 0);
     rows.push(
-      <tr key={`ds-${i}`}>
+      <tr key="vb">
         <td class="muted-text">{'\u2014'}</td>
-        <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}</td>
-        <td>SC direct ship divider allocation</td>
-        <PackagesCell varieties={a.varieties} packages={credits} />
+        <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}</td>
+        <td class="muted-text">Virtual booth divider allocation</td>
+        <PackagesCell varieties={vbVarieties} packages={vbTotal} />
       </tr>
     );
   }
+
+  // Direct ship: single summary row (divider is aggregate, not per-order)
+  if (dsAllocs.length > 0) {
+    const dsTotal = dsAllocs.reduce((sum, a) => sum + a.packages + (a.donations || 0), 0);
+    const dsVarieties: Varieties = {};
+    for (const a of dsAllocs)
+      for (const [v, n] of Object.entries(a.varieties))
+        dsVarieties[v as keyof Varieties] = (dsVarieties[v as keyof Varieties] || 0) + (n || 0);
+    rows.push(
+      <tr key="ds">
+        <td class="muted-text">{'\u2014'}</td>
+        <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]}</td>
+        <td class="muted-text">Direct ship divider allocation</td>
+        <PackagesCell varieties={dsVarieties} packages={dsTotal} />
+      </tr>
+    );
+  }
+
+  // Booth rows sorted newest-first
+  for (const { row } of datedRows) rows.push(row);
 
   return (
     <div class="section-break">

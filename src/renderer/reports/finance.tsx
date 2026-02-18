@@ -125,7 +125,7 @@ export function FinanceReport({ data, banner }: { data: UnifiedDataset; banner?:
       label: 'Cash Turned In',
       value: formatCurrency(totalPayments),
       description: 'Money received from scouts',
-      color: STAT_COLORS.PINK,
+      color: STAT_COLORS.TEAL,
       operator: '\u2212'
     },
     {

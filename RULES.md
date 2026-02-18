@@ -563,3 +563,24 @@ The app provides twelve reports in five tab groups plus tools:
 
 **Tools** (separate tab bar buttons):
 12. **Inventory History** — Daily inventory change log with running balance (toggle in Settings)
+
+### Stat Card Color Palette
+
+Report stat cards use a shared `STAT_COLORS` palette (`stat-cards.tsx`) with semantic color roles. When adding or modifying stat cards, follow these conventions:
+
+| Color | Role | Example usage |
+|---|---|---|
+| GREEN | Result/total (highlight cards) | Total Sales, Troop Proceeds, Total Donations |
+| BLUE | Starting/primary values | Packages Credited, Cash Owed, Delivered |
+| PINK | Girl-related activity | In Person (door-to-door), Cash Turned In |
+| TEAL | Secondary metrics | Credit Tier, Direct Ship, Completed count |
+| PURPLE | Credits, donations, troop allocations | Booth + troop credits, Cookie Share |
+| AMBER | Intermediate calculations | Gross Proceeds |
+| ORANGE | Warnings | Needs Distribution |
+| RED | Negative values, deductions, amounts due | First-50 Deduction, Cash Due (overdue) |
+
+**Guidelines:**
+- Result/total cards use GREEN with `highlight: true` (gray background)
+- Avoid placing same-color cards adjacent to each other
+- RED is reserved for genuinely negative amounts — don't use for neutral metrics
+- When a value is conditionally positive or negative (e.g., Cash Due), use RED when overdue and GREEN when settled

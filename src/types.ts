@@ -386,7 +386,6 @@ export interface BoothLocation {
 export interface SiteOrderEntry {
   orderNumber: string;
   packages: number;
-  allocated: number;
   owner: Owner;
   orderType: OrderType | null;
 }

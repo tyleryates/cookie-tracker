@@ -20,7 +20,7 @@ function buildSiteOrdersDataset(store: ReadonlyDataStore, scoutDataset: Record<s
   const girlDeliveryEntries: SiteOrderEntry[] = [];
   const boothSaleEntries: SiteOrderEntry[] = [];
 
-  // Classify site orders by type, sorted by date ascending for FIFO allocation
+  // Classify site orders by type
   if (siteScout) {
     const sortedOrders = [...siteScout.orders].sort(
       (a, b) => (a.date || '').localeCompare(b.date || '') || a.orderNumber.localeCompare(b.orderNumber)
@@ -32,7 +32,6 @@ function buildSiteOrdersDataset(store: ReadonlyDataStore, scoutDataset: Record<s
       const entry: SiteOrderEntry = {
         orderNumber: order.orderNumber,
         packages: order.physicalPackages,
-        allocated: 0,
         owner: OWNER.TROOP,
         orderType: order.orderType
       };
@@ -45,48 +44,6 @@ function buildSiteOrdersDataset(store: ReadonlyDataStore, scoutDataset: Record<s
         girlDeliveryEntries.push(entry);
       }
     }
-  }
-
-  // Direct ship: try per-order allocation by matching orderId first
-  for (const entry of directShipEntries) {
-    for (const alloc of store.allocations) {
-      if (alloc.channel !== ALLOCATION_CHANNEL.DIRECT_SHIP) continue;
-      if (alloc.orderId === entry.orderNumber || alloc.orderId === `D${entry.orderNumber}`) {
-        entry.allocated += alloc.packages || 0;
-      }
-    }
-  }
-
-  // Fallback: SC API often returns a single divider blob without per-order orderId.
-  // If no entries got orderId-based allocation, FIFO from total direct ship pool.
-  const hasOrderIdMatches = directShipEntries.some((e) => e.allocated > 0);
-  if (!hasOrderIdMatches) {
-    let dsPool = 0;
-    for (const alloc of store.allocations) {
-      if (alloc.channel === ALLOCATION_CHANNEL.DIRECT_SHIP) {
-        dsPool += alloc.packages || 0;
-      }
-    }
-    for (const entry of directShipEntries) {
-      const consumed = Math.min(entry.packages, dsPool);
-      entry.allocated = consumed;
-      dsPool -= consumed;
-    }
-  }
-
-  // Girl delivery: FIFO allocation (oldest first, already sorted by date)
-  // Virtual booth divider doesn't track per-order, so we consume from the pool
-  // starting with the oldest orders until the allocation is exhausted
-  let pool = 0;
-  for (const transfer of store.transfers) {
-    if (transfer.category === TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) {
-      pool += transfer.physicalPackages || 0;
-    }
-  }
-  for (const entry of girlDeliveryEntries) {
-    const consumed = Math.min(entry.packages, pool);
-    entry.allocated = consumed;
-    pool -= consumed;
   }
 
   // Calculate category-level allocation totals

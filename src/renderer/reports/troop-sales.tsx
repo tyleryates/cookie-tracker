@@ -2,7 +2,6 @@ import type { ComponentChildren } from 'preact';
 import { ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
 import type { Order, Scout, SiteOrderCategory, SiteOrdersDataset, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
-import { ExpandableRow } from '../components/expandable-row';
 import { ScoutCreditChips } from '../components/scout-credit-chips';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
@@ -50,151 +49,115 @@ function SiteOrderWarning({ siteOrders }: { siteOrders: SiteOrdersDataset }) {
 }
 
 // ============================================================================
-// Combined orders table (girl delivery + direct ship)
+// Section-based layout (Girl Delivery + Direct Ship)
 // ============================================================================
 
-function OrderScoutAllocations({
-  orderNumber,
-  orderType,
-  scouts
-}: {
-  orderNumber: string;
-  orderType: string | null;
-  scouts: Record<string, Scout>;
-}) {
+function SectionAllocations({ channel, scouts }: { channel: 'directShip' | 'virtualBooth'; scouts: Record<string, Scout> }) {
   const scoutCredits: Array<{ name: string; total: number }> = [];
-
-  if (orderType === ORDER_TYPE.DIRECT_SHIP) {
-    // Try exact per-order match first (available when SC provides orderId)
-    for (const [name, scout] of Object.entries(scouts)) {
-      if (scout.isSiteOrder) continue;
-      const matching = scout.$allocationsByChannel.directShip
-        .filter((a) => a.orderId === orderNumber || a.orderId === `D${orderNumber}`)
-        .reduce((sum, a) => sum + a.packages + a.donations, 0);
-      if (matching > 0) scoutCredits.push({ name, total: matching });
-    }
-
-    // Fallback: SC API returns a single divider blob without per-order orderId.
-    // Show each scout's total direct ship allocation instead.
-    if (scoutCredits.length === 0) {
-      for (const [name, scout] of Object.entries(scouts)) {
-        if (scout.isSiteOrder) continue;
-        const total = scout.$allocationsByChannel.directShip.reduce((sum, a) => sum + a.packages + a.donations, 0);
-        if (total > 0) scoutCredits.push({ name, total });
-      }
-    }
-  } else {
-    // Girl delivery orders (DELIVERY + IN_HAND) are allocated via virtual booth T2G transfers.
-    // SC stores order numbers with a "D" prefix (e.g. "D1001") while DC strips it ("1001").
-    for (const [name, scout] of Object.entries(scouts)) {
-      if (scout.isSiteOrder) continue;
-      const matching = scout.$allocationsByChannel.virtualBooth
-        .filter((a) => a.orderNumber === orderNumber || a.orderNumber === `D${orderNumber}`)
-        .reduce((sum, a) => sum + a.packages + a.donations, 0);
-      if (matching > 0) scoutCredits.push({ name, total: matching });
-    }
-
-    // Fallback: virtual booth divider doesn't always track per-order.
-    // Show each scout's total virtual booth allocation instead.
-    if (scoutCredits.length === 0) {
-      for (const [name, scout] of Object.entries(scouts)) {
-        if (scout.isSiteOrder) continue;
-        const total = scout.$allocationsByChannel.virtualBooth.reduce((sum, a) => sum + a.packages + a.donations, 0);
-        if (total > 0) scoutCredits.push({ name, total });
-      }
-    }
+  for (const [name, scout] of Object.entries(scouts)) {
+    if (scout.isSiteOrder) continue;
+    const total = scout.$allocationsByChannel[channel].reduce((sum, a) => sum + a.packages + a.donations, 0);
+    if (total > 0) scoutCredits.push({ name, total });
   }
-
-  return <ScoutCreditChips credits={scoutCredits} unit="credited" />;
+  return <ScoutCreditChips credits={scoutCredits} unit="credit" />;
 }
 
-function OrdersTable({
-  girlDelivery,
-  directShip,
+function OrderSection({
+  title,
+  category,
+  channel,
   orderLookup,
   scouts
 }: {
-  girlDelivery: SiteOrderCategory;
-  directShip: SiteOrderCategory;
+  title: string;
+  category: SiteOrderCategory;
+  channel: 'directShip' | 'virtualBooth';
   orderLookup: Map<string, Order>;
   scouts: Record<string, Scout>;
 }) {
-  const totalOrders = girlDelivery.orders.length + directShip.orders.length;
-  if (totalOrders === 0) return null;
+  if (category.orders.length === 0 && category.allocated === 0) return null;
 
-  // Sort newest first; per-order allocation status is pre-computed in the data layer
-  const rows = [...girlDelivery.orders.map((e) => ({ entry: e })), ...directShip.orders.map((e) => ({ entry: e }))].sort((a, b) => {
-    const dateA = orderLookup.get(a.entry.orderNumber)?.date || '';
-    const dateB = orderLookup.get(b.entry.orderNumber)?.date || '';
+  const rows = [...category.orders].sort((a, b) => {
+    const dateA = orderLookup.get(a.orderNumber)?.date || '';
+    const dateB = orderLookup.get(b.orderNumber)?.date || '';
     return new Date(dateB).getTime() - new Date(dateA).getTime();
   });
 
-  const COLUMN_COUNT = 8;
-
   return (
-    <>
-      <h4 style={{ margin: '20px 0 8px' }}>Orders</h4>
-      <DataTable
-        columns={['Date', 'Order #', 'Type', 'Packages', 'Donations', 'Amount', 'Payment', 'Status']}
-        columnAligns={[undefined, undefined, undefined, 'center', 'center', 'center', 'center', 'center']}
-        className="table-normal"
-        hint="Click an order to see scout allocations for that order."
-      >
-        {rows.map(({ entry }) => {
-          const original = orderLookup.get(entry.orderNumber);
-          const varieties = original?.varieties;
-          const tip = varieties ? buildVarietyTooltip(varieties) : '';
-          const isCash = original?.paymentMethod === PAYMENT_METHOD.CASH;
-          const isDigital = original?.paymentMethod && original.paymentMethod !== PAYMENT_METHOD.CASH;
-          const amountClass = isCash ? 'cash-amount' : isDigital ? 'digital-amount' : undefined;
-          const paymentPillClass = isCash ? 'payment-pill payment-pill-cash' : isDigital ? 'payment-pill payment-pill-digital' : undefined;
-          const isAllocated = entry.allocated >= entry.packages;
-          const { className: statusClass, text: statusText } = original?.status
-            ? getStatusStyle(original.status)
-            : {
-                className: `status-pill ${isAllocated ? 'status-pill-success' : 'status-pill-warning'}`,
-                text: isAllocated ? 'Allocated' : 'Unallocated'
-              };
+    <div>
+      <h4 style={{ margin: '20px 0 8px' }}>
+        {title}
+        {category.total > 0 && (
+          <span class="muted-text" style={{ fontWeight: 'normal', marginLeft: '8px' }}>
+            {category.allocated} of {category.total} allocated
+          </span>
+        )}
+      </h4>
+      {rows.length > 0 && (
+        <DataTable
+          columns={['Date', 'Order #', 'Type', 'Packages', 'Donations', 'Amount', 'Payment', 'Status']}
+          columnAligns={[undefined, undefined, undefined, 'center', 'center', 'center', 'center', 'center']}
+          className="table-normal"
+        >
+          {rows.map((entry) => {
+            const original = orderLookup.get(entry.orderNumber);
+            const varieties = original?.varieties;
+            const tip = varieties ? buildVarietyTooltip(varieties) : '';
+            const isCash = original?.paymentMethod === PAYMENT_METHOD.CASH;
+            const isDigital = original?.paymentMethod && original.paymentMethod !== PAYMENT_METHOD.CASH;
+            const amountClass = isCash ? 'cash-amount' : isDigital ? 'digital-amount' : undefined;
+            const paymentPillClass = isCash
+              ? 'payment-pill payment-pill-cash'
+              : isDigital
+                ? 'payment-pill payment-pill-digital'
+                : undefined;
+            const { className: statusClass, text: statusText } = original?.status
+              ? getStatusStyle(original.status)
+              : { className: '', text: '' };
 
-          return (
-            <ExpandableRow
-              key={entry.orderNumber}
-              rowClass="booth-row"
-              firstCell={formatShortDate(original?.date)}
-              cells={[
-                entry.orderNumber,
-                (() => {
-                  const typeText = entry.orderType ? (ORDER_TYPE_LABELS[entry.orderType] ?? entry.orderType) : '—';
-                  const orderTip = original ? buildOrderTooltip(original) : '';
-                  return orderTip ? (
-                    <TooltipCell tooltip={orderTip} tag="span">
-                      {typeText}
+            return (
+              <tr key={entry.orderNumber}>
+                <td>{formatShortDate(original?.date)}</td>
+                <td>{entry.orderNumber}</td>
+                <td>
+                  {(() => {
+                    const typeText = entry.orderType ? (ORDER_TYPE_LABELS[entry.orderType] ?? entry.orderType) : '\u2014';
+                    const orderTip = original ? buildOrderTooltip(original) : '';
+                    return orderTip ? (
+                      <TooltipCell tooltip={orderTip} tag="span">
+                        {typeText}
+                      </TooltipCell>
+                    ) : (
+                      typeText
+                    );
+                  })()}
+                </td>
+                <td class="text-center">
+                  {tip ? (
+                    <TooltipCell tooltip={tip} tag="span">
+                      {entry.packages}
                     </TooltipCell>
                   ) : (
-                    typeText
-                  );
-                })(),
-                tip ? (
-                  <TooltipCell tooltip={tip} tag="span">
-                    {entry.packages}
-                  </TooltipCell>
-                ) : (
-                  entry.packages
-                ),
-                original?.donations || '\u2014',
-                <span class={amountClass}>{original ? `$${Math.round(original.amount)}` : '\u2014'}</span>,
-                paymentPillClass ? <span class={paymentPillClass}>{isCash ? 'Cash' : 'Digital'}</span> : '\u2014',
-                <span class={statusClass}>{statusText}</span>
-              ]}
-              cellAligns={[undefined, undefined, 'center', 'center', 'center', 'center', 'center']}
-              detail={<OrderScoutAllocations orderNumber={entry.orderNumber} orderType={entry.orderType} scouts={scouts} />}
-              colSpan={COLUMN_COUNT}
-              detailClass="detail-row"
-            />
-          );
-        })}
-      </DataTable>
-    </>
+                    entry.packages
+                  )}
+                </td>
+                <td class="text-center">{original?.donations || '\u2014'}</td>
+                <td class="text-center">
+                  <span class={amountClass}>{original ? `$${Math.round(original.amount)}` : '\u2014'}</span>
+                </td>
+                <td class="text-center">
+                  {paymentPillClass ? <span class={paymentPillClass}>{isCash ? 'Cash' : 'Digital'}</span> : '\u2014'}
+                </td>
+                <td class="text-center">
+                  <span class={statusClass}>{statusText}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </DataTable>
+      )}
+      <SectionAllocations channel={channel} scouts={scouts} />
+    </div>
   );
 }
 
@@ -254,7 +217,8 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
       {banner}
       <SiteOrderWarning siteOrders={siteOrders} />
       <StatCards stats={stats} />
-      <OrdersTable girlDelivery={girlDelivery} directShip={directShip} orderLookup={orderLookup} scouts={data.scouts} />
+      <OrderSection title="Girl Delivery" category={girlDelivery} channel="virtualBooth" orderLookup={orderLookup} scouts={data.scouts} />
+      <OrderSection title="Direct Ship" category={directShip} channel="directShip" orderLookup={orderLookup} scouts={data.scouts} />
     </div>
   );
 }

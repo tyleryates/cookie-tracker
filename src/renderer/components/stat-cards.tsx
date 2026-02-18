@@ -10,7 +10,6 @@ export const STAT_COLORS = {
   GREEN: '#2E7D32',
   TEAL: '#00838F',
   PURPLE: '#7B1FA2',
-  DEEP_PURPLE: '#6A1B9A',
   ORANGE: '#E65100',
   AMBER: '#EF6C00',
   RED: '#C62828'
