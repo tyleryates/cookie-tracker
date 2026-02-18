@@ -55,7 +55,7 @@ function buildTestStore() {
   });
 
   // --- DC Raw Data (rawDCData) ---
-  store.metadata.rawDCData = [
+  store.rawDCData = [
     // Jane: delivery order — 5 pkgs (3 Thin Mints, 2 Trefoils), $30, credit card
     makeDCRow('Jane', 'Doe', 'ORD-001', 'In-Person Delivery', 5, 0, '$30.00', 'CAPTURED', { 'Thin Mints': 3, Trefoils: 2 }),
     // Jane: in-hand order — 2 pkgs (2 Thin Mints), $12, cash

@@ -8,7 +8,7 @@ import type { CookieShareTracking } from '../../types';
 
 /** Build Cookie Share reconciliation tracking */
 function buildCookieShareTracking(store: ReadonlyDataStore): CookieShareTracking {
-  const rawDCData = store.metadata.rawDCData || [];
+  const rawDCData = store.rawDCData;
 
   let dcTotal = 0;
   let dcManualEntry = 0;

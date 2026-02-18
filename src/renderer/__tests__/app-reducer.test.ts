@@ -257,10 +257,10 @@ describe('SET_ACTIVE_REPORT', () => {
 // =============================================================================
 
 describe('DEFAULT_REPORT', () => {
-  it('sets activeReport to troop when no report is active', () => {
+  it('sets activeReport to inventory when no report is active', () => {
     const state = makeState({ activeReport: null });
     const result = appReducer(state, { type: 'DEFAULT_REPORT' });
-    expect(result.activeReport).toBe('troop');
+    expect(result.activeReport).toBe('inventory');
   });
 
   it('is a no-op when a report is already active', () => {
@@ -270,7 +270,7 @@ describe('DEFAULT_REPORT', () => {
   });
 
   it('returns the same state reference when a report is already active', () => {
-    const state = makeState({ activeReport: 'booth' });
+    const state = makeState({ activeReport: 'troop-sales' });
     const result = appReducer(state, { type: 'DEFAULT_REPORT' });
     expect(result).toBe(state);
   });
@@ -309,30 +309,6 @@ describe('TOGGLE_AUTO_REFRESH_BOOTHS', () => {
     const state = makeState({ autoRefreshBoothsEnabled: true });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: false });
     expect(result.autoRefreshBoothsEnabled).toBe(false);
-  });
-});
-
-// =============================================================================
-// OPEN_SETTINGS
-// =============================================================================
-
-describe('OPEN_SETTINGS', () => {
-  it('sets activePage to settings', () => {
-    const state = makeState({ activePage: 'dashboard' });
-    const result = appReducer(state, { type: 'OPEN_SETTINGS' });
-    expect(result.activePage).toBe('settings');
-  });
-});
-
-// =============================================================================
-// CLOSE_SETTINGS
-// =============================================================================
-
-describe('CLOSE_SETTINGS', () => {
-  it('sets activePage to dashboard', () => {
-    const state = makeState({ activePage: 'settings' });
-    const result = appReducer(state, { type: 'CLOSE_SETTINGS' });
-    expect(result.activePage).toBe('dashboard');
   });
 });
 
@@ -791,7 +767,7 @@ describe('immutability', () => {
 
   it('returns a new object for state-changing actions', () => {
     const state = makeState();
-    const result = appReducer(state, { type: 'OPEN_SETTINGS' });
+    const result = appReducer(state, { type: 'SET_ACTIVE_REPORT', report: 'settings' });
     expect(result).not.toBe(state);
   });
 });

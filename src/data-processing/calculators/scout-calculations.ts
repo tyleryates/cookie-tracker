@@ -113,12 +113,18 @@ function calculateFinancialTracking(scout: Scout): void {
   const unsoldValue = Math.max(0, inventoryValue - totalInventorySold);
   const cashOwed = allCashCollected + unsoldValue;
 
+  // Payments already turned in to the troop
+  const paymentsTurnedIn = scout.payments.reduce((sum, p) => sum + p.amount, 0);
+  const cashDue = cashOwed - paymentsTurnedIn;
+
   scout.totals.$financials = {
     cashCollected: allCashCollected,
     electronicPayments: inventoryElectronic,
     inventoryValue: inventoryValue,
     unsoldValue: unsoldValue,
-    cashOwed: cashOwed
+    cashOwed: cashOwed,
+    paymentsTurnedIn: paymentsTurnedIn,
+    cashDue: cashDue
   };
 }
 

@@ -92,7 +92,7 @@ describe('importDigitalCookie', () => {
     expect(store.metadata.sources[0].records).toBe(1);
   });
 
-  it('stores rawDCData on metadata', () => {
+  it('stores rawDCData on data store', () => {
     const store = createDataStore();
     const rows = [
       {
@@ -107,7 +107,7 @@ describe('importDigitalCookie', () => {
       }
     ];
     importDigitalCookie(store, rows);
-    expect(store.metadata.rawDCData).toBe(rows);
+    expect(store.rawDCData).toBe(rows);
   });
 
   it('merges when same order number appears twice', () => {

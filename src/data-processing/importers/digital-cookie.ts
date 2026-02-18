@@ -9,7 +9,7 @@ import { recordImportMetadata, updateScoutData } from './scout-helpers';
 
 /** Import Digital Cookie order data from Excel export */
 export function importDigitalCookie(store: DataStore, dcData: RawDataRow[]): void {
-  store.metadata.rawDCData = dcData;
+  store.rawDCData = dcData;
 
   for (const row of dcData) {
     const orderNum = String(row[DC_COLUMNS.ORDER_NUMBER]);

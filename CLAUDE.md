@@ -28,7 +28,8 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **7 reports** — Summary, Scouts, Booths, Donations, Inventory, Cookie Popularity, Find Booths (tool)
+- **12 reports in 6 tab groups** — Inventory (Troop Inventory, Scout Inventory), Sales (Troop Site Orders, Scout Orders), Booths (Completed, Upcoming, Booth Finder), Finances (Troop Proceeds, Scout Cash Report), Donations, Cookie Popularity, plus Inventory History tool
+- **Profile management** — Import, switch, and delete data profiles for managing multiple troops
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
 ## How the Code Is Organized
@@ -37,7 +38,7 @@ Three layers with strict boundaries:
 
 **Main process** (`src/main.ts`, `src/data-pipeline.ts`) — IPC handlers, scraper orchestration, credentials, file system. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
 
-**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports are in `renderer/reports/`, components in `renderer/components/`, hooks in `renderer/hooks/`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
+**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (12 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings and Sync are rendered as tab content (via `activeReport`), not separate pages — only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
 
 **Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Sub-directories: `importers/` (parse raw files into DataStore), `calculators/` (compute UnifiedDataset from DataStore).
 
@@ -58,12 +59,15 @@ Three layers with strict boundaries:
 | `src/credentials-manager.ts` | Encrypted credential storage |
 | `src/seasonal-data.ts` | Persists SC session data (troop info, cookie ID map) across syncs |
 | `src/data-pipeline.ts` | Orchestrates: scan files, import, build UnifiedDataset |
+| `src/data-processing/utils.ts` | Shared helpers for data-processing layer (`mapToRecord`) |
+| `src/profile-manager.ts` | Multi-profile data directory management |
 
 ### Renderer Components
 
 | Component | Purpose |
 |---|---|
 | `reports-section.tsx` | TabBar + ReportContent components, health banner, report rendering |
+| `available-booths-utils.ts` | Booth slot filtering, encoding, and summarization utilities (used by app.tsx, hooks, reports) |
 | `sync-section.tsx` | Sync state utilities, SyncTab component (sync button, auto-sync toggle, endpoint status) |
 | `settings-page.tsx` | Credential setup, DC role selection, SC verification |
 | `booth-selector.tsx` | Multi-select UI for choosing booth locations to track |

@@ -281,6 +281,22 @@ function getCookiePrice(cookieType: string): number | null {
  * @returns Total revenue
  * @throws Error if any variety has unknown price
  */
+/** Council-provided average distribution per 100 boxes (used when troop sales < LOW_SALES_THRESHOLD) */
+export const COUNCIL_AVERAGES: Partial<Record<CookieType, number>> = {
+  THIN_MINTS: 30,
+  CARAMEL_DELITES: 21,
+  PEANUT_BUTTER_PATTIES: 13,
+  PEANUT_BUTTER_SANDWICH: 7.5,
+  TREFOILS: 7.5,
+  ADVENTUREFULS: 6,
+  LEMONADES: 7,
+  EXPLOREMORES: 7.5,
+  CARAMEL_CHOCOLATE_CHIP: 2.5
+};
+
+/** Minimum total packages before using troop's own popularity data instead of council averages */
+export const LOW_SALES_THRESHOLD = 200;
+
 export function calculateRevenue(varieties: Varieties): number {
   let total = 0;
   for (const [cookieType, count] of Object.entries(varieties)) {

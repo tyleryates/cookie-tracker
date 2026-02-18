@@ -3,4 +3,4 @@
 export type { AllocationData } from './allocations';
 export { importAllocations, normalizeBoothLocation } from './allocations';
 export { importDigitalCookie } from './digital-cookie';
-export { importSmartCookie, importSmartCookieOrders, importSmartCookieReport } from './smart-cookie';
+export { importFinancePayments, importSmartCookie, importSmartCookieOrders, importSmartCookieReport } from './smart-cookie';

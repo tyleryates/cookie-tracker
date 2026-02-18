@@ -67,6 +67,13 @@ export function accumulateVarieties(source: Varieties, target: Varieties, option
   }
 }
 
+/** Convert a Map to a plain Record (string keys) */
+export function mapToRecord<V>(map: ReadonlyMap<string | number, V>): Record<string, V> {
+  const result: Record<string, V> = {};
+  for (const [k, v] of map) result[String(k)] = v;
+  return result;
+}
+
 /** Build physical varieties (everything except Cookie Share) from a full varieties map */
 export function buildPhysicalVarieties(varieties: Varieties): Varieties {
   const result: Varieties = {};

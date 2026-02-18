@@ -1,9 +1,8 @@
 // BoothSelector — 2-step booth picker: toggle stores, then check individual addresses
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { BOOTH_RESERVATION_TYPE } from '../../constants';
 import type { BoothLocation } from '../../types';
-import { haversineDistance } from '../format-utils';
+import { boothTypeClass, haversineDistance } from '../format-utils';
 import { ipcInvoke } from '../ipc';
 
 interface BoothSelectorProps {
@@ -208,13 +207,6 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
                   const addr = [booth.address.street, booth.address.city, booth.address.state, booth.address.zip]
                     .filter(Boolean)
                     .join(', ');
-                  const typeClass =
-                    booth.reservationType === BOOTH_RESERVATION_TYPE.LOTTERY
-                      ? 'type-lottery'
-                      : booth.reservationType === BOOTH_RESERVATION_TYPE.FCFS
-                        ? 'type-fcfs'
-                        : 'type-default';
-
                   const dist = boothDistances.get(booth.id);
 
                   return (
@@ -224,7 +216,7 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
                         {addr || `Booth #${booth.id}`}
                         {dist != null && <span class="muted-text">{` · ${dist.toFixed(1)} mi`}</span>}
                       </span>
-                      <span class={`booth-type-badge ${typeClass}`}>{booth.reservationType || '-'}</span>
+                      <span class={`booth-type-badge ${boothTypeClass(booth.reservationType)}`}>{booth.reservationType || '-'}</span>
                     </label>
                   );
                 })}

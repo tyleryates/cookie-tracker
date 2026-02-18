@@ -1,9 +1,9 @@
 // SyncSection — Sync utilities + SyncTab component for the Sync tab
 
 import { useState } from 'preact/hooks';
-import { formatMaxAge, SYNC_ENDPOINTS } from '../../constants';
+import { SYNC_ENDPOINTS } from '../../constants';
 import type { ActiveProfile, EndpointSyncState, ProfileInfo, SyncState } from '../../types';
-import { DateFormatter } from '../format-utils';
+import { DateFormatter, formatDataSize, formatDuration, formatMaxAge } from '../format-utils';
 
 // ============================================================================
 // HELPERS
@@ -66,23 +66,6 @@ export function computeGroupStatuses(
   if (syncFlags?.refreshingBooths) booths.status = 'syncing';
 
   return { reports, booths };
-}
-
-// ============================================================================
-// FORMAT HELPERS
-// ============================================================================
-
-function formatDuration(ms: number | undefined): string {
-  if (ms == null) return '';
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatDataSize(bytes: number | undefined): string {
-  if (bytes == null) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // ============================================================================
@@ -163,47 +146,55 @@ function EndpointRow({
   );
 }
 
-interface EndpointTableProps {
+function EndpointGroupTable({
+  endpoints,
+  group,
+  label,
+  showFrequency,
+  onRefresh,
+  refreshing,
+  readOnly
+}: {
   endpoints: Record<string, EndpointSyncState>;
-  availableBoothsEnabled: boolean;
+  group: string;
+  label: string;
   showFrequency: boolean;
-}
-
-function EndpointTable({ endpoints, availableBoothsEnabled, showFrequency }: EndpointTableProps) {
-  const reportEndpoints = SYNC_ENDPOINTS.filter((ep) => ep.group === 'reports');
-  const boothEndpoints = availableBoothsEnabled ? SYNC_ENDPOINTS.filter((ep) => ep.group === 'booth-availability') : [];
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  readOnly?: boolean;
+}) {
+  const eps = SYNC_ENDPOINTS.filter((ep) => ep.group === group);
+  if (eps.length === 0) return null;
   const colCount = showFrequency ? 7 : 6;
-
-  const renderRows = (eps: ReadonlyArray<(typeof SYNC_ENDPOINTS)[number]>) =>
-    eps.map((ep) => {
-      const epState = endpoints[ep.id] || { status: 'idle', lastSync: null };
-      return (
-        <EndpointRow
-          key={ep.id}
-          name={ep.name}
-          source={ep.source}
-          frequency={formatMaxAge(ep.maxAgeMs)}
-          epState={epState}
-          showFrequency={showFrequency}
-        />
-      );
-    });
 
   return (
     <table class="endpoint-table">
       <tbody>
         <tr class="endpoint-group-label">
-          <td colSpan={colCount}>Reports</td>
+          <td colSpan={colCount}>
+            <div class="endpoint-group-header">
+              {label}
+              {onRefresh && (
+                <button type="button" class="btn btn-primary btn-sm" disabled={refreshing || readOnly} onClick={onRefresh}>
+                  {refreshing ? 'Refreshing\u2026' : 'Refresh'}
+                </button>
+              )}
+            </div>
+          </td>
         </tr>
-        {renderRows(reportEndpoints)}
-        {boothEndpoints.length > 0 && (
-          <>
-            <tr class="endpoint-group-label">
-              <td colSpan={colCount}>Booth Finder</td>
-            </tr>
-            {renderRows(boothEndpoints)}
-          </>
-        )}
+        {eps.map((ep) => {
+          const epState = endpoints[ep.id] || { status: 'idle', lastSync: null };
+          return (
+            <EndpointRow
+              key={ep.id}
+              name={ep.name}
+              source={ep.source}
+              frequency={formatMaxAge(ep.maxAgeMs)}
+              epState={epState}
+              showFrequency={showFrequency}
+            />
+          );
+        })}
       </tbody>
     </table>
   );
@@ -249,32 +240,28 @@ export function SyncTab({
   const [importName, setImportName] = useState('');
 
   return (
-    <div class="report-visual">
-      <h3>Data</h3>
-      <EndpointTable endpoints={syncState.endpoints} availableBoothsEnabled={availableBoothsEnabled} showFrequency={false} />
-      <div class="sync-controls">
-        <button type="button" class="btn btn-secondary active" disabled={syncState.syncing || readOnly} onClick={onSyncReports}>
-          {syncState.syncing ? 'Refreshing\u2026' : 'Refresh Reports'}
-        </button>
-        {availableBoothsEnabled && (
-          <button
-            type="button"
-            class="btn btn-secondary active"
-            disabled={syncState.refreshingBooths || readOnly}
-            onClick={onRefreshBooths}
-          >
-            {syncState.refreshingBooths ? 'Refreshing\u2026' : 'Refresh Booths'}
-          </button>
-        )}
-      </div>
-      <div class="button-group" style={{ marginTop: '12px' }}>
-        <button type="button" class="btn btn-secondary" onClick={onRecalculate}>
-          Recalculate
-        </button>
-        <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
-          Export Data
-        </button>
-      </div>
+    <div class="report-visual sync-tab">
+      <h3>Sync Status</h3>
+      <EndpointGroupTable
+        endpoints={syncState.endpoints}
+        group="reports"
+        label="Reports"
+        showFrequency={false}
+        onRefresh={onSyncReports}
+        refreshing={syncState.syncing}
+        readOnly={readOnly}
+      />
+      {availableBoothsEnabled && (
+        <EndpointGroupTable
+          endpoints={syncState.endpoints}
+          group="booth-availability"
+          label="Booth Planner"
+          showFrequency={false}
+          onRefresh={onRefreshBooths}
+          refreshing={syncState.refreshingBooths}
+          readOnly={readOnly}
+        />
+      )}
       {profiles.length > 0 && (
         <div class="profile-section">
           <h3>Profile</h3>
@@ -286,16 +273,13 @@ export function SyncTab({
             >
               {profiles.map((p) => (
                 <option key={p.dirName} value={p.dirName}>
-                  {p.name}
+                  {p.dirName === 'default' ? 'Default' : p.name}
                 </option>
               ))}
             </select>
-            {readOnly && <span class="profile-hint">Imported snapshot — syncing disabled</span>}
-          </div>
-          <div class="profile-import">
             <input
               type="text"
-              class="form-input"
+              class="form-input profile-import-input"
               placeholder="New profile name"
               value={importName}
               onInput={(e) => setImportName((e.target as HTMLInputElement).value)}
@@ -311,8 +295,15 @@ export function SyncTab({
             >
               Import Data
             </button>
+            {readOnly && <span class="profile-hint">Imported snapshot — syncing disabled</span>}
           </div>
           <div class="button-group" style={{ marginTop: '12px' }}>
+            <button type="button" class="btn btn-secondary" onClick={onRecalculate}>
+              Recalculate
+            </button>
+            <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
+              Export Data
+            </button>
             <button type="button" class="btn btn-secondary" disabled={readOnly} onClick={onWipeData}>
               Wipe Data
             </button>

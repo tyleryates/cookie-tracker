@@ -1,19 +1,17 @@
 // useSync — sync handler, booth refresh, auto-sync polling, IPC event listeners
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
-import { SYNC_ENDPOINTS } from '../../constants';
+import { CHECK_INTERVAL_MS, SYNC_ENDPOINTS } from '../../constants';
 import Logger from '../../logger';
 import type { AppConfig, SyncState } from '../../types';
 import type { Action } from '../app-reducer';
-import { formatTime12h } from '../format-utils';
+import { formatCompactRange, formatShortDate } from '../format-utils';
 import { ipcInvoke, ipcInvokeRaw, onIpcEvent } from '../ipc';
-import { type BoothSlotSummary, encodeSlotKey, summarizeAvailableSlots } from '../reports/available-booths';
+import { type BoothSlotSummary, encodeSlotKey, summarizeAvailableSlots } from '../reports/available-booths-utils';
 
 // ============================================================================
 // AUTO-SYNC — staleness-based polling
 // ============================================================================
-
-const CHECK_INTERVAL_MS = 60_000;
 
 function isStale(lastSync: string | undefined | null, maxAgeMs: number): boolean {
   if (!lastSync) return true;
@@ -23,34 +21,6 @@ function isStale(lastSync: string | undefined | null, maxAgeMs: number): boolean
 // ============================================================================
 // NOTIFICATION FORMATTING
 // ============================================================================
-
-/** Format date as "Mon 3/15" (no year, no leading zeros) */
-function formatShortDate(dateStr: string): string {
-  const parts = dateStr.split(/[-/]/);
-  if (parts.length >= 3) {
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
-    return `${dayName} ${Number(parts[1])}/${Number(parts[2])}`;
-  }
-  return dateStr;
-}
-
-/** Compact time like "4pm" or "10am" — drops :00 minutes, no space */
-function formatCompactTime(time: string): { hour: string; period: string } {
-  const full = formatTime12h(time); // e.g. "4:00 pm"
-  const match = full.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
-  if (!match) return { hour: full, period: '' };
-  const hour = match[2] === '00' ? match[1] : `${match[1]}:${match[2]}`;
-  return { hour, period: match[3] };
-}
-
-/** Format range like "4-6pm" or "10am-12pm" */
-function formatCompactRange(startTime: string, endTime: string): string {
-  const start = formatCompactTime(startTime);
-  const end = formatCompactTime(endTime);
-  if (start.period === end.period) return `${start.hour}-${end.hour}${end.period}`;
-  return `${start.hour}${start.period}-${end.hour}${end.period}`;
-}
 
 function formatSlotTime(slot: { date: string; startTime: string; endTime: string }): string {
   return `${formatShortDate(slot.date)} ${formatCompactRange(slot.startTime, slot.endTime)}`;

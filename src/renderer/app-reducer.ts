@@ -19,7 +19,7 @@ export interface AppState {
   autoSyncEnabled: boolean;
   autoRefreshBoothsEnabled: boolean;
   activeReport: string | null;
-  activePage: 'dashboard' | 'settings' | 'welcome';
+  activePage: 'dashboard' | 'welcome';
   statusMessage: StatusMessage | null;
   syncState: SyncState;
   updateReady: string | null; // version string when update downloaded
@@ -42,8 +42,6 @@ export type Action =
   | { type: 'DEFAULT_REPORT' }
   | { type: 'TOGGLE_AUTO_SYNC'; enabled: boolean }
   | { type: 'TOGGLE_AUTO_REFRESH_BOOTHS'; enabled: boolean }
-  | { type: 'OPEN_SETTINGS' }
-  | { type: 'CLOSE_SETTINGS' }
   | {
       type: 'SYNC_ENDPOINT_UPDATE';
       endpoint: string;
@@ -108,7 +106,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       return { ...state, activeReport: action.report };
 
     case 'DEFAULT_REPORT':
-      return state.activeReport ? state : { ...state, activeReport: 'troop' };
+      return state.activeReport ? state : { ...state, activeReport: 'inventory' };
 
     case 'TOGGLE_AUTO_SYNC': {
       const readOnly = state.activeProfile != null && !state.activeProfile.isDefault;
@@ -119,12 +117,6 @@ export function appReducer(state: AppState, action: Action): AppState {
       const readOnly = state.activeProfile != null && !state.activeProfile.isDefault;
       return { ...state, autoRefreshBoothsEnabled: readOnly ? false : action.enabled };
     }
-
-    case 'OPEN_SETTINGS':
-      return { ...state, activePage: 'settings' };
-
-    case 'CLOSE_SETTINGS':
-      return { ...state, activePage: 'dashboard' };
 
     case 'SYNC_ENDPOINT_UPDATE': {
       const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };

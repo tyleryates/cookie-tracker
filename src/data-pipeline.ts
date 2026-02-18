@@ -11,6 +11,7 @@ import type { AllocationData } from './data-processing/importers';
 import {
   importAllocations,
   importDigitalCookie,
+  importFinancePayments,
   importSmartCookie,
   importSmartCookieOrders,
   importSmartCookieReport
@@ -21,6 +22,7 @@ import type {
   SCBoothDividerResult,
   SCBoothLocationRaw,
   SCDirectShipDivider,
+  SCFinanceTransaction,
   SCMeResponse,
   SCOrdersResponse,
   SCReservationsResponse,
@@ -54,7 +56,8 @@ function cellToString(value: ExcelJS.CellValue): string {
 
 async function parseExcel(buffer: Buffer): Promise<RawDataRow[]> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer as any);
+  // ExcelJS types are incomplete — load() accepts Buffer at runtime
+  await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
   const worksheet = workbook.worksheets[0];
   if (!worksheet) return [];
 
@@ -216,6 +219,10 @@ export async function loadData(dataDir: string): Promise<LoadDataResult | null> 
       cookieIdMap: readPipelineFile<Record<string, CookieType>>(currentDir, PIPELINE_FILES.SC_COOKIE_ID_MAP, isObject) ?? null
     };
     importAllocations(store, allocationData);
+
+    const financeRaw = readPipelineFile<SCFinanceTransaction[]>(currentDir, PIPELINE_FILES.SC_FINANCE, isArray);
+    if (financeRaw) importFinancePayments(store, financeRaw);
+
     loaded.sc = true;
   }
 

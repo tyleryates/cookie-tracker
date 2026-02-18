@@ -1,5 +1,10 @@
 /* Sync tab — endpoint table, status indicators, controls */
 
+/* Tighten gap between page header and first section */
+.sync-tab > h3:first-child {
+  margin-bottom: 12px;
+}
+
 /* Endpoint Table */
 .endpoint-table {
   width: 100%;
@@ -18,8 +23,8 @@
 }
 
 .endpoint-group-label td {
-  padding: 14px 8px 4px;
-  font-size: 0.75em;
+  padding: 14px 8px 6px;
+  font-size: 0.82em;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -29,6 +34,23 @@
 
 .endpoint-group-label:first-child td {
   padding-top: 4px;
+}
+
+.endpoint-table + .endpoint-table {
+  margin-top: 12px;
+}
+
+.endpoint-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.endpoint-group-header .btn-sm {
+  font-size: 0.82em;
+  padding: 4px 14px;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .endpoint-source {
@@ -173,15 +195,21 @@
   transform: translateX(16px);
 }
 
+/* Reduce gap between Sync Status header and first endpoint table */
+.report-visual > h3 + .endpoint-table .endpoint-group-label:first-child td {
+  padding-top: 0;
+}
+
 /* Profile section */
 .profile-section {
+  margin-top: 32px;
   margin-bottom: 8px;
 }
 
 .profile-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 12px;
 }
 
@@ -189,19 +217,12 @@
   max-width: 240px;
 }
 
+.profile-import-input {
+  max-width: 200px;
+}
+
 .profile-hint {
   font-size: 0.85em;
   color: var(--gray-500);
   font-style: italic;
-}
-
-.profile-import {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-
-.profile-import .form-input {
-  max-width: 200px;
 }

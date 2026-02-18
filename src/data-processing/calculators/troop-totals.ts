@@ -61,7 +61,7 @@ function buildTroopTotals(
   packageTotals: PackageTotals,
   scoutCounts: ScoutCounts
 ): TroopTotals {
-  const rawDCData = store.metadata.rawDCData || [];
+  const rawDCData = store.rawDCData;
 
   // Net troop inventory: received minus all outflows, plus returns
   const totalInventory =

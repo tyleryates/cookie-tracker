@@ -123,7 +123,19 @@ const Logger = {
 
   /** Flush and close the log stream (call before app exits) */
   close(): void {
-    if (logStream) {
+    if (logStream && fs) {
+      // Write final line directly via fs to guarantee flush before process exit
+      const logPath = (logStream as any).path;
+      logStream.end();
+      logStream = null;
+      if (typeof logPath === 'string') {
+        try {
+          fs.appendFileSync(logPath, `${timestamp()} [M] [INFO] === Session ended ===\n`);
+        } catch {
+          // ignore — file may already be closed
+        }
+      }
+    } else if (logStream) {
       logStream.end();
       logStream = null;
     }

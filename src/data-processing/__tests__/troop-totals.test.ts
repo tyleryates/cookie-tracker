@@ -123,7 +123,7 @@ describe('buildTroopTotals', () => {
 
   it('counts DC non-site donations from rawDCData', () => {
     const store = createDataStore();
-    (store as DataStore).metadata.rawDCData = [
+    (store as DataStore).rawDCData = [
       { 'Girl Last Name': 'Doe', Donation: '3' },
       { 'Girl Last Name': 'Site', Donation: '5' } // site order — should be skipped
     ];

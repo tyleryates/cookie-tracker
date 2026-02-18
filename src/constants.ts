@@ -21,6 +21,14 @@ export const DATA_SOURCES = {
 
 export type DataSource = (typeof DATA_SOURCES)[keyof typeof DATA_SOURCES];
 
+/** Maps each DataSource to its corresponding OrderMetadata key */
+export const DATA_SOURCE_METADATA_KEY = {
+  [DATA_SOURCES.DIGITAL_COOKIE]: 'dc',
+  [DATA_SOURCES.SMART_COOKIE]: 'sc',
+  [DATA_SOURCES.SMART_COOKIE_REPORT]: 'scReport',
+  [DATA_SOURCES.SMART_COOKIE_API]: 'scApi'
+} as const satisfies Record<DataSource, string>;
+
 // ============================================================================
 // ORDER CLASSIFICATION — Multi-dimensional type system (see RULES.md)
 // ============================================================================
@@ -209,6 +217,7 @@ export const DISPLAY_STRINGS: Record<string, string> = {
 
 export const EXCEL_EPOCH = new Date(1899, 11, 30); // Excel date serialization epoch
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;
+export const CHECK_INTERVAL_MS = 60_000; // Auto-sync polling interval
 
 // Booth day/time filter UI
 export const BOOTH_TIME_SLOTS = [
@@ -292,6 +301,7 @@ export const PIPELINE_FILES = {
   SC_BOOTH_CATALOG: 'sc-booth-catalog.json',
   SC_BOOTH_LOCATIONS: 'sc-booth-locations.json',
   SC_COOKIE_ID_MAP: 'sc-cookie-id-map.json',
+  SC_FINANCE: 'sc-finance.json',
   DC_EXPORT: 'dc-export.xlsx',
   UNIFIED: 'unified.json'
 } as const;
@@ -300,27 +310,19 @@ export const PIPELINE_FILES = {
 // SYNC ENDPOINTS — Per-endpoint sync status registry
 // ============================================================================
 
-/** Derive a human-readable frequency label from milliseconds */
-export function formatMaxAge(ms: number): string {
-  const minutes = ms / 60_000;
-  if (minutes < 60) return `${minutes} min`;
-  const hours = minutes / 60;
-  if (hours === 1) return 'Hourly';
-  return `${hours} hours`;
-}
-
 export const SYNC_ENDPOINTS = [
   { id: 'sc-orders', source: 'SC', name: 'Orders', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
   { id: 'sc-direct-ship', source: 'SC', name: 'Direct Ship Allocations', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
   { id: 'sc-cookie-shares', source: 'SC', name: 'Cookie Share Details', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
   { id: 'sc-reservations', source: 'SC', name: 'Reservations', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
   { id: 'sc-booth-allocations', source: 'SC', name: 'Booth Allocations', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
+  { id: 'sc-finance', source: 'SC', name: 'Finance', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
   { id: 'dc-troop-report', source: 'DC', name: 'Troop Report', maxAgeMs: 3_600_000, syncAction: 'sync', group: 'reports' },
   { id: 'sc-booth-catalog', source: 'SC', name: 'Booth Catalog', maxAgeMs: 14_400_000, syncAction: 'manual', group: 'booth-availability' },
   {
     id: 'sc-booth-availability',
     source: 'SC',
-    name: 'Booth Finder',
+    name: 'Booth Planner',
     maxAgeMs: 900_000,
     syncAction: 'refreshBooths',
     group: 'booth-availability'

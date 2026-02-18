@@ -16,45 +16,87 @@ function buildSiteOrdersDataset(store: ReadonlyDataStore, scoutDataset: Record<s
     }
   }
 
-  const siteOrdersByType: { directShip: SiteOrderEntry[]; girlDelivery: SiteOrderEntry[]; boothSale: SiteOrderEntry[] } = {
-    directShip: [],
-    girlDelivery: [],
-    boothSale: []
-  };
+  const directShipEntries: SiteOrderEntry[] = [];
+  const girlDeliveryEntries: SiteOrderEntry[] = [];
+  const boothSaleEntries: SiteOrderEntry[] = [];
 
-  // Classify site orders by type
+  // Classify site orders by type, sorted by date ascending for FIFO allocation
   if (siteScout) {
-    for (const order of siteScout.orders) {
+    const sortedOrders = [...siteScout.orders].sort(
+      (a, b) => (a.date || '').localeCompare(b.date || '') || a.orderNumber.localeCompare(b.orderNumber)
+    );
+
+    for (const order of sortedOrders) {
       if (order.orderType === ORDER_TYPE.DONATION) continue;
 
-      const entry = {
+      const entry: SiteOrderEntry = {
         orderNumber: order.orderNumber,
         packages: order.physicalPackages,
+        allocated: 0,
         owner: OWNER.TROOP,
         orderType: order.orderType
       };
 
       if (order.orderType === ORDER_TYPE.DIRECT_SHIP) {
-        siteOrdersByType.directShip.push(entry);
+        directShipEntries.push(entry);
       } else if (order.orderType === ORDER_TYPE.BOOTH) {
-        siteOrdersByType.boothSale.push(entry);
+        boothSaleEntries.push(entry);
       } else {
-        siteOrdersByType.girlDelivery.push(entry);
+        girlDeliveryEntries.push(entry);
       }
     }
   }
 
-  // Calculate allocation totals
+  // Direct ship: try per-order allocation by matching orderId first
+  for (const entry of directShipEntries) {
+    for (const alloc of store.allocations) {
+      if (alloc.channel !== ALLOCATION_CHANNEL.DIRECT_SHIP) continue;
+      if (alloc.orderId === entry.orderNumber || alloc.orderId === `D${entry.orderNumber}`) {
+        entry.allocated += alloc.packages || 0;
+      }
+    }
+  }
+
+  // Fallback: SC API often returns a single divider blob without per-order orderId.
+  // If no entries got orderId-based allocation, FIFO from total direct ship pool.
+  const hasOrderIdMatches = directShipEntries.some((e) => e.allocated > 0);
+  if (!hasOrderIdMatches) {
+    let dsPool = 0;
+    for (const alloc of store.allocations) {
+      if (alloc.channel === ALLOCATION_CHANNEL.DIRECT_SHIP) {
+        dsPool += alloc.packages || 0;
+      }
+    }
+    for (const entry of directShipEntries) {
+      const consumed = Math.min(entry.packages, dsPool);
+      entry.allocated = consumed;
+      dsPool -= consumed;
+    }
+  }
+
+  // Girl delivery: FIFO allocation (oldest first, already sorted by date)
+  // Virtual booth divider doesn't track per-order, so we consume from the pool
+  // starting with the oldest orders until the allocation is exhausted
+  let pool = 0;
+  for (const transfer of store.transfers) {
+    if (transfer.category === TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) {
+      pool += transfer.physicalPackages || 0;
+    }
+  }
+  for (const entry of girlDeliveryEntries) {
+    const consumed = Math.min(entry.packages, pool);
+    entry.allocated = consumed;
+    pool -= consumed;
+  }
+
+  // Calculate category-level allocation totals
   const allocations = calculateAllocations(store);
 
-  // Build site order summary with allocation tracking
-  const result: SiteOrdersDataset = {
-    directShip: buildCategory(siteOrdersByType.directShip, allocations.directShip),
-    girlDelivery: buildCategory(siteOrdersByType.girlDelivery, allocations.virtualBooth),
-    boothSale: buildCategory(siteOrdersByType.boothSale, allocations.boothSales)
+  return {
+    directShip: buildCategory(directShipEntries, allocations.directShip),
+    girlDelivery: buildCategory(girlDeliveryEntries, allocations.virtualBooth),
+    boothSale: buildCategory(boothSaleEntries, allocations.boothSales)
   };
-
-  return result;
 }
 
 function buildCategory(orders: SiteOrderEntry[], allocated: number): SiteOrderCategory {

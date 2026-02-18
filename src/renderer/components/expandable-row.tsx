@@ -18,9 +18,11 @@ interface ExpandableRowProps {
   detailClass?: string;
   /** Render the expand icon in its own column instead of inline */
   separateCaret?: boolean;
+  /** Per-cell text-align values (indexed to match cells array) */
+  cellAligns?: Array<'center' | 'right' | undefined>;
 }
 
-export function ExpandableRow({ firstCell, cells, detail, colSpan, rowClass, detailClass, separateCaret }: ExpandableRowProps) {
+export function ExpandableRow({ firstCell, cells, detail, colSpan, rowClass, detailClass, separateCaret, cellAligns }: ExpandableRowProps) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -40,7 +42,9 @@ export function ExpandableRow({ firstCell, cells, detail, colSpan, rowClass, det
           </td>
         )}
         {cells.map((cell, i) => (
-          <td key={i}>{cell}</td>
+          <td key={i} style={cellAligns?.[i] ? { textAlign: cellAligns[i] } : undefined}>
+            {cell}
+          </td>
         ))}
       </tr>
       {expanded && (

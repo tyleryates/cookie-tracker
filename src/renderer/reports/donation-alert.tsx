@@ -1,8 +1,10 @@
-import { ORDER_TYPE, OWNER } from '../../constants';
+import type { ComponentChildren } from 'preact';
+import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, OWNER } from '../../constants';
 import { isDCAutoSync } from '../../order-classification';
 import type { Order, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
-import { StatCards } from '../components/stat-cards';
+import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
+import { TooltipCell } from '../components/tooltip-cell';
 
 interface ScoutDonationRow {
   name: string;
@@ -11,31 +13,41 @@ interface ScoutDonationRow {
   dcTotal: number;
   manualEntered: number;
   boothCS: number;
+  siteCS: number;
+  credits: number;
   totalCS: number;
   adjustment: number;
 }
 
-function StatusBanner({ adjustmentNeeded }: { adjustmentNeeded: number }) {
-  if (adjustmentNeeded === 0) return null;
-  if (adjustmentNeeded > 0) {
-    return (
-      <div class="info-box info-box-warning">
-        <p>
-          <strong>
-            Add {adjustmentNeeded} Cookie Share package{adjustmentNeeded !== 1 ? 's' : ''} in Smart Cookie (Orders → Virtual Cookie Share).
-          </strong>
-        </p>
-      </div>
-    );
+function buildCreditTooltip(row: ScoutDonationRow): string {
+  const parts: string[] = [];
+  if (row.boothCS > 0) parts.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}: ${row.boothCS}`);
+  if (row.siteCS > 0) parts.push(`${DISPLAY_STRINGS[ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]}: ${row.siteCS}`);
+  return parts.join('\n');
+}
+
+function StatusBanner({ scoutRows }: { scoutRows: ScoutDonationRow[] }) {
+  const needsAdd = scoutRows.filter((r) => r.adjustment > 0);
+  const needsRemove = scoutRows.filter((r) => r.adjustment < 0);
+  if (needsAdd.length === 0 && needsRemove.length === 0) return null;
+
+  const lines: string[] = [];
+  for (const r of needsAdd) {
+    lines.push(`Add ${r.adjustment} for ${r.name}`);
   }
-  const count = Math.abs(adjustmentNeeded);
+  for (const r of needsRemove) {
+    lines.push(`Remove ${Math.abs(r.adjustment)} for ${r.name}`);
+  }
+
+  const isError = needsRemove.length > 0 && needsAdd.length === 0;
   return (
-    <div class="info-box info-box-error">
-      <p>
-        <strong>
-          Remove {count} Cookie Share package{count !== 1 ? 's' : ''} from Smart Cookie.
-        </strong>
-      </p>
+    <div class={`info-box ${isError ? 'info-box-error' : 'info-box-warning'}`}>
+      <p>Adjust Cookie Share in Smart Cookie (Orders → Virtual Cookie Share):</p>
+      <ul>
+        {lines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -61,7 +73,9 @@ function buildScoutDonationRows(scouts: Record<string, Scout>, virtualCSAllocati
     const { dcTotal, dcAutoSync } = computeScoutDonations(scout);
     const manualNeeded = dcTotal - dcAutoSync;
     const boothCS = scout.totals.$allocationSummary.booth.donations;
-    const totalCS = dcTotal + boothCS;
+    const siteCS = scout.totals.$allocationSummary.virtualBooth.donations;
+    const credits = boothCS + siteCS;
+    const totalCS = dcTotal + credits;
     if (totalCS === 0) continue;
 
     let manualEntered = 0;
@@ -77,6 +91,8 @@ function buildScoutDonationRows(scouts: Record<string, Scout>, virtualCSAllocati
       dcTotal,
       manualEntered,
       boothCS,
+      siteCS,
+      credits,
       totalCS,
       adjustment: manualNeeded - manualEntered
     });
@@ -87,20 +103,20 @@ function buildScoutDonationRows(scouts: Record<string, Scout>, virtualCSAllocati
 function AdjustmentCell({ adjustment }: { adjustment: number }) {
   if (adjustment > 0)
     return (
-      <td class="status-warning">
+      <td class="status-warning text-center">
         <strong>+{adjustment}</strong>
       </td>
     );
   if (adjustment < 0)
     return (
-      <td class="status-error">
+      <td class="status-error text-center">
         <strong>{adjustment}</strong>
       </td>
     );
-  return <td class="status-success">—</td>;
+  return <td class="status-success text-center">—</td>;
 }
 
-export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
+export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
   if (!data?.cookieShare) {
     return (
       <div class="report-visual">
@@ -141,15 +157,15 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
   const totalTroopDonations = totalBoothCookieShare + siteDonations;
   const totalCookieShare = totalGirlDonations + totalTroopDonations;
 
-  const stats: Array<{ label: string; value: string | number; description: string; color: string; operator?: string }> = [
-    { label: 'Girl Donations', value: totalGirlDonations, description: `${girlDC} DC + ${girlInPerson} in person`, color: '#00838F' }
+  const stats: Stat[] = [
+    { label: 'Girl Donations', value: totalGirlDonations, description: `${girlDC} DC + ${girlInPerson} in person`, color: STAT_COLORS.TEAL }
   ];
   if (totalTroopDonations > 0) {
     stats.push({
       label: 'Troop Donations',
       value: totalTroopDonations,
       description: `${totalBoothCookieShare} booth + ${siteDonations} site`,
-      color: '#7B1FA2',
+      color: STAT_COLORS.PURPLE,
       operator: '+'
     });
   }
@@ -157,49 +173,71 @@ export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
     label: 'Total Donations',
     value: totalCookieShare,
     description: 'All Cookie Share',
-    color: '#E91E63',
-    operator: '='
+    color: STAT_COLORS.PINK,
+    operator: '=',
+    highlight: true
   });
 
-  const hasBoothCS = totalBoothCookieShare > 0;
   const scoutRows = buildScoutDonationRows(scouts, data.virtualCookieShareAllocations);
+  const hasCredits = scoutRows.some((r) => r.credits > 0);
 
-  const headers = ['Scout', 'Auto-Synced', 'Needs Entry', 'Entered in SC'];
-  if (hasBoothCS) headers.push('Booth');
+  const headers = ['Scout', 'Auto-Synced', 'Needs Entry in SC', 'Entered in SC'];
+  const aligns: Array<'center' | undefined> = [undefined, 'center', 'center', 'center'];
+  if (hasCredits) {
+    headers.push('Credits');
+    aligns.push('center');
+  }
   headers.push('Total', 'Adjustment');
+  aligns.push('center', 'center');
 
   const isReconciled = adjustmentNeeded === 0;
 
   return (
     <div class="report-visual">
       <div class="report-header-row">
-        <h3>Donation Report & Reconciliation</h3>
+        <h3>Donations Report</h3>
         <span
           class={`report-status-badge ${isReconciled ? 'report-status-ok' : adjustmentNeeded > 0 ? 'report-status-warning' : 'report-status-error'}`}
         >
-          {isReconciled ? 'Reconciled' : 'Needs Adjustment'}
+          {isReconciled ? 'Reconciled' : 'Needs Attention'}
         </span>
       </div>
+      {banner}
+
+      <StatusBanner scoutRows={scoutRows} />
+
       <StatCards stats={stats} />
-      <StatusBanner adjustmentNeeded={adjustmentNeeded} />
 
       {scoutRows.length > 0 && (
-        <DataTable columns={headers}>
-          {scoutRows.map(({ name, dcAutoSync, manualNeeded, manualEntered, boothCS, totalCS, adjustment }) => (
-            <tr key={name} class={adjustment > 0 ? 'row-highlight-warning' : adjustment < 0 ? 'row-highlight-error' : undefined}>
-              <td>
-                <strong>{name}</strong>
-              </td>
-              <td>{dcAutoSync || '—'}</td>
-              <td>{manualNeeded || '—'}</td>
-              <td>{manualEntered || '—'}</td>
-              {hasBoothCS && <td>{boothCS || '—'}</td>}
-              <td>
-                <strong>{totalCS}</strong>
-              </td>
-              <AdjustmentCell adjustment={adjustment} />
-            </tr>
-          ))}
+        <DataTable columns={headers} columnAligns={aligns}>
+          {scoutRows.map((row) => {
+            const creditTip = buildCreditTooltip(row);
+            return (
+              <tr
+                key={row.name}
+                class={row.adjustment > 0 ? 'row-highlight-warning' : row.adjustment < 0 ? 'row-highlight-error' : undefined}
+              >
+                <td>
+                  <strong>{row.name}</strong>
+                </td>
+                <td class="text-center">{row.dcAutoSync || '—'}</td>
+                <td class="text-center">{row.manualNeeded || '—'}</td>
+                <td class="text-center">{row.manualEntered || '—'}</td>
+                {hasCredits &&
+                  (row.credits > 0 && creditTip ? (
+                    <TooltipCell tooltip={creditTip} className="tooltip-cell text-center">
+                      {row.credits}
+                    </TooltipCell>
+                  ) : (
+                    <td class="text-center">{'—'}</td>
+                  ))}
+                <td class="text-center">
+                  <strong>{row.totalCS}</strong>
+                </td>
+                <AdjustmentCell adjustment={row.adjustment} />
+              </tr>
+            );
+          })}
         </DataTable>
       )}
     </div>

@@ -413,6 +413,7 @@ ipcMain.handle(
   'scrape-websites',
   handleIpcError(async (event) => {
     if (profileReadOnly) throw new Error('Syncing is disabled for imported profiles');
+    if (activeOrchestrator) throw new Error('Sync already in progress');
     const auth = loadAndValidateCredentials();
     if (auth.error || !auth.credentials) {
       throw new Error(auth.error || 'No credentials available');
@@ -720,7 +721,7 @@ ipcMain.handle(
   end tell
 end run`;
     await new Promise<void>((resolve, reject) => {
-      execFile('osascript', ['-e', script, message, recipient], (error) => {
+      const proc = execFile('osascript', ['-e', script, message, recipient], (error) => {
         if (error) {
           Logger.error('iMessage send failed:', error.message);
           reject(error);
@@ -729,6 +730,11 @@ end run`;
           resolve();
         }
       });
+      // Kill osascript if it hangs (e.g. macOS permission prompt, Messages.app not responding)
+      setTimeout(() => {
+        proc.kill();
+        reject(new Error('iMessage send timed out after 30 seconds'));
+      }, 30_000);
     });
   })
 );

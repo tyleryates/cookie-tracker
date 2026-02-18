@@ -74,7 +74,8 @@ export async function loadAppConfig(): Promise<AppConfig> {
       boothNotifiedSlots: [],
       boothIds: [],
       boothDayFilters: [],
-      ignoredTimeSlots: []
+      ignoredTimeSlots: [],
+      inventoryHistoryEnabled: false
     };
   }
 }

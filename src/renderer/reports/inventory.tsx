@@ -1,25 +1,26 @@
+import type { ComponentChildren } from 'preact';
 import { PACKAGES_PER_CASE, SC_TRANSFER_STATUS, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
-import { COOKIE_TYPE, getCookieColor, getCookieDisplayName } from '../../cookie-constants';
-import type { Transfer, UnifiedDataset, Varieties } from '../../types';
+import { getCookieColor, getCookieDisplayName } from '../../cookie-constants';
+import type { Transfer, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
-import { StatCards } from '../components/stat-cards';
+import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, formatCurrency, formatDate, getCompleteVarieties, sortVarietiesByOrder } from '../format-utils';
+import { buildVarietyTooltip, formatShortDate, getCompleteVarieties, isPhysicalVariety, sortVarietiesByOrder } from '../format-utils';
 
-function transferTooltip(varieties: Varieties | undefined, transform?: (count: number) => number): string {
-  if (!varieties || Object.keys(varieties).length === 0) return '';
-  const transformed: Varieties = {};
-  for (const [variety, count] of Object.entries(varieties)) {
-    transformed[variety as keyof Varieties] = transform ? transform(count) : count;
-  }
-  return buildVarietyTooltip(transformed);
+/** Normalize date strings to YYYY-MM-DD for consistent grouping and sorting */
+export function normalizeDate(dateStr: string): string {
+  const iso = dateStr.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+  const us = dateStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (us) return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
+  return dateStr;
 }
 
 /** Inventory direction from the troop's perspective */
 type InventoryDirection = 'in' | 'out';
 
 /** Build a human-readable type label, from/to, and direction for a transfer row */
-function describeTransfer(transfer: Transfer): { typeLabel: string; from: string; to: string; direction: InventoryDirection } {
+export function describeTransfer(transfer: Transfer): { typeLabel: string; from: string; to: string; direction: InventoryDirection } {
   switch (transfer.category) {
     case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
       if (transfer.type === TRANSFER_TYPE.T2T) {
@@ -43,7 +44,7 @@ function describeTransfer(transfer: Transfer): { typeLabel: string; from: string
   }
 }
 
-export function InventoryReport({ data }: { data: UnifiedDataset }) {
+export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
   if (!data?.transferBreakdowns) {
     return (
       <div class="report-visual">
@@ -80,21 +81,28 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   const netT2G = totalAllocated - totalReturned;
   const t2gDescription = totalReturned > 0 ? `${totalAllocated} out − ${totalReturned} returned` : 'Allocated to scouts';
 
-  const stats: Array<{ label: string; value: number; description: string; color: string; operator?: string }> = [
-    { label: 'Physical Packages', value: totalPackages, description: packagesDesc, color: '#1565C0' },
+  const stats: Stat[] = [
+    { label: 'Physical Packages', value: totalPackages, description: packagesDesc, color: STAT_COLORS.BLUE },
+    { label: 'Transfers to Girls', value: netT2G, description: t2gDescription, color: STAT_COLORS.TEAL, operator: '\u2212' },
     {
       label: 'Troop Package Sales',
       value: troopTotals.boothDividerT2G + troopTotals.virtualBoothT2G,
       description: `${troopTotals.boothDividerT2G} booth + ${troopTotals.virtualBoothT2G} site`,
-      color: '#7B1FA2',
+      color: STAT_COLORS.PURPLE,
       operator: '\u2212'
     },
-    { label: 'Girl Transfers', value: netT2G, description: t2gDescription, color: '#00838F', operator: '\u2212' },
-    { label: 'Troop Inventory', value: netInventory, description: 'Packages on hand', color: '#E65100', operator: '=' }
+    {
+      label: 'Troop Inventory',
+      value: netInventory,
+      description: 'Packages on hand',
+      color: STAT_COLORS.ORANGE,
+      operator: '=',
+      highlight: true
+    }
   ];
 
-  const inventoryRows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(inventoryVarieties))).filter(
-    ([variety]) => variety !== COOKIE_TYPE.COOKIE_SHARE
+  const inventoryRows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(inventoryVarieties))).filter(([variety]) =>
+    isPhysicalVariety(variety)
   );
 
   // Combine all transfers into one sorted list
@@ -107,11 +115,12 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
   return (
     <div class="report-visual">
       <div class="report-header-row">
-        <h3>Troop Inventory</h3>
+        <h3>Troop Inventory & Transfers</h3>
       </div>
+      {banner}
 
       <StatCards stats={stats} />
-      <DataTable columns={['Variety', 'Packages', '']}>
+      <DataTable columns={['Variety', 'Packages', '']} columnAligns={[undefined, 'center']}>
         {inventoryRows.map(([variety, count]) => {
           const cases = Math.floor(count / PACKAGES_PER_CASE);
           const remaining = count % PACKAGES_PER_CASE;
@@ -125,15 +134,10 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
           return (
             <tr key={variety}>
               <td>
-                {color && (
-                  <span
-                    class="inventory-chip-dot"
-                    style={{ background: color, display: 'inline-block', verticalAlign: 'middle', marginRight: '8px' }}
-                  />
-                )}
-                {getCookieDisplayName(variety)}
+                {color && <span class="inventory-chip-dot" style={{ background: color }} />}
+                <strong>{getCookieDisplayName(variety)}</strong>
               </td>
-              <td>{count}</td>
+              <td class="text-center">{count}</td>
               <td class="meta-text">{breakdown}</td>
             </tr>
           );
@@ -143,37 +147,41 @@ export function InventoryReport({ data }: { data: UnifiedDataset }) {
       {allTransfers.length > 0 && (
         <>
           <h4>Transfers</h4>
-          <DataTable columns={['Date', 'Type', 'From', 'To', 'Packages', 'Amount', 'Status']}>
+          <DataTable
+            columns={['Date', 'Type', 'From', 'To', 'Packages', 'Status']}
+            columnAligns={[undefined, 'center', undefined, undefined, 'center', 'center']}
+          >
             {allTransfers.map((transfer: Transfer, i: number) => {
               const isPending =
                 transfer.status === SC_TRANSFER_STATUS.SAVED ||
                 (transfer.actions && (transfer.actions.submittable || transfer.actions.approvable));
               const statusText = isPending ? 'Pending' : 'Completed';
-              const statusClass = isPending ? 'status-warning' : 'status-success';
+              const statusClass = isPending ? 'status-pill status-pill-warning' : 'status-pill status-pill-success';
 
               const { typeLabel, from, to, direction } = describeTransfer(transfer);
               const packages = transfer.packages || 0;
               const pkgDisplay = direction === 'out' ? `- ${packages}` : `+ ${packages}`;
               const pkgClass = direction === 'out' ? 'pkg-out' : 'pkg-in';
-              const tip = transferTooltip(transfer.varieties);
+              const tip = buildVarietyTooltip(transfer.varieties);
 
               return (
                 <tr key={i}>
-                  <td>{formatDate(transfer.date)}</td>
-                  <td>
+                  <td>{formatShortDate(transfer.date)}</td>
+                  <td class="text-center">
                     <span class={`transfer-type-label transfer-type-${typeLabel.toLowerCase().replace(/\s+/g, '-')}`}>{typeLabel}</span>
                   </td>
                   <td>{from === 'Troop' ? <span class="troop-pill">Troop</span> : from}</td>
                   <td>{to === 'Troop' ? <span class="troop-pill">Troop</span> : to}</td>
                   {tip ? (
-                    <TooltipCell tooltip={tip} className={`tooltip-cell ${pkgClass}`}>
+                    <TooltipCell tooltip={tip} className={`tooltip-cell ${pkgClass} text-center`}>
                       {pkgDisplay}
                     </TooltipCell>
                   ) : (
-                    <td class={pkgClass}>{pkgDisplay}</td>
+                    <td class={`${pkgClass} text-center`}>{pkgDisplay}</td>
                   )}
-                  <td>{formatCurrency(transfer.amount ?? 0)}</td>
-                  <td class={statusClass}>{statusText}</td>
+                  <td class="text-center">
+                    <span class={statusClass}>{statusText}</span>
+                  </td>
                 </tr>
               );
             })}

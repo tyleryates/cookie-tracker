@@ -1,5 +1,6 @@
 // HTML Builder Utilities
 
+import { BOOTH_RESERVATION_TYPE } from '../constants';
 import { COOKIE_ORDER, getCookieColor, getCookieDisplayName } from '../cookie-constants';
 import type { BoothReservationImported, BoothTimeSlot, CookieType, Varieties } from '../types';
 
@@ -127,6 +128,27 @@ function formatDate(dateStr: string | null | undefined): string {
   return DateFormatter.toDisplay(dateStr);
 }
 
+/** Format date as "Sat 02/14" (short day of week + MM/DD, no year) */
+function formatShortDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '-';
+  const str = String(dateStr);
+  // YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (isoMatch) {
+    const d = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+    const day = d.toLocaleDateString('en-US', { weekday: 'short' });
+    return `${day} ${isoMatch[2].padStart(2, '0')}/${isoMatch[3].padStart(2, '0')}`;
+  }
+  // MM/DD/YYYY or M/D/YYYY
+  const usMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (usMatch) {
+    const d = new Date(Number(usMatch[3]), Number(usMatch[1]) - 1, Number(usMatch[2]));
+    const day = d.toLocaleDateString('en-US', { weekday: 'short' });
+    return `${day} ${usMatch[1].padStart(2, '0')}/${usMatch[2].padStart(2, '0')}`;
+  }
+  return str;
+}
+
 function formatTimeRange(startTime: string | undefined, endTime: string | undefined): string {
   if (startTime && endTime) return `${formatTime12h(startTime)} - ${formatTime12h(endTime)}`;
   return startTime ? formatTime12h(startTime) : '-';
@@ -192,9 +214,9 @@ function formatTime12h(time: string): string {
 
 /** Format a YYYY-MM-DD date string as "Mon MM/DD/YYYY" */
 function formatBoothDate(dateStr: string): string {
-  const parts = dateStr.split(/[-/]/);
-  if (parts.length >= 3) {
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const d = parseLocalDate(dateStr);
+  if (d) {
+    const parts = dateStr.split(/[-/]/);
     const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
     return `${dayName} ${parts[1]}/${parts[2]}/${parts[0]}`;
   }
@@ -211,8 +233,8 @@ function countBoothsNeedingDistribution(boothReservations: BoothReservationImpor
     if (type.includes('virtual')) return false;
     if (r.booth.isDistributed) return false;
     if (!r.timeslot.date) return true;
-    const parts = r.timeslot.date.split(/[-/]/);
-    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    const d = parseLocalDate(r.timeslot.date);
+    if (!d) return true;
     if (d < todayMidnight) return true; // Past day
     if (d.getTime() === todayMidnight.getTime()) {
       // Today — only count if booth end time has passed
@@ -223,21 +245,29 @@ function countBoothsNeedingDistribution(boothReservations: BoothReservationImpor
   }).length;
 }
 
-export {
-  buildVarietyTooltip,
-  sortVarietiesByOrder,
-  getCompleteVarieties,
-  countBoothsNeedingDistribution,
-  DateFormatter,
-  formatDate,
-  formatCurrency,
-  formatTimeRange,
-  formatTime12h,
-  formatBoothDate,
-  parseTimeToMinutes,
-  slotOverlapsRange,
-  haversineDistance
-};
+/** Compact time like "4pm" or "10am" — drops :00 minutes, no space */
+function formatCompactTime(time: string): { hour: string; period: string } {
+  const full = formatTime12h(time); // e.g. "4:00 pm"
+  const match = full.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (!match) return { hour: full, period: '' };
+  const hour = match[2] === '00' ? match[1] : `${match[1]}:${match[2]}`;
+  return { hour, period: match[3] };
+}
+
+/** Format range like "4-6pm" or "10am-12pm" */
+function formatCompactRange(startTime: string, endTime: string): string {
+  const start = formatCompactTime(startTime);
+  const end = formatCompactTime(endTime);
+  if (start.period === end.period) return `${start.hour}-${end.hour}${end.period}`;
+  return `${start.hour}${start.period}-${end.hour}${end.period}`;
+}
+
+/** Parse a YYYY-MM-DD or YYYY/MM/DD date string to a local Date (midnight) */
+function parseLocalDate(dateStr: string): Date | null {
+  const parts = dateStr.split(/[-/]/);
+  if (parts.length < 3) return null;
+  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+}
 
 /** Haversine distance between two lat/lng points, in miles */
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -247,3 +277,83 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+
+/** CSS class for booth reservation type badge */
+function boothTypeClass(reservationType: string | undefined): string {
+  if (reservationType === BOOTH_RESERVATION_TYPE.LOTTERY) return 'type-lottery';
+  if (reservationType === BOOTH_RESERVATION_TYPE.FCFS) return 'type-fcfs';
+  return 'type-default';
+}
+
+/** Format booth time slot as compact range with fallback */
+function formatBoothTime(startTime: string | undefined, endTime: string | undefined): string {
+  if (startTime && endTime) return formatCompactRange(startTime, endTime);
+  return startTime || '-';
+}
+
+/** Format millisecond duration as "123ms" or "1.2s" */
+function formatDuration(ms: number | undefined): string {
+  if (ms == null) return '';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+/** Format byte count as "123 B", "45 KB", or "1.2 MB" */
+function formatDataSize(bytes: number | undefined): string {
+  if (bytes == null) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Human-readable frequency label from milliseconds */
+function formatMaxAge(ms: number): string {
+  const minutes = ms / 60_000;
+  if (minutes < 60) return `${minutes} min`;
+  const hours = minutes / 60;
+  if (hours === 1) return 'Hourly';
+  return `${hours} hours`;
+}
+
+/** Check if a booth reservation type is virtual (excluded from most booth reports) */
+function isVirtualBooth(reservationType: string | undefined): boolean {
+  return (reservationType || '').toLowerCase().includes('virtual');
+}
+
+/** Check if a cookie variety is physical (not Cookie Share / donation-only) */
+function isPhysicalVariety(variety: string): boolean {
+  return variety !== 'COOKIE_SHARE';
+}
+
+/** Get today's date at local midnight */
+function todayMidnight(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+export {
+  boothTypeClass,
+  buildVarietyTooltip,
+  sortVarietiesByOrder,
+  getCompleteVarieties,
+  countBoothsNeedingDistribution,
+  DateFormatter,
+  formatDate,
+  formatShortDate,
+  formatBoothTime,
+  formatCurrency,
+  formatDataSize,
+  formatDuration,
+  formatMaxAge,
+  formatTimeRange,
+  formatCompactRange,
+  formatTime12h,
+  formatBoothDate,
+  isPhysicalVariety,
+  isVirtualBooth,
+  parseTimeToMinutes,
+  slotOverlapsRange,
+  parseLocalDate,
+  todayMidnight,
+  haversineDistance
+};

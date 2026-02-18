@@ -17,7 +17,7 @@ interface SettingsPageProps {
   autoSyncEnabled: boolean;
   autoRefreshBoothsEnabled: boolean;
   readOnly?: boolean;
-  onBack: () => void;
+  onComplete?: () => void;
   onUpdateConfig: (patch: Partial<AppConfig>) => void;
   onToggleAutoSync: (enabled: boolean) => void;
   onToggleAutoRefreshBooths: (enabled: boolean) => void;
@@ -29,7 +29,7 @@ export function SettingsPage({
   autoSyncEnabled,
   autoRefreshBoothsEnabled,
   readOnly = false,
-  onBack,
+  onComplete,
   onUpdateConfig,
   onToggleAutoSync,
   onToggleAutoRefreshBooths
@@ -128,7 +128,7 @@ export function SettingsPage({
       ]);
       // Clear password from state now that it's saved to keychain
       setScPassword('');
-      if (mode === 'welcome' && dcConfirmed) onBack();
+      if (mode === 'welcome' && dcConfirmed) onComplete?.();
     } catch (error) {
       setScError((error as Error).message);
     } finally {
@@ -184,7 +184,7 @@ export function SettingsPage({
     if (!dcSelectedRole) return;
     await saveCredentials({ digitalCookie: { role: dcSelectedRole } });
     setDcConfirmed(true);
-    if (mode === 'welcome' && scVerified) onBack();
+    if (mode === 'welcome' && scVerified) onComplete?.();
   };
 
   const handleClearSC = async () => {
@@ -240,7 +240,7 @@ export function SettingsPage({
               onChange={(e) => onUpdateConfig({ availableBoothsEnabled: (e.target as HTMLInputElement).checked })}
             />
             <span class="toggle-slider" />
-            <span class="toggle-label">Booth Finder</span>
+            <span class="toggle-label">Booth Planner</span>
           </label>
           {appConfig?.availableBoothsEnabled && (
             <div class="settings-toggle-sub">
@@ -322,6 +322,16 @@ export function SettingsPage({
               )}
             </div>
           )}
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              checked={appConfig?.inventoryHistoryEnabled ?? false}
+              disabled={readOnly}
+              onChange={(e) => onUpdateConfig({ inventoryHistoryEnabled: (e.target as HTMLInputElement).checked })}
+            />
+            <span class="toggle-slider" />
+            <span class="toggle-label">Inventory History</span>
+          </label>
           <label class="toggle-switch">
             <input
               type="checkbox"

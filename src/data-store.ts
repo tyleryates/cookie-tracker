@@ -1,6 +1,16 @@
 // Data Store — Plain data container and factory for reconciled cookie data
 
-import type { Allocation, BoothLocation, BoothReservationImported, DataStoreMetadata, Order, RawScoutData, Transfer } from './types';
+import type {
+  Allocation,
+  BoothLocation,
+  BoothReservationImported,
+  DataStoreMetadata,
+  FinancePayment,
+  Order,
+  RawDataRow,
+  RawScoutData,
+  Transfer
+} from './types';
 
 export interface DataStore {
   orders: Map<string, Order>;
@@ -11,7 +21,9 @@ export interface DataStore {
   allocations: Allocation[];
   boothReservations: BoothReservationImported[];
   boothLocations: BoothLocation[];
+  financePayments: Map<string, FinancePayment[]>;
   virtualCookieShareAllocations: Map<number, number>;
+  rawDCData: RawDataRow[];
   metadata: DataStoreMetadata;
 }
 
@@ -27,7 +39,9 @@ export function createDataStore(): DataStore {
     allocations: [],
     boothReservations: [],
     boothLocations: [],
+    financePayments: new Map(),
     virtualCookieShareAllocations: new Map(),
+    rawDCData: [],
     metadata: {
       lastImportDC: null,
       lastImportSC: null,

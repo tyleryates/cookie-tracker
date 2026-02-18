@@ -7,10 +7,11 @@ interface DataTableProps {
   className?: string;
   style?: string | JSX.CSSProperties;
   hint?: string;
+  columnAligns?: Array<'center' | 'right' | undefined>;
   children: ComponentChildren;
 }
 
-export function DataTable({ columns, className, style, hint, children }: DataTableProps) {
+export function DataTable({ columns, className, style, hint, columnAligns, children }: DataTableProps) {
   return (
     <>
       {hint && <p class="table-hint">{hint}</p>}
@@ -18,7 +19,9 @@ export function DataTable({ columns, className, style, hint, children }: DataTab
         <thead>
           <tr>
             {columns.map((col, i) => (
-              <th key={i}>{col}</th>
+              <th key={i} style={columnAligns?.[i] ? { textAlign: columnAligns[i] } : undefined}>
+                {col}
+              </th>
             ))}
           </tr>
         </thead>

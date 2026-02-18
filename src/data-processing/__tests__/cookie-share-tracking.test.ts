@@ -23,7 +23,7 @@ function makeTransfer(overrides: Partial<Transfer>): Transfer {
 describe('buildCookieShareTracking', () => {
   it('counts DC donations from non-site orders', () => {
     const store = createDataStore() as DataStore;
-    store.metadata.rawDCData = [
+    store.rawDCData = [
       { 'Girl Last Name': 'Doe', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '3' },
       { 'Girl Last Name': 'Smith', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '2' }
     ];
@@ -33,7 +33,7 @@ describe('buildCookieShareTracking', () => {
 
   it('skips site orders in DC donation count', () => {
     const store = createDataStore() as DataStore;
-    store.metadata.rawDCData = [
+    store.rawDCData = [
       { 'Girl Last Name': 'Site', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '10' },
       { 'Girl Last Name': 'Doe', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '3' }
     ];
@@ -43,7 +43,7 @@ describe('buildCookieShareTracking', () => {
 
   it('detects DC manual entries (non-auto-sync orders)', () => {
     const store = createDataStore() as DataStore;
-    store.metadata.rawDCData = [
+    store.rawDCData = [
       // In-Person Delivery + CASH → NOT auto-sync → manual entry
       { 'Girl Last Name': 'Doe', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '3' },
       // Shipped + CAPTURED → auto-sync → NOT manual entry
@@ -56,7 +56,7 @@ describe('buildCookieShareTracking', () => {
 
   it('Donation + CAPTURED is auto-sync, not manual', () => {
     const store = createDataStore() as DataStore;
-    store.metadata.rawDCData = [{ 'Girl Last Name': 'Doe', 'Order Type': 'Donation', 'Payment Status': 'CAPTURED', Donation: '4' }];
+    store.rawDCData = [{ 'Girl Last Name': 'Doe', 'Order Type': 'Donation', 'Payment Status': 'CAPTURED', Donation: '4' }];
     const result = buildCookieShareTracking(store);
     expect(result.digitalCookie.total).toBe(4);
     expect(result.digitalCookie.manualEntry).toBe(0);
@@ -94,7 +94,7 @@ describe('buildCookieShareTracking', () => {
 
   it('reconciled when DC manual entries match SC manual entries', () => {
     const store = createDataStore() as DataStore;
-    store.metadata.rawDCData = [{ 'Girl Last Name': 'Doe', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '5' }];
+    store.rawDCData = [{ 'Girl Last Name': 'Doe', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '5' }];
     store.transfers = [makeTransfer({ category: TRANSFER_CATEGORY.COOKIE_SHARE_RECORD, orderNumber: '100', packages: 5 })];
     const result = buildCookieShareTracking(store);
     expect(result.digitalCookie.manualEntry).toBe(5);
@@ -104,7 +104,7 @@ describe('buildCookieShareTracking', () => {
 
   it('not reconciled when DC and SC manual entries differ', () => {
     const store = createDataStore() as DataStore;
-    store.metadata.rawDCData = [{ 'Girl Last Name': 'Doe', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '5' }];
+    store.rawDCData = [{ 'Girl Last Name': 'Doe', 'Order Type': 'In-Person Delivery', 'Payment Status': 'CASH', Donation: '5' }];
     store.transfers = [makeTransfer({ category: TRANSFER_CATEGORY.COOKIE_SHARE_RECORD, orderNumber: '100', packages: 3 })];
     const result = buildCookieShareTracking(store);
     expect(result.reconciled).toBe(false);

@@ -6,6 +6,7 @@ export function makeScout(name: string, girlId?: number): Scout {
     girlId,
     isSiteOrder: false,
     orders: [],
+    payments: [],
     inventory: { total: 0, varieties: {} },
     allocations: [],
     $allocationsByChannel: { booth: [], directShip: [], virtualBooth: [] },
@@ -17,7 +18,15 @@ export function makeScout(name: string, girlId?: number): Scout {
       credited: 0,
       totalSold: 0,
       inventory: 0,
-      $financials: { cashCollected: 0, electronicPayments: 0, inventoryValue: 0, unsoldValue: 0, cashOwed: 0 },
+      $financials: {
+        cashCollected: 0,
+        electronicPayments: 0,
+        inventoryValue: 0,
+        unsoldValue: 0,
+        cashOwed: 0,
+        paymentsTurnedIn: 0,
+        cashDue: 0
+      },
       $inventoryDisplay: {},
       $salesByVariety: {},
       $allocationSummary: {

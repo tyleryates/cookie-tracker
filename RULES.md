@@ -538,12 +538,30 @@ When a new cookie variety, order type, payment method, or transfer type appears:
 
 ## Reports
 
-The app provides seven reports (tab labels in parentheses):
+The app provides twelve reports in six tab groups:
 
-1. **Troop Summary** (Summary) — Total packages sold by channel, inventory, troop proceeds — dashboard layout, no scrolling
-2. **Scout Summary** (Scouts) — Per-scout sales, inventory, credited allocations, cash owed, variety breakdowns. Shows "Unallocated Troop Orders" warning banner when site orders need allocation.
-3. **Cookie Share Reconciliation** (Donations) — DC vs SC Cookie Share comparison, adjustments needed per scout
-4. **Booth Reservations & Sales** (Booths) — Booth reservations, distribution status, per-scout allocations
-5. **Booth Finder** (Find Booths) — Upcoming booth locations with available time slots
-6. **Inventory Report** (Inventory) — C2T pickups, T2G allocations, per-variety troop and scout inventory
-7. **Cookie Popularity** (Cookie Popularity) — Sales breakdown by cookie variety with percentages
+**Inventory** tab:
+1. **Troop Inventory & Transfers** — C2T pickups, T2G allocations, per-variety troop inventory
+2. **Scout Inventory** — Per-scout inventory balances, variety breakdowns, sales vs inventory comparison
+
+**Sales** tab:
+3. **Troop Site Orders** — Troop-level booth/delivery orders with per-scout allocation tracking
+4. **Scout Orders & Credits** — Per-scout sales, credited allocations, cash owed, variety breakdowns
+
+**Booths** tab:
+5. **Completed Booths** — Distributed booths, needs-distribution status, per-scout allocations
+6. **Upcoming Booths** — Reserved booths that haven't happened yet
+7. **Booth Finder** — Available time slots at selected booth locations with day/time filters
+
+**Finances** tab:
+8. **Troop Proceeds** — Total packages credited, credit tier, gross/net troop proceeds
+9. **Scout Cash Report** — Per-scout cash collected, electronic payments, cash due
+
+**Donations** tab:
+10. **Cookie Share Reconciliation** — DC vs SC Cookie Share comparison, adjustments needed per scout
+
+**Cookie Popularity** tab:
+11. **Cookie Popularity** — Sales breakdown by cookie variety with percentages and distribution estimator
+
+**Tools** (separate tab bar buttons):
+12. **Inventory History** — Daily inventory change log with running balance (toggle in Settings)

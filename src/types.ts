@@ -150,6 +150,18 @@ export interface Allocation {
 }
 
 // ============================================================================
+// FINANCE PAYMENT TYPES
+// ============================================================================
+
+export interface FinancePayment {
+  id: number;
+  date: string; // normalized YYYY-MM-DD
+  amount: number;
+  method: string; // "Cash", "Check", etc.
+  reference: string;
+}
+
+// ============================================================================
 // SCOUT TYPES
 // ============================================================================
 
@@ -179,6 +191,8 @@ export interface ScoutTotals {
     inventoryValue: number;
     unsoldValue: number;
     cashOwed: number;
+    paymentsTurnedIn: number;
+    cashDue: number;
   };
   $inventoryDisplay: Varieties;
   $salesByVariety: Varieties;
@@ -208,6 +222,7 @@ export interface Scout {
     virtualBooth: Allocation[];
   };
   orders: Order[];
+  payments: FinancePayment[];
   $issues?: {
     negativeInventory?: Array<{
       variety: CookieType;
@@ -231,7 +246,6 @@ interface ImportMetadata {
 }
 
 export interface DataStoreMetadata extends ImportMetadata {
-  rawDCData?: RawDataRow[];
   warnings: Warning[];
 }
 
@@ -377,6 +391,7 @@ export interface BoothLocation {
 export interface SiteOrderEntry {
   orderNumber: string;
   packages: number;
+  allocated: number;
   owner: Owner;
   orderType: OrderType | null;
 }
@@ -526,6 +541,7 @@ export interface AppConfig {
   boothIds: number[];
   boothDayFilters: string[];
   ignoredTimeSlots: string[];
+  inventoryHistoryEnabled: boolean;
 }
 
 // ============================================================================

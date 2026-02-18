@@ -3,8 +3,8 @@
 import { DATA_SOURCES, PACKAGES_PER_CASE, SC_API_COLUMNS, SC_REPORT_COLUMNS, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../../constants';
 import type { DataStore } from '../../data-store';
 import { createTransfer, mergeOrCreateOrder } from '../../data-store-operations';
-import type { SCOrdersResponse } from '../../scrapers/sc-types';
-import type { Order, RawDataRow, TransferInput } from '../../types';
+import type { SCFinanceTransaction, SCOrdersResponse } from '../../scrapers/sc-types';
+import type { FinancePayment, Order, RawDataRow, TransferInput } from '../../types';
 import { isC2TTransfer } from '../utils';
 import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSCTransfer } from './parsers';
 import { mergeDCOrderFromSC, recordImportMetadata, trackScoutFromAPITransfer, updateScoutData } from './scout-helpers';
@@ -179,4 +179,37 @@ export function importSmartCookie(store: DataStore, scData: RawDataRow[]): void 
   }
 
   recordImportMetadata(store, 'lastImportSC', DATA_SOURCES.SMART_COOKIE, scData.length);
+}
+
+/** Parse SC finance date "M/D/YYYY 12:00:00 AM" → "YYYY-MM-DD" */
+function parseFinanceDate(raw: string): string {
+  const match = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (!match) return '';
+  const [, m, d, y] = match;
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+
+/** Import finance payments from SC finance API (manual entries only) */
+export function importFinancePayments(store: DataStore, rawTransactions: SCFinanceTransaction[]): void {
+  for (const txn of rawTransactions) {
+    if (txn.LockTran) continue; // Skip auto DC entries
+
+    const payment: FinancePayment = {
+      id: txn.FinanceTranID,
+      date: parseFinanceDate(txn.FinanceDate),
+      amount: txn.FinanceAmount,
+      method: txn.PaymentMethod,
+      reference: txn.RefNumber || ''
+    };
+
+    const scoutName = txn.GirlDesc || '';
+    if (!scoutName) continue;
+
+    const existing = store.financePayments.get(scoutName);
+    if (existing) {
+      existing.push(payment);
+    } else {
+      store.financePayments.set(scoutName, [payment]);
+    }
+  }
 }

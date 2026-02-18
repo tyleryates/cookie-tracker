@@ -3,6 +3,7 @@
 
 import type { ReadonlyDataStore } from '../../data-store';
 import type { Scout, UnifiedDataset, Warning } from '../../types';
+import { mapToRecord } from '../utils';
 import { addAllocations, addInventory } from './allocation-processing';
 import { buildCookieShareTracking } from './cookie-share-tracking';
 import { buildUnifiedMetadata } from './metadata';
@@ -17,7 +18,7 @@ import { buildVarieties } from './varieties';
 
 /** Build complete scout dataset with all calculations */
 function buildScoutDataset(store: ReadonlyDataStore, warnings: Warning[]): Record<string, Scout> {
-  const rawDCData = store.metadata.rawDCData || [];
+  const rawDCData = store.rawDCData;
   const scoutDataset = initializeScouts(store, rawDCData);
 
   // Phase 1: Add orders from Digital Cookie
@@ -77,9 +78,7 @@ function buildUnifiedDataset(store: ReadonlyDataStore): UnifiedDataset {
     boothLocations: store.boothLocations,
     metadata,
     warnings,
-    virtualCookieShareAllocations: Object.fromEntries(
-      Array.from(store.virtualCookieShareAllocations.entries()).map(([k, v]) => [String(k), v])
-    ),
+    virtualCookieShareAllocations: mapToRecord(store.virtualCookieShareAllocations),
     hasTransferData: store.transfers.length > 0
   };
 }

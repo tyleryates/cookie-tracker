@@ -1,18 +1,33 @@
 import { describe, expect, it } from 'vitest';
+import { BOOTH_RESERVATION_TYPE } from '../../constants';
 import { COOKIE_ORDER } from '../../cookie-constants';
 import { classifyOrderStatus } from '../../order-classification';
-import type { BoothTimeSlot } from '../../types';
+import type { BoothReservationImported, BoothTimeSlot } from '../../types';
 import {
+  boothTypeClass,
   buildVarietyTooltip,
+  countBoothsNeedingDistribution,
   DateFormatter,
   formatBoothDate,
+  formatBoothTime,
+  formatCompactRange,
   formatCurrency,
+  formatDataSize,
   formatDate,
+  formatDuration,
+  formatMaxAge,
+  formatShortDate,
   formatTime12h,
   formatTimeRange,
   getCompleteVarieties,
+  haversineDistance,
+  isPhysicalVariety,
+  isVirtualBooth,
+  parseLocalDate,
   parseTimeToMinutes,
-  slotOverlapsRange
+  slotOverlapsRange,
+  sortVarietiesByOrder,
+  todayMidnight
 } from '../format-utils';
 
 describe('formatDate / DateFormatter.toDisplay', () => {
@@ -253,5 +268,272 @@ describe('formatBoothDate', () => {
 
   it('returns as-is for unrecognized format', () => {
     expect(formatBoothDate('February 5')).toBe('February 5');
+  });
+});
+
+describe('parseLocalDate', () => {
+  it('parses YYYY-MM-DD to local midnight Date', () => {
+    const d = parseLocalDate('2025-02-05');
+    expect(d).not.toBeNull();
+    expect(d!.getFullYear()).toBe(2025);
+    expect(d!.getMonth()).toBe(1); // 0-indexed
+    expect(d!.getDate()).toBe(5);
+  });
+
+  it('parses YYYY/MM/DD format', () => {
+    const d = parseLocalDate('2025/03/15');
+    expect(d).not.toBeNull();
+    expect(d!.getMonth()).toBe(2);
+    expect(d!.getDate()).toBe(15);
+  });
+
+  it('returns null for invalid format', () => {
+    expect(parseLocalDate('bad')).toBeNull();
+  });
+});
+
+describe('boothTypeClass', () => {
+  it('returns type-lottery for LOTTERY', () => {
+    expect(boothTypeClass(BOOTH_RESERVATION_TYPE.LOTTERY)).toBe('type-lottery');
+  });
+
+  it('returns type-fcfs for FCFS', () => {
+    expect(boothTypeClass(BOOTH_RESERVATION_TYPE.FCFS)).toBe('type-fcfs');
+  });
+
+  it('returns type-default for undefined', () => {
+    expect(boothTypeClass(undefined)).toBe('type-default');
+  });
+
+  it('returns type-default for unknown string', () => {
+    expect(boothTypeClass('OTHER')).toBe('type-default');
+  });
+});
+
+describe('formatBoothTime', () => {
+  it('formats compact range when both start and end given', () => {
+    expect(formatBoothTime('10:00', '12:00')).toBe('10am-12pm');
+  });
+
+  it('returns start time as fallback when no end', () => {
+    expect(formatBoothTime('10:00', undefined)).toBe('10:00');
+  });
+
+  it('returns "-" when both undefined', () => {
+    expect(formatBoothTime(undefined, undefined)).toBe('-');
+  });
+});
+
+describe('formatCompactRange', () => {
+  it('merges same-period times', () => {
+    expect(formatCompactRange('10:00', '12:00')).toBe('10am-12pm');
+  });
+
+  it('shows both periods when different', () => {
+    expect(formatCompactRange('10:00', '14:00')).toBe('10am-2pm');
+  });
+
+  it('drops minutes when :00', () => {
+    expect(formatCompactRange('16:00', '18:00')).toBe('4-6pm');
+  });
+
+  it('keeps minutes when not :00', () => {
+    expect(formatCompactRange('16:30', '18:00')).toBe('4:30-6pm');
+  });
+});
+
+describe('formatShortDate', () => {
+  it('formats ISO date as "Day MM/DD"', () => {
+    // 2025-02-05 is Wednesday
+    expect(formatShortDate('2025-02-05')).toBe('Wed 02/05');
+  });
+
+  it('formats US date as "Day MM/DD"', () => {
+    expect(formatShortDate('2/5/2025')).toBe('Wed 02/05');
+  });
+
+  it('returns "-" for null', () => {
+    expect(formatShortDate(null)).toBe('-');
+  });
+
+  it('returns as-is for unknown format', () => {
+    expect(formatShortDate('hello')).toBe('hello');
+  });
+});
+
+describe('formatDuration', () => {
+  it('returns empty string for undefined', () => {
+    expect(formatDuration(undefined)).toBe('');
+  });
+
+  it('formats milliseconds under 1000', () => {
+    expect(formatDuration(450)).toBe('450ms');
+  });
+
+  it('formats seconds for 1000+', () => {
+    expect(formatDuration(1500)).toBe('1.5s');
+  });
+
+  it('formats exact seconds', () => {
+    expect(formatDuration(2000)).toBe('2.0s');
+  });
+});
+
+describe('formatDataSize', () => {
+  it('returns empty string for undefined', () => {
+    expect(formatDataSize(undefined)).toBe('');
+  });
+
+  it('formats bytes', () => {
+    expect(formatDataSize(500)).toBe('500 B');
+  });
+
+  it('formats kilobytes', () => {
+    expect(formatDataSize(2048)).toBe('2 KB');
+  });
+
+  it('formats megabytes', () => {
+    expect(formatDataSize(1.5 * 1024 * 1024)).toBe('1.5 MB');
+  });
+});
+
+describe('formatMaxAge', () => {
+  it('formats minutes', () => {
+    expect(formatMaxAge(1_800_000)).toBe('30 min');
+  });
+
+  it('formats 1 hour as "Hourly"', () => {
+    expect(formatMaxAge(3_600_000)).toBe('Hourly');
+  });
+
+  it('formats multiple hours', () => {
+    expect(formatMaxAge(14_400_000)).toBe('4 hours');
+  });
+});
+
+describe('sortVarietiesByOrder', () => {
+  it('sorts entries by COOKIE_ORDER position', () => {
+    const entries: [string, number][] = [
+      ['TREFOILS', 3],
+      ['THIN_MINTS', 5]
+    ];
+    const sorted = sortVarietiesByOrder(entries);
+    // THIN_MINTS comes before TREFOILS in COOKIE_ORDER
+    expect(sorted[0][0]).toBe('THIN_MINTS');
+    expect(sorted[1][0]).toBe('TREFOILS');
+  });
+
+  it('puts unknown varieties after known ones', () => {
+    const entries: [string, number][] = [
+      ['UNKNOWN_COOKIE', 1],
+      ['THIN_MINTS', 5]
+    ];
+    const sorted = sortVarietiesByOrder(entries);
+    expect(sorted[0][0]).toBe('THIN_MINTS');
+    expect(sorted[1][0]).toBe('UNKNOWN_COOKIE');
+  });
+});
+
+describe('haversineDistance', () => {
+  it('returns 0 for same point', () => {
+    expect(haversineDistance(32.7, -117.1, 32.7, -117.1)).toBe(0);
+  });
+
+  it('calculates roughly correct distance between known points', () => {
+    // San Diego to Los Angeles ≈ 120 miles
+    const dist = haversineDistance(32.7157, -117.1611, 34.0522, -118.2437);
+    expect(dist).toBeGreaterThan(100);
+    expect(dist).toBeLessThan(140);
+  });
+});
+
+describe('countBoothsNeedingDistribution', () => {
+  function makeReservation(overrides: {
+    reservationType?: string;
+    isDistributed?: boolean;
+    date?: string;
+    endTime?: string;
+  }): BoothReservationImported {
+    return {
+      booth: {
+        id: 1,
+        storeName: 'Test',
+        reservationType: overrides.reservationType || 'FCFS',
+        isDistributed: overrides.isDistributed || false,
+        locationId: 1
+      },
+      timeslot: {
+        date: overrides.date || '2020-01-01',
+        startTime: '10:00',
+        endTime: overrides.endTime || '12:00'
+      }
+    };
+  }
+
+  it('returns 0 for empty array', () => {
+    expect(countBoothsNeedingDistribution([])).toBe(0);
+  });
+
+  it('counts past undistributed booths', () => {
+    const reservations = [makeReservation({ date: '2020-01-01' })];
+    expect(countBoothsNeedingDistribution(reservations)).toBe(1);
+  });
+
+  it('excludes already distributed booths', () => {
+    const reservations = [makeReservation({ date: '2020-01-01', isDistributed: true })];
+    expect(countBoothsNeedingDistribution(reservations)).toBe(0);
+  });
+
+  it('excludes virtual booth reservations', () => {
+    const reservations = [makeReservation({ date: '2020-01-01', reservationType: 'virtual' })];
+    expect(countBoothsNeedingDistribution(reservations)).toBe(0);
+  });
+});
+
+describe('isVirtualBooth', () => {
+  it('returns true for "virtual" (case-insensitive)', () => {
+    expect(isVirtualBooth('virtual')).toBe(true);
+    expect(isVirtualBooth('VIRTUAL')).toBe(true);
+    expect(isVirtualBooth('Virtual Booth')).toBe(true);
+  });
+
+  it('returns false for LOTTERY', () => {
+    expect(isVirtualBooth('LOTTERY')).toBe(false);
+  });
+
+  it('returns false for FCFS', () => {
+    expect(isVirtualBooth('FCFS')).toBe(false);
+  });
+
+  it('returns false for undefined', () => {
+    expect(isVirtualBooth(undefined)).toBe(false);
+  });
+});
+
+describe('isPhysicalVariety', () => {
+  it('returns true for THIN_MINTS', () => {
+    expect(isPhysicalVariety('THIN_MINTS')).toBe(true);
+  });
+
+  it('returns false for COOKIE_SHARE', () => {
+    expect(isPhysicalVariety('COOKIE_SHARE')).toBe(false);
+  });
+});
+
+describe('todayMidnight', () => {
+  it('returns a date with zeroed time components', () => {
+    const d = todayMidnight();
+    expect(d.getHours()).toBe(0);
+    expect(d.getMinutes()).toBe(0);
+    expect(d.getSeconds()).toBe(0);
+    expect(d.getMilliseconds()).toBe(0);
+  });
+
+  it("returns today's date", () => {
+    const d = todayMidnight();
+    const now = new Date();
+    expect(d.getFullYear()).toBe(now.getFullYear());
+    expect(d.getMonth()).toBe(now.getMonth());
+    expect(d.getDate()).toBe(now.getDate());
   });
 });

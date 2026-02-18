@@ -29,7 +29,8 @@ class ConfigManager {
       boothNotifiedSlots: [],
       boothIds: [],
       boothDayFilters: [],
-      ignoredTimeSlots: []
+      ignoredTimeSlots: [],
+      inventoryHistoryEnabled: false
     };
   }
 
@@ -60,7 +61,7 @@ class ConfigManager {
             if (expectedEl && Array.isArray(disk[key]) && !disk[key].every((el: unknown) => typeof el === expectedEl)) {
               healed = true;
             } else {
-              (result as any)[key] = disk[key];
+              (result[key] as AppConfig[typeof key]) = disk[key];
             }
           } else {
             healed = true;

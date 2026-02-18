@@ -1,18 +1,18 @@
 // App — Root Preact component. Owns all state, delegates logic to hooks.
 
-import { useCallback, useReducer, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
 import * as packageJson from '../../package.json';
 import Logger from '../logger';
-import { type ProfilesConfig, toActiveProfile } from '../types';
+import { type AppConfig, type ProfilesConfig, toActiveProfile, type UnifiedDataset } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { ReportContent, TabBar } from './components/reports-section';
 import { SettingsPage } from './components/settings-page';
 import { computeGroupStatuses, createInitialSyncState, type GroupStatus, SyncTab } from './components/sync-section';
 import { loadAppConfig } from './data-loader';
-import { DateFormatter } from './format-utils';
+import { countBoothsNeedingDistribution, DateFormatter } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
-import { encodeSlotKey } from './reports/available-booths';
+import { encodeSlotKey, summarizeAvailableSlots } from './reports/available-booths-utils';
 
 const initialState: AppState = {
   unified: null,
@@ -55,61 +55,132 @@ function SyncPill({ label, group }: { label: string; group: GroupStatus }) {
   );
 }
 
+interface Alert {
+  message: string;
+  report: string;
+}
+
+function computeAlerts(unified: UnifiedDataset | null, appConfig: AppConfig | null): Alert[] {
+  if (!unified) return [];
+  const alerts: Alert[] = [];
+
+  const hasUnallocated =
+    unified.siteOrders?.directShip?.hasWarning || unified.siteOrders?.girlDelivery?.hasWarning || unified.siteOrders?.boothSale?.hasWarning;
+  if (hasUnallocated) alerts.push({ message: 'Unallocated troop orders', report: 'troop-sales' });
+
+  if (countBoothsNeedingDistribution(unified.boothReservations || []) > 0)
+    alerts.push({ message: 'Booths need distribution', report: 'completed-booths' });
+
+  if ((unified.troopTotals?.scouts?.withNegativeInventory ?? 0) > 0)
+    alerts.push({ message: 'Scouts are missing cookies', report: 'scout-inventory' });
+
+  if (unified.cookieShare?.reconciled === false) alerts.push({ message: 'Donations need adjustment', report: 'donation-alert' });
+
+  if (appConfig?.availableBoothsEnabled) {
+    const filters = appConfig.boothDayFilters || [];
+    const ignored = appConfig.ignoredTimeSlots || [];
+    const availableSlots = summarizeAvailableSlots(unified.boothLocations || [], filters, ignored).reduce((sum, b) => sum + b.slotCount, 0);
+    if (availableSlots > 0) alerts.push({ message: `${availableSlots} open booth slots`, report: 'available-booths' });
+  }
+
+  return alerts;
+}
+
+function AlertBadge({
+  unified,
+  appConfig,
+  onSelectReport
+}: {
+  unified: UnifiedDataset | null;
+  appConfig: AppConfig | null;
+  onSelectReport: (type: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const alerts = computeAlerts(unified, appConfig);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  if (alerts.length === 0) return null;
+
+  return (
+    <div class="alert-badge-wrapper" ref={wrapperRef}>
+      <button type="button" class="alert-badge-btn" onClick={() => setOpen(!open)}>
+        {'\u26A0'} {alerts.length}
+      </button>
+      {open && (
+        <div class="alert-dropdown">
+          {alerts.map((a) => (
+            <button
+              type="button"
+              key={a.report + a.message}
+              class="alert-dropdown-item"
+              onClick={() => {
+                onSelectReport(a.report);
+                setOpen(false);
+              }}
+            >
+              {'\u26A0\uFE0F'} {a.message}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AppHeader({
   syncing,
   readOnly,
   groups,
   showBooths,
+  unified,
+  appConfig,
+  settingsActive,
   onSync,
   onOpenSettings,
-  showBackButton,
-  onBack,
+  onSelectReport,
   isWelcome
 }: {
   syncing: boolean;
   readOnly: boolean;
   groups: ReturnType<typeof computeGroupStatuses>;
   showBooths: boolean;
+  unified: UnifiedDataset | null;
+  appConfig: AppConfig | null;
+  settingsActive: boolean;
   onSync: () => void;
   onOpenSettings: () => void;
-  showBackButton: boolean;
-  onBack: () => void;
+  onSelectReport: (type: string) => void;
   isWelcome: boolean;
 }) {
-  const showPills = !isWelcome && !showBackButton;
-
   return (
     <div class="app-header">
-      {showBackButton && (
-        <div class="app-header-actions" style={{ marginRight: '12px' }}>
-          <button type="button" class="icon-btn" onClick={onBack} title="Back">
-            {'\u2190'}
-          </button>
-        </div>
-      )}
       <span class="app-header-title">
         {'\uD83C\uDF6A'} Cookie Tracker <span class="app-header-version">v{packageJson.version}</span>
       </span>
       {!isWelcome && (
         <div class="app-header-actions">
-          {showPills && (
-            <div class="app-header-sync-pills">
-              <SyncPill label="Reports" group={groups.reports} />
-              {showBooths && <SyncPill label="Booths" group={groups.booths} />}
-            </div>
-          )}
-          {!showBackButton && (
-            <button type="button" class="icon-btn has-tooltip" disabled={syncing || readOnly} onClick={onSync}>
-              {syncing ? <span class="spinner" /> : '\u21BB'}
-              <span class="btn-tooltip">Refresh Data</span>
-            </button>
-          )}
-          {!showBackButton && (
-            <button type="button" class="icon-btn has-tooltip" onClick={onOpenSettings}>
-              {'\u2699'}
-              <span class="btn-tooltip">Settings</span>
-            </button>
-          )}
+          <div class="app-header-sync-pills">
+            <SyncPill label="Reports" group={groups.reports} />
+            {showBooths && <SyncPill label="Booths" group={groups.booths} />}
+          </div>
+          <AlertBadge unified={unified} appConfig={appConfig} onSelectReport={onSelectReport} />
+          <button type="button" class="icon-btn has-tooltip" disabled={syncing || readOnly} onClick={onSync}>
+            {syncing ? <span class="spinner" /> : '\u21BB'}
+            <span class="btn-tooltip">Refresh Data</span>
+          </button>
+          <button type="button" class={`icon-btn has-tooltip${settingsActive ? ' active' : ''}`} onClick={onOpenSettings}>
+            {'\u2699'}
+            <span class="btn-tooltip">Settings</span>
+          </button>
         </div>
       )}
     </div>
@@ -175,10 +246,9 @@ export function App() {
     contentRef.current?.scrollTo(0, 0);
   }, []);
 
-  const handleCloseSettings = useCallback(() => {
-    const wasWelcome = stateRef.current.activePage === 'welcome';
-    dispatch({ type: 'CLOSE_SETTINGS' });
-    if (wasWelcome) sync();
+  const handleWelcomeComplete = useCallback(() => {
+    dispatch({ type: 'SET_ACTIVE_REPORT', report: 'inventory' });
+    sync();
   }, [sync]);
 
   const handleSaveBoothIds = useCallback(
@@ -211,12 +281,6 @@ export function App() {
     showStatus('Ignored time slots cleared', 'success');
   }, [showStatus]);
 
-  const handleResetNotified = useCallback(() => {
-    dispatch({ type: 'UPDATE_CONFIG', patch: { boothNotifiedSlots: [] } });
-    ipcInvoke('update-config', { boothNotifiedSlots: [] });
-    showStatus('Message notifications reset', 'success');
-  }, [showStatus]);
-
   const handleWipeData = useCallback(async () => {
     await ipcInvoke('wipe-data');
     dispatch({ type: 'WIPE_DATA', syncState: createInitialSyncState() });
@@ -232,7 +296,7 @@ export function App() {
     await ipcInvoke('update-config', { ignoredTimeSlots: ignored });
   }, []);
 
-  const handleUpdateConfig = useCallback((patch: Partial<import('../types').AppConfig>) => {
+  const handleUpdateConfig = useCallback((patch: Partial<AppConfig>) => {
     dispatch({ type: 'UPDATE_CONFIG', patch });
     ipcInvoke('update-config', patch);
   }, []);
@@ -323,8 +387,7 @@ export function App() {
     [dispatchProfiles, reloadAfterSwitch, showStatus]
   );
 
-  const groups = computeGroupStatuses(state.syncState.endpoints, state.syncState);
-  const isSettings = state.activePage === 'settings';
+  const groups = useMemo(() => computeGroupStatuses(state.syncState.endpoints, state.syncState), [state.syncState]);
   const isWelcome = state.activePage === 'welcome';
   const readOnly = !!state.activeProfile && !state.activeProfile.isDefault;
 
@@ -350,24 +413,37 @@ export function App() {
         readOnly={readOnly}
         groups={groups}
         showBooths={!!state.appConfig?.availableBoothsEnabled}
+        unified={state.unified}
+        appConfig={state.appConfig}
+        settingsActive={state.activeReport === 'settings'}
         onSync={handleHeaderSync}
-        onOpenSettings={() => dispatch({ type: 'OPEN_SETTINGS' })}
-        showBackButton={isSettings}
-        onBack={handleCloseSettings}
+        onOpenSettings={() => handleSelectReport('settings')}
+        onSelectReport={handleSelectReport}
         isWelcome={isWelcome}
       />
-      {!isSettings && !isWelcome && (
+      {!isWelcome && (
         <TabBar activeReport={state.activeReport} unified={state.unified} appConfig={state.appConfig} onSelectReport={handleSelectReport} />
       )}
       <div class="app-content" ref={contentRef}>
-        {isSettings || isWelcome ? (
+        {isWelcome ? (
           <SettingsPage
-            mode={isWelcome ? 'welcome' : 'settings'}
+            mode="welcome"
             appConfig={state.appConfig}
             autoSyncEnabled={state.autoSyncEnabled}
             autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
             readOnly={readOnly}
-            onBack={handleCloseSettings}
+            onComplete={handleWelcomeComplete}
+            onUpdateConfig={handleUpdateConfig}
+            onToggleAutoSync={handleToggleAutoSync}
+            onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
+          />
+        ) : state.activeReport === 'settings' ? (
+          <SettingsPage
+            mode="settings"
+            appConfig={state.appConfig}
+            autoSyncEnabled={state.autoSyncEnabled}
+            autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
+            readOnly={readOnly}
             onUpdateConfig={handleUpdateConfig}
             onToggleAutoSync={handleToggleAutoSync}
             onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
@@ -399,7 +475,6 @@ export function App() {
             readOnly={readOnly}
             onIgnoreSlot={handleIgnoreSlot}
             onResetIgnored={handleResetIgnored}
-            onResetNotified={handleResetNotified}
             onRefreshBooths={refreshBooths}
             onSaveBoothIds={handleSaveBoothIds}
             onSaveDayFilters={handleSaveDayFilters}

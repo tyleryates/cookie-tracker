@@ -257,50 +257,13 @@ button.stat-card-active {
 
 .stat-operator {
   display: flex;
-  align-items: center;
+  align-items: start;
   justify-content: center;
   font-size: 2.2em;
   font-weight: 400;
   color: var(--gray-300);
-}
-
-/* Detail cards — mini stat cards inside drill-down panels */
-.detail-cards {
-  display: grid;
-  gap: 12px;
-  padding: 4px 0;
-}
-
-.detail-operator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.4em;
-  font-weight: 400;
-  color: var(--gray-300);
-}
-
-.detail-card {
-  text-align: center;
-  padding: 8px 4px;
-}
-
-.detail-card-label {
-  font-size: 0.8em;
-  font-weight: 600;
-  color: var(--gray-500);
-  margin-bottom: 4px;
-}
-
-.detail-card-value {
-  font-size: 1.4em;
-  font-weight: 700;
-}
-
-.detail-card-desc {
-  font-size: 0.75em;
-  color: var(--gray-400);
-  margin-top: 2px;
+  /* Align with .stat-card-value (label ~14px + 8px margin) */
+  padding-top: 22px;
 }
 
 /* Detail list — key/value rows inside drill-down panels */
@@ -409,6 +372,17 @@ button.stat-card-active {
   margin: 0;
 }
 
+.info-box ul {
+  margin: 6px 0 0 18px;
+  padding: 0;
+  list-style: disc;
+}
+
+.info-box ul.list-none {
+  list-style: none;
+  padding-left: 2px;
+}
+
 .info-box p + p {
   margin-top: 10px;
 }
@@ -442,24 +416,22 @@ button.stat-card-active {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 24px;
-  padding-bottom: 12px;
-  border-bottom: 3px solid var(--primary);
+  margin-bottom: 20px;
 }
 
 .report-header-row h3,
 .report-visual .report-header-row h3 {
   margin: 0;
-  padding: 0;
-  border: none;
 }
 
 .report-status-badge {
-  font-size: 0.8em;
+  font-size: 0.75em;
   font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 12px;
+  padding: 4px 12px;
+  border-radius: 20px;
   white-space: nowrap;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .report-status-ok {
@@ -514,7 +486,7 @@ button.stat-card-active {
 }
 
 .status-success {
-  color: var(--success);
+  color: var(--status-success-dark);
   font-weight: 600;
 }
 .status-info {
@@ -541,6 +513,9 @@ button.stat-card-active {
 
 .section-break {
   margin-top: 24px;
+}
+.scout-breakdown > .section-break:first-child {
+  margin-top: 0;
 }
 .section-break-sm {
   margin-top: 12px;
@@ -614,7 +589,7 @@ button.stat-card-active {
   color: var(--gray-400);
 }
 
-/* Action row — Find Booths button + sync status (inside filter card) */
+/* Action row — Search button + sync status (inside filter card) */
 .booth-action-row {
   display: flex;
   align-items: center;
@@ -695,4 +670,78 @@ button.stat-card-active {
 
 .config-day-chip strong {
   color: var(--gray-700);
+}
+
+/* Modal overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5000;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-content {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: 24px;
+  max-width: 576px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.2em;
+  cursor: pointer;
+  color: var(--gray-400);
+  padding: 4px;
+}
+
+.modal-close:hover {
+  color: var(--gray-700);
+}
+
+.modal-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.modal-input-row select,
+.modal-input-row input {
+  padding: 8px 10px;
+  border: 2px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: 0.9em;
+  background: var(--surface);
+}
+
+.modal-input-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-input-row input {
+  width: 100px;
+}
+
+.modal-input-row select:focus,
+.modal-input-row input:focus {
+  outline: none;
+  border-color: var(--primary);
 }

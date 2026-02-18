@@ -79,18 +79,3 @@
 .settings-toggle-sub .form-input {
   max-width: 300px;
 }
-
-.settings-danger-zone {
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid var(--gray-200);
-}
-
-.settings-danger-zone h3 {
-  color: var(--gray-500);
-  margin: 0 0 16px 0;
-  font-size: 0.9em;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}

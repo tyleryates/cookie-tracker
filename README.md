@@ -25,7 +25,7 @@ The app checks for updates automatically.
 1. Launch the app
 2. Click **Configure Logins** and enter your Digital Cookie and Smart Cookie credentials
 3. Click **Sync Now** to download your data
-4. View any of the 7 reports
+4. View any of the 12 reports
 
 ## Privacy
 

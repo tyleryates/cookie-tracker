@@ -15,6 +15,7 @@ import type {
   SCCookieMapEntry,
   SCDirectShipDivider,
   SCDividerGirl,
+  SCFinanceTransaction,
   SCOrder,
   SCOrdersResponse,
   SCReservation,
@@ -170,6 +171,11 @@ class SmartCookieScraper extends BaseScraper {
       'Reservations',
       signal
     );
+  }
+
+  async fetchFinanceList(signal?: AbortSignal): Promise<SCFinanceTransaction[]> {
+    this.checkAborted(signal);
+    return this.session.apiGet<SCFinanceTransaction[]>('/ported/finance/list?troop=false', 'Finance list', signal);
   }
 
   async fetchSmartBoothDivider(reservationId: string, signal?: AbortSignal): Promise<{ girls?: SCDividerGirl[] } | null> {
@@ -377,7 +383,7 @@ class SmartCookieScraper extends BaseScraper {
       const cookieMapCached = storedCookies?.length ? { fresh: true, data: this.buildCookieIdMap(storedCookies) } : undefined;
       const catalogCached = boothCache?.isCatalogFresh() ? { fresh: true, data: boothCache.getCatalog() || [] } : undefined;
 
-      const [ordersData, directShipDivider, reservations, catalog, cookieIdMap] = await Promise.all([
+      const [ordersData, directShipDivider, reservations, catalog, cookieIdMap, financeData] = await Promise.all([
         this.fetchEndpoint('sc-orders', () => this.fetchOrders(signal), { fatal: true }),
         this.fetchEndpoint<SCDirectShipDivider | null>('sc-direct-ship', () => this.fetchDirectShipDivider(signal), { fallback: null }),
         this.fetchEndpoint<SCReservationsResponse | null>('sc-reservations', () => this.fetchReservations(signal), { fallback: null }),
@@ -388,7 +394,8 @@ class SmartCookieScraper extends BaseScraper {
         this.fetchEndpoint<Record<string, string> | null>('sc-cookie-map', () => this.fetchCookieIdMap(signal), {
           fallback: null,
           cached: cookieMapCached
-        })
+        }),
+        this.fetchEndpoint<SCFinanceTransaction[]>('sc-finance', () => this.fetchFinanceList(signal), { fallback: [] })
       ]);
 
       // Fallback troopId extraction
@@ -402,6 +409,7 @@ class SmartCookieScraper extends BaseScraper {
       if (reservations) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_RESERVATIONS, reservations);
       savePipelineFile(this.dataDir, PIPELINE_FILES.SC_BOOTH_CATALOG, catalog);
       if (cookieIdMap) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_COOKIE_ID_MAP, cookieIdMap);
+      if (financeData.length > 0) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_FINANCE, financeData);
 
       this.checkAborted(signal);
 

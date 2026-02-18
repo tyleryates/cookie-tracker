@@ -4,6 +4,20 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 
+/** Shared color palette for stat card values */
+export const STAT_COLORS = {
+  BLUE: '#1565C0',
+  GREEN: '#2E7D32',
+  TEAL: '#00838F',
+  PURPLE: '#7B1FA2',
+  DEEP_PURPLE: '#6A1B9A',
+  ORANGE: '#E65100',
+  AMBER: '#EF6C00',
+  PINK: '#E91E63',
+  RED: '#f44336',
+  DARK_RED: '#C62828'
+} as const;
+
 export interface Stat {
   label: string;
   value: string | number;

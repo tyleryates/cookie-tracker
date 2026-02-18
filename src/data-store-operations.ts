@@ -1,6 +1,6 @@
 // Data Store Operations — Factory functions for creating orders and transfers
 
-import { DATA_SOURCES, type DataSource, OWNER, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
+import { DATA_SOURCE_METADATA_KEY, type DataSource, OWNER, TRANSFER_CATEGORY, TRANSFER_TYPE, type TransferCategory } from './constants';
 import { buildPhysicalVarieties, isC2TTransfer, sumPhysicalPackages } from './data-processing/utils';
 import type { DataStore } from './data-store';
 import Logger from './logger';
@@ -128,19 +128,7 @@ export function createTransfer(data: TransferInput): Transfer {
 
 /** Get the metadata key for a data source */
 function getMetadataKey(source: DataSource): keyof OrderMetadata {
-  const keyMap: Record<string, keyof OrderMetadata> = {
-    [DATA_SOURCES.DIGITAL_COOKIE]: 'dc',
-    [DATA_SOURCES.SMART_COOKIE]: 'sc',
-    [DATA_SOURCES.SMART_COOKIE_REPORT]: 'scReport',
-    [DATA_SOURCES.SMART_COOKIE_API]: 'scApi'
-  };
-
-  if (!keyMap[source]) {
-    Logger.warn(`Unknown data source "${source}" - using fallback key. Update getMetadataKey() in data-store-operations.ts`);
-    return 'dc';
-  }
-
-  return keyMap[source];
+  return DATA_SOURCE_METADATA_KEY[source];
 }
 
 /** Merge into existing order or create new one, storing it in the data store */

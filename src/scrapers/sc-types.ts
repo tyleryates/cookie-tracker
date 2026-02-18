@@ -125,6 +125,22 @@ export interface SCBoothTimeSlot {
   end?: string;
 }
 
+/** Finance transaction from /ported/finance/list */
+export interface SCFinanceTransaction {
+  FinanceTranID: number;
+  TransactionNumber: string;
+  GirlDesc: string;
+  TroopDesc: string;
+  FinanceDate: string; // "2/15/2026 12:00:00 AM"
+  PaymentMethod: string; // "Cash", "CreditCard", "Check"
+  FinanceAmount: number;
+  FinanceNotes: string;
+  RefNumber: string;
+  LockTran: boolean; // false = manual entry, true = auto from DC
+  FinanceTypeName: string; // "Payment"
+  Multiplier: number;
+}
+
 /** Raw booth location from /booths/search */
 export interface SCBoothLocationRaw {
   id?: number;

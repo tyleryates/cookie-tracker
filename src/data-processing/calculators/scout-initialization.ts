@@ -34,6 +34,14 @@ function initializeScouts(store: ReadonlyDataStore, rawDCData: RawDataRow[]): Ma
     }
   }
 
+  // Attach finance payments to scouts
+  for (const [scoutName, payments] of store.financePayments) {
+    const scout = scoutDataset.get(scoutName);
+    if (scout) {
+      scout.payments = payments;
+    }
+  }
+
   return scoutDataset;
 }
 
@@ -47,6 +55,7 @@ function createScoutStructure(name: string, girlId: number | null, isSiteOrder: 
 
     // Orders (classified)
     orders: [],
+    payments: [],
 
     // Inventory
     inventory: {
@@ -72,7 +81,9 @@ function createScoutStructure(name: string, girlId: number | null, isSiteOrder: 
         electronicPayments: 0,
         inventoryValue: 0,
         unsoldValue: 0,
-        cashOwed: 0
+        cashOwed: 0,
+        paymentsTurnedIn: 0,
+        cashDue: 0
       },
       $inventoryDisplay: {}, // Net inventory by variety
       $salesByVariety: {},
