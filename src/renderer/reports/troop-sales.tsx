@@ -59,7 +59,7 @@ function OrderSection({
         <h4>{title}</h4>
         {category.hasWarning && (
           <span class="report-status-badge report-status-warning">
-            {category.unallocated} package{category.unallocated === 1 ? '' : 's'} undistributed
+            {category.unallocated} undistributed package{category.unallocated === 1 ? '' : 's'}
             {helpText && (
               <TooltipCell tooltip={helpText} tag="span" className="help-circle">
                 ?
@@ -189,17 +189,22 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
       <div class="report-header-row">
         <h3>Troop Online Orders</h3>
         <span class={`report-status-badge ${hasUnallocated ? 'report-status-warning' : 'report-status-ok'}`}>
-          {hasUnallocated ? 'Needs Attention' : 'Fully Distributed'}
+          {hasUnallocated ? 'Action Required' : 'Fully Distributed'}
         </span>
       </div>
       {banner}
+      {!data.metadata.lastImportDC && (
+        <div class="info-box info-box-warning">
+          <p>Digital Cookie data was not loaded. Online order details may be incomplete.</p>
+        </div>
+      )}
       <StatCards stats={stats} />
       <OrderSection
         title="Girl Delivery"
         category={girlDelivery}
         channel="virtualBooth"
         helpText={
-          'Use Virtual Booth Divider in Smart Cookie (My Troop \u2192 Booth \u2192 My Reservations \u2192 select booth \u2192 "...")'
+          'Use Virtual Booth Divider in Smart Cookie\n(My Troop \u2192 Booth \u2192 My Reservations \u2192 select booth \u2192 "...")'
         }
         orderLookup={orderLookup}
         scouts={data.scouts}
@@ -208,7 +213,7 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
         title="Direct Ship"
         category={directShip}
         channel="directShip"
-        helpText={'Use Troop Direct Ship Orders Divider in Smart Cookie (My Troop \u2192 Booth \u2192 Troop Direct Ship Orders)'}
+        helpText={'Use Troop Direct Ship Orders Divider in Smart Cookie\n(My Troop \u2192 Booth \u2192 Troop Direct Ship Orders)'}
         orderLookup={orderLookup}
         scouts={data.scouts}
       />

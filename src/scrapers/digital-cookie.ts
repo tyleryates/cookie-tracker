@@ -37,7 +37,8 @@ class DigitalCookieScraper extends BaseScraper {
           reportType: 'TROOP_ORDER_REPORT',
           troopId,
           serviceUnitId,
-          councilId
+          councilId,
+          troopGlobalID: this.session.selectedRoleId || ''
         },
         signal
       }
@@ -51,15 +52,18 @@ class DigitalCookieScraper extends BaseScraper {
     }
 
     const responseData = JSON.parse(result.responseData);
-    const fileName = responseData.fileName;
+    const rawFileName = responseData.fileName;
 
-    if (!fileName || responseData.statusCode !== 'Success') {
+    if (!rawFileName || responseData.statusCode !== 'Success') {
       const errMsg = 'Report generation did not return a valid file name';
       this.sendEndpointStatus('dc-troop-report', 'error', false, Date.now() - startTime, undefined, undefined, errMsg);
       throw new Error(errMsg);
     }
 
     this.checkAborted(signal);
+
+    // Sanitize server-provided filename to prevent path traversal in URL
+    const fileName = encodeURIComponent(rawFileName.replace(/[^a-zA-Z0-9._-]/g, '_'));
 
     const downloadResponse = await this.session.authenticatedGet<Buffer>(`/ajaxCall/downloadFile/TROOP_ORDER_REPORT/${fileName}`, {
       responseType: 'arraybuffer',

@@ -12,7 +12,7 @@ const ARRAY_ELEMENT_TYPES: Partial<Record<keyof AppConfig, string>> = {
 };
 
 class ConfigManager {
-  configPath: string;
+  private configPath: string;
 
   constructor(dataDir: string) {
     this.configPath = path.join(dataDir, 'config.json');

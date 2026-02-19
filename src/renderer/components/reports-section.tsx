@@ -26,6 +26,7 @@ interface TabBarProps {
   unified: UnifiedDataset | null;
   appConfig: AppConfig | null;
   todoCount: number;
+  warningCount: number;
   onSelectReport: (type: string) => void;
 }
 
@@ -56,20 +57,10 @@ interface ReportTab {
 const REPORT_TABS: ReportTab[] = [
   { id: 'troop', label: 'Troop', types: ['inventory', 'troop-sales', 'proceeds'] },
   { id: 'scout', label: 'Scout', types: ['summary', 'scout-inventory', 'finance'] },
-  { id: 'booths', label: 'Booths', types: ['completed-booths', 'upcoming-booths', 'available-booths'] },
+  { id: 'booths', label: 'Booths', types: ['completed-booths', 'upcoming-booths'] },
   { id: 'donations', label: 'Donations', types: ['donation-alert'] },
   { id: 'popularity', label: 'Cookie Popularity', types: ['variety'] }
 ];
-
-const TOOL_BUTTONS: { type: string; label: string }[] = [{ type: 'inventory-history', label: 'Inventory History' }];
-
-// Reverse lookup: report type → tab id
-const TYPE_TO_TAB = new Map<string, string>();
-for (const tab of REPORT_TABS) {
-  for (const t of tab.types) {
-    TYPE_TO_TAB.set(t, tab.id);
-  }
-}
 
 // Display names for dropdown items in paired tabs
 const REPORT_TYPE_LABELS: Record<string, string> = {
@@ -81,7 +72,8 @@ const REPORT_TYPE_LABELS: Record<string, string> = {
   finance: 'Cash Report',
   'completed-booths': 'Completed Booths',
   'upcoming-booths': 'Upcoming Booths',
-  'available-booths': 'Booth Finder'
+  'available-booths': 'Booth Finder',
+  'inventory-history': 'Inventory History'
 };
 
 // ============================================================================
@@ -197,19 +189,24 @@ function renderReport({
 // TAB BAR
 // ============================================================================
 
-export function TabBar({ activeReport, unified, appConfig, todoCount, onSelectReport }: TabBarProps) {
+export function TabBar({ activeReport, unified, appConfig, todoCount, warningCount, onSelectReport }: TabBarProps) {
   const hasData = !!unified;
   const hc = unified?.metadata?.healthChecks;
   const unknownTypes = hc?.unknownOrderTypes || 0;
   const isBlocked = unknownTypes > 0;
-  const hasDataHealthIssues =
-    hasData &&
-    hc != null &&
-    (hc.unknownOrderTypes > 0 || hc.unknownPaymentMethods > 0 || hc.unknownTransferTypes > 0 || hc.unknownCookieIds > 0);
-  const visibleTools = TOOL_BUTTONS.filter((btn) => {
-    if (btn.type === 'inventory-history') return appConfig?.inventoryHistoryEnabled;
-    return true;
-  });
+
+  // Dynamically extend tabs based on config
+  const effectiveTabs = useMemo(() => {
+    return REPORT_TABS.map((tab) => {
+      if (tab.id === 'troop' && appConfig?.inventoryHistoryEnabled) {
+        return { ...tab, types: [...tab.types, 'inventory-history'] as [string, ...string[]] };
+      }
+      if (tab.id === 'booths' && appConfig?.availableBoothsEnabled) {
+        return { ...tab, types: [...tab.types, 'available-booths'] as [string, ...string[]] };
+      }
+      return tab;
+    });
+  }, [appConfig?.inventoryHistoryEnabled, appConfig?.availableBoothsEnabled]);
 
   // Compute count badges for dropdown items
   const dropdownCounts = useMemo<Record<string, number>>(() => {
@@ -289,7 +286,7 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, onSelectRe
 
   return (
     <nav class="tab-bar">
-      {REPORT_TABS.map((tab) => {
+      {effectiveTabs.map((tab) => {
         const isActive = activeReport !== null && tab.types.includes(activeReport);
         const isPaired = tab.types.length > 1;
         const disabled = !hasData || isBlocked;
@@ -350,35 +347,18 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, onSelectRe
           </button>
         );
       })}
-      {visibleTools.map((btn, i) => (
-        <button
-          type="button"
-          key={btn.type}
-          class={`tab-bar-item${activeReport === btn.type ? ' active' : ''}`}
-          style={i === 0 ? { marginLeft: 'auto' } : undefined}
-          disabled={!hasData || isBlocked}
-          onClick={() => onSelectReport(btn.type)}
-        >
-          {btn.label}
-        </button>
-      ))}
       <button
         type="button"
         class={`tab-bar-item${activeReport === 'health-check' ? ' active' : ''}`}
-        style={visibleTools.length === 0 ? { marginLeft: 'auto' } : undefined}
+        style={{ marginLeft: 'auto' }}
         disabled={!hasData || isBlocked}
         onClick={() => onSelectReport('health-check')}
       >
         To-Do
-        {todoCount > 0 && <span class="tab-todo-badge">{todoCount}</span>}
-      </button>
-      <button type="button" class={`tab-bar-item${activeReport === 'sync' ? ' active' : ''}`} onClick={() => onSelectReport('sync')}>
-        {hasDataHealthIssues ? (
-          <span class="tab-alert-pill" title="Data health issues">
-            Data {'\u26A0'}
+        {hasData && (
+          <span class={todoCount > 0 ? 'tab-todo-badge' : warningCount > 0 ? 'tab-todo-badge-info' : 'tab-todo-badge-ok'}>
+            {todoCount > 0 ? todoCount : warningCount > 0 ? warningCount : 0}
           </span>
-        ) : (
-          'Data'
         )}
       </button>
     </nav>

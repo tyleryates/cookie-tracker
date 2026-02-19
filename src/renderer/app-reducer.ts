@@ -59,7 +59,7 @@ export type Action =
   | { type: 'BOOTH_REFRESH_FINISHED' }
   | { type: 'UPDATE_BOOTH_LOCATIONS'; boothLocations: UnifiedDataset['boothLocations'] }
   | { type: 'IGNORE_SLOT'; config: AppConfig }
-  | { type: 'WIPE_DATA'; syncState: SyncState }
+  | { type: 'RESET_DATA'; syncState: SyncState }
   | { type: 'UPDATE_DOWNLOADED'; version: string }
   | { type: 'SET_PROFILES'; profiles: ProfileInfo[]; activeProfile: ActiveProfile };
 
@@ -95,12 +95,11 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'UPDATE_CONFIG': {
       if (!state.appConfig) return state;
       const merged = { ...state.appConfig, ...action.patch };
-      return {
-        ...state,
-        appConfig: merged,
-        autoSyncEnabled: merged.autoSyncEnabled ?? state.autoSyncEnabled,
-        autoRefreshBoothsEnabled: merged.autoRefreshBoothsEnabled ?? state.autoRefreshBoothsEnabled
-      };
+      const result: AppState = { ...state, appConfig: merged };
+      if ('autoSyncEnabled' in action.patch) result.autoSyncEnabled = merged.autoSyncEnabled ?? state.autoSyncEnabled;
+      if ('autoRefreshBoothsEnabled' in action.patch)
+        result.autoRefreshBoothsEnabled = merged.autoRefreshBoothsEnabled ?? state.autoRefreshBoothsEnabled;
+      return result;
     }
 
     case 'SET_UNIFIED':
@@ -112,11 +111,23 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'DEFAULT_REPORT':
       return state.activeReport ? state : { ...state, activeReport: 'inventory' };
 
-    case 'TOGGLE_AUTO_SYNC':
-      return { ...state, autoSyncEnabled: isReadOnly(state) ? false : action.enabled };
+    case 'TOGGLE_AUTO_SYNC': {
+      const enabled = isReadOnly(state) ? false : action.enabled;
+      return {
+        ...state,
+        autoSyncEnabled: enabled,
+        ...(state.appConfig && { appConfig: { ...state.appConfig, autoSyncEnabled: enabled } })
+      };
+    }
 
-    case 'TOGGLE_AUTO_REFRESH_BOOTHS':
-      return { ...state, autoRefreshBoothsEnabled: isReadOnly(state) ? false : action.enabled };
+    case 'TOGGLE_AUTO_REFRESH_BOOTHS': {
+      const enabled = isReadOnly(state) ? false : action.enabled;
+      return {
+        ...state,
+        autoRefreshBoothsEnabled: enabled,
+        ...(state.appConfig && { appConfig: { ...state.appConfig, autoRefreshBoothsEnabled: enabled } })
+      };
+    }
 
     case 'SYNC_ENDPOINT_UPDATE': {
       const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };
@@ -161,7 +172,7 @@ export function appReducer(state: AppState, action: Action): AppState {
     case 'IGNORE_SLOT':
       return { ...state, appConfig: action.config };
 
-    case 'WIPE_DATA':
+    case 'RESET_DATA':
       return { ...state, unified: null, appConfig: null, activeReport: null, syncState: action.syncState };
 
     case 'UPDATE_DOWNLOADED':

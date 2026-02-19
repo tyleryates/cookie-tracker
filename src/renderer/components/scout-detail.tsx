@@ -3,11 +3,19 @@
 import type preact from 'preact';
 import { useState } from 'preact/hooks';
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
-import type { Order, Scout, Varieties } from '../../types';
+import type { Allocation, Order, Scout, Varieties } from '../../types';
 import { buildVarietyTooltip, formatShortDate, formatTimeRange } from '../format-utils';
 import { buildOrderTooltip, getStatusStyle, isActionRequired } from '../order-helpers';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
+
+/** Sum varieties across multiple allocations into a single Varieties map */
+function accumulateVarieties(allocations: Allocation[]): Varieties {
+  const result: Varieties = {};
+  for (const a of allocations)
+    for (const [v, n] of Object.entries(a.varieties)) result[v as keyof Varieties] = (result[v as keyof Varieties] || 0) + (n || 0);
+  return result;
+}
 
 /** Render a packages cell with variety tooltip if available */
 function PackagesCell({ varieties, packages }: { varieties: Varieties; packages: number }) {
@@ -50,10 +58,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
   // Virtual booth: single summary row (divider is aggregate, not per-order)
   if (vbAllocs.length > 0) {
     const vbTotal = vbAllocs.reduce((sum, a) => sum + a.packages + (a.donations || 0), 0);
-    const vbVarieties: Varieties = {};
-    for (const a of vbAllocs)
-      for (const [v, n] of Object.entries(a.varieties))
-        vbVarieties[v as keyof Varieties] = (vbVarieties[v as keyof Varieties] || 0) + (n || 0);
+    const vbVarieties = accumulateVarieties(vbAllocs);
     rows.push(
       <tr key="vb">
         <td class="muted-text">{'\u2014'}</td>
@@ -67,10 +72,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
   // Direct ship: single summary row (divider is aggregate, not per-order)
   if (dsAllocs.length > 0) {
     const dsTotal = dsAllocs.reduce((sum, a) => sum + a.packages + (a.donations || 0), 0);
-    const dsVarieties: Varieties = {};
-    for (const a of dsAllocs)
-      for (const [v, n] of Object.entries(a.varieties))
-        dsVarieties[v as keyof Varieties] = (dsVarieties[v as keyof Varieties] || 0) + (n || 0);
+    const dsVarieties = accumulateVarieties(dsAllocs);
     rows.push(
       <tr key="ds">
         <td class="muted-text">{'\u2014'}</td>

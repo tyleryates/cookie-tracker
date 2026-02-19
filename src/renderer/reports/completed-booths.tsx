@@ -158,7 +158,7 @@ function NeedsDistributionSection({ booths, hasBoothSaleWarning }: { booths: Boo
       <div class="report-header-row" style={{ marginTop: '20px', marginBottom: '8px' }}>
         <h4>Needs Distribution</h4>
         <span class="report-status-badge report-status-warning">
-          {booths.length} booth{booths.length === 1 ? '' : 's'} need distribution
+          {totalNeedsDist} item{totalNeedsDist === 1 ? '' : 's'} {totalNeedsDist === 1 ? 'needs' : 'need'} attention
           <TooltipCell
             tooltip={'Distribute in Smart Cookie\n(Booth \u2192 My Reservations \u2192 booth row \u2192 "...")'}
             tag="span"
@@ -234,7 +234,7 @@ export function CompletedBoothsReport({ data, banner }: { data: UnifiedDataset; 
       <div class="report-header-row">
         <h3>Completed Booths</h3>
         <span class={`report-status-badge ${hasWarning ? 'report-status-warning' : 'report-status-ok'}`}>
-          {hasWarning ? 'Needs Attention' : 'Fully Distributed'}
+          {hasWarning ? 'Action Required' : 'Fully Distributed'}
         </span>
       </div>
       {banner}

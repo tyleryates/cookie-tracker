@@ -9,7 +9,7 @@
 import { ALLOCATION_CHANNEL, DC_COLUMNS, DC_PAYMENT_STATUS, ORDER_TYPE, OWNER, SPECIAL_IDENTIFIERS, TRANSFER_CATEGORY } from './constants';
 import type { DataStore } from './data-store';
 import Logger from './logger';
-import type { Transfer } from './types';
+import type { BoothLocation, Transfer } from './types';
 
 /** Get a real scout name from the store, or a fallback */
 function anyScoutName(store: DataStore): string {
@@ -36,21 +36,41 @@ function siteScoutName(store: DataStore): string {
   return `${SPECIAL_IDENTIFIERS.TROOP_FIRSTNAME_PREFIX}${troopNum} ${SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME}`;
 }
 
+/** Build a synthetic DC row for injection */
+function makeDCRow(
+  store: DataStore,
+  orderNum: string,
+  opts: { site?: boolean; orderType?: string; packages?: string; amount?: string; status?: string; payment?: string; donation?: string }
+) {
+  const name = opts.site ? siteScoutName(store) : anyScoutName(store);
+  const parts = name.split(' ');
+  return {
+    [DC_COLUMNS.ORDER_NUMBER]: orderNum,
+    [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || (opts.site ? 'TroopDebug' : 'Debug'),
+    [DC_COLUMNS.GIRL_LAST_NAME]: opts.site ? SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME : parts.slice(1).join(' ') || 'Scout',
+    [DC_COLUMNS.ORDER_DATE]: TODAY,
+    [DC_COLUMNS.ORDER_TYPE]: opts.orderType ?? 'In-Person Delivery',
+    [DC_COLUMNS.TOTAL_PACKAGES]: opts.packages ?? '2',
+    [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
+    [DC_COLUMNS.CURRENT_SALE_AMOUNT]: opts.amount ?? '12',
+    [DC_COLUMNS.ORDER_STATUS]: opts.status ?? 'Completed',
+    [DC_COLUMNS.PAYMENT_STATUS]: opts.payment ?? DC_PAYMENT_STATUS.CASH,
+    [DC_COLUMNS.DONATION]: opts.donation ?? '0'
+  };
+}
+
 const TODAY = new Date().toISOString().slice(0, 10);
 
 function log(msg: string): void {
   Logger.debug(`[Debug] ${msg}`);
 }
 
-export function applyDebugMutations(store: DataStore): void {
+/** 1. Inject Needs Approval + Pending order statuses → red/yellow pills in Scout Inventory detail */
+function mutateOrderStatuses(store: DataStore): number {
   let n = 0;
-
-  // =========================================================================
-  // 1. Needs Approval + Pending order statuses
-  //    → Red/yellow pills in Scout Inventory detail
-  // =========================================================================
   let setNA = false;
   let setPending = false;
+
   for (const order of store.orders.values()) {
     if (order.owner !== OWNER.GIRL) continue;
     if (order.orderType !== ORDER_TYPE.DELIVERY && order.orderType !== ORDER_TYPE.IN_HAND) continue;
@@ -72,51 +92,21 @@ export function applyDebugMutations(store: DataStore): void {
     }
   }
 
-  // Fallback: inject synthetic DC rows that the build will classify as DELIVERY with the right status
   if (!setNA) {
-    const scout = anyScoutName(store);
-    const parts = scout.split(' ');
-    store.rawDCData.push({
-      [DC_COLUMNS.ORDER_NUMBER]: 'DEBUG-NA-001',
-      [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || 'Debug',
-      [DC_COLUMNS.GIRL_LAST_NAME]: parts.slice(1).join(' ') || 'Scout',
-      [DC_COLUMNS.ORDER_DATE]: TODAY,
-      [DC_COLUMNS.ORDER_TYPE]: 'In-Person Delivery',
-      [DC_COLUMNS.TOTAL_PACKAGES]: '2',
-      [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
-      [DC_COLUMNS.CURRENT_SALE_AMOUNT]: '12',
-      [DC_COLUMNS.ORDER_STATUS]: 'Needs Approval for Delivery',
-      [DC_COLUMNS.PAYMENT_STATUS]: DC_PAYMENT_STATUS.CASH,
-      [DC_COLUMNS.DONATION]: '0'
-    });
+    store.rawDCData.push(makeDCRow(store, 'DEBUG-NA-001', { status: 'Needs Approval for Delivery' }));
     n++;
     log('Injected synthetic "Needs Approval" DC order');
   }
   if (!setPending) {
-    const scout = anyScoutName(store);
-    const parts = scout.split(' ');
-    store.rawDCData.push({
-      [DC_COLUMNS.ORDER_NUMBER]: 'DEBUG-PD-001',
-      [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || 'Debug',
-      [DC_COLUMNS.GIRL_LAST_NAME]: parts.slice(1).join(' ') || 'Scout',
-      [DC_COLUMNS.ORDER_DATE]: TODAY,
-      [DC_COLUMNS.ORDER_TYPE]: 'In-Person Delivery',
-      [DC_COLUMNS.TOTAL_PACKAGES]: '2',
-      [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
-      [DC_COLUMNS.CURRENT_SALE_AMOUNT]: '12',
-      [DC_COLUMNS.ORDER_STATUS]: 'Approved for Delivery',
-      [DC_COLUMNS.PAYMENT_STATUS]: DC_PAYMENT_STATUS.CASH,
-      [DC_COLUMNS.DONATION]: '0'
-    });
+    store.rawDCData.push(makeDCRow(store, 'DEBUG-PD-001', { status: 'Approved for Delivery' }));
     n++;
     log('Injected synthetic "Pending" DC order');
   }
+  return n;
+}
 
-  // =========================================================================
-  // 2. Negative scout inventory
-  //    → "Scouts are missing cookies" alert badge, warning box + red cells
-  // =========================================================================
-  let zeroedTransfer = false;
+/** 2. Create negative scout inventory → alert badge, warning box + red cells */
+function mutateNegativeInventory(store: DataStore): number {
   for (const transfer of store.transfers) {
     if (transfer.category !== TRANSFER_CATEGORY.GIRL_PICKUP) continue;
     if (transfer.physicalPackages <= 0) continue;
@@ -131,37 +121,17 @@ export function applyDebugMutations(store: DataStore): void {
     if (transfer.physicalVarieties[firstVariety]) {
       transfer.physicalVarieties[firstVariety] = 0;
     }
-    zeroedTransfer = true;
-    n++;
     log(`Zeroed ${firstVariety} (${removed} pkgs) on T2G transfer to ${transfer.to}`);
-    break;
+    return 1;
   }
 
-  if (!zeroedTransfer) {
-    // Inject a DC order for a scout who has no T2G inventory → negative inventory
-    const scout = anyScoutName(store);
-    const parts = scout.split(' ');
-    store.rawDCData.push({
-      [DC_COLUMNS.ORDER_NUMBER]: 'DEBUG-NEG-001',
-      [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || 'Debug',
-      [DC_COLUMNS.GIRL_LAST_NAME]: parts.slice(1).join(' ') || 'Scout',
-      [DC_COLUMNS.ORDER_DATE]: TODAY,
-      [DC_COLUMNS.ORDER_TYPE]: 'In-Person Delivery',
-      [DC_COLUMNS.TOTAL_PACKAGES]: '5',
-      [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
-      [DC_COLUMNS.CURRENT_SALE_AMOUNT]: '30',
-      [DC_COLUMNS.ORDER_STATUS]: 'Completed',
-      [DC_COLUMNS.PAYMENT_STATUS]: DC_PAYMENT_STATUS.CASH,
-      [DC_COLUMNS.DONATION]: '0'
-    });
-    n++;
-    log('Injected synthetic order to create negative inventory');
-  }
+  store.rawDCData.push(makeDCRow(store, 'DEBUG-NEG-001', { packages: '5', amount: '30' }));
+  log('Injected synthetic order to create negative inventory');
+  return 1;
+}
 
-  // =========================================================================
-  // 3. Unknown transfer type
-  //    → health check: unknownTransferTypes
-  // =========================================================================
+/** 3. Inject unknown transfer type → health check warning */
+function mutateUnknownTransferType(store: DataStore): number {
   const fakeTransfer: Transfer = {
     type: 'XYZZY' as Transfer['type'],
     category: TRANSFER_CATEGORY.GIRL_PICKUP as Transfer['category'],
@@ -175,201 +145,109 @@ export function applyDebugMutations(store: DataStore): void {
     physicalVarieties: {}
   };
   store.transfers.push(fakeTransfer);
-  n++;
   log('Pushed transfer with unknown type "XYZZY"');
+  return 1;
+}
 
-  // =========================================================================
-  // 4b. Unknown payment method
-  //     → health check: unknownPaymentMethods
-  // =========================================================================
-  let changedPayment = false;
+/** 4. Inject unknown payment method → health check warning */
+function mutateUnknownPayment(store: DataStore): number {
   for (const row of store.rawDCData) {
     if (row[DC_COLUMNS.PAYMENT_STATUS]) {
       row[DC_COLUMNS.PAYMENT_STATUS] = 'BITCOIN';
-      changedPayment = true;
-      n++;
       log(`Changed Payment Status → "BITCOIN" on order ${row[DC_COLUMNS.ORDER_NUMBER]}`);
-      break;
+      return 1;
     }
   }
-  if (!changedPayment) {
-    const scout = anyScoutName(store);
-    const parts = scout.split(' ');
-    store.rawDCData.push({
-      [DC_COLUMNS.ORDER_NUMBER]: 'DEBUG-PAY-001',
-      [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || 'Debug',
-      [DC_COLUMNS.GIRL_LAST_NAME]: parts.slice(1).join(' ') || 'Scout',
-      [DC_COLUMNS.ORDER_DATE]: TODAY,
-      [DC_COLUMNS.ORDER_TYPE]: 'In-Person Delivery',
-      [DC_COLUMNS.TOTAL_PACKAGES]: '1',
-      [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
-      [DC_COLUMNS.CURRENT_SALE_AMOUNT]: '6',
-      [DC_COLUMNS.ORDER_STATUS]: 'Completed',
-      [DC_COLUMNS.PAYMENT_STATUS]: 'BITCOIN',
-      [DC_COLUMNS.DONATION]: '0'
-    });
-    n++;
-    log('Injected synthetic DC row with payment "BITCOIN"');
-  }
+  store.rawDCData.push(makeDCRow(store, 'DEBUG-PAY-001', { packages: '1', amount: '6', payment: 'BITCOIN' }));
+  log('Injected synthetic DC row with payment "BITCOIN"');
+  return 1;
+}
 
-  // =========================================================================
-  // 6. Unallocated Troop Girl Delivery
-  //    → "Unallocated troop orders" alert, info box on Troop Online Orders
-  //    girlDelivery.allocated comes from VIRTUAL_BOOTH_ALLOCATION transfers
-  // =========================================================================
-  let removedVB = false;
+/** 6. Unallocated Troop Girl Delivery → alert + info box on Troop Online Orders */
+function mutateUnallocatedGirlDelivery(store: DataStore): number {
   for (let i = store.transfers.length - 1; i >= 0; i--) {
     if (store.transfers[i].category === TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) {
       log(`Removed VIRTUAL_BOOTH_ALLOCATION transfer to ${store.transfers[i].to}`);
       store.transfers.splice(i, 1);
-      removedVB = true;
-      n++;
-      break;
+      return 1;
     }
   }
-  if (!removedVB) {
-    // No VB allocation to remove — inject a site DELIVERY order with no matching allocation
-    const site = siteScoutName(store);
-    const parts = site.split(' ');
-    store.rawDCData.push({
-      [DC_COLUMNS.ORDER_NUMBER]: 'DEBUG-GD-001',
-      [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || 'TroopDebug',
-      [DC_COLUMNS.GIRL_LAST_NAME]: SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME,
-      [DC_COLUMNS.ORDER_DATE]: TODAY,
-      [DC_COLUMNS.ORDER_TYPE]: 'In-Person Delivery',
-      [DC_COLUMNS.TOTAL_PACKAGES]: '3',
-      [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
-      [DC_COLUMNS.CURRENT_SALE_AMOUNT]: '18',
-      [DC_COLUMNS.ORDER_STATUS]: 'Completed',
-      [DC_COLUMNS.PAYMENT_STATUS]: DC_PAYMENT_STATUS.CAPTURED,
-      [DC_COLUMNS.DONATION]: '0'
-    });
-    n++;
-    log('Injected synthetic site DELIVERY order (unallocated girl delivery)');
-  }
+  store.rawDCData.push(makeDCRow(store, 'DEBUG-GD-001', { site: true, packages: '3', amount: '18', payment: DC_PAYMENT_STATUS.CAPTURED }));
+  log('Injected synthetic site DELIVERY order (unallocated girl delivery)');
+  return 1;
+}
 
-  // =========================================================================
-  // 7. Unallocated Troop Direct Ship
-  //    → "Unallocated troop orders" alert
-  //    directShip.allocated comes from store.allocations with DIRECT_SHIP channel
-  // =========================================================================
-  let removedDS = false;
+/** 7. Unallocated Troop Direct Ship → alert */
+function mutateUnallocatedDirectShip(store: DataStore): number {
   for (let i = store.allocations.length - 1; i >= 0; i--) {
     if (store.allocations[i].channel === ALLOCATION_CHANNEL.DIRECT_SHIP) {
       log(`Removed DIRECT_SHIP allocation for girl ${store.allocations[i].girlId}`);
       store.allocations.splice(i, 1);
-      removedDS = true;
-      n++;
-      break;
+      return 1;
     }
   }
-  if (!removedDS) {
-    // Inject a site DIRECT_SHIP order with no matching allocation
-    const site = siteScoutName(store);
-    const parts = site.split(' ');
-    store.rawDCData.push({
-      [DC_COLUMNS.ORDER_NUMBER]: 'DEBUG-DS-001',
-      [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || 'TroopDebug',
-      [DC_COLUMNS.GIRL_LAST_NAME]: SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME,
-      [DC_COLUMNS.ORDER_DATE]: TODAY,
-      [DC_COLUMNS.ORDER_TYPE]: 'Shipped by Girl Scouts',
-      [DC_COLUMNS.TOTAL_PACKAGES]: '2',
-      [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
-      [DC_COLUMNS.CURRENT_SALE_AMOUNT]: '12',
-      [DC_COLUMNS.ORDER_STATUS]: 'Shipped',
-      [DC_COLUMNS.PAYMENT_STATUS]: DC_PAYMENT_STATUS.CAPTURED,
-      [DC_COLUMNS.DONATION]: '0'
-    });
-    n++;
-    log('Injected synthetic site DIRECT_SHIP order (unallocated direct ship)');
-  }
+  store.rawDCData.push(
+    makeDCRow(store, 'DEBUG-DS-001', {
+      site: true,
+      orderType: 'Shipped by Girl Scouts',
+      status: 'Shipped',
+      payment: DC_PAYMENT_STATUS.CAPTURED
+    })
+  );
+  log('Injected synthetic site DIRECT_SHIP order (unallocated direct ship)');
+  return 1;
+}
 
-  // =========================================================================
-  // 8. Unallocated Booth Sale
-  //    → "Unallocated troop orders" alert, warning on Completed Booths
-  //    boothSale.allocated comes from store.allocations with BOOTH channel
-  // =========================================================================
-  let removedBooth = false;
+/** 8. Unallocated Booth Sale → alert + warning on Completed Booths */
+function mutateUnallocatedBoothSale(store: DataStore): number {
   for (let i = store.allocations.length - 1; i >= 0; i--) {
     if (store.allocations[i].channel === ALLOCATION_CHANNEL.BOOTH) {
       log(`Removed BOOTH allocation for girl ${store.allocations[i].girlId}`);
       store.allocations.splice(i, 1);
-      removedBooth = true;
-      n++;
-      break;
+      return 1;
     }
   }
-  if (!removedBooth) {
-    // Inject a site BOOTH order with no matching allocation
-    // DC "Cookies in Hand" + Site lastname → classified as BOOTH
-    const site = siteScoutName(store);
-    const parts = site.split(' ');
-    store.rawDCData.push({
-      [DC_COLUMNS.ORDER_NUMBER]: 'DEBUG-BS-001',
-      [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || 'TroopDebug',
-      [DC_COLUMNS.GIRL_LAST_NAME]: SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME,
-      [DC_COLUMNS.ORDER_DATE]: TODAY,
-      [DC_COLUMNS.ORDER_TYPE]: 'Cookies in Hand',
-      [DC_COLUMNS.TOTAL_PACKAGES]: '4',
-      [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
-      [DC_COLUMNS.CURRENT_SALE_AMOUNT]: '24',
-      [DC_COLUMNS.ORDER_STATUS]: 'Completed',
-      [DC_COLUMNS.PAYMENT_STATUS]: DC_PAYMENT_STATUS.CASH,
-      [DC_COLUMNS.DONATION]: '0'
-    });
-    n++;
-    log('Injected synthetic site BOOTH order (unallocated booth sale)');
-  }
+  store.rawDCData.push(makeDCRow(store, 'DEBUG-BS-001', { site: true, orderType: 'Cookies in Hand', packages: '4', amount: '24' }));
+  log('Injected synthetic site BOOTH order (unallocated booth sale)');
+  return 1;
+}
 
-  // =========================================================================
-  // 9. Booth needs distribution
-  //    → "Booths need distribution" alert, "Needs Distribution" pill
-  //    countBoothsNeedingDistribution counts past booths with isDistributed=false
-  // =========================================================================
-  let flippedBooth = false;
+/** 9. Booth needs distribution → alert + "Needs Distribution" pill */
+function mutateBoothNeedsDistribution(store: DataStore): number {
   for (const res of store.boothReservations) {
     if (res.booth.reservationType?.toLowerCase().includes('virtual')) continue;
     if (res.booth.isDistributed) {
       res.booth.isDistributed = false;
-      flippedBooth = true;
-      n++;
       log(`Set isDistributed=false on booth "${res.booth.storeName}"`);
-      break;
+      return 1;
     }
   }
-  if (!flippedBooth) {
-    // Inject a synthetic past booth reservation that's not distributed
-    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-    store.boothReservations.push({
-      id: 'DEBUG-BOOTH-001',
-      troopId: store.troopNumber || '0000',
-      booth: {
-        boothId: 'debug-booth',
-        storeName: 'Debug Store',
-        address: '123 Debug St',
-        reservationType: 'FCFS',
-        isDistributed: false,
-        isVirtuallyDistributed: false
-      },
-      timeslot: { date: yesterday, startTime: '10:00', endTime: '14:00' },
-      cookies: { THIN_MINTS: 5 },
-      totalPackages: 5,
-      physicalPackages: 5,
-      trackedCookieShare: 0
-    });
-    n++;
-    log('Injected synthetic past booth reservation (needs distribution)');
-  }
 
-  // =========================================================================
-  // 10. Donations need adjustment
-  //     → "Donations need adjustment" alert, adjustment rows on Donations report
-  //     reconciled = (dcManualEntry === scManualEntries)
-  //     Strategy: reduce SC manual entries to create mismatch
-  // =========================================================================
-  // The global reconciliation uses COOKIE_SHARE_RECORD transfers (scManualEntries).
-  // The per-scout "Entered in SC" column uses virtualCookieShareAllocations (girlId → count).
-  // We need to reduce BOTH to make the badge AND the per-row adjustment visible.
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  store.boothReservations.push({
+    id: 'DEBUG-BOOTH-001',
+    troopId: store.troopNumber || '0000',
+    booth: {
+      boothId: 'debug-booth',
+      storeName: 'Debug Store',
+      address: '123 Debug St',
+      reservationType: 'FCFS',
+      isDistributed: false,
+      isVirtuallyDistributed: false
+    },
+    timeslot: { date: yesterday, startTime: '10:00', endTime: '14:00' },
+    cookies: { THIN_MINTS: 5 },
+    totalPackages: 5,
+    physicalPackages: 5,
+    trackedCookieShare: 0
+  });
+  log('Injected synthetic past booth reservation (needs distribution)');
+  return 1;
+}
+
+/** 10. Donations need adjustment → alert + adjustment rows on Donations report */
+function mutateDonationReconciliation(store: DataStore): number {
+  let n = 0;
 
   // 10a. Reduce a virtualCookieShareAllocations entry → per-scout adjustment becomes non-zero
   let reducedVCS = false;
@@ -400,25 +278,51 @@ export function applyDebugMutations(store: DataStore): void {
 
   // Fallback: if neither source had data, inject a DC order with manual donations and no SC match
   if (!adjustedDonation && !reducedVCS) {
-    const scout = anyScoutName(store);
-    const parts = scout.split(' ');
-    store.rawDCData.push({
-      [DC_COLUMNS.ORDER_NUMBER]: 'DEBUG-DON-001',
-      [DC_COLUMNS.GIRL_FIRST_NAME]: parts[0] || 'Debug',
-      [DC_COLUMNS.GIRL_LAST_NAME]: parts.slice(1).join(' ') || 'Scout',
-      [DC_COLUMNS.ORDER_DATE]: TODAY,
-      [DC_COLUMNS.ORDER_TYPE]: 'In-Person Delivery',
-      [DC_COLUMNS.TOTAL_PACKAGES]: '3',
-      [DC_COLUMNS.REFUNDED_PACKAGES]: '0',
-      [DC_COLUMNS.CURRENT_SALE_AMOUNT]: '18',
-      [DC_COLUMNS.ORDER_STATUS]: 'Completed',
-      [DC_COLUMNS.PAYMENT_STATUS]: DC_PAYMENT_STATUS.CASH,
-      [DC_COLUMNS.DONATION]: '2'
-    });
-    // No matching SC record → dcManualEntry=2, scManualEntries=0 → not reconciled
+    store.rawDCData.push(makeDCRow(store, 'DEBUG-DON-001', { packages: '3', amount: '18', donation: '2' }));
     n++;
     log('Injected synthetic DC order with 2 manual-entry donations (no SC match)');
   }
+  return n;
+}
 
+/** 11. Available booth slots → slots appear in Available Booths report and tab badge count */
+function mutateAvailableBooths(store: DataStore): number {
+  const tomorrow = new Date(Date.now() + 86_400_000);
+  const dayAfter = new Date(Date.now() + 2 * 86_400_000);
+  const toDateStr = (d: Date) => d.toISOString().slice(0, 10);
+  const fakeBooth: BoothLocation = {
+    id: 99999,
+    storeName: 'Debug Grocery (Fake Booth)',
+    address: { street: '456 Test Ave', city: 'Testville', state: 'CA', zip: '90210', latitude: 34.09, longitude: -118.41 },
+    reservationType: 'FCFS',
+    notes: 'Injected by debug mutations',
+    availableDates: [
+      {
+        date: toDateStr(tomorrow),
+        timeSlots: [
+          { startTime: '10:00', endTime: '14:00' },
+          { startTime: '14:00', endTime: '18:00' }
+        ]
+      },
+      { date: toDateStr(dayAfter), timeSlots: [{ startTime: '10:00', endTime: '14:00' }] }
+    ]
+  };
+  store.boothLocations.push(fakeBooth);
+  log(`Injected fake booth "${fakeBooth.storeName}" with 3 available slots`);
+  return 1;
+}
+
+export function applyDebugMutations(store: DataStore): void {
+  let n = 0;
+  n += mutateOrderStatuses(store);
+  n += mutateNegativeInventory(store);
+  n += mutateUnknownTransferType(store);
+  n += mutateUnknownPayment(store);
+  n += mutateUnallocatedGirlDelivery(store);
+  n += mutateUnallocatedDirectShip(store);
+  n += mutateUnallocatedBoothSale(store);
+  n += mutateBoothNeedsDistribution(store);
+  n += mutateDonationReconciliation(store);
+  n += mutateAvailableBooths(store);
   Logger.info(`[Debug] Applied ${n} debug mutations to DataStore`);
 }

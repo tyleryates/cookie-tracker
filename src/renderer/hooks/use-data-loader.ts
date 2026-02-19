@@ -1,4 +1,4 @@
-// useDataLoader — data loading, recalculation, export
+// useDataLoader — data loading, export, debug injection
 
 import { useCallback } from 'preact/hooks';
 import Logger from '../../logger';
@@ -48,10 +48,6 @@ export function useDataLoader(
     [dispatch, showStatus]
   );
 
-  const recalculate = useCallback(() => {
-    loadData({ showMessages: true });
-  }, [loadData]);
-
   const exportData = useCallback(async () => {
     try {
       const result = await ipcInvoke('export-data');
@@ -77,5 +73,5 @@ export function useDataLoader(
     }
   }, [dispatch, showStatus]);
 
-  return { loadData, recalculate, exportData, injectDebug };
+  return { loadData, exportData, injectDebug };
 }

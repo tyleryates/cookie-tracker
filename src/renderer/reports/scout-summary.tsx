@@ -129,12 +129,27 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
 
   const COLUMN_COUNT = 9;
 
+  let totalNeedsApproval = 0;
+  for (const [, scout] of sortedScouts) {
+    totalNeedsApproval += scout.totals.$orderStatusCounts.needsApproval;
+  }
+
   return (
     <div class="report-visual">
       <div class="report-header-row">
         <h3>Scout Sales Summary</h3>
+        {totalNeedsApproval > 0 && (
+          <span class="report-status-badge report-status-info">
+            {`${totalNeedsApproval} order${totalNeedsApproval === 1 ? ' needs' : 's need'} approval`}
+          </span>
+        )}
       </div>
       {banner}
+      {!data.metadata.lastImportDC && (
+        <div class="info-box info-box-warning">
+          <p>Digital Cookie data was not loaded. Scout sales data may be incomplete.</p>
+        </div>
+      )}
       <StatCards stats={stats} />
       <DataTable
         columns={['Scout', 'Orders', 'Delivered', 'In Person', 'Shipped', 'Credits', 'Total', 'Cash Collected', 'Digital Payments']}
@@ -154,8 +169,10 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
               cells={[
                 orderTooltip ? (
                   <TooltipCell tooltip={orderTooltip} tag="span">
-                    <span class={orderClass}>{scout.orders.length}</span>
-                    {scout.totals.$orderStatusCounts.needsApproval > 0 && <span class="inline-alert-pill">{'\u26A0'}</span>}
+                    <span class={`inline-alert-anchor ${orderClass}`}>
+                      {scout.orders.length}
+                      {scout.totals.$orderStatusCounts.needsApproval > 0 && <span class="inline-alert-pill">{'\u26A0'}</span>}
+                    </span>
                   </TooltipCell>
                 ) : (
                   <span class={orderClass}>{scout.orders.length}</span>

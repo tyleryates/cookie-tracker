@@ -603,7 +603,6 @@ export interface IpcChannelMap {
   'load-config': { request: undefined; response: AppConfig };
   'update-config': { request: Partial<AppConfig>; response: AppConfig };
   'scrape-websites': { request: undefined; response: ScrapeResults };
-  'cancel-sync': { request: undefined; response: undefined };
   'refresh-booth-locations': { request: undefined; response: BoothLocation[] };
   'fetch-booth-catalog': { request: undefined; response: BoothLocation[] };
   'export-data': { request: undefined; response: { path: string } | null };
@@ -633,10 +632,6 @@ export interface IpcChannelMap {
     request: undefined;
     response: undefined;
   };
-  'wipe-data': {
-    request: undefined;
-    response: undefined;
-  };
   'quit-and-install': {
     request: undefined;
     response: undefined;
@@ -647,6 +642,14 @@ export interface IpcChannelMap {
   };
   'send-imessage': {
     request: { recipient: string; message: string };
+    response: undefined;
+  };
+  'set-dock-badge': {
+    request: { count: number };
+    response: undefined;
+  };
+  'log-message': {
+    request: string;
     response: undefined;
   };
 }

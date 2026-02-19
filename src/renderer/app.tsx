@@ -1,18 +1,24 @@
 // App — Root Preact component. Owns all state, delegates logic to hooks.
 
-import { useCallback, useMemo, useReducer, useRef } from 'preact/hooks';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
 import Logger from '../logger';
 import { type AppConfig, type ProfilesConfig, toActiveProfile } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { ReportContent, TabBar } from './components/reports-section';
-import { SettingsPage } from './components/settings-page';
-import { computeGroupStatuses, createInitialSyncState, type GroupStatus, SyncTab } from './components/sync-section';
+import { SettingsPage, SettingsToggles } from './components/settings-page';
+import {
+  computeGroupStatuses,
+  createInitialSyncState,
+  DataHealthChecks,
+  type GroupStatus,
+  SyncStatusSection
+} from './components/sync-section';
 import { loadAppConfig } from './data-loader';
-import { countBoothsNeedingDistribution, DateFormatter } from './format-utils';
+import { countBoothsNeedingDistribution, DateFormatter, getActiveScouts } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
-import { encodeSlotKey } from './reports/available-booths-utils';
+import { encodeSlotKey, summarizeAvailableSlots } from './reports/available-booths-utils';
 import { HealthCheckReport } from './reports/health-check';
 
 const initialState: AppState = {
@@ -43,7 +49,7 @@ function SyncPill({ label, group }: { label: string; group: GroupStatus }) {
     statusText = 'Failed';
     modifier = 'error';
   } else if (group.lastSync) {
-    statusText = DateFormatter.toFriendly(group.lastSync);
+    statusText = DateFormatter.toRelativeTimestamp(group.lastSync);
   } else {
     return null;
   }
@@ -112,7 +118,7 @@ export function App() {
 
   // Hook chain
   const { showStatus } = useStatusMessage(dispatch, state.statusMessage);
-  const { loadData, recalculate, exportData, injectDebug } = useDataLoader(dispatch, showStatus);
+  const { loadData, exportData, injectDebug } = useDataLoader(dispatch, showStatus);
   const { sync, refreshBooths } = useSync(
     dispatch,
     showStatus,
@@ -194,12 +200,6 @@ export function App() {
     showStatus('Ignored time slots cleared', 'success');
   }, [showStatus]);
 
-  const handleWipeData = useCallback(async () => {
-    await ipcInvoke('wipe-data');
-    dispatch({ type: 'WIPE_DATA', syncState: createInitialSyncState() });
-    showStatus('Data wiped', 'success');
-  }, [showStatus]);
-
   const handleIgnoreSlot = useCallback(async (boothId: number, date: string, startTime: string) => {
     const config = stateRef.current.appConfig;
     const ignored = [...(config?.ignoredTimeSlots || []), encodeSlotKey(boothId, date, startTime)];
@@ -225,7 +225,7 @@ export function App() {
   );
 
   const reloadAfterSwitch = useCallback(async () => {
-    dispatch({ type: 'WIPE_DATA', syncState: createInitialSyncState() });
+    dispatch({ type: 'RESET_DATA', syncState: createInitialSyncState() });
 
     // Hydrate the new profile's endpoint timestamps
     try {
@@ -301,17 +301,37 @@ export function App() {
   );
 
   const groups = useMemo(() => computeGroupStatuses(state.syncState.endpoints, state.syncState), [state.syncState]);
-  const todoCount = useMemo(() => {
+  const availableSlotCount = useMemo(() => {
     const u = state.unified;
-    if (!u) return 0;
-    let count = 0;
-    if (u.siteOrders.girlDelivery.hasWarning) count++;
-    if (u.siteOrders.directShip.hasWarning) count++;
-    if (u.siteOrders.boothSale.hasWarning || countBoothsNeedingDistribution(u.boothReservations) > 0) count++;
-    if (u.troopTotals.scouts.withNegativeInventory > 0) count++;
-    if (!u.cookieShare.reconciled) count++;
-    return count;
-  }, [state.unified]);
+    const c = state.appConfig;
+    if (!u?.boothLocations) return 0;
+    const filters = c?.boothDayFilters || [];
+    const ignored = c?.ignoredTimeSlots || [];
+    return summarizeAvailableSlots(u.boothLocations, filters, ignored).reduce((sum, b) => sum + b.slotCount, 0);
+  }, [state.unified, state.appConfig]);
+
+  const { todoCount, warningCount } = useMemo(() => {
+    const u = state.unified;
+    if (!u) return { todoCount: 0, warningCount: 0 };
+    let todos = 0;
+    // Action items
+    if (!u.metadata.lastImportDC) todos++;
+    if (u.siteOrders.girlDelivery.hasWarning) todos++;
+    if (u.siteOrders.directShip.hasWarning) todos++;
+    if (u.siteOrders.boothSale.hasWarning || countBoothsNeedingDistribution(u.boothReservations) > 0) todos++;
+    if (!u.cookieShare.reconciled) todos++;
+    if (availableSlotCount > 0) todos++;
+    // Warnings (informational, not action-required)
+    let warnings = 0;
+    if (u.troopTotals.scouts.withNegativeInventory > 0) warnings++;
+    if (getActiveScouts(u.scouts).some(([, s]) => s.totals.$orderStatusCounts.needsApproval > 0)) warnings++;
+    return { todoCount: todos, warningCount: warnings };
+  }, [state.unified, availableSlotCount]);
+
+  useEffect(() => {
+    ipcInvoke('set-dock-badge', { count: todoCount }).catch(() => {});
+  }, [todoCount]);
+
   const isWelcome = state.activePage === 'welcome';
   const readOnly = !!state.activeProfile && !state.activeProfile.isDefault;
 
@@ -348,44 +368,50 @@ export function App() {
           unified={state.unified}
           appConfig={state.appConfig}
           todoCount={todoCount}
+          warningCount={warningCount}
           onSelectReport={handleSelectReport}
         />
       )}
       <div class="app-content" ref={contentRef}>
         {isWelcome || state.activeReport === 'settings' ? (
-          <SettingsPage
-            mode={isWelcome ? 'welcome' : 'settings'}
-            appConfig={state.appConfig}
-            autoSyncEnabled={state.autoSyncEnabled}
-            autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
-            readOnly={readOnly}
-            onComplete={isWelcome ? handleWelcomeComplete : undefined}
-            onUpdateConfig={handleUpdateConfig}
-            onToggleAutoSync={handleToggleAutoSync}
-            onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
-          />
+          <div class="report-visual sync-tab">
+            {!isWelcome && (
+              <SettingsToggles
+                appConfig={state.appConfig}
+                readOnly={readOnly}
+                onUpdateConfig={handleUpdateConfig}
+                activeProfile={state.activeProfile}
+                profiles={state.profiles}
+                onSwitchProfile={handleSwitchProfile}
+                onImportProfile={handleImportProfile}
+                onDeleteProfile={handleDeleteProfile}
+                onExport={exportData}
+                onInjectDebug={injectDebug}
+                hasData={!!state.unified}
+              />
+            )}
+            <SettingsPage mode={isWelcome ? 'welcome' : 'settings'} onComplete={isWelcome ? handleWelcomeComplete : undefined} />
+            {!isWelcome && (
+              <>
+                <SyncStatusSection
+                  syncState={state.syncState}
+                  availableBoothsEnabled={!!state.appConfig?.availableBoothsEnabled}
+                  autoSyncEnabled={state.autoSyncEnabled}
+                  autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
+                  onSyncReports={sync}
+                  onRefreshBooths={refreshBooths}
+                  onToggleAutoSync={handleToggleAutoSync}
+                  onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
+                  readOnly={readOnly}
+                />
+                {state.unified?.metadata.healthChecks && (
+                  <DataHealthChecks healthChecks={state.unified.metadata.healthChecks} warnings={state.unified.warnings} />
+                )}
+              </>
+            )}
+          </div>
         ) : state.activeReport === 'health-check' && state.unified ? (
-          <HealthCheckReport data={state.unified} onNavigate={handleSelectReport} />
-        ) : state.activeReport === 'sync' ? (
-          <SyncTab
-            syncState={state.syncState}
-            availableBoothsEnabled={!!state.appConfig?.availableBoothsEnabled}
-            healthChecks={state.unified?.metadata.healthChecks ?? null}
-            warnings={state.unified?.warnings ?? []}
-            onSyncReports={sync}
-            onRefreshBooths={refreshBooths}
-            onRecalculate={recalculate}
-            onExport={exportData}
-            onInjectDebug={injectDebug}
-            onWipeData={handleWipeData}
-            hasData={!!state.unified}
-            readOnly={readOnly}
-            activeProfile={state.activeProfile}
-            profiles={state.profiles}
-            onSwitchProfile={handleSwitchProfile}
-            onImportProfile={handleImportProfile}
-            onDeleteProfile={handleDeleteProfile}
-          />
+          <HealthCheckReport data={state.unified} availableSlotCount={availableSlotCount} onNavigate={handleSelectReport} />
         ) : (
           <ReportContent
             activeReport={state.activeReport}

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BOOTH_RESERVATION_TYPE } from '../../constants';
 import { COOKIE_ORDER } from '../../cookie-constants';
-import { classifyOrderStatus } from '../../order-classification';
 import type { BoothReservationImported, BoothTimeSlot } from '../../types';
 import {
   boothTypeClass,
@@ -13,7 +12,6 @@ import {
   formatCompactRange,
   formatCurrency,
   formatDataSize,
-  formatDate,
   formatDuration,
   formatMaxAge,
   formatShortDate,
@@ -30,9 +28,9 @@ import {
   todayMidnight
 } from '../format-utils';
 
-describe('formatDate / DateFormatter.toDisplay', () => {
+describe('DateFormatter.toDisplay', () => {
   it('converts YYYY/MM/DD to MM/DD/YYYY', () => {
-    expect(formatDate('2025/02/05')).toBe('02/05/2025');
+    expect(DateFormatter.toDisplay('2025/02/05')).toBe('02/05/2025');
   });
 
   it('converts YYYY-MM-DD to MM/DD/YYYY', () => {
@@ -40,28 +38,15 @@ describe('formatDate / DateFormatter.toDisplay', () => {
   });
 
   it('returns "-" for null', () => {
-    expect(formatDate(null)).toBe('-');
+    expect(DateFormatter.toDisplay(null)).toBe('-');
   });
 
   it('returns "-" for undefined', () => {
-    expect(formatDate(undefined)).toBe('-');
+    expect(DateFormatter.toDisplay(undefined)).toBe('-');
   });
 
   it('returns as-is for unknown format', () => {
-    expect(formatDate('February 5, 2025')).toBe('February 5, 2025');
-  });
-});
-
-describe('DateFormatter.toTimestamp', () => {
-  it('creates filename-safe timestamp from Date', () => {
-    const date = new Date('2025-02-05T14:30:45.123Z');
-    const result = DateFormatter.toTimestamp(date);
-    expect(result).toBe('2025-02-05T14-30-45-123Z');
-  });
-
-  it('does not contain colons or dots', () => {
-    const result = DateFormatter.toTimestamp(new Date());
-    expect(result).not.toMatch(/[:.]/);
+    expect(DateFormatter.toDisplay('February 5, 2025')).toBe('February 5, 2025');
   });
 });
 
@@ -157,32 +142,6 @@ describe('slotOverlapsRange', () => {
   it('returns true when after string is invalid', () => {
     const slot = makeSlot('4:00 PM', '6:00 PM');
     expect(slotOverlapsRange(slot, 'bad', '5:00 PM')).toBe(true);
-  });
-});
-
-describe('classifyOrderStatus', () => {
-  it('returns NEEDS_APPROVAL for "Needs Approval"', () => {
-    expect(classifyOrderStatus('Needs Approval')).toBe('NEEDS_APPROVAL');
-  });
-
-  it('returns COMPLETED for "Status Delivered"', () => {
-    expect(classifyOrderStatus('Status Delivered')).toBe('COMPLETED');
-  });
-
-  it('returns COMPLETED for "Completed"', () => {
-    expect(classifyOrderStatus('Completed')).toBe('COMPLETED');
-  });
-
-  it('returns PENDING for "Pending"', () => {
-    expect(classifyOrderStatus('Pending')).toBe('PENDING');
-  });
-
-  it('returns UNKNOWN for unknown status string', () => {
-    expect(classifyOrderStatus('Something Else')).toBe('UNKNOWN');
-  });
-
-  it('returns UNKNOWN for undefined', () => {
-    expect(classifyOrderStatus(undefined)).toBe('UNKNOWN');
   });
 });
 

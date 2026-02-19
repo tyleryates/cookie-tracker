@@ -146,6 +146,11 @@ export function FinanceReport({ data, banner }: { data: UnifiedDataset; banner?:
         <h3>Scout Cash Report</h3>
       </div>
       {banner}
+      {!data.metadata.lastImportDC && (
+        <div class="info-box info-box-warning">
+          <p>Digital Cookie data was not loaded. Cash owed amounts may be incomplete.</p>
+        </div>
+      )}
 
       <StatCards stats={stats} />
       <DataTable columns={['Scout', 'Cash Owed', 'Paid', 'Cash Due']} className="table-normal scout-table">

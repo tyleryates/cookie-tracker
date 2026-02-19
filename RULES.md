@@ -181,11 +181,10 @@ An order "needs inventory" (from the girl's perspective) when: `owner === GIRL` 
 | **Delivered** | Physical packages for in-person delivery (girl's own sales) | Reduces scout inventory |
 | **Picked Up** | T2G inventory received from troop (physical only) | Increases scout inventory |
 | **Inventory** | Net: Picked Up − Delivered (negative = shortage) | — |
-| **Booth** | Booth sales credited to scout (from Smart Booth Divider) | None (credit only) |
-| **Credited** | Troop virtual booth + direct ship allocations | None (credit only) |
+| **Credits** | Booth sales + virtual booth + direct ship allocations credited to scout | None (credit only) |
 | **Shipped** | Scout's own direct ship orders | None (supplier ships) |
 | **Donations** | Virtual Cookie Share packages | None (virtual) |
-| **Total Sold** | Delivered + Shipped + Donations + Booth + Credited | — |
+| **Total Sold** | Delivered + Shipped + Donations + Credits | — |
 
 ---
 
@@ -538,31 +537,35 @@ When a new cookie variety, order type, payment method, or transfer type appears:
 
 ## Reports
 
-The app provides twelve reports in five tab groups plus tools:
+The app provides thirteen reports in five tab groups plus To-Do:
+
+**To-Do** tab:
+1. **Health Check** — Aggregates all actionable items and warnings into a single view with three sections:
+   - **Action Required** (orange) — Items that need attention: DC data sync, undistributed orders (girl delivery, direct ship, booth), unreconciled donations. These drive the tab badge count.
+   - **Warnings** (blue) — Non-blocking issues: scouts with negative inventory, scouts with unapproved orders. Shown for awareness but don't require immediate action.
+   - **Completed** (green) — Resolved items with checkmarks. Badge shows "All Done" when no actions or warnings remain.
 
 **Troop** tab (dropdown):
-1. **Inventory & Transfers** — C2T pickups, T2G allocations, per-variety troop inventory
-2. **Online Orders** — Troop-level delivery/direct-ship orders with per-scout allocation tracking
-3. **Proceeds** — Total packages credited, credit tier, gross/net troop proceeds
+2. **Inventory & Transfers** — C2T pickups, T2G allocations, per-variety troop inventory
+3. **Online Orders** — Troop-level delivery/direct-ship orders with per-scout allocation tracking
+4. **Proceeds** — Total packages credited, credit tier, gross/net troop proceeds
+5. **Inventory History** — Daily inventory change log with running balance (toggle in Settings)
 
 **Scout** tab (dropdown):
-4. **Sales Summary** — Per-scout sales, credited allocations, variety breakdowns
-5. **Inventory** — Per-scout inventory balances, variety breakdowns, transfers
-6. **Cash Report** — Per-scout cash collected, electronic payments, cash due
+6. **Sales Summary** — Per-scout sales, credited allocations, variety breakdowns
+7. **Inventory** — Per-scout inventory balances, variety breakdowns, transfers
+8. **Cash Report** — Per-scout cash collected, electronic payments, cash due
 
 **Booths** tab (dropdown):
-7. **Completed Booths** — Distributed booths, needs-distribution status, per-scout allocations
-8. **Upcoming Booths** — Reserved booths that haven't happened yet
-9. **Booth Finder** — Available time slots at selected booth locations with day/time filters
+9. **Completed Booths** — Distributed booths, needs-distribution status, per-scout allocations
+10. **Upcoming Booths** — Reserved booths that haven't happened yet
+11. **Booth Finder** — Available time slots at selected booth locations with day/time filters (toggle in Settings)
 
 **Donations** tab:
-10. **Cookie Share Reconciliation** — DC vs SC Cookie Share comparison, adjustments needed per scout
+12. **Cookie Share Reconciliation** — DC vs SC Cookie Share comparison, adjustments needed per scout
 
 **Cookie Popularity** tab:
-11. **Cookie Popularity** — Sales breakdown by cookie variety with percentages and distribution estimator
-
-**Tools** (separate tab bar buttons):
-12. **Inventory History** — Daily inventory change log with running balance (toggle in Settings)
+13. **Cookie Popularity** — Sales breakdown by cookie variety with percentages and distribution estimator
 
 ### Stat Card Color Palette
 

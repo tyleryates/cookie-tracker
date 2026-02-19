@@ -104,8 +104,8 @@ function AdjustmentCell({ adjustment }: { adjustment: number }) {
   if (adjustment > 0)
     return (
       <td class="text-center">
-        <span class="inline-alert-anchor status-success">
-          <strong>+{adjustment}</strong>
+        <span class="inline-alert-anchor status-error">
+          +{adjustment}
           <span class="inline-alert-pill">{'\u26A0'}</span>
         </span>
       </td>
@@ -114,7 +114,7 @@ function AdjustmentCell({ adjustment }: { adjustment: number }) {
     return (
       <td class="text-center">
         <span class="inline-alert-anchor status-error">
-          <strong>{adjustment}</strong>
+          {adjustment}
           <span class="inline-alert-pill">{'\u26A0'}</span>
         </span>
       </td>
@@ -208,10 +208,15 @@ export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; ba
       <div class="report-header-row">
         <h3>Donations Report</h3>
         <span class={`report-status-badge ${isReconciled ? 'report-status-ok' : 'report-status-warning'}`}>
-          {isReconciled ? 'Reconciled in SC' : 'Needs Update in SC'}
+          {isReconciled ? 'Reconciled in SC' : 'Action Required'}
         </span>
       </div>
       {banner}
+      {!data.metadata.lastImportDC && (
+        <div class="info-box info-box-warning">
+          <p>Digital Cookie data was not loaded. Donation amounts may be incomplete.</p>
+        </div>
+      )}
 
       <StatusBanner scoutRows={scoutRows} />
 

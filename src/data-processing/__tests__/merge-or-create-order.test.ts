@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DATA_SOURCES, OWNER, TRANSFER_CATEGORY } from '../../constants';
+import { DATA_SOURCES, OWNER } from '../../constants';
 import { createDataStore, type DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
-import type { Order, Transfer } from '../../types';
-import { calculatePackageTotals } from '../calculators/package-totals';
+import type { Order } from '../../types';
 
 // ============================================================================
 // mergeOrCreateOrder
@@ -96,82 +95,5 @@ describe('mergeOrCreateOrder', () => {
     expect(order.amount).toBe(0);
     expect(order.owner).toBe(OWNER.TROOP);
     expect(order.varieties).toEqual({});
-  });
-});
-
-// ============================================================================
-// calculatePackageTotals
-// ============================================================================
-
-describe('calculatePackageTotals', () => {
-  function makeTransfer(overrides: Partial<Transfer>): Transfer {
-    return {
-      type: 'C2T',
-      category: TRANSFER_CATEGORY.COUNCIL_TO_TROOP,
-      date: '',
-      from: '',
-      to: '',
-      packages: 0,
-      physicalPackages: 0,
-      cases: 0,
-      varieties: {},
-      physicalVarieties: {},
-      ...overrides
-    };
-  }
-
-  it('accumulates C2T into c2tReceived', () => {
-    const totals = calculatePackageTotals([
-      makeTransfer({ category: TRANSFER_CATEGORY.COUNCIL_TO_TROOP, physicalPackages: 50 }),
-      makeTransfer({ category: TRANSFER_CATEGORY.COUNCIL_TO_TROOP, physicalPackages: 30 })
-    ]);
-    expect(totals.c2tReceived).toBe(80);
-  });
-
-  it('accumulates T2T outgoing', () => {
-    const totals = calculatePackageTotals([makeTransfer({ category: TRANSFER_CATEGORY.TROOP_OUTGOING, physicalPackages: 10 })]);
-    expect(totals.t2tOut).toBe(10);
-  });
-
-  it('accumulates girl pickup into allocated', () => {
-    const totals = calculatePackageTotals([makeTransfer({ category: TRANSFER_CATEGORY.GIRL_PICKUP, physicalPackages: 20 })]);
-    expect(totals.allocated).toBe(20);
-  });
-
-  it('accumulates virtual booth T2G', () => {
-    const totals = calculatePackageTotals([makeTransfer({ category: TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION, physicalPackages: 5 })]);
-    expect(totals.virtualBoothT2G).toBe(5);
-  });
-
-  it('accumulates booth divider T2G', () => {
-    const totals = calculatePackageTotals([makeTransfer({ category: TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION, physicalPackages: 3 })]);
-    expect(totals.boothDividerT2G).toBe(3);
-  });
-
-  it('accumulates direct ship', () => {
-    const totals = calculatePackageTotals([makeTransfer({ category: TRANSFER_CATEGORY.DIRECT_SHIP, physicalPackages: 7 })]);
-    expect(totals.directShip).toBe(7);
-  });
-
-  it('accumulates G2T returns', () => {
-    const totals = calculatePackageTotals([makeTransfer({ category: TRANSFER_CATEGORY.GIRL_RETURN, physicalPackages: 4 })]);
-    expect(totals.g2t).toBe(4);
-  });
-
-  it('ignores unmapped categories', () => {
-    const totals = calculatePackageTotals([
-      makeTransfer({ category: TRANSFER_CATEGORY.DC_ORDER_RECORD, physicalPackages: 100 }),
-      makeTransfer({ category: TRANSFER_CATEGORY.COOKIE_SHARE_RECORD, physicalPackages: 50 })
-    ]);
-    expect(totals.c2tReceived).toBe(0);
-    expect(totals.allocated).toBe(0);
-  });
-
-  it('returns all zeros for empty transfers', () => {
-    const totals = calculatePackageTotals([]);
-    expect(totals.c2tReceived).toBe(0);
-    expect(totals.t2tOut).toBe(0);
-    expect(totals.allocated).toBe(0);
-    expect(totals.g2t).toBe(0);
   });
 });

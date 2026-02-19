@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios';
 import { PIPELINE_FILES, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../constants';
 import { normalizeCookieName } from '../cookie-constants';
+import { isC2TTransfer } from '../data-processing/utils';
 import Logger from '../logger';
 import type SeasonalData from '../seasonal-data';
 import type { ProgressCallback, ScrapeSourceResult } from '../types';
@@ -335,7 +336,7 @@ class SmartCookieScraper extends BaseScraper {
   extractTroopIdFromOrders(orders: SCOrder[]): string | null {
     for (const order of orders) {
       const type = order.transfer_type || order.type || '';
-      if ((type === TRANSFER_TYPE.C2T || type.startsWith(TRANSFER_TYPE.C2T)) && order.to) {
+      if (isC2TTransfer(type) && order.to) {
         const match = String(order.to).match(/\d+/);
         if (match) {
           Logger.debug(`Extracted troopId from C2T transfer: ${match[0]}`);

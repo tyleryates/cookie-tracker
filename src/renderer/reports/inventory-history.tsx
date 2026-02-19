@@ -1,10 +1,9 @@
 import type { ComponentChildren } from 'preact';
-import { TRANSFER_TYPE } from '../../constants';
+import { ALLOCATION_CHANNEL, TRANSFER_TYPE } from '../../constants';
 import type { UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { TooltipCell } from '../components/tooltip-cell';
-import { formatShortDate } from '../format-utils';
-import { describeTransfer, normalizeDate } from './inventory';
+import { describeTransfer, formatShortDate, normalizeDate } from '../format-utils';
 
 export function InventoryHistoryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
   if (!data?.transferBreakdowns) {
@@ -61,13 +60,13 @@ export function InventoryHistoryReport({ data, banner }: { data: UnifiedDataset;
   for (const scout of Object.values(data.scouts)) {
     if (scout.isSiteOrder) continue;
     for (const a of scout.allocations) {
-      if (a.channel !== 'booth' && a.channel !== 'virtualBooth') continue;
+      if (a.channel !== ALLOCATION_CHANNEL.BOOTH && a.channel !== ALLOCATION_CHANNEL.VIRTUAL_BOOTH) continue;
       if (!a.date) continue;
       const pkg = a.packages || 0;
       if (pkg === 0) continue;
       const key = normalizeDate(a.date);
       const entry = getEntry(key);
-      const label = a.channel === 'booth' ? 'Booth Sales' : 'Site Sales';
+      const label = a.channel === ALLOCATION_CHANNEL.BOOTH ? 'Booth Sales' : 'Site Sales';
       entry.out += pkg;
       entry.outDetails.set(label, (entry.outDetails.get(label) || 0) + pkg);
     }

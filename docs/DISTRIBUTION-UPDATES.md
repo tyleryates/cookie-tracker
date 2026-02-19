@@ -20,7 +20,7 @@ This guide explains how to distribute updates to users who have the Cookie Track
    make build-all       # Both
    ```
 4. Find the installers in `release/` folder:
-   - macOS: `Cookie Tracker-1.0.1-arm64.dmg` + `.zip`
+   - macOS: `Cookie Tracker-1.0.1-arm64-mac.zip`
    - Windows: `Cookie Tracker-1.0.1-win.zip`
 5. Share the file via email, Dropbox, Google Drive, etc.
 
@@ -89,9 +89,9 @@ This automatically:
    ```
 
    This will:
-   - Build the installers
+   - Build the macOS installer (use `make publish-win` separately for Windows)
    - Create a GitHub Release (v1.0.1)
-   - Upload the installers to the release
+   - Upload the installer to the release
    - Generate update metadata files
 
 5. **Done!** Users will be notified automatically
@@ -110,16 +110,17 @@ This automatically:
 
 ### How It Works:
 
-- `src/main.ts` checks GitHub Releases on startup (production only)
-- Compares installed version vs latest release
+- `src/update-manager.ts` configures `electron-updater` and checks GitHub Releases on startup (production only, called from `main.ts`)
+- `electron-updater` compares installed version vs latest release
 - If newer version exists, downloads silently (`autoDownload: true`)
 - Renderer shows a persistent warning banner when download completes
 - Installs on quit (`autoInstallOnAppQuit: true`) or on manual restart
+- macOS uses a custom install script to work around Squirrel.Mac limitations (see `quitAndInstall` in `update-manager.ts`)
 
 ### Update Frequency:
 
 - Checks for updates once per app launch
-- Only in production (not during `npm start`)
+- Only in production (not during `npm start`) and when `autoUpdateEnabled` is true in Settings
 - Doesn't slow down app startup (3-second delay)
 
 ---
@@ -140,7 +141,7 @@ If you don't want to use GitHub public releases:
 
 3. **Share link with users** (manual download)
 
-4. **Disable auto-update:** Comment out the `autoUpdater.checkForUpdates()` call in `src/main.ts`.
+4. **Disable auto-update:** Comment out the `autoUpdater.checkForUpdates()` call in `src/update-manager.ts`.
 
 ---
 
@@ -205,7 +206,7 @@ xattr -cr "/Applications/Cookie Tracker.app"
 
 ## Code Signing & Notarization (macOS)
 
-The build is configured to automatically sign, notarize, and package the app as a DMG. This eliminates the "damaged app" warning for users. If the signing environment variables are not set, the build still produces an unsigned app (safe for local dev).
+The build is configured to automatically sign and notarize the app. This eliminates the "damaged app" warning for users. If the signing environment variables are not set, the build still produces an unsigned app (safe for local dev).
 
 ### One-Time Setup
 
@@ -253,15 +254,14 @@ make check-signing
 - **Code signing**: electron-builder automatically finds the "Developer ID Application" certificate in Keychain
 - **Hardened runtime**: Enabled with Electron-specific entitlements (JIT, unsigned memory, library validation bypass)
 - **Notarization**: electron-builder submits the app to Apple and staples the notarization ticket
-- **Output**: `release/` contains both a `.dmg` (drag-to-Applications installer) and `.zip` (for electron-updater auto-updates)
+- **Output**: `release/` contains a `.zip` (used for both distribution and electron-updater auto-updates)
 
 ### Build Output
 
 ```bash
 make build
 # Produces in release/:
-#   Cookie Tracker-{version}-arm64.dmg    — DMG installer
-#   Cookie Tracker-{version}-arm64-mac.zip — zip for auto-updater
+#   Cookie Tracker-{version}-arm64-mac.zip — app bundle for distribution and auto-updater
 #   latest-mac.yml                         — auto-update metadata
 ```
 
@@ -294,9 +294,9 @@ spctl -a -t exec -vv "release/mac-arm64/Cookie Tracker.app"
 
 ### macOS:
 
-1. Download `Cookie Tracker-{version}.dmg`
-2. Double-click to open
-3. Drag "Cookie Tracker" icon to Applications folder
+1. Download `Cookie Tracker-{version}-arm64-mac.zip`
+2. Double-click to extract
+3. Drag "Cookie Tracker" to Applications folder
 4. Open Applications folder and double-click Cookie Tracker
 5. If you see security warning: System Settings → Privacy & Security → "Open Anyway"
 
@@ -329,10 +329,10 @@ Before publishing an update:
 
 - [ ] Update version in `package.json`
 - [ ] Test the new features/fixes
-- [ ] Update README.md if needed
+- [ ] Update docs if needed (CLAUDE.md, RULES.md, docs/)
 - [ ] Compile TypeScript: `make compile`
 - [ ] Commit changes to git
-- [ ] Build and test locally: `make build && open release/*.dmg`
+- [ ] Build and test locally: `make build`
 - [ ] Verify app opens and works
 - [ ] Publish: `make publish`
 - [ ] Verify GitHub release was created

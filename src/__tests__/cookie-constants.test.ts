@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { COOKIE_ID_MAP, calculateRevenue, getCookieDisplayName, getTroopProceedsRate, normalizeCookieName } from '../cookie-constants';
-import { isDCAutoSync } from '../order-classification';
 
 describe('normalizeCookieName', () => {
   it('normalizes singular and plural forms', () => {
@@ -81,24 +80,5 @@ describe('COOKIE_ID_MAP', () => {
     expect(COOKIE_ID_MAP[1]).toBe('CARAMEL_DELITES');
     expect(COOKIE_ID_MAP[37]).toBe('COOKIE_SHARE');
     expect(COOKIE_ID_MAP[52]).toBe('CARAMEL_CHOCOLATE_CHIP');
-  });
-});
-
-describe('isDCAutoSync', () => {
-  it('identifies shipped + captured as auto-sync', () => {
-    expect(isDCAutoSync('Shipped to Customer', 'CAPTURED')).toBe(true);
-  });
-
-  it('identifies donation + captured as auto-sync', () => {
-    expect(isDCAutoSync('Donation', 'CAPTURED')).toBe(true);
-  });
-
-  it('rejects non-shipped non-donation orders', () => {
-    expect(isDCAutoSync('In-Person Delivery', 'CAPTURED')).toBe(false);
-  });
-
-  it('rejects non-captured payments', () => {
-    expect(isDCAutoSync('Shipped to Customer', 'CASH')).toBe(false);
-    expect(isDCAutoSync('Donation', 'CASH')).toBe(false);
   });
 });

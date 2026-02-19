@@ -10,7 +10,7 @@ function titleCase(s: string): string {
 export function getStatusStyle(status: string | undefined): { className: string; text: string } {
   switch (classifyOrderStatus(status)) {
     case 'NEEDS_APPROVAL':
-      return { className: 'status-pill status-pill-error', text: 'Needs Approval ⚠️' };
+      return { className: 'status-pill status-pill-error', text: 'Needs Approval' };
     case 'COMPLETED':
       return { className: 'status-pill status-pill-success', text: 'Complete' };
     case 'PENDING':

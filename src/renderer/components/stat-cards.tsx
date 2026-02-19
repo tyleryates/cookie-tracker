@@ -1,6 +1,6 @@
 // StatCards — stat card grid with optional drill-down detail
 
-import type { ComponentChildren } from 'preact';
+import { type ComponentChildren, Fragment } from 'preact';
 import { useState } from 'preact/hooks';
 
 /** Shared color palette for stat card values */
@@ -41,9 +41,6 @@ export function StatCards({ stats, defaultExpanded }: { stats: Stat[]; defaultEx
     columns = `repeat(${stats.length}, 1fr)`;
   }
 
-  // Count grid columns for detail row colspan
-  const colCount = hasOperators ? stats.reduce((n, s) => n + (s.operator ? 2 : 1), 0) : stats.length;
-
   const handleClick = (i: number) => {
     if (!stats[i].detail) return;
     if (expanded === i) return; // tab behavior — stays selected
@@ -65,26 +62,20 @@ export function StatCards({ stats, defaultExpanded }: { stats: Stat[]; defaultEx
             </>
           );
           return (
-            <>
+            <Fragment key={i}>
               {stat.operator && <div class="stat-operator">{stat.operator}</div>}
               {stat.detail ? (
-                <button key={i} type="button" class={cardClass} onClick={() => handleClick(i)}>
+                <button type="button" class={cardClass} onClick={() => handleClick(i)}>
                   {content}
                 </button>
               ) : (
-                <div key={i} class={cardClass}>
-                  {content}
-                </div>
+                <div class={cardClass}>{content}</div>
               )}
-            </>
+            </Fragment>
           );
         })}
       </div>
-      {expanded !== null && stats[expanded]?.detail && (
-        <div class="stat-card-detail" style={{ gridColumn: `1 / span ${colCount}` }}>
-          {stats[expanded].detail}
-        </div>
-      )}
+      {expanded !== null && stats[expanded]?.detail && <div class="stat-card-detail">{stats[expanded].detail}</div>}
     </div>
   );
 }

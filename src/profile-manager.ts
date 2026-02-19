@@ -115,8 +115,13 @@ class ProfileManager {
     return { profile, config };
   }
 
+  private validateDirName(dirName: string): void {
+    if (!/^[a-z0-9-]+$/.test(dirName)) throw new Error(`Invalid profile directory name: ${dirName}`);
+  }
+
   deleteProfile(dirName: string): ProfilesConfig {
     if (dirName === 'default') throw new Error('Cannot delete the default profile');
+    this.validateDirName(dirName);
 
     const config = this.loadProfiles();
     const profileDir = path.join(this.rootDataDir, dirName);
@@ -133,6 +138,7 @@ class ProfileManager {
   }
 
   switchProfile(dirName: string): { profileDir: string; config: ProfilesConfig } {
+    this.validateDirName(dirName);
     const config = this.loadProfiles();
     const profile = config.profiles.find((p) => p.dirName === dirName);
     if (!profile) throw new Error(`Profile not found: ${dirName}`);

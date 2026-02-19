@@ -1,8 +1,8 @@
 // Formatting and display utilities
 
-import { BOOTH_RESERVATION_TYPE } from '../constants';
+import { BOOTH_RESERVATION_TYPE, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../constants';
 import { COOKIE_ORDER, getCookieColor, getCookieDisplayName } from '../cookie-constants';
-import type { BoothReservationImported, BoothTimeSlot, CookieType, Scout, Varieties } from '../types';
+import type { BoothReservationImported, BoothTimeSlot, CookieType, Scout, Transfer, Varieties } from '../types';
 
 /** Sort varieties entries by preferred display order */
 function sortVarietiesByOrder(entries: [string, number][]): [string, number][] {
@@ -48,11 +48,6 @@ const DateFormatter = {
     return str; // Return as-is if format doesn't match
   },
 
-  // Create filename-safe timestamp (YYYY-MM-DD-HH-MM-SS)
-  toTimestamp(date = new Date()) {
-    return date.toISOString().replace(/[:.]/g, '-').split('.')[0];
-  },
-
   // Format full timestamp for hover (e.g., "Feb 5, 2026, 3:45 PM")
   toFullTimestamp(date: string | Date | null | undefined): string {
     if (!date) return 'Never synced';
@@ -68,8 +63,8 @@ const DateFormatter = {
     });
   },
 
-  // Format friendly relative timestamp with time-of-day
-  toFriendly(date: string | Date | null | undefined): string {
+  // Format friendly relative timestamp with time-of-day (e.g. "Today at 3:45 PM", "2 days ago")
+  toRelativeTimestamp(date: string | Date | null | undefined): string {
     if (!date) return 'Never';
 
     const now = new Date();
@@ -123,30 +118,24 @@ const DateFormatter = {
   }
 };
 
-// Convenience wrapper for DateFormatter.toDisplay()
-function formatDate(dateStr: string | null | undefined): string {
-  return DateFormatter.toDisplay(dateStr);
+/** Parse a date string in ISO (YYYY-MM-DD) or US (MM/DD/YYYY) format, returning { year, month, day } */
+function parseDateComponents(str: string): { year: number; month: number; day: number } | null {
+  const iso = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (iso) return { year: Number(iso[1]), month: Number(iso[2]), day: Number(iso[3]) };
+  const us = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (us) return { year: Number(us[3]), month: Number(us[1]), day: Number(us[2]) };
+  return null;
 }
 
 /** Format date as "Sat 02/14" (short day of week + MM/DD, no year) */
 function formatShortDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   const str = String(dateStr);
-  // YYYY-MM-DD or YYYY/MM/DD
-  const isoMatch = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-  if (isoMatch) {
-    const d = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
-    const day = d.toLocaleDateString('en-US', { weekday: 'short' });
-    return `${day} ${isoMatch[2].padStart(2, '0')}/${isoMatch[3].padStart(2, '0')}`;
-  }
-  // MM/DD/YYYY or M/D/YYYY
-  const usMatch = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-  if (usMatch) {
-    const d = new Date(Number(usMatch[3]), Number(usMatch[1]) - 1, Number(usMatch[2]));
-    const day = d.toLocaleDateString('en-US', { weekday: 'short' });
-    return `${day} ${usMatch[1].padStart(2, '0')}/${usMatch[2].padStart(2, '0')}`;
-  }
-  return str;
+  const parts = parseDateComponents(str);
+  if (!parts) return str;
+  const d = new Date(parts.year, parts.month - 1, parts.day);
+  const day = d.toLocaleDateString('en-US', { weekday: 'short' });
+  return `${day} ${String(parts.month).padStart(2, '0')}/${String(parts.day).padStart(2, '0')}`;
 }
 
 function formatTimeRange(startTime: string | undefined, endTime: string | undefined): string {
@@ -226,7 +215,7 @@ function formatBoothDate(dateStr: string): string {
 /** Count non-virtual booth reservations that need distribution (past, or today after end time) */
 function countBoothsNeedingDistribution(boothReservations: BoothReservationImported[]): number {
   const now = new Date();
-  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const today = todayMidnight();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return boothReservations.filter((r) => {
     const type = (r.booth.reservationType || '').toLowerCase();
@@ -235,8 +224,8 @@ function countBoothsNeedingDistribution(boothReservations: BoothReservationImpor
     if (!r.timeslot.date) return true;
     const d = parseLocalDate(r.timeslot.date);
     if (!d) return true;
-    if (d < todayMidnight) return true; // Past day
-    if (d.getTime() === todayMidnight.getTime()) {
+    if (d < today) return true; // Past day
+    if (d.getTime() === today.getTime()) {
       // Today — only count if booth end time has passed
       const endMin = parseTimeToMinutes(r.timeslot.endTime || '');
       return endMin >= 0 && nowMinutes >= endMin;
@@ -351,6 +340,40 @@ function getActiveScouts(scouts: Record<string, Scout>): Array<[string, Scout]> 
     .sort((a, b) => a[0].localeCompare(b[0]));
 }
 
+/** Normalize date strings to YYYY-MM-DD for consistent grouping and sorting */
+function normalizeDate(dateStr: string): string {
+  const iso = dateStr.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
+  const us = dateStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (us) return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
+  return dateStr;
+}
+
+/** Inventory direction from the troop's perspective */
+type InventoryDirection = 'in' | 'out';
+
+/** Build a human-readable type label, from/to, and direction for a transfer row */
+function describeTransfer(transfer: Transfer): { typeLabel: string; from: string; to: string; direction: InventoryDirection } {
+  switch (transfer.category) {
+    case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
+      if (transfer.type === TRANSFER_TYPE.T2T) {
+        return { typeLabel: 'T2T In', from: `Troop ${transfer.from}`, to: 'Troop', direction: 'in' };
+      }
+      return { typeLabel: 'C2T', from: transfer.from || 'Council', to: 'Troop', direction: 'in' };
+    case TRANSFER_CATEGORY.TROOP_OUTGOING:
+      return { typeLabel: 'T2T Out', from: 'Troop', to: `Troop ${transfer.to}`, direction: 'out' };
+    case TRANSFER_CATEGORY.GIRL_PICKUP:
+    case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
+    case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
+    case TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION:
+      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
+    case TRANSFER_CATEGORY.GIRL_RETURN:
+      return { typeLabel: 'G2T', from: transfer.from || '-', to: 'Troop', direction: 'in' };
+    default:
+      return { typeLabel: transfer.type || '-', from: transfer.from || '-', to: transfer.to || '-', direction: 'out' };
+  }
+}
+
 export {
   boothTypeClass,
   buildVarietyTooltip,
@@ -359,7 +382,7 @@ export {
   getCompleteVarieties,
   countBoothsNeedingDistribution,
   DateFormatter,
-  formatDate,
+  describeTransfer,
   formatShortDate,
   formatBoothTime,
   formatCurrency,
@@ -372,6 +395,7 @@ export {
   formatBoothDate,
   isPhysicalVariety,
   isVirtualBooth,
+  normalizeDate,
   parseTimeToMinutes,
   slotOverlapsRange,
   parseLocalDate,

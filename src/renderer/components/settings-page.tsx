@@ -1,6 +1,7 @@
-// SettingsPage — Full page for credential management with verification
+// SettingsPage — Credential management with verification
+// SettingsToggles — App toggle settings, profile management, import modal
 
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import Logger from '../../logger';
 import type { DCRole } from '../../seasonal-data';
 import type { AppConfig, CredentialPatch } from '../../types';
@@ -13,38 +14,16 @@ interface SCVerifyResult {
 
 interface SettingsPageProps {
   mode: 'welcome' | 'settings';
-  appConfig: AppConfig | null;
-  autoSyncEnabled: boolean;
-  autoRefreshBoothsEnabled: boolean;
-  readOnly?: boolean;
   onComplete?: () => void;
-  onUpdateConfig: (patch: Partial<AppConfig>) => void;
-  onToggleAutoSync: (enabled: boolean) => void;
-  onToggleAutoRefreshBooths: (enabled: boolean) => void;
 }
 
-export function SettingsPage({
-  mode,
-  appConfig,
-  autoSyncEnabled,
-  autoRefreshBoothsEnabled,
-  readOnly = false,
-  onComplete,
-  onUpdateConfig,
-  onToggleAutoSync,
-  onToggleAutoRefreshBooths
-}: SettingsPageProps) {
+export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
   // Smart Cookie fields
   const [scUsername, setScUsername] = useState('');
   const [scPassword, setScPassword] = useState('');
   const [scVerifying, setScVerifying] = useState(false);
   const [scVerified, setScVerified] = useState<SCVerifyResult | null>(null);
   const [scError, setScError] = useState<string | null>(null);
-
-  // iMessage alert fields
-  const [imessageRecipient, setImessageRecipient] = useState('');
-  const [imessageSending, setImessageSending] = useState(false);
-  const [imessageError, setImessageError] = useState<string | null>(null);
 
   // Digital Cookie fields
   const [dcUsername, setDcUsername] = useState('');
@@ -54,11 +33,6 @@ export function SettingsPage({
   const [dcSelectedRole, setDcSelectedRole] = useState('');
   const [dcConfirmed, setDcConfirmed] = useState(false);
   const [dcError, setDcError] = useState<string | null>(null);
-
-  // Seed iMessage recipient from saved config
-  useEffect(() => {
-    if (appConfig?.boothAlertRecipient) setImessageRecipient(appConfig.boothAlertRecipient);
-  }, [appConfig?.boothAlertRecipient]);
 
   // Load existing credentials + seasonal data on mount
   useEffect(() => {
@@ -213,136 +187,16 @@ export function SettingsPage({
 
   return (
     <div>
-      <h2>{mode === 'welcome' ? 'Welcome' : 'Settings'}</h2>
-      {mode === 'welcome' && (
-        <p class="settings-welcome-message">
-          One-time setup — enter your Smart Cookie and Digital Cookie logins below. Credentials are encrypted on disk using your OS
-          keychain.
-        </p>
-      )}
-      {mode === 'settings' && (
-        <div class="settings-toggles">
-          <label class="toggle-switch">
-            <input
-              type="checkbox"
-              checked={autoSyncEnabled}
-              disabled={readOnly}
-              onChange={(e) => onToggleAutoSync((e.target as HTMLInputElement).checked)}
-            />
-            <span class="toggle-slider" />
-            <span class="toggle-label">Auto Sync Reports</span>
-          </label>
-          <label class="toggle-switch">
-            <input
-              type="checkbox"
-              checked={appConfig?.availableBoothsEnabled ?? false}
-              disabled={readOnly}
-              onChange={(e) => onUpdateConfig({ availableBoothsEnabled: (e.target as HTMLInputElement).checked })}
-            />
-            <span class="toggle-slider" />
-            <span class="toggle-label">Booth Planner</span>
-          </label>
-          {appConfig?.availableBoothsEnabled && (
-            <div class="settings-toggle-sub">
-              <label class="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={autoRefreshBoothsEnabled}
-                  disabled={readOnly}
-                  onChange={(e) => onToggleAutoRefreshBooths((e.target as HTMLInputElement).checked)}
-                />
-                <span class="toggle-slider" />
-                <span class="toggle-label">Auto Refresh</span>
-              </label>
-            </div>
-          )}
-          {appConfig?.availableBoothsEnabled && (
-            <div class="settings-toggle-sub">
-              <label class="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={appConfig?.boothAlertImessage ?? false}
-                  disabled={readOnly}
-                  onChange={(e) => onUpdateConfig({ boothAlertImessage: (e.target as HTMLInputElement).checked })}
-                />
-                <span class="toggle-slider" />
-                <span class="toggle-label">iMessage Alerts</span>
-              </label>
-              {appConfig?.boothAlertImessage && (
-                <div style={{ marginTop: '8px' }}>
-                  <input
-                    type="text"
-                    class="form-input"
-                    placeholder="Your phone number or Apple ID"
-                    value={appConfig.boothAlertRecipient ? appConfig.boothAlertRecipient : imessageRecipient}
-                    disabled={!!appConfig.boothAlertRecipient || imessageSending}
-                    onInput={(e) => setImessageRecipient((e.target as HTMLInputElement).value)}
-                  />
-                  <div class="settings-verify-row" style={{ marginTop: '8px' }}>
-                    {!appConfig.boothAlertRecipient ? (
-                      <button
-                        type="button"
-                        class="btn btn-secondary"
-                        disabled={!imessageRecipient.trim() || imessageSending}
-                        onClick={async () => {
-                          setImessageSending(true);
-                          setImessageError(null);
-                          try {
-                            await ipcInvoke('send-imessage', {
-                              recipient: imessageRecipient.trim(),
-                              message: 'Cookie Tracker iMessage alerts are now active!'
-                            });
-                            onUpdateConfig({ boothAlertRecipient: imessageRecipient.trim() });
-                          } catch (err) {
-                            setImessageError((err as Error).message);
-                          } finally {
-                            setImessageSending(false);
-                          }
-                        }}
-                      >
-                        {imessageSending ? 'Sending...' : 'Confirm'}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        class="btn btn-secondary"
-                        onClick={() => {
-                          setImessageRecipient('');
-                          setImessageError(null);
-                          onUpdateConfig({ boothAlertRecipient: '' });
-                        }}
-                      >
-                        Clear
-                      </button>
-                    )}
-                    {imessageError && <span class="settings-error">{imessageError}</span>}
-                  </div>
-                  {!appConfig.boothAlertRecipient && <span class="settings-role-hint">A test message will be sent to verify delivery</span>}
-                </div>
-              )}
-            </div>
-          )}
-          <label class="toggle-switch">
-            <input
-              type="checkbox"
-              checked={appConfig?.inventoryHistoryEnabled ?? false}
-              disabled={readOnly}
-              onChange={(e) => onUpdateConfig({ inventoryHistoryEnabled: (e.target as HTMLInputElement).checked })}
-            />
-            <span class="toggle-slider" />
-            <span class="toggle-label">Inventory History</span>
-          </label>
-          <label class="toggle-switch">
-            <input
-              type="checkbox"
-              checked={appConfig?.autoUpdateEnabled ?? false}
-              disabled={readOnly}
-              onChange={(e) => onUpdateConfig({ autoUpdateEnabled: (e.target as HTMLInputElement).checked })}
-            />
-            <span class="toggle-slider" />
-            <span class="toggle-label">Check for Updates</span>
-          </label>
-        </div>
+      {mode === 'welcome' ? (
+        <>
+          <h2>Welcome</h2>
+          <p class="settings-welcome-message">
+            One-time setup — enter your Smart Cookie and Digital Cookie logins below. Credentials are encrypted on disk using your OS
+            keychain.
+          </p>
+        </>
+      ) : (
+        <h3>Logins</h3>
       )}
       <div class="settings-cards">
         {/* Smart Cookie Section */}
@@ -475,6 +329,245 @@ export function SettingsPage({
           </form>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// SETTINGS TOGGLES
+// ============================================================================
+
+interface SettingsTogglesProps {
+  appConfig: AppConfig | null;
+  readOnly: boolean;
+  onUpdateConfig: (patch: Partial<AppConfig>) => void;
+  activeProfile: import('../../types').ActiveProfile | null;
+  profiles: import('../../types').ProfileInfo[];
+  onSwitchProfile: (dirName: string) => void;
+  onImportProfile: (name: string) => void;
+  onDeleteProfile: (dirName: string) => void;
+  onExport: () => void;
+  onInjectDebug: () => void;
+  hasData: boolean;
+}
+
+function ImportModal({ onImport, onClose }: { onImport: (name: string) => void; onClose: () => void }) {
+  const [name, setName] = useState('');
+  const backdropRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      class="modal-overlay"
+      ref={backdropRef}
+      role="dialog"
+      onClick={(e) => e.target === backdropRef.current && onClose()}
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}
+    >
+      <div class="modal-content">
+        <h3>Import Data</h3>
+        <p class="muted-text">Import a previously exported .zip file as a read-only snapshot.</p>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (name.trim()) {
+              onImport(name.trim());
+              onClose();
+            }
+          }}
+        >
+          <div class="form-group">
+            <label for="importName">Profile name:</label>
+            <input
+              type="text"
+              id="importName"
+              class="form-input"
+              placeholder="e.g. Week 3 Backup"
+              value={name}
+              // biome-ignore lint/a11y/noAutofocus: modal focus
+              autoFocus
+              onInput={(e) => setName((e.target as HTMLInputElement).value)}
+            />
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" class="btn btn-primary" disabled={!name.trim()}>
+              Choose File & Import
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export function SettingsToggles({
+  appConfig,
+  readOnly,
+  onUpdateConfig,
+  activeProfile,
+  profiles,
+  onSwitchProfile,
+  onImportProfile,
+  onDeleteProfile,
+  onExport,
+  onInjectDebug,
+  hasData
+}: SettingsTogglesProps) {
+  const [imessageRecipient, setImessageRecipient] = useState('');
+  const [imessageSending, setImessageSending] = useState(false);
+  const [imessageError, setImessageError] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+
+  useEffect(() => {
+    if (appConfig?.boothAlertRecipient) setImessageRecipient(appConfig.boothAlertRecipient);
+  }, [appConfig?.boothAlertRecipient]);
+
+  return (
+    <div>
+      <h3>Settings</h3>
+      <div class="settings-toggles">
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            checked={appConfig?.autoUpdateEnabled ?? false}
+            disabled={readOnly}
+            onChange={(e) => onUpdateConfig({ autoUpdateEnabled: (e.target as HTMLInputElement).checked })}
+          />
+          <span class="toggle-slider" />
+          <span class="toggle-label">Check for Updates</span>
+        </label>
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            checked={appConfig?.inventoryHistoryEnabled ?? false}
+            disabled={readOnly}
+            onChange={(e) => onUpdateConfig({ inventoryHistoryEnabled: (e.target as HTMLInputElement).checked })}
+          />
+          <span class="toggle-slider" />
+          <span class="toggle-label">Show Inventory History Report</span>
+        </label>
+        <label class="toggle-switch">
+          <input
+            type="checkbox"
+            checked={appConfig?.availableBoothsEnabled ?? false}
+            disabled={readOnly}
+            onChange={(e) => onUpdateConfig({ availableBoothsEnabled: (e.target as HTMLInputElement).checked })}
+          />
+          <span class="toggle-slider" />
+          <span class="toggle-label">Booth Finder</span>
+        </label>
+        {appConfig?.availableBoothsEnabled && (
+          <div class="settings-toggle-sub">
+            <label class="toggle-switch">
+              <input
+                type="checkbox"
+                checked={appConfig?.boothAlertImessage ?? false}
+                disabled={readOnly}
+                onChange={(e) => onUpdateConfig({ boothAlertImessage: (e.target as HTMLInputElement).checked })}
+              />
+              <span class="toggle-slider" />
+              <span class="toggle-label">iMessage Alerts</span>
+            </label>
+            {appConfig?.boothAlertImessage && (
+              <div style={{ marginTop: '8px' }}>
+                <input
+                  type="text"
+                  class="form-input"
+                  placeholder="Your phone number or Apple ID"
+                  value={appConfig.boothAlertRecipient ? appConfig.boothAlertRecipient : imessageRecipient}
+                  disabled={!!appConfig.boothAlertRecipient || imessageSending}
+                  onInput={(e) => setImessageRecipient((e.target as HTMLInputElement).value)}
+                />
+                <div class="settings-verify-row" style={{ marginTop: '8px' }}>
+                  {!appConfig.boothAlertRecipient ? (
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      disabled={!imessageRecipient.trim() || imessageSending}
+                      onClick={async () => {
+                        setImessageSending(true);
+                        setImessageError(null);
+                        try {
+                          await ipcInvoke('send-imessage', {
+                            recipient: imessageRecipient.trim(),
+                            message: 'Cookie Tracker iMessage alerts are now active!'
+                          });
+                          onUpdateConfig({ boothAlertRecipient: imessageRecipient.trim() });
+                        } catch (err) {
+                          setImessageError((err as Error).message);
+                        } finally {
+                          setImessageSending(false);
+                        }
+                      }}
+                    >
+                      {imessageSending ? 'Sending...' : 'Confirm'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      class="btn btn-secondary"
+                      onClick={() => {
+                        setImessageRecipient('');
+                        setImessageError(null);
+                        onUpdateConfig({ boothAlertRecipient: '' });
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                  {imessageError && <span class="settings-error">{imessageError}</span>}
+                </div>
+                {!appConfig.boothAlertRecipient && <span class="settings-role-hint">A test message will be sent to verify delivery</span>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      {profiles.length > 0 && (
+        <>
+          <div class="profile-controls" style={{ marginTop: '16px' }}>
+            <select
+              class="form-input profile-select"
+              value={activeProfile?.dirName || 'default'}
+              onChange={(e) => onSwitchProfile((e.target as HTMLSelectElement).value)}
+            >
+              {profiles.map((p) => (
+                <option key={p.dirName} value={p.dirName}>
+                  {p.dirName === 'default' ? 'Default' : p.name}
+                </option>
+              ))}
+            </select>
+            <button type="button" class="btn btn-secondary" onClick={() => setShowImportModal(true)}>
+              Import Data
+            </button>
+            {readOnly && <span class="profile-hint">Imported snapshot — syncing disabled</span>}
+          </div>
+          <div class="button-group" style={{ marginTop: '12px' }}>
+            <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
+              Export Data
+            </button>
+            <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onInjectDebug}>
+              Inject Debug Data
+            </button>
+            {readOnly && (
+              <button type="button" class="btn btn-secondary" onClick={() => activeProfile && onDeleteProfile(activeProfile.dirName)}>
+                Delete Profile
+              </button>
+            )}
+          </div>
+        </>
+      )}
+      {showImportModal && <ImportModal onImport={onImportProfile} onClose={() => setShowImportModal(false)} />}
     </div>
   );
 }

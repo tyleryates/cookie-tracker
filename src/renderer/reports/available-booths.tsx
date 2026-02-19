@@ -118,11 +118,16 @@ export function AvailableBoothsReport({
     }
   }
 
+  // Pre-compute filtered dates once per booth (used for both filtering and rendering)
+  const boothFilteredDates = new Map<number, ReturnType<typeof filterAvailableDates>>();
+  for (const loc of boothLocations) {
+    const filtered = filterAvailableDates(loc.availableDates || [], filters);
+    const dates = removeIgnoredSlots(filtered, loc.id, ignoredSet);
+    if (dates.length > 0) boothFilteredDates.set(loc.id, dates);
+  }
+
   const boothsWithDates = boothLocations
-    .filter((loc) => {
-      const filtered = filterAvailableDates(loc.availableDates || [], filters);
-      return removeIgnoredSlots(filtered, loc.id, ignoredSet).length > 0;
-    })
+    .filter((loc) => boothFilteredDates.has(loc.id))
     .sort((a, b) => (boothDistanceMap.get(a.id) ?? Number.POSITIVE_INFINITY) - (boothDistanceMap.get(b.id) ?? Number.POSITIVE_INFINITY));
 
   // Build collapsed summary text
@@ -166,7 +171,7 @@ export function AvailableBoothsReport({
     syncStatusText = 'Last check failed';
     syncStatusIcon = '\u2717';
   } else if (syncState.lastSync) {
-    syncStatusText = DateFormatter.toFriendly(syncState.lastSync);
+    syncStatusText = DateFormatter.toRelativeTimestamp(syncState.lastSync);
     syncStatusIcon = '\u2713';
   } else {
     syncStatusText = 'Not yet checked';
@@ -279,8 +284,7 @@ export function AvailableBoothsReport({
           boothsWithDates.map((loc) => {
             const addrParts = [loc.address.street, loc.address.city, loc.address.state, loc.address.zip].filter(Boolean);
             const addressStr = addrParts.join(', ');
-            const filtered = filterAvailableDates(loc.availableDates || [], filters);
-            const dates = removeIgnoredSlots(filtered, loc.id, ignoredSet);
+            const dates = boothFilteredDates.get(loc.id) || [];
 
             return (
               <div key={loc.id} class="booth-card">

@@ -96,8 +96,7 @@ export const TRANSFER_CATEGORY = {
   DC_ORDER_RECORD: 'DC_ORDER_RECORD', // D — DC order synced to SC (not a sale, just a sync record)
   COOKIE_SHARE_RECORD: 'COOKIE_SHARE_RECORD', // COOKIE_SHARE, COOKIE_SHARE_D (manual or DC-synced)
   BOOTH_COOKIE_SHARE: 'BOOTH_COOKIE_SHARE', // COOKIE_SHARE from booth divider (automatic)
-  DIRECT_SHIP: 'DIRECT_SHIP', // Shipped from supplier (order record, not inventory movement)
-  PLANNED: 'PLANNED' // Future/uncommitted order
+  DIRECT_SHIP: 'DIRECT_SHIP' // Shipped from supplier (order record, not inventory movement)
 } as const;
 
 export type TransferCategory = (typeof TRANSFER_CATEGORY)[keyof typeof TRANSFER_CATEGORY];
@@ -205,7 +204,7 @@ export const SC_API_COLUMNS = {
 // DISPLAY STRINGS (UI Labels & Tooltips)
 // ============================================================================
 
-export const DISPLAY_STRINGS: Record<string, string> = {
+export const DISPLAY_STRINGS: Record<(typeof ALLOCATION_METHOD)[keyof typeof ALLOCATION_METHOD], string> = {
   [ALLOCATION_METHOD.VIRTUAL_BOOTH_DIVIDER]: 'Troop Girl Delivered',
   [ALLOCATION_METHOD.DIRECT_SHIP_DIVIDER]: 'Troop Direct Ship',
   [ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]: 'Booth Sales'
@@ -218,6 +217,7 @@ export const DISPLAY_STRINGS: Record<string, string> = {
 export const EXCEL_EPOCH = new Date(1899, 11, 30); // Excel date serialization epoch
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;
 export const CHECK_INTERVAL_MS = 60_000; // Auto-sync polling interval
+export const IMESSAGE_TIMEOUT_MS = 30_000; // Kill osascript if iMessage send hangs
 
 // Booth day/time filter UI
 export const BOOTH_TIME_SLOTS = [
@@ -322,7 +322,7 @@ export const SYNC_ENDPOINTS = [
   {
     id: 'sc-booth-availability',
     source: 'SC',
-    name: 'Booth Planner',
+    name: 'Booth Finder',
     maxAgeMs: 900_000,
     syncAction: 'refreshBooths',
     group: 'booth-availability'

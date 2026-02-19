@@ -28,7 +28,11 @@ import { parseVarietiesFromAPI } from './parsers';
 import { parseGirlAllocation, registerScout } from './scout-helpers';
 
 /** Import Smart Direct Ship Divider allocations */
-function importDirectShipDivider(store: DataStore, dividerData: SCDirectShipDivider): void {
+function importDirectShipDivider(
+  store: DataStore,
+  dividerData: SCDirectShipDivider,
+  dynamicCookieIdMap: Record<string, CookieType> | null
+): void {
   const girls = dividerData.girls || [];
 
   for (const girl of girls) {
@@ -36,7 +40,7 @@ function importDirectShipDivider(store: DataStore, dividerData: SCDirectShipDivi
     const cookies = girl.cookies || [];
 
     // Parse varieties from cookies array
-    const { varieties } = parseVarietiesFromAPI(cookies);
+    const { varieties } = parseVarietiesFromAPI(cookies, dynamicCookieIdMap);
 
     store.allocations.push({
       channel: ALLOCATION_CHANNEL.DIRECT_SHIP,
@@ -239,7 +243,7 @@ export function importAllocations(store: DataStore, data: AllocationData): void 
   const cookieIdMap = data.cookieIdMap ?? null;
 
   if (data.directShipDivider && !Array.isArray(data.directShipDivider) && data.directShipDivider.girls) {
-    importDirectShipDivider(store, data.directShipDivider);
+    importDirectShipDivider(store, data.directShipDivider, cookieIdMap);
   }
 
   if (data.virtualCookieShares && data.virtualCookieShares.length > 0) {

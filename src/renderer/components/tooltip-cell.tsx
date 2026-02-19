@@ -31,12 +31,13 @@ export function TooltipCell({ tooltip, children, style, tag, className }: Toolti
     const rect = ref.current.getBoundingClientRect();
     const el = document.createElement('div');
     el.className = 'tooltip-fixed';
-    // Safe: tooltip content is built from app constants (cookie names, colors, numbers)
-    // via buildVarietyTooltip — no user-controlled strings flow into this path.
-    // Using template to parse in an inert context (prevents script execution).
-    const tpl = document.createElement('template');
-    tpl.innerHTML = tooltip.replace(/\n/g, '<br>');
-    el.appendChild(tpl.content);
+    // Split on newlines and build DOM nodes to avoid innerHTML with
+    // potentially user-influenced strings (e.g. DC customer names).
+    const lines = tooltip.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (i > 0) el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(lines[i]));
+    }
     document.body.appendChild(el);
 
     // Position centered above the element, clamped to viewport

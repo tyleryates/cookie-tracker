@@ -1,5 +1,10 @@
 /* Sync tab — endpoint table, status indicators, controls */
 
+/* Space between settings sections (Logins, Sync Status, Data Health, Settings, Profile) */
+.sync-tab > div + div {
+  margin-top: 32px;
+}
+
 /* Tighten gap between section headers and content */
 .sync-tab h3 {
   margin-bottom: 12px;
@@ -46,9 +51,41 @@
   justify-content: space-between;
 }
 
+.endpoint-group-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .endpoint-group-header .btn-sm {
   font-size: 0.82em;
   padding: 4px 14px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Compact toggle for endpoint group headers */
+.toggle-inline {
+  gap: 6px;
+}
+
+.toggle-inline .toggle-slider {
+  width: 32px;
+  height: 18px;
+}
+
+.toggle-inline .toggle-slider::after {
+  width: 14px;
+  height: 14px;
+}
+
+.toggle-inline input[type="checkbox"]:checked + .toggle-slider::after {
+  transform: translateX(14px);
+}
+
+.toggle-inline .toggle-label {
+  font-size: 0.82em;
+  font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
 }
@@ -163,7 +200,6 @@
 
 /* Profile section */
 .profile-section {
-  margin-top: 32px;
   margin-bottom: 8px;
 }
 
@@ -176,10 +212,6 @@
 
 .profile-select {
   max-width: 240px;
-}
-
-.profile-import-input {
-  max-width: 200px;
 }
 
 .profile-hint {

@@ -148,9 +148,11 @@ Virtual Cookie Share orders are manual entries in Smart Cookie that give girls c
 - **Girl Delivery with Donation** — Customer orders cookies AND Cookie Share. Cookies flow automatically, but TCM must manually create Virtual Cookie Share for the donation portion.
 - **Non-credit-card Cookie Share** — Cookie Share sold for cash/check outside DC.
 
-**Does NOT require manual entry:**
-- Ship-only orders with Cookie Share (flows automatically)
-- Donation-only orders (flows automatically)
+**Does NOT require manual entry (credit card payments only):**
+- Ship-only orders with Cookie Share paid by credit card (flows automatically)
+- Donation-only orders paid by credit card (flows automatically)
+
+**Note:** CASH payment types NEVER auto-sync regardless of order type. See RULES.md for the full auto-sync matrix.
 
 ---
 

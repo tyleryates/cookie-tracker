@@ -10,7 +10,6 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
   'load-config',
   'update-config',
   'scrape-websites',
-  'cancel-sync',
   'refresh-booth-locations',
   'fetch-booth-catalog',
   'export-data',
@@ -25,10 +24,10 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
   'load-timestamps',
   'record-unified-build',
   'wipe-logins',
-  'wipe-data',
   'quit-and-install',
   'check-for-updates',
   'send-imessage',
+  'set-dock-badge',
   'log-message'
 ]);
 

@@ -6,7 +6,7 @@ import Logger from './logger';
 import type { Credentials } from './types';
 
 class CredentialsManager {
-  credentialsPath: string;
+  private credentialsPath: string;
 
   constructor(dataDir: string | null = null) {
     // Use provided dataDir, or fall back to __dirname for development
@@ -74,7 +74,7 @@ class CredentialsManager {
 
       const jsonString = JSON.stringify(credentials, null, 2);
       const encryptedBuffer = safeStorage.encryptString(jsonString);
-      fs.writeFileSync(this.credentialsPath, encryptedBuffer);
+      fs.writeFileSync(this.credentialsPath, encryptedBuffer, { mode: 0o600 });
 
       // Delete old plaintext file if it exists (migration)
       const oldPath = this.credentialsPath.replace('.enc', '.json');

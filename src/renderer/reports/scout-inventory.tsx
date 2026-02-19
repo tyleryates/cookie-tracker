@@ -164,7 +164,7 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
 
   return (
     <div class="scout-breakdown">
-      {/* Summary table */}
+      <h5>Current Inventory</h5>
       <table class="table-compact">
         <colgroup>
           <col style={{ width: twoShare }} />
@@ -350,7 +350,8 @@ export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; b
     );
   }
 
-  const hasNegativeInventory = (data.troopTotals.scouts.withNegativeInventory ?? 0) > 0;
+  const negativeCount = data.troopTotals.scouts.withNegativeInventory ?? 0;
+  const hasNegativeInventory = negativeCount > 0;
 
   const sortedScouts = getActiveScouts(data.scouts).filter(([, scout]) => scout.inventory.total > 0);
 
@@ -385,11 +386,18 @@ export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; b
     <div class="report-visual">
       <div class="report-header-row">
         <h3>Scout Inventory</h3>
-        <span class={`report-status-badge ${hasNegativeInventory ? 'report-status-warning' : 'report-status-ok'}`}>
-          {hasNegativeInventory ? 'Needs Attention' : 'No Errors'}
-        </span>
+        {hasNegativeInventory && (
+          <span class="report-status-badge report-status-info">
+            {`${negativeCount} scout${negativeCount === 1 ? ' needs' : 's need'} inventory`}
+          </span>
+        )}
       </div>
       {banner}
+      {!data.metadata.lastImportDC && (
+        <div class="info-box info-box-warning">
+          <p>Digital Cookie data was not loaded. Sold amounts and inventory may be incomplete.</p>
+        </div>
+      )}
       <StatCards stats={stats} />
 
       <DataTable

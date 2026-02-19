@@ -1,12 +1,11 @@
-import { execFile, execSync, spawn } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import archiver from 'archiver';
-import { app, BrowserWindow, dialog, ipcMain, autoUpdater as nativeUpdater } from 'electron';
-import { autoUpdater } from 'electron-updater';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import ConfigManager from './config-manager';
-import { PIPELINE_FILES } from './constants';
+import { IMESSAGE_TIMEOUT_MS, PIPELINE_FILES } from './constants';
 import CredentialsManager from './credentials-manager';
 import { loadData } from './data-pipeline';
 import { normalizeBoothLocation } from './data-processing/importers';
@@ -20,10 +19,10 @@ import { SmartCookieSession } from './scrapers/sc-session';
 import SmartCookieScraper from './scrapers/smart-cookie';
 import SeasonalData, { type SeasonalDataFiles } from './seasonal-data';
 import type { AppConfig, CredentialPatch, Credentials, CredentialsSummary, EndpointMetadata, IpcResponse, Timestamps } from './types';
+import { checkForUpdates, checkForUpdatesOnStartup, quitAndInstall, setupAutoUpdater } from './update-manager';
 
 let mainWindow: BrowserWindow | null = null;
 let activeOrchestrator: ScraperOrchestrator | null = null;
-let downloadedUpdateFile: string | null = null;
 
 // Use app.getPath('userData') for data storage (works with packaged app)
 // Production (packaged): ~/Library/Application Support/Cookie Tracker on macOS (uses productName)
@@ -162,10 +161,12 @@ function handleIpcError<T>(handler: (...args: any[]) => Promise<T>): (...args: a
 }
 
 // Renderer log relay — fire-and-forget, no response needed
-ipcMain.handle('log-message', (_event, line: string) => {
-  Logger.appendLine(line);
-  return { success: true };
-});
+ipcMain.handle(
+  'log-message',
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, line: string) => {
+    Logger.appendLine(line);
+  })
+);
 
 function loadAndValidateCredentials(): { credentials: Credentials; error?: undefined } | { credentials?: undefined; error: string } {
   const credentials = credentialsManager.loadCredentials();
@@ -194,7 +195,8 @@ function createWindow(): void {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   });
 
@@ -210,63 +212,8 @@ function createWindow(): void {
   });
 }
 
-// Auto-update configuration — downloads silently, renderer shows restart banner
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
-Logger.info(`Auto-updater configured: autoDownload=true, autoInstallOnAppQuit=true, isPackaged=${app.isPackaged}`);
-
-autoUpdater.on('checking-for-update', () => {
-  Logger.info('Checking for updates...');
-});
-
-autoUpdater.on('update-available', (info) => {
-  Logger.info(`Update available: v${info.version}`);
-  mainWindow?.webContents.send('update-available', { version: info.version });
-});
-
-autoUpdater.on('update-not-available', (info) => {
-  Logger.info(`No update available (current: v${info.version})`);
-});
-
-let downloadProgressReceived = false;
-autoUpdater.on('update-downloaded', (info) => {
-  const downloadedFile = (info as any).downloadedFile as string | undefined;
-  let fileSize: string | undefined;
-  if (downloadedFile && fs) {
-    try {
-      const stat = fs.statSync(downloadedFile);
-      fileSize = `${(stat.size / (1024 * 1024)).toFixed(1)}MB`;
-    } catch {
-      fileSize = 'stat failed';
-    }
-  }
-  Logger.info(
-    `Update downloaded: v${info.version}, file=${downloadedFile || 'unknown'}, size=${fileSize || 'unknown'}, hadProgress=${downloadProgressReceived}`
-  );
-  if (!downloadProgressReceived) {
-    Logger.info('Update was cached (no download-progress events received) — file from previous download');
-  }
-  downloadProgressReceived = false;
-  downloadedUpdateFile = downloadedFile || null;
-  mainWindow?.webContents.send('update-downloaded', { version: info.version });
-});
-
-autoUpdater.on('download-progress', (progress) => {
-  downloadProgressReceived = true;
-  Logger.info(`Update download: ${Math.round(progress.percent)}% (${progress.transferred}/${progress.total})`);
-});
-
-autoUpdater.on('error', (err) => {
-  Logger.error('Auto-updater error:', err.message);
-});
-
-// Native Squirrel updater events (macOS)
-nativeUpdater.on('checking-for-update', () => Logger.info('Native updater: checking-for-update'));
-nativeUpdater.on('update-available', () => Logger.info('Native updater: update-available'));
-nativeUpdater.on('update-not-available', () => Logger.info('Native updater: update-not-available'));
-nativeUpdater.on('update-downloaded', () => Logger.info('Native updater: update-downloaded'));
-nativeUpdater.on('before-quit-for-update', () => Logger.info('Native updater: before-quit-for-update'));
-nativeUpdater.on('error', (err) => Logger.error('Native updater error:', err.message));
+// Auto-update — event handlers, download tracking, and install logic (see update-manager.ts)
+setupAutoUpdater(() => mainWindow);
 
 // App lifecycle events
 app.on('before-quit', () => Logger.info('App event: before-quit'));
@@ -291,20 +238,7 @@ app.whenReady().then(() => {
 
   createWindow();
 
-  // Check for updates on startup (only if enabled in config and packaged)
-  if (!app.isPackaged) {
-    Logger.info('Skipping update check in development');
-  } else {
-    const config = configManager.loadConfig();
-    if (config.autoUpdateEnabled) {
-      Logger.info('Will check for updates in 3 seconds');
-      setTimeout(() => {
-        autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
-      }, 3000);
-    } else {
-      Logger.info('Auto-update disabled in config, skipping update check');
-    }
-  }
+  checkForUpdatesOnStartup(configManager.loadConfig().autoUpdateEnabled);
 });
 
 app.on('window-all-closed', () => {
@@ -333,15 +267,18 @@ ipcMain.handle(
 );
 
 // Handle load-data-debug: same as load-data but injects debug mutations before building
-ipcMain.handle(
-  'load-data-debug',
-  handleIpcError(async () => {
-    Logger.info('IPC: load-data-debug');
-    const result = await loadData(profileDir, { debug: true });
-    Logger.info(`IPC: load-data-debug complete — ${result ? `${Object.keys(result.unified?.scouts || {}).length} scouts` : 'no data'}`);
-    return result;
-  })
-);
+// Only available in development builds — disabled in packaged production builds
+if (!app.isPackaged) {
+  ipcMain.handle(
+    'load-data-debug',
+    handleIpcError(async () => {
+      Logger.info('IPC: load-data-debug');
+      const result = await loadData(profileDir, { debug: true });
+      Logger.info(`IPC: load-data-debug complete — ${result ? `${Object.keys(result.unified?.scouts || {}).length} scouts` : 'no data'}`);
+      return result;
+    })
+  );
+}
 
 // Handle save file (for unified dataset caching — saves to current/)
 ipcMain.handle(
@@ -464,18 +401,6 @@ ipcMain.handle(
     Logger.info('IPC: scrape-websites — sync complete', Object.keys(results.endpointStatuses));
     activeOrchestrator = null;
     return results;
-  })
-);
-
-// Handle cancel sync
-ipcMain.handle(
-  'cancel-sync',
-  handleIpcError(async () => {
-    Logger.info('IPC: cancel-sync');
-    if (activeOrchestrator) {
-      activeOrchestrator.cancel();
-      activeOrchestrator = null;
-    }
   })
 );
 
@@ -609,7 +534,7 @@ ipcMain.handle(
   })
 );
 
-// Wipe handlers (debug/testing utilities)
+// Wipe logins (debug/testing utility)
 ipcMain.handle(
   'wipe-logins',
   handleIpcError(async () => {
@@ -621,103 +546,13 @@ ipcMain.handle(
 );
 
 ipcMain.handle(
-  'wipe-data',
-  handleIpcError(async () => {
-    if (profileReadOnly) return;
-    // Keep only login-related files (seasonal data used for verification)
-    const KEEP_FILES = new Set(['sc-troop.json', 'sc-cookies.json', 'dc-roles.json']);
-    if (fs.existsSync(profileDir)) {
-      for (const entry of fs.readdirSync(profileDir)) {
-        if (KEEP_FILES.has(entry)) continue;
-        const fullPath = path.join(profileDir, entry);
-        const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-          fs.rmSync(fullPath, { recursive: true, force: true });
-        } else {
-          fs.unlinkSync(fullPath);
-        }
-      }
-    }
-    activeOrchestrator = null;
-  })
-);
-
-ipcMain.handle(
   'quit-and-install',
-  handleIpcError(async () => {
-    Logger.info('IPC: quit-and-install — starting');
-    Logger.info(`quit-and-install: platform=${process.platform}, downloadedFile=${downloadedUpdateFile}`);
-
-    if (process.platform === 'darwin' && downloadedUpdateFile && fs.existsSync(downloadedUpdateFile)) {
-      // Manual install: Squirrel.Mac's "The command is disabled" error means
-      // quitAndInstall() can never work. Instead, extract the downloaded zip,
-      // spawn a detached script to replace the app bundle, and exit.
-      const currentAppPath = app.getAppPath().replace(/\/Contents\/Resources\/app(\.asar)?$/, '');
-      Logger.info(`quit-and-install: manual install — currentApp=${currentAppPath}`);
-
-      const tempDir = path.join(os.tmpdir(), 'cookie-tracker-update');
-      try {
-        // Extract the update zip
-        Logger.info(`quit-and-install: extracting ${downloadedUpdateFile} to ${tempDir}`);
-        execSync(`rm -rf "${tempDir}" && mkdir -p "${tempDir}" && ditto -xk "${downloadedUpdateFile}" "${tempDir}"`);
-
-        // Find the .app bundle in the extracted dir
-        const entries = fs.readdirSync(tempDir).filter((f) => f.endsWith('.app'));
-        if (entries.length === 0) {
-          Logger.error('quit-and-install: no .app found in extracted zip');
-          throw new Error('No .app bundle found in update zip');
-        }
-        const newAppPath = path.join(tempDir, entries[0]);
-        Logger.info(`quit-and-install: found ${entries[0]}, spawning update script`);
-
-        // Spawn a detached shell script that waits for this process to exit,
-        // replaces the app bundle, relaunches, and cleans up.
-        const script = [
-          `while kill -0 ${process.pid} 2>/dev/null; do sleep 0.5; done`,
-          `rm -rf "${currentAppPath}"`,
-          `mv "${newAppPath}" "${currentAppPath}"`,
-          `open "${currentAppPath}"`,
-          `rm -rf "${tempDir}"`
-        ].join(' && ');
-
-        spawn('bash', ['-c', script], { detached: true, stdio: 'ignore' }).unref();
-        Logger.info('quit-and-install: update script spawned, exiting app');
-        Logger.close();
-        app.exit(0);
-      } catch (err) {
-        Logger.error('quit-and-install: manual install failed:', err);
-        // Fall through to Squirrel attempt
-      }
-    }
-
-    // Non-macOS or manual install failed: try Squirrel/standard approach
-    Logger.info('quit-and-install: trying standard quitAndInstall()');
-    app.removeAllListeners('window-all-closed');
-    app.removeAllListeners('activate');
-    if (mainWindow) mainWindow.removeAllListeners('close');
-
-    nativeUpdater.once('before-quit-for-update', () => {
-      Logger.info('quit-and-install: before-quit-for-update fired, calling app.exit()');
-      app.exit();
-    });
-
-    autoUpdater.quitAndInstall();
-
-    // Fallback: force exit after 5s if nothing happened
-    setTimeout(() => {
-      Logger.info('quit-and-install: fallback timeout, calling app.exit(0)');
-      app.exit(0);
-    }, 5000);
-  })
+  handleIpcError(async () => quitAndInstall(() => mainWindow))
 );
 
 ipcMain.handle(
   'check-for-updates',
-  handleIpcError(async () => {
-    if (app.isPackaged && configManager.loadConfig().autoUpdateEnabled) {
-      autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
-    }
-  })
+  handleIpcError(async () => checkForUpdates(configManager.loadConfig().autoUpdateEnabled))
 );
 
 // Handle send iMessage via AppleScript
@@ -732,7 +567,11 @@ ipcMain.handle(
   end tell
 end run`;
     await new Promise<void>((resolve, reject) => {
+      let settled = false;
       const proc = execFile('osascript', ['-e', script, message, recipient], (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         if (error) {
           Logger.error('iMessage send failed:', error.message);
           reject(error);
@@ -742,11 +581,23 @@ end run`;
         }
       });
       // Kill osascript if it hangs (e.g. macOS permission prompt, Messages.app not responding)
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
         proc.kill();
-        reject(new Error('iMessage send timed out after 30 seconds'));
-      }, 30_000);
+        reject(new Error('iMessage send timed out'));
+      }, IMESSAGE_TIMEOUT_MS);
     });
+  })
+);
+
+// Handle dock badge (macOS)
+ipcMain.handle(
+  'set-dock-badge',
+  handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { count }: { count: number }) => {
+    if (app.dock) {
+      app.dock.setBadge(count > 0 ? String(count) : '');
+    }
   })
 );
 
@@ -861,7 +712,7 @@ ipcMain.handle(
     const newProfileDir = path.join(rootDataDir, profile.dirName);
 
     // Extract ZIP into a temp directory first, then validate paths before moving
-    const tempDir = path.join(rootDataDir, `_import_${Date.now()}`);
+    const tempDir = path.join(rootDataDir, `_import_${crypto.randomBytes(8).toString('hex')}`);
     fs.mkdirSync(tempDir, { recursive: true });
     try {
       await new Promise<void>((resolve, reject) => {

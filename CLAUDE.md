@@ -28,7 +28,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **12 reports in 5 tab groups** — Troop (Inventory & Transfers, Online Orders, Proceeds), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, Booth Finder), Donations, Cookie Popularity, plus Inventory History tool
+- **13 reports in 5 tab groups + To-Do** — To-Do (Health Check, standalone button), Troop (Inventory & Transfers, Online Orders, Proceeds, plus Inventory History when enabled), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, plus Booth Finder when enabled), Donations, Cookie Popularity
 - **Profile management** — Import, switch, and delete data profiles for managing multiple troops
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
@@ -36,9 +36,9 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 
 Three layers with strict boundaries:
 
-**Main process** (`src/main.ts`, `src/data-pipeline.ts`) — IPC handlers, scraper orchestration, credentials, file system. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
+**Main process** (`src/main.ts`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers, scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
 
-**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (12 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings and Sync are rendered as tab content (via `activeReport`), not separate pages — only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
+**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (13 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings and Sync are rendered as tab content (via `activeReport`), not separate pages — only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
 
 **Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Sub-directories: `importers/` (parse raw files into DataStore), `calculators/` (compute UnifiedDataset from DataStore).
 
@@ -59,6 +59,7 @@ Three layers with strict boundaries:
 | `src/credentials-manager.ts` | Encrypted credential storage |
 | `src/seasonal-data.ts` | Persists SC session data (troop info, cookie ID map) across syncs |
 | `src/data-pipeline.ts` | Orchestrates: scan files, import, build UnifiedDataset |
+| `src/update-manager.ts` | Auto-update configuration, event handlers, quit-and-install logic |
 | `src/data-processing/utils.ts` | Shared helpers for data-processing layer (`mapToRecord`) |
 | `src/profile-manager.ts` | Multi-profile data directory management |
 
@@ -67,9 +68,8 @@ Three layers with strict boundaries:
 | Component | Purpose |
 |---|---|
 | `reports-section.tsx` | TabBar + ReportContent components, health banner, report rendering |
-| `available-booths-utils.ts` | Booth slot filtering, encoding, and summarization utilities (used by app.tsx, hooks, reports) |
-| `sync-section.tsx` | Sync state utilities, SyncTab component (sync button, auto-sync toggle, endpoint status) |
-| `settings-page.tsx` | Credential setup, DC role selection, SC verification |
+| `sync-section.tsx` | Sync state utilities (`createInitialSyncState`, `computeGroupStatuses`), SyncStatusSection, DataHealthChecks |
+| `settings-page.tsx` | Credential setup (SettingsPage), app toggle switches + profile management + import modal (SettingsToggles) |
 | `booth-selector.tsx` | Multi-select UI for choosing booth locations to track |
 | `booth-day-filter.tsx` | Day/time filter configuration for Available Booths report |
 | `scout-detail.tsx` | Expandable scout detail panel (orders, inventory, allocations) |
@@ -77,6 +77,7 @@ Three layers with strict boundaries:
 | `stat-cards.tsx` | Reusable stat card grid component |
 | `expandable-row.tsx` | Expandable/collapsible table row component |
 | `tooltip-cell.tsx` | Tooltip component for table cells |
+| `scout-credit-chips.tsx` | Shared chip display for per-scout allocation breakdowns |
 
 ### Layer Rules
 

@@ -1,8 +1,8 @@
-// SyncSection — Sync utilities + SyncTab component for the Sync tab
+// SyncSection — Sync utilities and health check components
 
 import { useState } from 'preact/hooks';
 import { SYNC_ENDPOINTS } from '../../constants';
-import type { ActiveProfile, EndpointSyncState, HealthChecks, ProfileInfo, SyncState, Warning } from '../../types';
+import type { EndpointSyncState, HealthChecks, SyncState, Warning } from '../../types';
 import { DateFormatter, formatDataSize, formatDuration, formatMaxAge } from '../format-utils';
 
 // ============================================================================
@@ -60,10 +60,17 @@ export function computeGroupStatuses(
   const reports = compute('reports');
   const booths = compute('booth-availability');
 
-  // Override: if the top-level syncing flag is on, force group status to 'syncing'
-  // to prevent flicker when one platform finishes before the other starts
-  if (syncFlags?.syncing) reports.status = 'syncing';
-  if (syncFlags?.refreshingBooths) booths.status = 'syncing';
+  // Override: if the top-level syncing flag is on AND some endpoints in the group
+  // haven't resolved yet, force 'syncing' to prevent flicker when one platform
+  // finishes before the other starts. Once all group endpoints are resolved
+  // (synced/error), stop overriding so the group reflects its true status even if
+  // other groups (e.g. booth availability) are still in-flight.
+  if (syncFlags?.syncing && reports.status !== 'synced' && reports.status !== 'error' && reports.status !== 'partial') {
+    reports.status = 'syncing';
+  }
+  if (syncFlags?.refreshingBooths && booths.status !== 'synced' && booths.status !== 'error' && booths.status !== 'partial') {
+    booths.status = 'syncing';
+  }
 
   return { reports, booths };
 }
@@ -71,6 +78,13 @@ export function computeGroupStatuses(
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
+
+function statusIcon(ep: EndpointSyncState) {
+  if (ep.status === 'syncing') return <span class="spinner" />;
+  if (ep.status === 'error') return ep.httpStatus || '\u2717';
+  if (ep.status === 'synced') return ep.cached ? 'cached' : 200;
+  return '';
+}
 
 function EndpointRow({
   name,
@@ -93,7 +107,7 @@ function EndpointRow({
   const timestampDisplay = epState.lastSync
     ? hovered
       ? DateFormatter.toFullTimestamp(epState.lastSync)
-      : DateFormatter.toFriendly(epState.lastSync)
+      : DateFormatter.toRelativeTimestamp(epState.lastSync)
     : epState.status === 'error'
       ? 'Failed'
       : '';
@@ -125,21 +139,7 @@ function EndpointRow({
       )}
       <td class="endpoint-status-cell">
         <span class={`sync-status ${statusClass}`} title={epState.error || statusTooltip}>
-          {epState.status === 'syncing' ? (
-            <span class="spinner" />
-          ) : epState.status === 'error' && epState.httpStatus ? (
-            epState.httpStatus
-          ) : epState.status === 'synced' ? (
-            epState.cached ? (
-              'cached'
-            ) : (
-              200
-            )
-          ) : epState.status === 'error' ? (
-            '\u2717'
-          ) : (
-            ''
-          )}
+          {statusIcon(epState)}
         </span>
       </td>
     </tr>
@@ -153,7 +153,9 @@ function EndpointGroupTable({
   showFrequency,
   onRefresh,
   refreshing,
-  readOnly
+  readOnly,
+  autoEnabled,
+  onToggleAuto
 }: {
   endpoints: Record<string, EndpointSyncState>;
   group: string;
@@ -162,6 +164,8 @@ function EndpointGroupTable({
   onRefresh?: () => void;
   refreshing?: boolean;
   readOnly?: boolean;
+  autoEnabled?: boolean;
+  onToggleAuto?: (enabled: boolean) => void;
 }) {
   const eps = SYNC_ENDPOINTS.filter((ep) => ep.group === group);
   if (eps.length === 0) return null;
@@ -174,11 +178,25 @@ function EndpointGroupTable({
           <td colSpan={colCount}>
             <div class="endpoint-group-header">
               {label}
-              {onRefresh && (
-                <button type="button" class="btn btn-primary btn-sm" disabled={refreshing || readOnly} onClick={onRefresh}>
-                  {refreshing ? 'Refreshing\u2026' : 'Refresh'}
-                </button>
-              )}
+              <span class="endpoint-group-controls">
+                {onToggleAuto && (
+                  <label class="toggle-switch toggle-inline">
+                    <span class="toggle-label">Auto sync</span>
+                    <input
+                      type="checkbox"
+                      checked={autoEnabled}
+                      disabled={readOnly}
+                      onChange={(e) => onToggleAuto((e.target as HTMLInputElement).checked)}
+                    />
+                    <span class="toggle-slider" />
+                  </label>
+                )}
+                {onRefresh && (
+                  <button type="button" class="btn btn-primary btn-sm" disabled={refreshing || readOnly} onClick={onRefresh}>
+                    {refreshing ? 'Refreshing\u2026' : 'Refresh'}
+                  </button>
+                )}
+              </span>
             </div>
           </td>
         </tr>
@@ -211,11 +229,11 @@ const DATA_CHECKS: { key: keyof HealthChecks; label: string; warningType: string
   { key: 'unknownCookieIds', label: 'Cookie IDs', warningType: 'UNKNOWN_COOKIE_ID' }
 ];
 
-function DataHealthChecks({ healthChecks, warnings }: { healthChecks: HealthChecks; warnings: Warning[] }) {
+export function DataHealthChecks({ healthChecks, warnings }: { healthChecks: HealthChecks; warnings: Warning[] }) {
   const hasIssues = DATA_CHECKS.some((c) => healthChecks[c.key] > 0);
 
   return (
-    <div style={{ marginTop: '24px' }}>
+    <div>
       <h3>Data Health</h3>
       <table class="endpoint-table">
         <tbody>
@@ -255,52 +273,34 @@ function DataHealthChecks({ healthChecks, warnings }: { healthChecks: HealthChec
 }
 
 // ============================================================================
-// SYNC TAB
+// SYNC STATUS SECTION
 // ============================================================================
 
-interface SyncTabProps {
+interface SyncStatusSectionProps {
   syncState: SyncState;
   availableBoothsEnabled: boolean;
-  healthChecks: HealthChecks | null;
-  warnings: Warning[];
+  autoSyncEnabled: boolean;
+  autoRefreshBoothsEnabled: boolean;
   onSyncReports: () => void;
   onRefreshBooths: () => void;
-  onRecalculate: () => void;
-  onExport: () => void;
-  onInjectDebug: () => void;
-  onWipeData: () => void;
-  hasData: boolean;
+  onToggleAutoSync: (enabled: boolean) => void;
+  onToggleAutoRefreshBooths: (enabled: boolean) => void;
   readOnly: boolean;
-  activeProfile: ActiveProfile | null;
-  profiles: ProfileInfo[];
-  onSwitchProfile: (dirName: string) => void;
-  onImportProfile: (name: string) => void;
-  onDeleteProfile: (dirName: string) => void;
 }
 
-export function SyncTab({
+export function SyncStatusSection({
   syncState,
   availableBoothsEnabled,
-  healthChecks,
-  warnings,
+  autoSyncEnabled,
+  autoRefreshBoothsEnabled,
   onSyncReports,
   onRefreshBooths,
-  onRecalculate,
-  onExport,
-  onInjectDebug,
-  onWipeData,
-  hasData,
-  readOnly,
-  activeProfile,
-  profiles,
-  onSwitchProfile,
-  onImportProfile,
-  onDeleteProfile
-}: SyncTabProps) {
-  const [importName, setImportName] = useState('');
-
+  onToggleAutoSync,
+  onToggleAutoRefreshBooths,
+  readOnly
+}: SyncStatusSectionProps) {
   return (
-    <div class="report-visual sync-tab">
+    <div>
       <h3>Sync Status</h3>
       <EndpointGroupTable
         endpoints={syncState.endpoints}
@@ -310,74 +310,21 @@ export function SyncTab({
         onRefresh={onSyncReports}
         refreshing={syncState.syncing}
         readOnly={readOnly}
+        autoEnabled={autoSyncEnabled}
+        onToggleAuto={onToggleAutoSync}
       />
       {availableBoothsEnabled && (
         <EndpointGroupTable
           endpoints={syncState.endpoints}
           group="booth-availability"
-          label="Booth Planner"
+          label="Booth Finder"
           showFrequency={false}
           onRefresh={onRefreshBooths}
           refreshing={syncState.refreshingBooths}
           readOnly={readOnly}
+          autoEnabled={autoRefreshBoothsEnabled}
+          onToggleAuto={onToggleAutoRefreshBooths}
         />
-      )}
-      {healthChecks && <DataHealthChecks healthChecks={healthChecks} warnings={warnings} />}
-      {profiles.length > 0 && (
-        <div class="profile-section">
-          <h3>Profile</h3>
-          <div class="profile-controls">
-            <select
-              class="form-input profile-select"
-              value={activeProfile?.dirName || 'default'}
-              onChange={(e) => onSwitchProfile((e.target as HTMLSelectElement).value)}
-            >
-              {profiles.map((p) => (
-                <option key={p.dirName} value={p.dirName}>
-                  {p.dirName === 'default' ? 'Default' : p.name}
-                </option>
-              ))}
-            </select>
-            <input
-              type="text"
-              class="form-input profile-import-input"
-              placeholder="New profile name"
-              value={importName}
-              onInput={(e) => setImportName((e.target as HTMLInputElement).value)}
-            />
-            <button
-              type="button"
-              class="btn btn-secondary"
-              disabled={!importName.trim()}
-              onClick={() => {
-                onImportProfile(importName.trim());
-                setImportName('');
-              }}
-            >
-              Import Data
-            </button>
-            {readOnly && <span class="profile-hint">Imported snapshot — syncing disabled</span>}
-          </div>
-          <div class="button-group" style={{ marginTop: '12px' }}>
-            <button type="button" class="btn btn-secondary" onClick={onRecalculate}>
-              Recalculate
-            </button>
-            <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
-              Export Data
-            </button>
-            <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onInjectDebug}>
-              Inject Debug Data
-            </button>
-            <button type="button" class="btn btn-secondary" disabled={readOnly} onClick={onWipeData}>
-              Wipe Data
-            </button>
-            {readOnly && (
-              <button type="button" class="btn btn-secondary" onClick={() => activeProfile && onDeleteProfile(activeProfile.dirName)}>
-                Delete Profile
-              </button>
-            )}
-          </div>
-        </div>
       )}
     </div>
   );

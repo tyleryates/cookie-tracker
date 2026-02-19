@@ -1,45 +1,11 @@
 import type { ComponentChildren } from 'preact';
-import { SC_TRANSFER_STATUS, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
+import { SC_TRANSFER_STATUS, TRANSFER_TYPE } from '../../constants';
 import { COOKIE_ORDER, getCookieAbbreviation, getCookieColor } from '../../cookie-constants';
 import type { Transfer, UnifiedDataset, Varieties } from '../../types';
 import { DataTable } from '../components/data-table';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, formatShortDate, isPhysicalVariety } from '../format-utils';
-
-/** Normalize date strings to YYYY-MM-DD for consistent grouping and sorting */
-export function normalizeDate(dateStr: string): string {
-  const iso = dateStr.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
-  const us = dateStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-  if (us) return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
-  return dateStr;
-}
-
-/** Inventory direction from the troop's perspective */
-type InventoryDirection = 'in' | 'out';
-
-/** Build a human-readable type label, from/to, and direction for a transfer row */
-export function describeTransfer(transfer: Transfer): { typeLabel: string; from: string; to: string; direction: InventoryDirection } {
-  switch (transfer.category) {
-    case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
-      if (transfer.type === TRANSFER_TYPE.T2T) {
-        return { typeLabel: 'T2T In', from: `Troop ${transfer.from}`, to: 'Troop', direction: 'in' };
-      }
-      return { typeLabel: 'C2T', from: transfer.from || 'Council', to: 'Troop', direction: 'in' };
-    case TRANSFER_CATEGORY.TROOP_OUTGOING:
-      return { typeLabel: 'T2T Out', from: 'Troop', to: `Troop ${transfer.to}`, direction: 'out' };
-    case TRANSFER_CATEGORY.GIRL_PICKUP:
-    case TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION:
-    case TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION:
-    case TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION:
-      return { typeLabel: 'T2G', from: 'Troop', to: transfer.to || '-', direction: 'out' };
-    case TRANSFER_CATEGORY.GIRL_RETURN:
-      return { typeLabel: 'G2T', from: transfer.from || '-', to: 'Troop', direction: 'in' };
-    default:
-      return { typeLabel: transfer.type || '-', from: transfer.from || '-', to: transfer.to || '-', direction: 'out' };
-  }
-}
+import { buildVarietyTooltip, describeTransfer, formatShortDate, isPhysicalVariety } from '../format-utils';
 
 export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
   if (!data?.transferBreakdowns) {
@@ -202,8 +168,8 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
               <strong>No Smart Cookie Data</strong>
             </p>
             <p class="meta-text">
-              Inventory pickups (C2T transfers) come from Smart Cookies. Click "Sync from Websites" to download Smart Cookie data including
-              Initial Order and Cupboard Order pickups.
+              Inventory pickups (C2T transfers) come from Smart Cookies. Click the refresh button in the header to download Smart Cookie
+              data including Initial Order and Cupboard Order pickups.
             </p>
           </div>
         ))}

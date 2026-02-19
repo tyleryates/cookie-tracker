@@ -11,6 +11,7 @@ import Logger from '../logger';
 export class DigitalCookieSession {
   client: AxiosInstance;
   selectedRoleName: string | null = null;
+  selectedRoleId: string | null = null;
   userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36';
   private credentials: { username: string; password: string; role?: string } | null = null;
 
@@ -145,6 +146,18 @@ export class DigitalCookieSession {
 
   /** Authenticated GET request with automatic re-login on auth failure */
   async authenticatedGet<T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    // Add AJAX headers for API endpoints
+    if (url.startsWith('/ajaxCall/')) {
+      config = {
+        ...config,
+        headers: {
+          ...config?.headers,
+          Accept: 'application/json, text/javascript, */*; q=0.01',
+          'X-Requested-With': 'XMLHttpRequest',
+          Referer: `https://digitalcookie.girlscouts.org/globalID/${this.selectedRoleId || ''}/troop/council-dashboard`
+        }
+      };
+    }
     try {
       return await this.client.get<T>(url, config);
     } catch (error: unknown) {
@@ -188,8 +201,9 @@ export class DigitalCookieSession {
       throw new Error(`Role selection failed with status ${roleResponse.status}`);
     }
 
-    Logger.info(`DC session: login successful (role=${selectedRoleName})`);
+    Logger.info(`DC session: login successful (role=${selectedRoleName}, id=${roleId})`);
     this.selectedRoleName = selectedRoleName;
+    this.selectedRoleId = roleId;
     return true;
   }
 
@@ -202,6 +216,7 @@ export class DigitalCookieSession {
   /** Reset all session state and recreate the HTTP client */
   reset(): void {
     this.selectedRoleName = null;
+    this.selectedRoleId = null;
     this.credentials = null;
     this.client = this.createClient();
   }
