@@ -2,7 +2,7 @@
 
 import { useState } from 'preact/hooks';
 import { SYNC_ENDPOINTS } from '../../constants';
-import type { ActiveProfile, EndpointSyncState, ProfileInfo, SyncState } from '../../types';
+import type { ActiveProfile, EndpointSyncState, HealthChecks, ProfileInfo, SyncState, Warning } from '../../types';
 import { DateFormatter, formatDataSize, formatDuration, formatMaxAge } from '../format-utils';
 
 // ============================================================================
@@ -201,16 +201,73 @@ function EndpointGroupTable({
 }
 
 // ============================================================================
+// DATA HEALTH CHECKS
+// ============================================================================
+
+const DATA_CHECKS: { key: keyof HealthChecks; label: string; warningType: string }[] = [
+  { key: 'unknownOrderTypes', label: 'Order Types', warningType: 'UNKNOWN_ORDER_TYPE' },
+  { key: 'unknownPaymentMethods', label: 'Payment Methods', warningType: 'UNKNOWN_PAYMENT_METHOD' },
+  { key: 'unknownTransferTypes', label: 'Transfer Types', warningType: 'UNKNOWN_TRANSFER_TYPE' },
+  { key: 'unknownCookieIds', label: 'Cookie IDs', warningType: 'UNKNOWN_COOKIE_ID' }
+];
+
+function DataHealthChecks({ healthChecks, warnings }: { healthChecks: HealthChecks; warnings: Warning[] }) {
+  const hasIssues = DATA_CHECKS.some((c) => healthChecks[c.key] > 0);
+
+  return (
+    <div style={{ marginTop: '24px' }}>
+      <h3>Data Health</h3>
+      <table class="endpoint-table">
+        <tbody>
+          {DATA_CHECKS.map((check) => {
+            const count = healthChecks[check.key];
+            const passed = count === 0;
+            const related = passed
+              ? []
+              : warnings.filter((w) => w.type === check.warningType).map(({ type: _type, message: _msg, ...rest }) => rest);
+            return (
+              <tr key={check.key} class="endpoint-row">
+                <td style={{ width: '2em', textAlign: 'center', fontSize: '1.1em' }}>
+                  {passed ? <span class="status-success">{'\u2713'}</span> : <span class="status-warning">{'\u26A0'}</span>}
+                </td>
+                <td style={{ fontWeight: 500, whiteSpace: 'nowrap' }}>{check.label}</td>
+                <td style={{ width: '100%' }} class={passed ? undefined : 'status-warning'}>
+                  {passed ? (
+                    'All recognized'
+                  ) : (
+                    <>
+                      {`${count} unknown`}
+                      <pre class="debug-snippet">{JSON.stringify(related.slice(0, 10), null, 2)}</pre>
+                      {related.length > 10 && <p style={{ margin: 0, fontSize: '0.85em' }}>{`\u2026and ${related.length - 10} more`}</p>}
+                    </>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {hasIssues && (
+        <p class="note-text">Unknown types require an app update to resolve. Contact support if this persists after updating.</p>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
 // SYNC TAB
 // ============================================================================
 
 interface SyncTabProps {
   syncState: SyncState;
   availableBoothsEnabled: boolean;
+  healthChecks: HealthChecks | null;
+  warnings: Warning[];
   onSyncReports: () => void;
   onRefreshBooths: () => void;
   onRecalculate: () => void;
   onExport: () => void;
+  onInjectDebug: () => void;
   onWipeData: () => void;
   hasData: boolean;
   readOnly: boolean;
@@ -224,10 +281,13 @@ interface SyncTabProps {
 export function SyncTab({
   syncState,
   availableBoothsEnabled,
+  healthChecks,
+  warnings,
   onSyncReports,
   onRefreshBooths,
   onRecalculate,
   onExport,
+  onInjectDebug,
   onWipeData,
   hasData,
   readOnly,
@@ -262,6 +322,7 @@ export function SyncTab({
           readOnly={readOnly}
         />
       )}
+      {healthChecks && <DataHealthChecks healthChecks={healthChecks} warnings={warnings} />}
       {profiles.length > 0 && (
         <div class="profile-section">
           <h3>Profile</h3>
@@ -303,6 +364,9 @@ export function SyncTab({
             </button>
             <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onExport}>
               Export Data
+            </button>
+            <button type="button" class="btn btn-secondary" disabled={!hasData} onClick={onInjectDebug}>
+              Inject Debug Data
             </button>
             <button type="button" class="btn btn-secondary" disabled={readOnly} onClick={onWipeData}>
               Wipe Data

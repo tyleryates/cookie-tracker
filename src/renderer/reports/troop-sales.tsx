@@ -1,12 +1,12 @@
 import type { ComponentChildren } from 'preact';
 import { ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
-import type { Order, Scout, SiteOrderCategory, SiteOrdersDataset, UnifiedDataset } from '../../types';
+import type { Order, Scout, SiteOrderCategory, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ScoutCreditChips } from '../components/scout-credit-chips';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
 import { buildVarietyTooltip, formatShortDate } from '../format-utils';
-import { buildOrderTooltip, getStatusStyle } from '../order-helpers';
+import { buildOrderTooltip, getStatusStyle, isActionRequired } from '../order-helpers';
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   [ORDER_TYPE.DELIVERY]: 'Girl Delivery',
@@ -15,38 +15,6 @@ const ORDER_TYPE_LABELS: Record<string, string> = {
   [ORDER_TYPE.IN_HAND]: 'In Person',
   [ORDER_TYPE.DONATION]: 'Donation'
 };
-
-// ============================================================================
-// Site order warning
-// ============================================================================
-
-function SiteOrderWarning({ siteOrders }: { siteOrders: SiteOrdersDataset }) {
-  const { directShip, girlDelivery } = siteOrders;
-  const hasUnallocated = directShip.hasWarning || girlDelivery.hasWarning;
-  if (!hasUnallocated) return null;
-
-  return (
-    <div class="info-box info-box-warning">
-      <p>
-        <strong>Unallocated Troop Orders</strong>
-      </p>
-      <ul class="list-none">
-        {girlDelivery.hasWarning && (
-          <li>
-            <strong>Girl Delivery:</strong> {girlDelivery.unallocated} of {girlDelivery.total} packages — use{' '}
-            <strong>Virtual Booth Divider</strong> (Booth &rarr; My Reservations &rarr; "Virtual Delivery" row &rarr; "...")
-          </li>
-        )}
-        {directShip.hasWarning && (
-          <li>
-            <strong>Direct Ship:</strong> {directShip.unallocated} of {directShip.total} packages — use{' '}
-            <strong>Troop Direct Ship Orders Divider</strong> (Orders &rarr; Troop Direct Ship Orders &rarr; "Distribute orders to girls")
-          </li>
-        )}
-      </ul>
-    </div>
-  );
-}
 
 // ============================================================================
 // Section-based layout (Girl Delivery + Direct Ship)
@@ -66,12 +34,14 @@ function OrderSection({
   title,
   category,
   channel,
+  helpText,
   orderLookup,
   scouts
 }: {
   title: string;
   category: SiteOrderCategory;
   channel: 'directShip' | 'virtualBooth';
+  helpText?: string;
   orderLookup: Map<string, Order>;
   scouts: Record<string, Scout>;
 }) {
@@ -85,14 +55,19 @@ function OrderSection({
 
   return (
     <div>
-      <h4 style={{ margin: '20px 0 8px' }}>
-        {title}
-        {category.total > 0 && (
-          <span class="muted-text" style={{ fontWeight: 'normal', marginLeft: '8px' }}>
-            {category.allocated} of {category.total} allocated
+      <div class="report-header-row" style={{ marginTop: '20px', marginBottom: '8px' }}>
+        <h4>{title}</h4>
+        {category.hasWarning && (
+          <span class="report-status-badge report-status-warning">
+            {category.unallocated} package{category.unallocated === 1 ? '' : 's'} undistributed
+            {helpText && (
+              <TooltipCell tooltip={helpText} tag="span" className="help-circle">
+                ?
+              </TooltipCell>
+            )}
           </span>
         )}
-      </h4>
+      </div>
       {rows.length > 0 && (
         <DataTable
           columns={['Date', 'Order #', 'Type', 'Packages', 'Donations', 'Amount', 'Payment', 'Status']}
@@ -118,7 +93,10 @@ function OrderSection({
             return (
               <tr key={entry.orderNumber}>
                 <td>{formatShortDate(original?.date)}</td>
-                <td>{entry.orderNumber}</td>
+                <td>
+                  {entry.orderNumber}
+                  {isActionRequired(original?.status) && <span class="inline-alert-pill">{'\u26A0'}</span>}
+                </td>
                 <td>
                   {(() => {
                     const typeText = entry.orderType ? (ORDER_TYPE_LABELS[entry.orderType] ?? entry.orderType) : '\u2014';
@@ -199,7 +177,7 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
     {
       label: 'Total',
       value: totalPackages,
-      description: `${totalAllocated} allocated, ${totalUnallocated} unallocated`,
+      description: `${totalAllocated} distributed, ${totalUnallocated} undistributed`,
       color: STAT_COLORS.GREEN,
       operator: '=',
       highlight: true
@@ -211,14 +189,29 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
       <div class="report-header-row">
         <h3>Troop Online Orders</h3>
         <span class={`report-status-badge ${hasUnallocated ? 'report-status-warning' : 'report-status-ok'}`}>
-          {hasUnallocated ? 'Needs Attention' : 'All Distributed'}
+          {hasUnallocated ? 'Needs Attention' : 'Fully Distributed'}
         </span>
       </div>
       {banner}
-      <SiteOrderWarning siteOrders={siteOrders} />
       <StatCards stats={stats} />
-      <OrderSection title="Girl Delivery" category={girlDelivery} channel="virtualBooth" orderLookup={orderLookup} scouts={data.scouts} />
-      <OrderSection title="Direct Ship" category={directShip} channel="directShip" orderLookup={orderLookup} scouts={data.scouts} />
+      <OrderSection
+        title="Girl Delivery"
+        category={girlDelivery}
+        channel="virtualBooth"
+        helpText={
+          'Use Virtual Booth Divider in Smart Cookie (My Troop \u2192 Booth \u2192 My Reservations \u2192 select booth \u2192 "...")'
+        }
+        orderLookup={orderLookup}
+        scouts={data.scouts}
+      />
+      <OrderSection
+        title="Direct Ship"
+        category={directShip}
+        channel="directShip"
+        helpText={'Use Troop Direct Ship Orders Divider in Smart Cookie (My Troop \u2192 Booth \u2192 Troop Direct Ship Orders)'}
+        orderLookup={orderLookup}
+        scouts={data.scouts}
+      />
     </div>
   );
 }

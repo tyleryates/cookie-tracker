@@ -133,9 +133,14 @@ export class DigitalCookieSession {
     }
   }
 
-  /** Check if an error is an authentication error (401 or 403) */
+  /** Check if an error is an authentication error (401, 403, or HTML response on API endpoint) */
   private isAuthError(error: unknown): boolean {
-    return isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403);
+    if (!isAxiosError(error) || !error.response) return false;
+    const status = error.response.status;
+    if (status === 401 || status === 403) return true;
+    // DC returns 400 with an HTML login page when the session expires on API endpoints
+    if (status === 400 && typeof error.response.data === 'string' && error.response.data.includes('<!DOCTYPE')) return true;
+    return false;
   }
 
   /** Authenticated GET request with automatic re-login on auth failure */
@@ -147,6 +152,11 @@ export class DigitalCookieSession {
         Logger.warn(`DC auth error on GET ${url}, attempting re-login`);
         await this.relogin();
         return await this.client.get<T>(url, config);
+      }
+      if (isAxiosError(error) && error.response) {
+        const body =
+          typeof error.response.data === 'string' ? error.response.data.slice(0, 500) : JSON.stringify(error.response.data)?.slice(0, 500);
+        Logger.error(`DC HTTP ${error.response.status} on GET ${url}: ${body}`);
       }
       throw error;
     }

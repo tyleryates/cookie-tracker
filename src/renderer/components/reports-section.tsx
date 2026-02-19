@@ -25,6 +25,7 @@ interface TabBarProps {
   activeReport: string | null;
   unified: UnifiedDataset | null;
   appConfig: AppConfig | null;
+  todoCount: number;
   onSelectReport: (type: string) => void;
 }
 
@@ -130,7 +131,6 @@ interface RenderReportProps {
   onSaveBoothIds: (ids: number[]) => void;
   onSaveDayFilters: (filters: string[]) => void;
   boothResetKey?: number;
-  headerBanner?: preact.ComponentChildren;
 }
 
 function renderReport({
@@ -144,32 +144,31 @@ function renderReport({
   onRefreshBooths,
   onSaveBoothIds,
   onSaveDayFilters,
-  boothResetKey,
-  headerBanner
+  boothResetKey
 }: RenderReportProps) {
   switch (type) {
     case 'proceeds':
-      return <TroopProceedsReport data={unified} banner={headerBanner} />;
+      return <TroopProceedsReport data={unified} />;
     case 'inventory':
-      return <InventoryReport data={unified} banner={headerBanner} />;
+      return <InventoryReport data={unified} />;
     case 'scout-inventory':
-      return <ScoutInventoryReport data={unified} banner={headerBanner} />;
+      return <ScoutInventoryReport data={unified} />;
     case 'troop-sales':
-      return <TroopSalesReport data={unified} banner={headerBanner} />;
+      return <TroopSalesReport data={unified} />;
     case 'summary':
-      return <ScoutSummaryReport data={unified} banner={headerBanner} />;
+      return <ScoutSummaryReport data={unified} />;
     case 'variety':
-      return <VarietyReport data={unified} banner={headerBanner} />;
+      return <VarietyReport data={unified} />;
     case 'donation-alert':
-      return <DonationAlertReport data={unified} banner={headerBanner} />;
+      return <DonationAlertReport data={unified} />;
     case 'finance':
-      return <FinanceReport data={unified} banner={headerBanner} />;
+      return <FinanceReport data={unified} />;
     case 'inventory-history':
-      return <InventoryHistoryReport data={unified} banner={headerBanner} />;
+      return <InventoryHistoryReport data={unified} />;
     case 'upcoming-booths':
-      return <UpcomingBoothsReport data={unified} banner={headerBanner} />;
+      return <UpcomingBoothsReport data={unified} />;
     case 'completed-booths':
-      return <CompletedBoothsReport data={unified} banner={headerBanner} />;
+      return <CompletedBoothsReport data={unified} />;
     case 'available-booths':
       return (
         <AvailableBoothsReport
@@ -187,7 +186,6 @@ function renderReport({
           onRefresh={onRefreshBooths}
           onSaveBoothIds={onSaveBoothIds}
           onSaveDayFilters={onSaveDayFilters}
-          banner={headerBanner}
         />
       );
     default:
@@ -199,10 +197,15 @@ function renderReport({
 // TAB BAR
 // ============================================================================
 
-export function TabBar({ activeReport, unified, appConfig, onSelectReport }: TabBarProps) {
+export function TabBar({ activeReport, unified, appConfig, todoCount, onSelectReport }: TabBarProps) {
   const hasData = !!unified;
-  const unknownTypes = unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
+  const hc = unified?.metadata?.healthChecks;
+  const unknownTypes = hc?.unknownOrderTypes || 0;
   const isBlocked = unknownTypes > 0;
+  const hasDataHealthIssues =
+    hasData &&
+    hc != null &&
+    (hc.unknownOrderTypes > 0 || hc.unknownPaymentMethods > 0 || hc.unknownTransferTypes > 0 || hc.unknownCookieIds > 0);
   const visibleTools = TOOL_BUTTONS.filter((btn) => {
     if (btn.type === 'inventory-history') return appConfig?.inventoryHistoryEnabled;
     return true;
@@ -361,11 +364,22 @@ export function TabBar({ activeReport, unified, appConfig, onSelectReport }: Tab
       ))}
       <button
         type="button"
-        class={`tab-bar-item${activeReport === 'sync' ? ' active' : ''}`}
+        class={`tab-bar-item${activeReport === 'health-check' ? ' active' : ''}`}
         style={visibleTools.length === 0 ? { marginLeft: 'auto' } : undefined}
-        onClick={() => onSelectReport('sync')}
+        disabled={!hasData || isBlocked}
+        onClick={() => onSelectReport('health-check')}
       >
-        Data
+        To-Do
+        {todoCount > 0 && <span class="tab-todo-badge">{todoCount}</span>}
+      </button>
+      <button type="button" class={`tab-bar-item${activeReport === 'sync' ? ' active' : ''}`} onClick={() => onSelectReport('sync')}>
+        {hasDataHealthIssues ? (
+          <span class="tab-alert-pill" title="Data health issues">
+            Data {'\u26A0'}
+          </span>
+        ) : (
+          'Data'
+        )}
       </button>
     </nav>
   );
@@ -389,7 +403,6 @@ export function ReportContent({
   onSaveDayFilters
 }: ReportContentProps) {
   const unknownTypes = unified?.metadata?.healthChecks?.unknownOrderTypes || 0;
-  const unknownCookieIds = unified?.metadata?.healthChecks?.unknownCookieIds || 0;
   const isBlocked = unknownTypes > 0;
 
   if (isBlocked) {
@@ -407,15 +420,6 @@ export function ReportContent({
 
   if (!activeReport || !unified) return null;
 
-  const cookieIdWarning = unknownCookieIds > 0 && (
-    <HealthBanner
-      level="warning"
-      title="Unknown Cookie IDs"
-      message={`Found ${unknownCookieIds} unknown cookie ID(s) in Smart Cookie data. These packages are counted in totals but missing from variety breakdowns. Update COOKIE_ID_MAP in cookie-constants.ts.`}
-      details={unified.warnings?.filter((w) => w.type === 'UNKNOWN_COOKIE_ID') || []}
-    />
-  );
-
   return (
     <div class="report-container">
       {renderReport({
@@ -429,8 +433,7 @@ export function ReportContent({
         onRefreshBooths,
         onSaveBoothIds,
         onSaveDayFilters,
-        boothResetKey,
-        headerBanner: cookieIdWarning
+        boothResetKey
       })}
     </div>
   );

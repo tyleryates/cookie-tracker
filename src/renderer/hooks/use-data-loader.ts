@@ -3,7 +3,7 @@
 import { useCallback } from 'preact/hooks';
 import Logger from '../../logger';
 import type { Action } from '../app-reducer';
-import { loadDataFromDisk, saveUnifiedDatasetToDisk } from '../data-loader';
+import { loadDataFromDisk, loadDebugData, saveUnifiedDatasetToDisk } from '../data-loader';
 import { ipcInvoke } from '../ipc';
 
 export function useDataLoader(
@@ -61,5 +61,21 @@ export function useDataLoader(
     }
   }, [showStatus]);
 
-  return { loadData, recalculate, exportData };
+  const injectDebug = useCallback(async () => {
+    try {
+      showStatus('Injecting debug data...', 'success');
+      const result = await loadDebugData();
+      if (!result) {
+        showStatus('No data to inject into — load data first', 'warning');
+        return;
+      }
+      dispatch({ type: 'SET_UNIFIED', unified: result.unified });
+      showStatus('Debug data injected', 'success');
+    } catch (error) {
+      showStatus(`Debug inject failed: ${(error as Error).message}`, 'error');
+      Logger.error('Debug inject error:', error);
+    }
+  }, [dispatch, showStatus]);
+
+  return { loadData, recalculate, exportData, injectDebug };
 }

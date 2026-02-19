@@ -11,7 +11,6 @@ import { TooltipCell } from '../components/tooltip-cell';
 import {
   boothTypeClass,
   buildVarietyTooltip,
-  countBoothsNeedingDistribution,
   formatBoothTime,
   formatShortDate,
   isVirtualBooth,
@@ -53,8 +52,6 @@ function classifyBooths(data: UnifiedDataset) {
   const now = new Date();
   const todayLocal = todayMidnight();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  const pastNotDistributed = countBoothsNeedingDistribution(boothReservations);
-
   const completed = nonVirtualReservations.filter((r) => r.booth.isDistributed);
   const needsDistribution = nonVirtualReservations.filter((r) => {
     if (r.booth.isDistributed) return false;
@@ -63,7 +60,7 @@ function classifyBooths(data: UnifiedDataset) {
   completed.sort((a, b) => (a.timeslot.date || '').localeCompare(b.timeslot.date || ''));
   needsDistribution.sort((a, b) => (a.timeslot.date || '').localeCompare(b.timeslot.date || ''));
 
-  return { completed, needsDistribution, pastNotDistributed };
+  return { completed, needsDistribution };
 }
 
 // ============================================================================
@@ -89,90 +86,115 @@ function BoothScoutAllocations({ booth, scouts }: { booth: BoothReservationImpor
   return <ScoutCreditChips credits={scoutCredits} unit="sale" />;
 }
 
-function CompletedBoothsSection({ booths, scouts }: { booths: BoothReservationImported[]; scouts: Record<string, Scout> }) {
-  if (booths.length === 0) return null;
-  return (
-    <DataTable
-      columns={['', 'Store', 'Type', 'Date', 'Time', 'Packages', 'Donations', '']}
-      columnAligns={[undefined, undefined, 'center', undefined, undefined, 'center', 'center', undefined]}
-      className="table-normal booth-table"
-      hint="Click on any booth to see scouts who attended that booth."
-    >
-      {booths.map((r) => {
-        const timeDisplay = formatBoothTime(r.timeslot.startTime, r.timeslot.endTime);
-        const donations = r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
-        const physicalPackages = r.physicalPackages;
-        const physicalCookies = { ...r.cookies };
-        delete physicalCookies[COOKIE_TYPE.COOKIE_SHARE];
-        const tip = buildVarietyTooltip(physicalCookies);
-
-        return (
-          <ExpandableRow
-            key={r.id}
-            rowClass="booth-row"
-            separateCaret
-            firstCell={
-              <>
-                <strong>{r.booth.storeName || '-'}</strong>
-                {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
-              </>
-            }
-            cells={[
-              <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>,
-              r.timeslot.date ? formatShortDate(r.timeslot.date) : '-',
-              timeDisplay,
-              tip ? (
-                <TooltipCell tooltip={tip} tag="span" className="tooltip-cell">
-                  {physicalPackages}
-                </TooltipCell>
-              ) : (
-                physicalPackages
-              ),
-              donations > 0 ? donations : '\u2014',
-              ''
-            ]}
-            cellAligns={['center', undefined, undefined, 'center', 'center', undefined]}
-            detail={<BoothScoutAllocations booth={r} scouts={scouts} />}
-            colSpan={8}
-            detailClass="detail-row"
-          />
-        );
-      })}
-    </DataTable>
-  );
-}
-
-function NeedsDistributionSection({ booths }: { booths: BoothReservationImported[] }) {
+function CompletedBoothsSection({
+  booths,
+  scouts,
+  showHeader
+}: {
+  booths: BoothReservationImported[];
+  scouts: Record<string, Scout>;
+  showHeader?: boolean;
+}) {
   if (booths.length === 0) return null;
   return (
     <>
-      <h4>Needs Distribution</h4>
+      {showHeader && <h4>Distributed Booths</h4>}
       <DataTable
-        columns={['Store', 'Type', 'Date', 'Time', 'Status']}
-        columnAligns={[undefined, 'center', undefined, undefined, 'center']}
+        columns={['', 'Store', 'Type', 'Date', 'Time', 'Packages', 'Donations', '']}
+        columnAligns={[undefined, undefined, 'center', undefined, undefined, 'center', 'center', undefined]}
         className="table-normal booth-table"
-        hint="These booths are past but haven't been distributed in Smart Cookie."
+        hint="Click on any booth to see scouts who attended that booth."
       >
         {booths.map((r) => {
           const timeDisplay = formatBoothTime(r.timeslot.startTime, r.timeslot.endTime);
+          const donations = r.cookies?.[COOKIE_TYPE.COOKIE_SHARE] || 0;
+          const physicalPackages = r.physicalPackages;
+          const physicalCookies = { ...r.cookies };
+          delete physicalCookies[COOKIE_TYPE.COOKIE_SHARE];
+          const tip = buildVarietyTooltip(physicalCookies);
+
           return (
-            <tr key={r.id}>
-              <td>
-                <strong>{r.booth.storeName || '-'}</strong>
-                {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
-              </td>
-              <td class="text-center">
-                <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>
-              </td>
-              <td>{r.timeslot.date ? formatShortDate(r.timeslot.date) : '-'}</td>
-              <td>{timeDisplay}</td>
-              <td class="text-center">
-                <span class="status-pill status-pill-warning">Needs Distribution</span>
-              </td>
-            </tr>
+            <ExpandableRow
+              key={r.id}
+              rowClass="booth-row"
+              separateCaret
+              firstCell={
+                <>
+                  <strong>{r.booth.storeName || '-'}</strong>
+                  {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
+                </>
+              }
+              cells={[
+                <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>,
+                r.timeslot.date ? formatShortDate(r.timeslot.date) : '-',
+                timeDisplay,
+                tip ? (
+                  <TooltipCell tooltip={tip} tag="span" className="tooltip-cell">
+                    {physicalPackages}
+                  </TooltipCell>
+                ) : (
+                  physicalPackages
+                ),
+                donations > 0 ? donations : '\u2014',
+                ''
+              ]}
+              cellAligns={['center', undefined, undefined, 'center', 'center', undefined]}
+              detail={<BoothScoutAllocations booth={r} scouts={scouts} />}
+              colSpan={8}
+              detailClass="detail-row"
+            />
           );
         })}
       </DataTable>
+    </>
+  );
+}
+
+function NeedsDistributionSection({ booths, hasBoothSaleWarning }: { booths: BoothReservationImported[]; hasBoothSaleWarning: boolean }) {
+  const totalNeedsDist = booths.length + (hasBoothSaleWarning ? 1 : 0);
+  if (totalNeedsDist === 0) return null;
+  return (
+    <>
+      <div class="report-header-row" style={{ marginTop: '20px', marginBottom: '8px' }}>
+        <h4>Needs Distribution</h4>
+        <span class="report-status-badge report-status-warning">
+          {booths.length} booth{booths.length === 1 ? '' : 's'} need distribution
+          <TooltipCell
+            tooltip={'Distribute in Smart Cookie\n(Booth \u2192 My Reservations \u2192 booth row \u2192 "...")'}
+            tag="span"
+            className="help-circle"
+          >
+            ?
+          </TooltipCell>
+        </span>
+      </div>
+      {booths.length > 0 && (
+        <DataTable
+          columns={['Store', 'Type', 'Date', 'Time', 'Status']}
+          columnAligns={[undefined, 'center', undefined, undefined, 'center']}
+          className="table-normal booth-table"
+        >
+          {booths.map((r) => {
+            const timeDisplay = formatBoothTime(r.timeslot.startTime, r.timeslot.endTime);
+            return (
+              <tr key={r.id}>
+                <td>
+                  <strong>{r.booth.storeName || '-'}</strong>
+                  {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
+                </td>
+                <td class="text-center">
+                  <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>
+                </td>
+                <td>{r.timeslot.date ? formatShortDate(r.timeslot.date) : '-'}</td>
+                <td>{timeDisplay}</td>
+                <td class="text-center">
+                  <span class="status-pill status-pill-warning">Needs Distribution</span>
+                </td>
+              </tr>
+            );
+          })}
+        </DataTable>
+      )}
     </>
   );
 }
@@ -205,35 +227,20 @@ export function CompletedBoothsReport({ data, banner }: { data: UnifiedDataset; 
       : [])
   ];
 
+  const hasWarning = booths.needsDistribution.length > 0 || data.siteOrders.boothSale.hasWarning;
+
   return (
     <div class="report-visual">
       <div class="report-header-row">
         <h3>Completed Booths</h3>
+        <span class={`report-status-badge ${hasWarning ? 'report-status-warning' : 'report-status-ok'}`}>
+          {hasWarning ? 'Needs Attention' : 'Fully Distributed'}
+        </span>
       </div>
       {banner}
       <StatCards stats={stats} />
-      {(booths.pastNotDistributed > 0 || data.siteOrders.boothSale.hasWarning) && (
-        <div class="info-box info-box-warning" style={{ marginTop: '16px' }}>
-          {booths.pastNotDistributed > 0 && (
-            <p>
-              <strong>
-                {booths.pastNotDistributed} booth{booths.pastNotDistributed === 1 ? '' : 's'} needs distribution
-              </strong>{' '}
-              — allocate cookies in Smart Cookie.
-            </p>
-          )}
-          {data.siteOrders.boothSale.hasWarning && (
-            <p style={booths.pastNotDistributed > 0 ? { marginTop: '8px' } : undefined}>
-              <strong>
-                Booth Sale: {data.siteOrders.boothSale.unallocated} of {data.siteOrders.boothSale.total} packages unallocated
-              </strong>{' '}
-              — use <strong>Booth Divider</strong> (Booth &rarr; My Reservations &rarr; booth row &rarr; "...")
-            </p>
-          )}
-        </div>
-      )}
-      <CompletedBoothsSection booths={booths.completed} scouts={data.scouts} />
-      <NeedsDistributionSection booths={booths.needsDistribution} />
+      <NeedsDistributionSection booths={booths.needsDistribution} hasBoothSaleWarning={data.siteOrders.boothSale.hasWarning} />
+      <CompletedBoothsSection booths={booths.completed} scouts={data.scouts} showHeader={booths.needsDistribution.length > 0} />
       {booths.completed.length === 0 && booths.needsDistribution.length === 0 && <p class="muted-text">No completed or past booths yet.</p>}
     </div>
   );

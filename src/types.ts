@@ -279,6 +279,11 @@ export interface Warning {
   scout?: string;
   reason?: string;
   file?: string;
+  // Transfer context
+  from?: string;
+  to?: string;
+  date?: string;
+  packages?: number;
 }
 
 // ============================================================================
@@ -585,6 +590,10 @@ export interface Timestamps {
 
 export interface IpcChannelMap {
   'load-data': {
+    request: undefined;
+    response: LoadDataResult | null;
+  };
+  'load-data-debug': {
     request: undefined;
     response: LoadDataResult | null;
   };

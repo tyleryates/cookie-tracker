@@ -1,9 +1,9 @@
 // App — Root Preact component. Owns all state, delegates logic to hooks.
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'preact/hooks';
+import { useCallback, useMemo, useReducer, useRef } from 'preact/hooks';
 import * as packageJson from '../../package.json';
 import Logger from '../logger';
-import { type AppConfig, type ProfilesConfig, toActiveProfile, type UnifiedDataset } from '../types';
+import { type AppConfig, type ProfilesConfig, toActiveProfile } from '../types';
 import { type AppState, appReducer } from './app-reducer';
 import { ReportContent, TabBar } from './components/reports-section';
 import { SettingsPage } from './components/settings-page';
@@ -12,7 +12,8 @@ import { loadAppConfig } from './data-loader';
 import { countBoothsNeedingDistribution, DateFormatter } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
-import { encodeSlotKey, summarizeAvailableSlots } from './reports/available-booths-utils';
+import { encodeSlotKey } from './reports/available-booths-utils';
+import { HealthCheckReport } from './reports/health-check';
 
 const initialState: AppState = {
   unified: null,
@@ -55,110 +56,23 @@ function SyncPill({ label, group }: { label: string; group: GroupStatus }) {
   );
 }
 
-interface Alert {
-  message: string;
-  report: string;
-}
-
-function computeAlerts(unified: UnifiedDataset | null, appConfig: AppConfig | null): Alert[] {
-  if (!unified) return [];
-  const alerts: Alert[] = [];
-
-  const hasUnallocated =
-    unified.siteOrders?.directShip?.hasWarning || unified.siteOrders?.girlDelivery?.hasWarning || unified.siteOrders?.boothSale?.hasWarning;
-  if (hasUnallocated) alerts.push({ message: 'Unallocated troop orders', report: 'troop-sales' });
-
-  if (countBoothsNeedingDistribution(unified.boothReservations || []) > 0)
-    alerts.push({ message: 'Booths need distribution', report: 'completed-booths' });
-
-  if ((unified.troopTotals?.scouts?.withNegativeInventory ?? 0) > 0)
-    alerts.push({ message: 'Scouts are missing cookies', report: 'scout-inventory' });
-
-  if (unified.cookieShare?.reconciled === false) alerts.push({ message: 'Donations need adjustment', report: 'donation-alert' });
-
-  if (appConfig?.availableBoothsEnabled) {
-    const filters = appConfig.boothDayFilters || [];
-    const ignored = appConfig.ignoredTimeSlots || [];
-    const availableSlots = summarizeAvailableSlots(unified.boothLocations || [], filters, ignored).reduce((sum, b) => sum + b.slotCount, 0);
-    if (availableSlots > 0) alerts.push({ message: `${availableSlots} open booth slots`, report: 'available-booths' });
-  }
-
-  return alerts;
-}
-
-function AlertBadge({
-  unified,
-  appConfig,
-  onSelectReport
-}: {
-  unified: UnifiedDataset | null;
-  appConfig: AppConfig | null;
-  onSelectReport: (type: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const alerts = computeAlerts(unified, appConfig);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleClick(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [open]);
-
-  if (alerts.length === 0) return null;
-
-  return (
-    <div class="alert-badge-wrapper" ref={wrapperRef}>
-      <button type="button" class="alert-badge-btn" onClick={() => setOpen(!open)}>
-        {'\u26A0'} {alerts.length}
-      </button>
-      {open && (
-        <div class="alert-dropdown">
-          {alerts.map((a) => (
-            <button
-              type="button"
-              key={a.report + a.message}
-              class="alert-dropdown-item"
-              onClick={() => {
-                onSelectReport(a.report);
-                setOpen(false);
-              }}
-            >
-              {'\u26A0\uFE0F'} {a.message}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AppHeader({
   syncing,
   readOnly,
   groups,
   showBooths,
-  unified,
-  appConfig,
   settingsActive,
   onSync,
   onOpenSettings,
-  onSelectReport,
   isWelcome
 }: {
   syncing: boolean;
   readOnly: boolean;
   groups: ReturnType<typeof computeGroupStatuses>;
   showBooths: boolean;
-  unified: UnifiedDataset | null;
-  appConfig: AppConfig | null;
   settingsActive: boolean;
   onSync: () => void;
   onOpenSettings: () => void;
-  onSelectReport: (type: string) => void;
   isWelcome: boolean;
 }) {
   return (
@@ -172,7 +86,6 @@ function AppHeader({
             <SyncPill label="Reports" group={groups.reports} />
             {showBooths && <SyncPill label="Booths" group={groups.booths} />}
           </div>
-          <AlertBadge unified={unified} appConfig={appConfig} onSelectReport={onSelectReport} />
           <button type="button" class="icon-btn has-tooltip" disabled={syncing || readOnly} onClick={onSync}>
             {syncing ? <span class="spinner" /> : '\u21BB'}
             <span class="btn-tooltip">Refresh Data</span>
@@ -199,7 +112,7 @@ export function App() {
 
   // Hook chain
   const { showStatus } = useStatusMessage(dispatch, state.statusMessage);
-  const { loadData, recalculate, exportData } = useDataLoader(dispatch, showStatus);
+  const { loadData, recalculate, exportData, injectDebug } = useDataLoader(dispatch, showStatus);
   const { sync, refreshBooths } = useSync(
     dispatch,
     showStatus,
@@ -388,6 +301,17 @@ export function App() {
   );
 
   const groups = useMemo(() => computeGroupStatuses(state.syncState.endpoints, state.syncState), [state.syncState]);
+  const todoCount = useMemo(() => {
+    const u = state.unified;
+    if (!u) return 0;
+    let count = 0;
+    if (u.siteOrders.girlDelivery.hasWarning) count++;
+    if (u.siteOrders.directShip.hasWarning) count++;
+    if (u.siteOrders.boothSale.hasWarning || countBoothsNeedingDistribution(u.boothReservations) > 0) count++;
+    if (u.troopTotals.scouts.withNegativeInventory > 0) count++;
+    if (!u.cookieShare.reconciled) count++;
+    return count;
+  }, [state.unified]);
   const isWelcome = state.activePage === 'welcome';
   const readOnly = !!state.activeProfile && !state.activeProfile.isDefault;
 
@@ -413,16 +337,19 @@ export function App() {
         readOnly={readOnly}
         groups={groups}
         showBooths={!!state.appConfig?.availableBoothsEnabled}
-        unified={state.unified}
-        appConfig={state.appConfig}
         settingsActive={state.activeReport === 'settings'}
         onSync={handleHeaderSync}
         onOpenSettings={() => handleSelectReport('settings')}
-        onSelectReport={handleSelectReport}
         isWelcome={isWelcome}
       />
       {!isWelcome && (
-        <TabBar activeReport={state.activeReport} unified={state.unified} appConfig={state.appConfig} onSelectReport={handleSelectReport} />
+        <TabBar
+          activeReport={state.activeReport}
+          unified={state.unified}
+          appConfig={state.appConfig}
+          todoCount={todoCount}
+          onSelectReport={handleSelectReport}
+        />
       )}
       <div class="app-content" ref={contentRef}>
         {isWelcome || state.activeReport === 'settings' ? (
@@ -437,14 +364,19 @@ export function App() {
             onToggleAutoSync={handleToggleAutoSync}
             onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
           />
+        ) : state.activeReport === 'health-check' && state.unified ? (
+          <HealthCheckReport data={state.unified} onNavigate={handleSelectReport} />
         ) : state.activeReport === 'sync' ? (
           <SyncTab
             syncState={state.syncState}
             availableBoothsEnabled={!!state.appConfig?.availableBoothsEnabled}
+            healthChecks={state.unified?.metadata.healthChecks ?? null}
+            warnings={state.unified?.warnings ?? []}
             onSyncReports={sync}
             onRefreshBooths={refreshBooths}
             onRecalculate={recalculate}
             onExport={exportData}
+            onInjectDebug={injectDebug}
             onWipeData={handleWipeData}
             hasData={!!state.unified}
             readOnly={readOnly}

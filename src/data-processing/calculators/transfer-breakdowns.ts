@@ -29,7 +29,11 @@ function buildTransferBreakdowns(store: ReadonlyDataStore, warnings: Warning[]):
         type: 'UNKNOWN_TRANSFER_TYPE',
         message: `Unknown transfer type "${transfer.type}"`,
         orderNumber: transfer.orderNumber,
-        reason: transfer.type
+        reason: transfer.type,
+        from: transfer.from,
+        to: transfer.to,
+        date: transfer.date,
+        packages: transfer.packages
       });
     }
 

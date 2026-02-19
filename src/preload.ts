@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer, shell } from 'electron';
 
 const ALLOWED_INVOKE_CHANNELS = new Set([
   'load-data',
+  'load-data-debug',
   'save-file',
   'load-credentials',
   'save-credentials',

@@ -344,7 +344,8 @@ button.stat-card-active {
   margin-bottom: 20px;
 }
 
-.report-header-row h3 {
+.report-visual .report-header-row h3,
+.report-visual .report-header-row h4 {
   margin: 0;
 }
 
@@ -366,11 +367,6 @@ button.stat-card-active {
 .report-status-warning {
   background: var(--warning-light);
   color: var(--status-warning-dark);
-}
-
-.report-status-error {
-  background: var(--error-light);
-  color: var(--status-error-dark);
 }
 
 /* Utility Classes */
@@ -395,6 +391,20 @@ button.stat-card-active {
   font-weight: normal;
 }
 
+.debug-snippet {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  font-size: 0.9em;
+  color: var(--gray-700);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 .status-success,
 .status-info,
 .status-warning,
@@ -416,6 +426,106 @@ button.stat-card-active {
 }
 .status-error-dark {
   color: var(--status-error-dark);
+}
+
+.tab-todo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 6px;
+  border-radius: 9px;
+  background: var(--warning);
+  color: #fff;
+  font-size: 0.75em;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.tab-alert-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 9px;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--error);
+  font-weight: 600;
+}
+
+.help-circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--warning);
+  background: transparent;
+  color: var(--warning);
+  font-size: 0.75em;
+  font-weight: 700;
+  cursor: help;
+  line-height: 1;
+}
+
+.help-circle:hover {
+  border-color: var(--warning);
+  color: var(--warning);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.inline-alert-anchor {
+  position: relative;
+  display: inline-block;
+}
+
+.inline-alert-anchor > .inline-alert-pill {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  margin-left: 3px;
+}
+
+.inline-alert-pill {
+  margin-left: 4px;
+  color: var(--error);
+  font-size: 0.85em;
+  vertical-align: middle;
+}
+
+.health-check-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--warning);
+  cursor: pointer;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.health-check-link:hover {
+  text-decoration: underline;
+}
+
+.health-check-link::after {
+  content: " \2192";
+  font-weight: normal;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.health-check-link:hover::after {
+  opacity: 1;
+}
+
+.health-check-link-done {
+  color: var(--primary);
 }
 
 .section-break {

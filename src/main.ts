@@ -332,6 +332,17 @@ ipcMain.handle(
   })
 );
 
+// Handle load-data-debug: same as load-data but injects debug mutations before building
+ipcMain.handle(
+  'load-data-debug',
+  handleIpcError(async () => {
+    Logger.info('IPC: load-data-debug');
+    const result = await loadData(profileDir, { debug: true });
+    Logger.info(`IPC: load-data-debug complete — ${result ? `${Object.keys(result.unified?.scouts || {}).length} scouts` : 'no data'}`);
+    return result;
+  })
+);
+
 // Handle save file (for unified dataset caching — saves to current/)
 ipcMain.handle(
   'save-file',

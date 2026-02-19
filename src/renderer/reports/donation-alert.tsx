@@ -103,14 +103,20 @@ function buildScoutDonationRows(scouts: Record<string, Scout>, virtualCSAllocati
 function AdjustmentCell({ adjustment }: { adjustment: number }) {
   if (adjustment > 0)
     return (
-      <td class="status-warning text-center">
-        <strong>+{adjustment}</strong>
+      <td class="text-center">
+        <span class="inline-alert-anchor status-success">
+          <strong>+{adjustment}</strong>
+          <span class="inline-alert-pill">{'\u26A0'}</span>
+        </span>
       </td>
     );
   if (adjustment < 0)
     return (
-      <td class="status-error text-center">
-        <strong>{adjustment}</strong>
+      <td class="text-center">
+        <span class="inline-alert-anchor status-error">
+          <strong>{adjustment}</strong>
+          <span class="inline-alert-pill">{'\u26A0'}</span>
+        </span>
       </td>
     );
   return <td class="status-success text-center">—</td>;
@@ -201,10 +207,8 @@ export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; ba
     <div class="report-visual">
       <div class="report-header-row">
         <h3>Donations Report</h3>
-        <span
-          class={`report-status-badge ${isReconciled ? 'report-status-ok' : adjustmentNeeded > 0 ? 'report-status-warning' : 'report-status-error'}`}
-        >
-          {isReconciled ? 'Up to Date' : 'Needs Attention'}
+        <span class={`report-status-badge ${isReconciled ? 'report-status-ok' : 'report-status-warning'}`}>
+          {isReconciled ? 'Reconciled in SC' : 'Needs Update in SC'}
         </span>
       </div>
       {banner}
@@ -218,10 +222,7 @@ export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; ba
           {scoutRows.map((row) => {
             const creditTip = buildCreditTooltip(row);
             return (
-              <tr
-                key={row.name}
-                class={row.adjustment > 0 ? 'row-highlight-warning' : row.adjustment < 0 ? 'row-highlight-error' : undefined}
-              >
+              <tr key={row.name}>
                 <td>
                   <strong>{row.name}</strong>
                 </td>

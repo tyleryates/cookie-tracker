@@ -21,6 +21,12 @@ export async function loadDataFromDisk(): Promise<LoadDataResult | null> {
   return data;
 }
 
+export async function loadDebugData(): Promise<LoadDataResult | null> {
+  const result = await ipcInvokeRaw('load-data-debug');
+  if (!result?.success) return null;
+  return result.data ?? null;
+}
+
 // ============================================================================
 // DATA EXPORT
 // ============================================================================

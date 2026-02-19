@@ -64,6 +64,9 @@ function buildUnifiedDataset(store: ReadonlyDataStore): UnifiedDataset {
   // Build Cookie Share tracking
   const cookieShareTracking = buildCookieShareTracking(store);
 
+  // Merge import-phase warnings (e.g. unknown cookie IDs) into build-phase warnings
+  warnings.push(...store.metadata.warnings);
+
   // Build metadata
   const metadata = buildUnifiedMetadata(store, warnings, scouts);
 

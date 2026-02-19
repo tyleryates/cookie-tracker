@@ -17,6 +17,7 @@ import {
   importSmartCookieReport
 } from './data-processing/importers';
 import { createDataStore, type ReadonlyDataStore } from './data-store';
+import { applyDebugMutations } from './debug-mutations';
 import Logger from './logger';
 import type {
   SCBoothDividerResult,
@@ -175,7 +176,7 @@ async function loadExcelFile(
  * Reads sync data from sync/ (API responses, DC export) and
  * legacy manual files from data/in/ (ReportExport, CookieOrders).
  */
-export async function loadData(dataDir: string): Promise<LoadDataResult | null> {
+export async function loadData(dataDir: string, options?: { debug?: boolean }): Promise<LoadDataResult | null> {
   const currentDir = path.join(dataDir, 'sync');
   const inDir = path.join(dataDir, 'in');
 
@@ -275,6 +276,10 @@ export async function loadData(dataDir: string): Promise<LoadDataResult | null> 
 
   const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;
   if (!anyLoaded) return null;
+
+  if (options?.debug) {
+    applyDebugMutations(store);
+  }
 
   Logger.debug('Building unified dataset...');
   const frozenStore: ReadonlyDataStore = store;

@@ -151,64 +151,21 @@ body {
   transition-delay: 600ms;
 }
 
-/* Alert badge */
-.alert-badge-wrapper {
-  position: relative;
-}
-
-.alert-badge-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 12px;
-  background: rgba(255, 193, 7, 0.25);
-  border: none;
-  cursor: pointer;
-  font-size: 0.75em;
-  font-weight: 600;
-  color: #ffd54f;
-  white-space: nowrap;
-}
-
-.alert-badge-btn:hover {
-  background: rgba(255, 193, 7, 0.35);
-}
-
-/* Alert dropdown */
-.alert-dropdown {
+/* Icon button badge (e.g. todo count) */
+.icon-btn-badge {
   position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  min-width: 260px;
-  z-index: 6000;
-  overflow: hidden;
-  animation: fadeIn 0.12s ease;
-}
-
-.alert-dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  font-size: 0.85em;
-  color: var(--gray-800);
-  cursor: pointer;
-  border: none;
-  background: none;
-  width: 100%;
-  text-align: left;
-}
-
-.alert-dropdown-item:hover {
-  background: var(--gray-50);
-}
-
-.alert-dropdown-item + .alert-dropdown-item {
-  border-top: 1px solid var(--gray-100);
+  top: 1px;
+  right: 1px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--warning);
+  color: #fff;
+  font-size: 0.6em;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
 }
 
 /* Tab Bar */

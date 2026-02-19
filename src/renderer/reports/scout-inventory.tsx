@@ -22,7 +22,7 @@ function stripOrderStatus(dcOrderType: string | undefined): string {
 }
 
 function formatOnHand(net: number): preact.JSX.Element {
-  if (net < 0) return <span class="pkg-out">-{Math.abs(net)} ⚠️</span>;
+  if (net < 0) return <span class="pkg-out">-{Math.abs(net)}</span>;
   if (net > 0) return <span class="pkg-in">+{net}</span>;
   return <span class="muted-text">—</span>;
 }
@@ -40,9 +40,12 @@ function InventoryCell({
     const varietyList = negativeVarieties.map((v) => `${getCookieDisplayName(v.variety)}: -${v.shortfall}`).join('\n');
     const display = netInventory > 0 ? `+${netInventory}` : `-${Math.abs(actualNet)}`;
     return (
-      <TooltipCell tooltip={varietyList} tag="span" className="tooltip-cell pkg-out">
-        {display} ⚠️
-      </TooltipCell>
+      <>
+        <span class="pkg-out">{display}</span>
+        <TooltipCell tooltip={varietyList} tag="span" className="inline-alert-pill">
+          {'\u26A0'}
+        </TooltipCell>
+      </>
     );
   }
   if (netInventory < 0) return <span class="pkg-out">-{Math.abs(netInventory)}</span>;
@@ -383,13 +386,10 @@ export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; b
       <div class="report-header-row">
         <h3>Scout Inventory</h3>
         <span class={`report-status-badge ${hasNegativeInventory ? 'report-status-warning' : 'report-status-ok'}`}>
-          {hasNegativeInventory ? 'Needs Attention' : 'All OK'}
+          {hasNegativeInventory ? 'Needs Attention' : 'No Errors'}
         </span>
       </div>
       {banner}
-
-      {hasNegativeInventory && <div class="info-box info-box-warning">Scouts are missing cookies for accepted orders.</div>}
-
       <StatCards stats={stats} />
 
       <DataTable

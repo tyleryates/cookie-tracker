@@ -12,17 +12,17 @@ import { getActiveScouts } from '../format-utils';
 // Helper functions
 // ============================================================================
 
-function getOrderStatusStyle(scout: Scout): { className: string; icon: string; tooltip: string } {
+function getOrderStatusStyle(scout: Scout): { className: string; tooltip: string } {
   const { needsApproval, pending, completed } = scout.totals.$orderStatusCounts;
 
   if (needsApproval > 0) {
     const parts = [`${needsApproval} need${needsApproval === 1 ? 's' : ''} approval`];
     if (pending > 0) parts.push(`${pending} pending deliver${pending === 1 ? 'y' : 'ies'}`);
-    return { className: 'status-error', icon: ' ⚠️', tooltip: parts.join(', ') };
+    return { className: 'status-error', tooltip: parts.join(', ') };
   }
-  if (pending > 0) return { className: 'status-warning', icon: '', tooltip: `${pending} pending deliver${pending === 1 ? 'y' : 'ies'}` };
-  if (completed === scout.orders.length && scout.orders.length > 0) return { className: 'status-success', icon: '', tooltip: '' };
-  return { className: '', icon: '', tooltip: '' };
+  if (pending > 0) return { className: 'status-warning', tooltip: `${pending} pending deliver${pending === 1 ? 'y' : 'ies'}` };
+  if (completed === scout.orders.length && scout.orders.length > 0) return { className: 'status-success', tooltip: '' };
+  return { className: '', tooltip: '' };
 }
 
 /** Tally packages + donations per order type for a scout */
@@ -142,7 +142,7 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
       >
         {sortedScouts.map(([name, scout]) => {
           const { totals } = scout;
-          const { className: orderClass, icon: orderIcon, tooltip: orderTooltip } = getOrderStatusStyle(scout);
+          const { className: orderClass, tooltip: orderTooltip } = getOrderStatusStyle(scout);
           const totalSold = totals.totalSold || 0;
           const tally = tallyByType(scout.orders);
 
@@ -154,16 +154,11 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
               cells={[
                 orderTooltip ? (
                   <TooltipCell tooltip={orderTooltip} tag="span">
-                    <span class={orderClass}>
-                      {scout.orders.length}
-                      {orderIcon}
-                    </span>
+                    <span class={orderClass}>{scout.orders.length}</span>
+                    {scout.totals.$orderStatusCounts.needsApproval > 0 && <span class="inline-alert-pill">{'\u26A0'}</span>}
                   </TooltipCell>
                 ) : (
-                  <span class={orderClass}>
-                    {scout.orders.length}
-                    {orderIcon}
-                  </span>
+                  <span class={orderClass}>{scout.orders.length}</span>
                 ),
                 <TypeCell pkg={tally.delivery.pkg} don={tally.delivery.don} />,
                 <TypeCell pkg={tally.inHand.pkg} don={tally.inHand.don} />,
