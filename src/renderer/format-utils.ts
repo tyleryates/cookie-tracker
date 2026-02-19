@@ -1,12 +1,12 @@
 // Formatting and display utilities
 
 import { BOOTH_RESERVATION_TYPE, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../constants';
-import { COOKIE_ORDER, getCookieColor, getCookieDisplayName } from '../cookie-constants';
+import { COOKIE_ORDER, getCookieDisplayName } from '../cookie-constants';
 import type { BoothReservationImported, BoothTimeSlot, CookieType, Scout, Transfer, Varieties } from '../types';
 
 /** Sort varieties entries by preferred display order */
 function sortVarietiesByOrder(entries: [string, number][]): [string, number][] {
-  return entries.sort((a: [string, number], b: [string, number]) => {
+  return [...entries].sort((a: [string, number], b: [string, number]) => {
     const indexA = COOKIE_ORDER.indexOf(a[0] as CookieType);
     const indexB = COOKIE_ORDER.indexOf(b[0] as CookieType);
 
@@ -147,17 +147,11 @@ function formatCurrency(value: number): string {
   return `$${Math.round(value || 0)}`;
 }
 
-/** Build variety tooltip as HTML string with colored dots */
+/** Build variety tooltip as plain text lines */
 function buildVarietyTooltip(varieties: Varieties): string {
   if (!varieties || Object.keys(varieties).length === 0) return '';
   return sortVarietiesByOrder(Object.entries(varieties))
-    .map(([variety, count]) => {
-      const color = getCookieColor(variety);
-      const dot = color
-        ? `<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};margin-right:5px;vertical-align:middle"></span>`
-        : '';
-      return `${dot}${getCookieDisplayName(variety)}: ${count}`;
-    })
+    .map(([variety, count]) => `${getCookieDisplayName(variety)}: ${count}`)
     .join('\n');
 }
 
@@ -234,7 +228,7 @@ function countBoothsNeedingDistribution(boothReservations: BoothReservationImpor
   }).length;
 }
 
-/** Compact time like "4pm" or "10am" — drops :00 minutes, no space */
+/** Compact time parts { hour, period } — e.g. { hour: "4", period: "pm" }. Drops :00 minutes. */
 function formatCompactTime(time: string): { hour: string; period: string } {
   const full = formatTime12h(time); // e.g. "4:00 pm"
   const match = full.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);

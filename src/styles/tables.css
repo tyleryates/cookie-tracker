@@ -209,11 +209,6 @@ tbody tr:hover {
   background: rgba(33, 150, 243, 0.12);
 }
 
-.transfer-type-t2t-in {
-  color: #0277bd;
-  background: rgba(3, 169, 244, 0.12);
-}
-
 .transfer-type-t2t-out {
   color: #c62828;
   background: rgba(229, 57, 53, 0.12);

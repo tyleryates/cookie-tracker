@@ -90,7 +90,7 @@ describe('buildVarietyTooltip', () => {
     const varieties = { THIN_MINTS: 2 };
     const result = buildVarietyTooltip(varieties);
     expect(result).toContain('Thin Mints: 2');
-    expect(result).toContain('border-radius:50%');
+    expect(result).not.toContain('<');
   });
 });
 

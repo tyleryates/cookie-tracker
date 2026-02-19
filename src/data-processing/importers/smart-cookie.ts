@@ -103,7 +103,7 @@ export function importSmartCookieOrders(store: DataStore, ordersData: SCOrdersRe
       from: from,
       to: to,
       packages: totalPackages,
-      cases: Math.round(Math.abs(order.total_cases || 0) / PACKAGES_PER_CASE), // Convert packages to cases
+      cases: Math.round(Math.abs(order.total_cases || 0) / PACKAGES_PER_CASE), // SC API total_cases is in packages despite the name
       varieties: varieties,
       amount: Math.abs(parseFloat(totalValue) || 0),
       virtualBooth: order.virtual_booth || false,

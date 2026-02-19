@@ -7,11 +7,11 @@ export function ScoutCreditChips({ credits, unit }: { credits: Array<{ name: str
     );
   }
 
-  credits.sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...credits].sort((a, b) => a.name.localeCompare(b.name));
 
   return (
     <div class="booth-detail-content">
-      {credits.map(({ name, total }) => (
+      {sorted.map(({ name, total }) => (
         <div key={name} class="booth-allocation-chip">
           <strong>{name}</strong>
           <span class="booth-allocation-credit">

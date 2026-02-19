@@ -13,9 +13,9 @@ export function useStatusMessage(dispatch: (action: Action) => void, statusMessa
     [dispatch]
   );
 
-  // Auto-hide success messages
+  // Auto-hide success messages (errors/warnings stay until manually dismissed or replaced)
   useEffect(() => {
-    if (!statusMessage) return;
+    if (!statusMessage || statusMessage.type !== 'success') return;
 
     const timeout = setTimeout(() => {
       dispatch({ type: 'CLEAR_STATUS' });

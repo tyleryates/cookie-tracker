@@ -27,9 +27,9 @@ export function InventoryHistoryReport({ data, banner }: { data: UnifiedDataset;
     );
   }
 
-  // Compute end-of-day running troop inventory using the same formula as troop-totals:
-  // inventory = c2tReceived - t2tOut - allocated - virtualBoothT2G - boothDividerT2G + g2t
-  // Category determines direction; PLANNED transfers are excluded (pending C2T pickups).
+  // Compute end-of-day running troop inventory from transfers + booth/virtual booth allocations.
+  // Direct ship is excluded (shipped from supplier, never in troop inventory).
+  // PLANNED transfers are excluded (pending C2T pickups).
   type DailyChange = { in: number; out: number; inDetails: Map<string, number>; outDetails: Map<string, number> };
   const dailyChanges = new Map<string, DailyChange>();
   const getEntry = (key: string): DailyChange => {

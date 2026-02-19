@@ -48,8 +48,8 @@ function OrderSection({
   if (category.orders.length === 0 && category.allocated === 0) return null;
 
   const rows = [...category.orders].sort((a, b) => {
-    const dateA = orderLookup.get(a.orderNumber)?.date || '';
-    const dateB = orderLookup.get(b.orderNumber)?.date || '';
+    const dateA = orderLookup.get(a.orderNumber)?.date || '1970-01-01';
+    const dateB = orderLookup.get(b.orderNumber)?.date || '1970-01-01';
     return new Date(dateB).getTime() - new Date(dateA).getTime();
   });
 

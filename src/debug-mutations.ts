@@ -163,7 +163,7 @@ function mutateUnknownPayment(store: DataStore): number {
   return 1;
 }
 
-/** 6. Unallocated Troop Girl Delivery → alert + info box on Troop Online Orders */
+/** 5. Unallocated Troop Girl Delivery → alert + info box on Troop Online Orders */
 function mutateUnallocatedGirlDelivery(store: DataStore): number {
   for (let i = store.transfers.length - 1; i >= 0; i--) {
     if (store.transfers[i].category === TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) {
@@ -177,7 +177,7 @@ function mutateUnallocatedGirlDelivery(store: DataStore): number {
   return 1;
 }
 
-/** 7. Unallocated Troop Direct Ship → alert */
+/** 6. Unallocated Troop Direct Ship → alert */
 function mutateUnallocatedDirectShip(store: DataStore): number {
   for (let i = store.allocations.length - 1; i >= 0; i--) {
     if (store.allocations[i].channel === ALLOCATION_CHANNEL.DIRECT_SHIP) {
@@ -198,7 +198,7 @@ function mutateUnallocatedDirectShip(store: DataStore): number {
   return 1;
 }
 
-/** 8. Unallocated Booth Sale → alert + warning on Completed Booths */
+/** 7. Unallocated Booth Sale → alert + warning on Completed Booths */
 function mutateUnallocatedBoothSale(store: DataStore): number {
   for (let i = store.allocations.length - 1; i >= 0; i--) {
     if (store.allocations[i].channel === ALLOCATION_CHANNEL.BOOTH) {
@@ -212,7 +212,7 @@ function mutateUnallocatedBoothSale(store: DataStore): number {
   return 1;
 }
 
-/** 9. Booth needs distribution → alert + "Needs Distribution" pill */
+/** 8. Booth needs distribution → alert + "Needs Distribution" pill */
 function mutateBoothNeedsDistribution(store: DataStore): number {
   for (const res of store.boothReservations) {
     if (res.booth.reservationType?.toLowerCase().includes('virtual')) continue;
@@ -245,7 +245,7 @@ function mutateBoothNeedsDistribution(store: DataStore): number {
   return 1;
 }
 
-/** 10. Donations need adjustment → alert + adjustment rows on Donations report */
+/** 9. Donations need adjustment → alert + adjustment rows on Donations report */
 function mutateDonationReconciliation(store: DataStore): number {
   let n = 0;
 
@@ -285,7 +285,7 @@ function mutateDonationReconciliation(store: DataStore): number {
   return n;
 }
 
-/** 11. Available booth slots → slots appear in Available Booths report and tab badge count */
+/** 10. Available booth slots → slots appear in Available Booths report and tab badge count */
 function mutateAvailableBooths(store: DataStore): number {
   const tomorrow = new Date(Date.now() + 86_400_000);
   const dayAfter = new Date(Date.now() + 2 * 86_400_000);

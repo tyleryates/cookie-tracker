@@ -19,6 +19,7 @@ try {
 }
 
 let logStream: import('node:fs').WriteStream | null = null;
+let logFilePath: string | null = null;
 let isRenderer = false;
 
 function formatData(data: unknown): string {
@@ -73,7 +74,7 @@ const Logger = {
    */
   init(dataDir: string): void {
     if (!fs || !path) return;
-    const logFilePath = path.join(dataDir, 'app.log');
+    logFilePath = path.join(dataDir, 'app.log');
     // Close previous stream (e.g. root-level → profile-level switch)
     if (logStream) {
       logStream.end();
@@ -123,17 +124,14 @@ const Logger = {
 
   /** Flush and close the log stream (call before app exits) */
   close(): void {
-    if (logStream && fs) {
+    if (logStream && fs && logFilePath) {
       // Write final line directly via fs to guarantee flush before process exit
-      const logPath = (logStream as any).path;
       logStream.end();
       logStream = null;
-      if (typeof logPath === 'string') {
-        try {
-          fs.appendFileSync(logPath, `${timestamp()} [M] [INFO] === Session ended ===\n`);
-        } catch {
-          // ignore — file may already be closed
-        }
+      try {
+        fs.appendFileSync(logFilePath, `${timestamp()} [M] [INFO] === Session ended ===\n`);
+      } catch {
+        // ignore — file may already be closed
       }
     } else if (logStream) {
       logStream.end();

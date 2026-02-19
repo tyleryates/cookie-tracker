@@ -128,7 +128,7 @@ Both scrapers use direct API calls (no browser automation).
 2. POST `/j_spring_security_check` — form login with CSRF token
 3. GET `/select-role` — parse role options; auto-select first "Troop" role if none specified
 4. The role name contains embedded IDs: "Troop **1234** of Service Unit **567**" — extract with regex
-5. GET `/ajaxCall/generateReport?reportType=TROOP_ORDER_REPORT&troopId={id}&serviceUnitId={id}&councilId={id}`
+5. GET `/ajaxCall/generateReport?reportType=TROOP_ORDER_REPORT&troopId={id}&serviceUnitId={id}&councilId={id}&troopGlobalID={roleId}`
 6. GET `/ajaxCall/downloadFile/TROOP_ORDER_REPORT/{fileName}` — download Excel
 
 ### Smart Cookie

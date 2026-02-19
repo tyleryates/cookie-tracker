@@ -38,7 +38,7 @@ Three layers with strict boundaries:
 
 **Main process** (`src/main.ts`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers, scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
 
-**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (13 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings and Sync are rendered as tab content (via `activeReport`), not separate pages — only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
+**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (13 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings is rendered as tab content (via `activeReport === 'settings'`), with sync status shown alongside it. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
 
 **Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Sub-directories: `importers/` (parse raw files into DataStore), `calculators/` (compute UnifiedDataset from DataStore).
 
@@ -61,6 +61,7 @@ Three layers with strict boundaries:
 | `src/data-pipeline.ts` | Orchestrates: scan files, import, build UnifiedDataset |
 | `src/update-manager.ts` | Auto-update configuration, event handlers, quit-and-install logic |
 | `src/data-processing/utils.ts` | Shared helpers for data-processing layer (`mapToRecord`) |
+| `src/renderer/reports/available-booths-utils.ts` | Booth slot filtering, encoding, and summarization utilities |
 | `src/profile-manager.ts` | Multi-profile data directory management |
 
 ### Renderer Components

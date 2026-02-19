@@ -57,7 +57,7 @@ function cellToString(value: ExcelJS.CellValue): string {
 
 async function parseExcel(buffer: Buffer): Promise<RawDataRow[]> {
   const workbook = new ExcelJS.Workbook();
-  // ExcelJS types are incomplete — load() accepts Buffer at runtime
+  // Cast needed: ExcelJS types expect old Buffer, TS 5.9+ infers Buffer<ArrayBufferLike>
   await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
   const worksheet = workbook.worksheets[0];
   if (!worksheet) return [];

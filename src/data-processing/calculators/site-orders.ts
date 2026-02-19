@@ -85,7 +85,7 @@ function calculateAllocations(store: ReadonlyDataStore): { directShip: number; v
   // Virtual booth allocations (T2G transfers)
   for (const transfer of store.transfers) {
     if (transfer.category === TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION) {
-      virtualBooth += transfer.packages || 0;
+      virtualBooth += transfer.physicalPackages || 0;
     }
   }
 

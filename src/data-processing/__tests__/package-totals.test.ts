@@ -5,14 +5,16 @@ import { calculatePackageTotals } from '../calculators/package-totals';
 
 function makeTransfer(overrides: Partial<Transfer>): Transfer {
   return {
-    id: '1',
     type: TRANSFER_TYPE.C2T,
     category: TRANSFER_CATEGORY.COUNCIL_TO_TROOP,
     date: '2025-02-01',
+    from: '',
+    to: '',
+    packages: 0,
     physicalPackages: 0,
-    scoutName: null,
-    source: 'SC',
+    cases: 0,
     varieties: {},
+    physicalVarieties: {},
     ...overrides
   };
 }

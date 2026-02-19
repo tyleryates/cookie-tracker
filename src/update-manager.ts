@@ -127,7 +127,7 @@ export async function quitAndInstall(getMainWindow: () => BrowserWindow | null):
 
       // Spawn a detached shell script that waits for this process to exit,
       // replaces the app bundle, relaunches, and cleans up.
-      // Uses a heredoc to avoid interpolating paths into the shell command string.
+      // Passes paths as positional arguments to avoid shell injection.
       const scriptPath = path.join(tempDir, 'update.sh');
       const scriptContent = [
         '#!/bin/bash',

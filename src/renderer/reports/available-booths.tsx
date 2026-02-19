@@ -4,7 +4,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
-import type { AppConfig, EndpointSyncState, UnifiedDataset } from '../../types';
+import type { AppConfig, BoothLocation, EndpointSyncState, UnifiedDataset } from '../../types';
 import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
 import { boothTypeClass, DateFormatter, formatBoothDate, formatTime12h, haversineDistance } from '../format-utils';
@@ -153,10 +153,12 @@ export function AvailableBoothsReport({
   });
 
   // Build store name → count map for expanded view
-  const selectedBooths = boothIds.map((id) => boothLocations.find((loc) => loc.id === id)).filter(Boolean);
+  const selectedBooths = boothIds
+    .map((id) => boothLocations.find((loc) => loc.id === id))
+    .filter((loc): loc is BoothLocation => loc != null);
   const storeNameCounts = new Map<string, number>();
   for (const loc of selectedBooths) {
-    const name = loc!.storeName;
+    const name = loc.storeName;
     if (name) storeNameCounts.set(name, (storeNameCounts.get(name) || 0) + 1);
   }
   const sortedStoreNames = [...storeNameCounts.entries()].sort((a, b) => a[0].localeCompare(b[0]));

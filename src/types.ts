@@ -599,7 +599,7 @@ export interface IpcChannelMap {
   };
   'save-file': { request: { filename: string; content: string }; response: { path: string } };
   'load-credentials': { request: undefined; response: CredentialsSummary };
-  'save-credentials': { request: CredentialPatch; response: undefined };
+  'save-credentials': { request: CredentialPatch; response: { success: boolean; error?: string; path?: string; encrypted?: boolean } };
   'load-config': { request: undefined; response: AppConfig };
   'update-config': { request: Partial<AppConfig>; response: AppConfig };
   'scrape-websites': { request: undefined; response: ScrapeResults };

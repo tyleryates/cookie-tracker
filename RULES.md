@@ -123,7 +123,7 @@ PGA = Total Packages Credited / Active Girls (girls with at least 1 package sold
 
 **Why this formula:** The troop is financially responsible for ALL packages received from council, regardless of whether they've been allocated to scouts yet. Packages sitting in troop inventory still count.
 
-**Per-Scout Proceeds Estimate:** Scout-level totals use a flat $0.90/pkg estimate because scout totals are computed before troop totals (where PGA determines the actual rate). This is intentional — changing it would require a two-pass approach, and the estimate is close enough for per-scout display.
+**Note:** Per-scout proceeds are not currently computed. Proceeds are only calculated at the troop level using the PGA-based rate tiers above.
 
 **Verification:** Compare against Smart Cookie CSV export fields: `ProceedInitialQty × InitialMultiplier = TroopProceed`
 
@@ -265,13 +265,13 @@ The SC API returns all record types through `/orders/search`. Each transfer is a
 | **COOKIE_SHARE** / **COOKIE_SHARE_D** | `COOKIE_SHARE_RECORD` | OUT (−) | Manual or DC-synced donation | No (sync record only) |
 | **COOKIE_SHARE** (from booth divider) | `BOOTH_COOKIE_SHARE` | OUT (−) | Booth divider Cookie Share | No (automatic, not manual) |
 | **DIRECT_SHIP** | `DIRECT_SHIP` | — | Shipped from supplier | **Yes** |
-| **PLANNED** | `PLANNED` | — | Future/uncommitted order | No (not yet approved) |
+| **PLANNED** | `COUNCIL_TO_TROOP` | — | Future/uncommitted order (skipped by raw type before counting) | No (not yet approved) |
 
 ### What Counts as "Sold"
 
 Sold counting is done by individual calculators per-category rather than a central set. Categories that count as "sold": `GIRL_PICKUP`, `VIRTUAL_BOOTH_ALLOCATION`, `BOOTH_SALES_ALLOCATION`, `DIRECT_SHIP_ALLOCATION`, `DIRECT_SHIP`.
 
-Excludes: `COUNCIL_TO_TROOP` (inventory in), `GIRL_RETURN` (returns), `DC_ORDER_RECORD` (sync record — counting it would double-count with the T2G allocation), `COOKIE_SHARE_RECORD` / `BOOTH_COOKIE_SHARE` (sync/allocation records), `PLANNED` (future).
+Excludes: `COUNCIL_TO_TROOP` (inventory in), `GIRL_RETURN` (returns), `DC_ORDER_RECORD` (sync record — counting it would double-count with the T2G allocation), `COOKIE_SHARE_RECORD` / `BOOTH_COOKIE_SHARE` (sync/allocation records), `PLANNED` raw type (filtered before counting).
 
 ### BOOTH_COOKIE_SHARE vs COOKIE_SHARE_RECORD
 

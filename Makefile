@@ -23,7 +23,7 @@ test:  ## Run unit tests
 	npx vitest run
 
 install:  ## Install dependencies
-	npm install
+	pnpm install
 
 version:  ## Show current version
 	@node -p "require('./package.json').version"
@@ -101,7 +101,7 @@ release-major: bump-major commit-version publish  ## Bump major, commit, and pub
 
 commit-version:  ## Commit version bump (internal helper)
 	@VERSION=$$(node -p "require('./package.json').version"); \
-	git add package.json package-lock.json; \
+	git add package.json pnpm-lock.yaml; \
 	git commit -m "Bump version to $$VERSION"; \
 	echo "✅ Committed version $$VERSION"
 

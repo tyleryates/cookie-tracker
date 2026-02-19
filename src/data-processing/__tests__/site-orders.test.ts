@@ -88,7 +88,7 @@ describe('buildSiteOrdersDataset', () => {
     site.orders = [makeOrder({ orderNumber: '1', physicalPackages: 10, orderType: ORDER_TYPE.DELIVERY })];
 
     // Virtual booth allocations count toward girlDelivery allocated
-    store.transfers = [makeTransfer({ category: TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION, packages: 6 })];
+    store.transfers = [makeTransfer({ category: TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION, physicalPackages: 6 })];
 
     const scouts = { 'Troop Site': site };
     const result = buildSiteOrdersDataset(store, scouts);
@@ -103,7 +103,7 @@ describe('buildSiteOrdersDataset', () => {
     const site = makeScout('Troop Site');
     site.isSiteOrder = true;
     site.orders = [makeOrder({ orderNumber: '1', physicalPackages: 5, orderType: ORDER_TYPE.DELIVERY })];
-    store.transfers = [makeTransfer({ category: TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION, packages: 5 })];
+    store.transfers = [makeTransfer({ category: TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION, physicalPackages: 5 })];
     const scouts = { 'Troop Site': site };
     const result = buildSiteOrdersDataset(store, scouts);
     expect(result.girlDelivery.hasWarning).toBe(false);

@@ -134,7 +134,8 @@ function loadTimestamps(): Timestamps {
 
     if (healed) saveTimestamps(result);
     return result;
-  } catch {
+  } catch (err) {
+    Logger.warn('Failed to load timestamps:', err);
     return empty;
   }
 }
@@ -372,35 +373,38 @@ ipcMain.handle(
     const scraper = new ScraperOrchestrator(profileDir, seasonalData, boothCache, scSession, dcSession);
     activeOrchestrator = scraper;
 
-    // Set up progress callback
-    scraper.setProgressCallback((progress) => {
-      event.sender.send('scrape-progress', progress);
-    });
+    try {
+      // Set up progress callback
+      scraper.setProgressCallback((progress) => {
+        event.sender.send('scrape-progress', progress);
+      });
 
-    // Small delay to ensure renderer's progress listener is fully registered
-    await new Promise((resolve) => setTimeout(resolve, 50));
+      // Small delay to ensure renderer's progress listener is fully registered
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // Run scraping (pass configured booth IDs)
-    const config = configManager.loadConfig();
-    const results = await scraper.scrapeAll(auth.credentials, config.availableBoothsEnabled ? config.boothIds : []);
+      // Run scraping (pass configured booth IDs)
+      const config = configManager.loadConfig();
+      const results = await scraper.scrapeAll(auth.credentials, config.availableBoothsEnabled ? config.boothIds : []);
 
-    // Persist per-endpoint sync metadata for restart survival
-    const ts = loadTimestamps();
-    for (const [ep, info] of Object.entries(results.endpointStatuses)) {
-      ts.endpoints[ep] = {
-        lastSync: info.lastSync || null,
-        status: info.status,
-        durationMs: info.durationMs,
-        dataSize: info.dataSize,
-        httpStatus: info.httpStatus,
-        error: info.error
-      };
+      // Persist per-endpoint sync metadata for restart survival
+      const ts = loadTimestamps();
+      for (const [ep, info] of Object.entries(results.endpointStatuses)) {
+        ts.endpoints[ep] = {
+          lastSync: info.lastSync || null,
+          status: info.status,
+          durationMs: info.durationMs,
+          dataSize: info.dataSize,
+          httpStatus: info.httpStatus,
+          error: info.error
+        };
+      }
+      saveTimestamps(ts);
+
+      Logger.info('IPC: scrape-websites — sync complete', Object.keys(results.endpointStatuses));
+      return results;
+    } finally {
+      activeOrchestrator = null;
     }
-    saveTimestamps(ts);
-
-    Logger.info('IPC: scrape-websites — sync complete', Object.keys(results.endpointStatuses));
-    activeOrchestrator = null;
-    return results;
   })
 );
 

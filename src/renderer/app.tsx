@@ -274,10 +274,11 @@ export function App() {
         const imported = pc.profiles.find((p) => p.name === name);
         if (imported) {
           await handleSwitchProfile(imported.dirName);
+          // handleSwitchProfile already shows its own success message
         } else {
           dispatchProfiles(pc);
+          showStatus(`Profile "${name}" imported`, 'success');
         }
-        showStatus(`Profile "${name}" imported`, 'success');
       } catch (error) {
         showStatus(`Import failed: ${(error as Error).message}`, 'error');
       }

@@ -8,10 +8,8 @@ import type { Credentials } from './types';
 class CredentialsManager {
   private credentialsPath: string;
 
-  constructor(dataDir: string | null = null) {
-    // Use provided dataDir, or fall back to __dirname for development
-    const baseDir = dataDir || path.join(__dirname, 'data');
-    this.credentialsPath = path.join(baseDir, 'credentials.enc');
+  constructor(dataDir: string) {
+    this.credentialsPath = path.join(dataDir, 'credentials.enc');
   }
 
   /**
