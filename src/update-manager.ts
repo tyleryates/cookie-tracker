@@ -98,61 +98,61 @@ export function checkForUpdates(autoUpdateEnabled: boolean): void {
   }
 }
 
-/** Quit the app and install the downloaded update. Handles macOS manual install workaround. */
-export async function quitAndInstall(getMainWindow: () => BrowserWindow | null): Promise<void> {
-  Logger.info('IPC: quit-and-install — starting');
-  Logger.info(`quit-and-install: platform=${process.platform}, downloadedFile=${downloadedUpdateFile}`);
+/**
+ * macOS manual install: extract the downloaded zip, spawn a detached script
+ * to replace the app bundle after this process exits.
+ * Returns true if the install was initiated (app will exit), false to fall through.
+ */
+function performManualMacOSInstall(downloadedFile: string): boolean {
+  const currentAppPath = app.getAppPath().replace(/\/Contents\/Resources\/app(\.asar)?$/, '');
+  Logger.info(`quit-and-install: manual install — currentApp=${currentAppPath}`);
 
-  if (process.platform === 'darwin' && downloadedUpdateFile && fs.existsSync(downloadedUpdateFile)) {
-    // Manual install: Squirrel.Mac's "The command is disabled" error means
-    // quitAndInstall() can never work. Instead, extract the downloaded zip,
-    // spawn a detached script to replace the app bundle, and exit.
-    const currentAppPath = app.getAppPath().replace(/\/Contents\/Resources\/app(\.asar)?$/, '');
-    Logger.info(`quit-and-install: manual install — currentApp=${currentAppPath}`);
+  const tempDir = path.join(os.tmpdir(), `cookie-tracker-update-${crypto.randomBytes(8).toString('hex')}`);
+  try {
+    Logger.info(`quit-and-install: extracting ${downloadedFile} to ${tempDir}`);
+    fs.rmSync(tempDir, { recursive: true, force: true });
+    fs.mkdirSync(tempDir, { recursive: true });
+    execFileSync('ditto', ['-xk', downloadedFile, tempDir]);
 
-    const tempDir = path.join(os.tmpdir(), `cookie-tracker-update-${crypto.randomBytes(8).toString('hex')}`);
-    try {
-      Logger.info(`quit-and-install: extracting ${downloadedUpdateFile} to ${tempDir}`);
-      fs.rmSync(tempDir, { recursive: true, force: true });
-      fs.mkdirSync(tempDir, { recursive: true });
-      execFileSync('ditto', ['-xk', downloadedUpdateFile, tempDir]);
-
-      const entries = fs.readdirSync(tempDir).filter((f) => f.endsWith('.app'));
-      if (entries.length === 0) {
-        Logger.error('quit-and-install: no .app found in extracted zip');
-        throw new Error('No .app bundle found in update zip');
-      }
-      const newAppPath = path.join(tempDir, entries[0]);
-      Logger.info(`quit-and-install: found ${entries[0]}, spawning update script`);
-
-      // Spawn a detached shell script that waits for this process to exit,
-      // replaces the app bundle, relaunches, and cleans up.
-      // Passes paths as positional arguments to avoid shell injection.
-      const scriptPath = path.join(tempDir, 'update.sh');
-      const scriptContent = [
-        '#!/bin/bash',
-        'while kill -0 $4 2>/dev/null; do sleep 0.5; done',
-        'rm -rf "$1"',
-        'mv "$2" "$1"',
-        'open "$1"',
-        'rm -rf "$3"'
-      ].join('\n');
-      fs.writeFileSync(scriptPath, scriptContent, { mode: 0o700 });
-
-      spawn(scriptPath, [currentAppPath, newAppPath, tempDir, String(process.pid)], { detached: true, stdio: 'ignore' }).unref();
-      Logger.info('quit-and-install: update script spawned, exiting app');
-      Logger.close();
-      app.exit(0);
-    } catch (err) {
-      Logger.error('quit-and-install: manual install failed:', err);
-      try {
-        fs.rmSync(tempDir, { recursive: true, force: true });
-      } catch {}
-      // Fall through to Squirrel attempt
+    const entries = fs.readdirSync(tempDir).filter((f) => f.endsWith('.app'));
+    if (entries.length === 0) {
+      throw new Error('No .app bundle found in update zip');
     }
-  }
+    const newAppPath = path.join(tempDir, entries[0]);
+    Logger.info(`quit-and-install: found ${entries[0]}, spawning update script`);
 
-  // Non-macOS or manual install failed: try Squirrel/standard approach
+    // Spawn a detached shell script that waits for this process to exit,
+    // replaces the app bundle, relaunches, and cleans up.
+    // Passes paths as positional arguments to avoid shell injection.
+    const scriptPath = path.join(tempDir, 'update.sh');
+    const scriptContent = [
+      '#!/bin/bash',
+      'while kill -0 $4 2>/dev/null; do sleep 0.5; done',
+      'rm -rf "$1"',
+      'mv "$2" "$1"',
+      'open "$1"',
+      'rm -rf "$3"'
+    ].join('\n');
+    fs.writeFileSync(scriptPath, scriptContent, { mode: 0o700 });
+
+    spawn(scriptPath, [currentAppPath, newAppPath, tempDir, String(process.pid)], { detached: true, stdio: 'ignore' }).unref();
+    Logger.info('quit-and-install: update script spawned, exiting app');
+    Logger.close();
+    app.exit(0);
+    return true;
+  } catch (err) {
+    Logger.error('quit-and-install: manual install failed:', err);
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch (cleanupErr) {
+      Logger.warn('quit-and-install: failed to clean up temp directory:', cleanupErr);
+    }
+    return false;
+  }
+}
+
+/** Try standard Squirrel/electron-updater quit-and-install with fallback timeout */
+function performStandardInstall(getMainWindow: () => BrowserWindow | null): void {
   Logger.info('quit-and-install: trying standard quitAndInstall()');
   app.removeAllListeners('window-all-closed');
   app.removeAllListeners('activate');
@@ -171,4 +171,17 @@ export async function quitAndInstall(getMainWindow: () => BrowserWindow | null):
     Logger.info('quit-and-install: fallback timeout, calling app.exit(0)');
     app.exit(0);
   }, 5000);
+}
+
+/** Quit the app and install the downloaded update. Handles macOS manual install workaround. */
+export async function quitAndInstall(getMainWindow: () => BrowserWindow | null): Promise<void> {
+  Logger.info('IPC: quit-and-install — starting');
+  Logger.info(`quit-and-install: platform=${process.platform}, downloadedFile=${downloadedUpdateFile}`);
+
+  const updateFile = downloadedUpdateFile;
+  if (process.platform === 'darwin' && updateFile && fs.existsSync(updateFile) && performManualMacOSInstall(updateFile)) {
+    return; // App is exiting via the manual install script
+  }
+
+  performStandardInstall(getMainWindow);
 }

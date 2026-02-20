@@ -5,14 +5,18 @@ import * as path from 'node:path';
 import Logger from '../logger';
 import type { ProgressCallback } from '../types';
 
-/** Save data to sync/{filename} as raw JSON (no envelope) */
+/** Save data to sync/{filename} as raw JSON (no envelope).
+ *  Uses atomic write (temp file + rename) to prevent partial writes on interruption. */
 export function savePipelineFile(dataDir: string, filename: string, data: unknown): void {
   try {
     const dir = path.join(dataDir, 'sync');
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(path.join(dir, filename), JSON.stringify(data, null, 2));
+    const target = path.join(dir, filename);
+    const tmp = `${target}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, target);
   } catch (err) {
     Logger.warn('Could not save pipeline file:', (err as Error).message);
   }

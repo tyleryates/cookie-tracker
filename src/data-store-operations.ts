@@ -16,6 +16,37 @@ function matchesTroopNumber(field: string, troopNumber: string): boolean {
   return digits === troopNumber;
 }
 
+/** Simple type → category lookup for types with no special-case logic */
+const TRANSFER_TYPE_CATEGORY: Record<string, TransferCategory> = {
+  [TRANSFER_TYPE.G2T]: TRANSFER_CATEGORY.GIRL_RETURN,
+  [TRANSFER_TYPE.D]: TRANSFER_CATEGORY.DC_ORDER_RECORD,
+  [TRANSFER_TYPE.DIRECT_SHIP]: TRANSFER_CATEGORY.DIRECT_SHIP,
+  [TRANSFER_TYPE.PLANNED]: TRANSFER_CATEGORY.COUNCIL_TO_TROOP
+};
+
+/** Determine T2T direction: outgoing if our troop is the sender, otherwise incoming */
+function classifyT2T(from: string | undefined, troopNumber: string | undefined, troopName: string | undefined): TransferCategory {
+  if (from && troopNumber && matchesTroopNumber(from, troopNumber)) return TRANSFER_CATEGORY.TROOP_OUTGOING;
+  if (from && troopName && matchesTroopNumber(from, troopName)) return TRANSFER_CATEGORY.TROOP_OUTGOING;
+  if (!troopNumber && !troopName) {
+    Logger.warn(`T2T transfer from="${from || '(empty)'}" cannot determine direction — defaulting to incoming`);
+  }
+  return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
+}
+
+/** Classify T2G based on divider flags */
+function classifyT2G(virtualBooth: boolean, boothDivider: boolean, directShipDivider: boolean): TransferCategory {
+  if (virtualBooth) return TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION;
+  if (boothDivider) return TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION;
+  if (directShipDivider) return TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION;
+  return TRANSFER_CATEGORY.GIRL_PICKUP;
+}
+
+/** Classify Cookie Share based on booth divider flag */
+function classifyCookieShare(boothDivider: boolean): TransferCategory {
+  return boothDivider ? TRANSFER_CATEGORY.BOOTH_COOKIE_SHARE : TRANSFER_CATEGORY.COOKIE_SHARE_RECORD;
+}
+
 /** Classify a transfer into an explicit category based on type + flags */
 function classifyTransferCategory(
   type: string | undefined,
@@ -31,33 +62,11 @@ function classifyTransferCategory(
     return TRANSFER_CATEGORY.DC_ORDER_RECORD;
   }
   if (isC2TTransfer(type)) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
-  if (type === TRANSFER_TYPE.T2T) {
-    // Outgoing T2T: our troop is the sender → inventory out
-    // Check both troopNumber (from troop_id) and troopName (from troop_name)
-    // because troop_id may be an internal SC ID that doesn't match the from field
-    if (from && troopNumber && matchesTroopNumber(from, troopNumber)) return TRANSFER_CATEGORY.TROOP_OUTGOING;
-    if (from && troopName && matchesTroopNumber(from, troopName)) return TRANSFER_CATEGORY.TROOP_OUTGOING;
-    if (!troopNumber && !troopName) {
-      Logger.warn(
-        `T2T transfer from="${from || '(empty)'}" cannot determine direction — no troopNumber or troopName available, defaulting to incoming`
-      );
-    }
-    return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
-  }
-  if (type === TRANSFER_TYPE.G2T) return TRANSFER_CATEGORY.GIRL_RETURN;
-  if (type === TRANSFER_TYPE.T2G) {
-    if (virtualBooth) return TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION;
-    if (boothDivider) return TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION;
-    if (directShipDivider) return TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION;
-    return TRANSFER_CATEGORY.GIRL_PICKUP;
-  }
-  if (type === TRANSFER_TYPE.D) return TRANSFER_CATEGORY.DC_ORDER_RECORD;
-  if (type === TRANSFER_TYPE.COOKIE_SHARE || type === TRANSFER_TYPE.COOKIE_SHARE_D) {
-    if (boothDivider) return TRANSFER_CATEGORY.BOOTH_COOKIE_SHARE;
-    return TRANSFER_CATEGORY.COOKIE_SHARE_RECORD;
-  }
-  if (type === TRANSFER_TYPE.DIRECT_SHIP) return TRANSFER_CATEGORY.DIRECT_SHIP;
-  if (type === TRANSFER_TYPE.PLANNED) return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
+  if (type === TRANSFER_TYPE.T2T) return classifyT2T(from, troopNumber, troopName);
+  if (type === TRANSFER_TYPE.T2G) return classifyT2G(virtualBooth, boothDivider, directShipDivider);
+  if (type === TRANSFER_TYPE.COOKIE_SHARE || type === TRANSFER_TYPE.COOKIE_SHARE_D) return classifyCookieShare(boothDivider);
+  const mapped = TRANSFER_TYPE_CATEGORY[type];
+  if (mapped) return mapped;
   Logger.warn(`Unknown transfer type "${type}" — defaulting to DC_ORDER_RECORD category`);
   return TRANSFER_CATEGORY.DC_ORDER_RECORD;
 }

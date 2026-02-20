@@ -133,7 +133,8 @@ export function appReducer(state: AppState, action: Action): AppState {
       const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };
       const isSyncing = action.status === 'syncing';
       // Clear previous sync's timing/error when starting; preserve/update when finished
-      const keepOnEnd = <T>(val: T | undefined, prevVal: T | undefined): T | undefined => (isSyncing ? undefined : (val ?? prevVal));
+      const preserveOnSyncEnd = <T>(val: T | undefined, prevVal: T | undefined): T | undefined =>
+        isSyncing ? undefined : (val ?? prevVal);
       return {
         ...state,
         syncState: {
@@ -145,10 +146,10 @@ export function appReducer(state: AppState, action: Action): AppState {
               status: action.status,
               lastSync: action.lastSync ?? prev.lastSync,
               cached: action.cached,
-              durationMs: keepOnEnd(action.durationMs, prev.durationMs),
-              dataSize: keepOnEnd(action.dataSize, prev.dataSize),
-              httpStatus: keepOnEnd(action.httpStatus, prev.httpStatus),
-              error: keepOnEnd(action.error, prev.error)
+              durationMs: preserveOnSyncEnd(action.durationMs, prev.durationMs),
+              dataSize: preserveOnSyncEnd(action.dataSize, prev.dataSize),
+              httpStatus: preserveOnSyncEnd(action.httpStatus, prev.httpStatus),
+              error: preserveOnSyncEnd(action.error, prev.error)
             }
           }
         }

@@ -4,12 +4,109 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
-import type { AppConfig, BoothLocation, EndpointSyncState, UnifiedDataset } from '../../types';
+import type { AppConfig, BoothAvailableDate, BoothLocation, BoothTimeSlot, EndpointSyncState, UnifiedDataset } from '../../types';
 import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
 import { boothTypeClass, DateFormatter, formatBoothDate, formatTime12h, haversineDistance } from '../format-utils';
 import { ipcInvoke } from '../ipc';
 import { filterAvailableDates, parseFiltersByDay, removeIgnoredSlots } from './available-booths-utils';
+
+function BoothDateGroup({
+  date,
+  timeSlots,
+  boothId,
+  readOnly,
+  onIgnoreSlot
+}: {
+  date: string;
+  timeSlots: BoothTimeSlot[];
+  boothId: number;
+  readOnly: boolean;
+  onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
+}) {
+  return (
+    <div class="booth-date-group">
+      <div class="booth-date-label">{formatBoothDate(date)}</div>
+      {timeSlots.length === 0 ? (
+        <span class="muted-text">No time slots available</span>
+      ) : (
+        <div class="booth-slot-list">
+          {timeSlots.map((slot) => {
+            const friendly =
+              slot.startTime && slot.endTime
+                ? `${formatTime12h(slot.startTime)} \u2013 ${formatTime12h(slot.endTime)}`
+                : formatTime12h(slot.startTime) || '-';
+            const raw = slot.startTime && slot.endTime ? `${slot.startTime} \u2013 ${slot.endTime}` : slot.startTime || '-';
+            return (
+              <span key={`${date}-${slot.startTime}`} title={raw} class="booth-time-slot">
+                {friendly}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    class="booth-slot-dismiss"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onIgnoreSlot(boothId, date, slot.startTime);
+                    }}
+                    title="Ignore this time slot"
+                  >
+                    &times;
+                  </button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BoothCard({
+  loc,
+  dates,
+  distance,
+  readOnly,
+  onIgnoreSlot
+}: {
+  loc: BoothLocation;
+  dates: BoothAvailableDate[];
+  distance?: number;
+  readOnly: boolean;
+  onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
+}) {
+  const addrParts = [loc.address.street, loc.address.city, loc.address.state, loc.address.zip].filter(Boolean);
+  const addressStr = addrParts.join(', ');
+
+  return (
+    <div class="booth-card">
+      <div class="booth-card-header">
+        <div>
+          <strong>{loc.storeName || '-'}</strong>
+          <div class="meta-text">
+            {addressStr || '-'}
+            {distance != null ? ` \u00B7 ${distance.toFixed(1)} mi` : ''}
+          </div>
+          {loc.notes && <div class="muted-text note-text">{loc.notes}</div>}
+        </div>
+        <span class={`booth-type-badge ${boothTypeClass(loc.reservationType)}`}>{loc.reservationType || '-'}</span>
+      </div>
+
+      <div class="booth-card-body">
+        {dates.map((d) => (
+          <BoothDateGroup
+            key={d.date}
+            date={d.date}
+            timeSlots={d.timeSlots}
+            boothId={loc.id}
+            readOnly={readOnly}
+            onIgnoreSlot={onIgnoreSlot}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 interface AvailableBoothsConfig {
   filters: string[];
@@ -284,70 +381,16 @@ export function AvailableBoothsReport({
         (boothsWithDates.length === 0 ? (
           <p class="muted-text">No available booth slots found.</p>
         ) : (
-          boothsWithDates.map((loc) => {
-            const addrParts = [loc.address.street, loc.address.city, loc.address.state, loc.address.zip].filter(Boolean);
-            const addressStr = addrParts.join(', ');
-            const dates = boothFilteredDates.get(loc.id) || [];
-
-            return (
-              <div key={loc.id} class="booth-card">
-                <div class="booth-card-header">
-                  <div>
-                    <strong>{loc.storeName || '-'}</strong>
-                    <div class="meta-text">
-                      {addressStr || '-'}
-                      {(() => {
-                        const dist = boothDistanceMap.get(loc.id);
-                        return dist != null ? ` \u00B7 ${dist.toFixed(1)} mi` : '';
-                      })()}
-                    </div>
-                    {loc.notes && <div class="muted-text note-text">{loc.notes}</div>}
-                  </div>
-                  <span class={`booth-type-badge ${boothTypeClass(loc.reservationType)}`}>{loc.reservationType || '-'}</span>
-                </div>
-
-                <div class="booth-card-body">
-                  {dates.map((d) => (
-                    <div key={d.date} class="booth-date-group">
-                      <div class="booth-date-label">{formatBoothDate(d.date)}</div>
-                      {d.timeSlots.length === 0 ? (
-                        <span class="muted-text">No time slots available</span>
-                      ) : (
-                        <div class="booth-slot-list">
-                          {d.timeSlots.map((slot) => {
-                            const friendly =
-                              slot.startTime && slot.endTime
-                                ? `${formatTime12h(slot.startTime)} \u2013 ${formatTime12h(slot.endTime)}`
-                                : formatTime12h(slot.startTime) || '-';
-                            const raw = slot.startTime && slot.endTime ? `${slot.startTime} \u2013 ${slot.endTime}` : slot.startTime || '-';
-
-                            return (
-                              <span key={`${d.date}-${slot.startTime}`} title={raw} class="booth-time-slot">
-                                {friendly}
-                                {!readOnly && (
-                                  <button
-                                    type="button"
-                                    class="booth-slot-dismiss"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onIgnoreSlot(loc.id, d.date, slot.startTime);
-                                    }}
-                                    title="Ignore this time slot"
-                                  >
-                                    &times;
-                                  </button>
-                                )}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })
+          boothsWithDates.map((loc) => (
+            <BoothCard
+              key={loc.id}
+              loc={loc}
+              dates={boothFilteredDates.get(loc.id) || []}
+              distance={boothDistanceMap.get(loc.id)}
+              readOnly={readOnly}
+              onIgnoreSlot={onIgnoreSlot}
+            />
+          ))
         ))}
     </div>
   );

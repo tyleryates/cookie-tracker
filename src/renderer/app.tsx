@@ -1,21 +1,28 @@
 // App — Root Preact component. Owns all state, delegates logic to hooks.
+// Sub-components (WelcomeContent, SettingsContent, MainContent) extract JSX
+// but remain in this file since they're tightly coupled to App state.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
-import * as packageJson from '../../package.json';
 import Logger from '../logger';
-import { type AppConfig, type ProfilesConfig, toActiveProfile } from '../types';
+import type {
+  ActiveProfile,
+  AppConfig,
+  EndpointSyncState,
+  HealthChecks,
+  ProfileInfo,
+  ProfilesConfig,
+  SyncState,
+  UnifiedDataset,
+  Warning
+} from '../types';
+import { toActiveProfile } from '../types';
 import { type AppState, appReducer } from './app-reducer';
+import { AppHeader } from './components/app-header';
 import { ReportContent, TabBar } from './components/reports-section';
 import { SettingsPage, SettingsToggles } from './components/settings-page';
-import {
-  computeGroupStatuses,
-  createInitialSyncState,
-  DataHealthChecks,
-  type GroupStatus,
-  SyncStatusSection
-} from './components/sync-section';
+import { computeGroupStatuses, createInitialSyncState, DataHealthChecks, SyncStatusSection } from './components/sync-section';
 import { loadAppConfig } from './data-loader';
-import { countBoothsNeedingDistribution, DateFormatter, getActiveScouts } from './format-utils';
+import { countBoothsNeedingDistribution, getActiveScouts } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
 import { encodeSlotKey, summarizeAvailableSlots } from './reports/available-booths-utils';
@@ -36,73 +43,152 @@ const initialState: AppState = {
 };
 
 // ============================================================================
-// APP HEADER
+// WELCOME CONTENT
 // ============================================================================
 
-function SyncPill({ label, group }: { label: string; group: GroupStatus }) {
-  let statusText: string;
-  let modifier = '';
-  if (group.status === 'syncing') {
-    statusText = 'Syncing\u2026';
-    modifier = 'syncing';
-  } else if (group.status === 'error') {
-    statusText = 'Failed';
-    modifier = 'error';
-  } else if (group.lastSync) {
-    statusText = DateFormatter.toRelativeTimestamp(group.lastSync);
-  } else {
-    return null;
-  }
-
+function WelcomeContent({ onComplete }: { onComplete: () => void }) {
   return (
-    <span class={`sync-pill ${modifier}`}>
-      <span class="sync-pill-label">{label}</span>
-      <span class="sync-pill-status">{statusText}</span>
-    </span>
+    <div class="report-visual sync-tab">
+      <SettingsPage mode="welcome" onComplete={onComplete} />
+    </div>
   );
 }
 
-function AppHeader({
-  syncing,
-  readOnly,
-  groups,
-  showBooths,
-  settingsActive,
-  onSync,
-  onOpenSettings,
-  isWelcome
-}: {
-  syncing: boolean;
+// ============================================================================
+// SETTINGS CONTENT
+// ============================================================================
+
+interface SettingsContentProps {
+  appConfig: AppConfig | null;
   readOnly: boolean;
-  groups: ReturnType<typeof computeGroupStatuses>;
-  showBooths: boolean;
-  settingsActive: boolean;
-  onSync: () => void;
-  onOpenSettings: () => void;
-  isWelcome: boolean;
-}) {
+  onUpdateConfig: (patch: Partial<AppConfig>) => void;
+  activeProfile: ActiveProfile | null;
+  profiles: ProfileInfo[];
+  onSwitchProfile: (dirName: string) => void;
+  onImportProfile: (name: string) => void;
+  onDeleteProfile: (dirName: string) => void;
+  onExport: () => void;
+  onInjectDebug: () => void;
+  hasData: boolean;
+  syncState: SyncState;
+  availableBoothsEnabled: boolean;
+  autoSyncEnabled: boolean;
+  autoRefreshBoothsEnabled: boolean;
+  onSyncReports: () => void;
+  onRefreshBooths: () => void;
+  onToggleAutoSync: (enabled: boolean) => void;
+  onToggleAutoRefreshBooths: (enabled: boolean) => void;
+  healthChecks: HealthChecks | undefined;
+  warnings: Warning[];
+}
+
+function SettingsContent({
+  appConfig,
+  readOnly,
+  onUpdateConfig,
+  activeProfile,
+  profiles,
+  onSwitchProfile,
+  onImportProfile,
+  onDeleteProfile,
+  onExport,
+  onInjectDebug,
+  hasData,
+  syncState,
+  availableBoothsEnabled,
+  autoSyncEnabled,
+  autoRefreshBoothsEnabled,
+  onSyncReports,
+  onRefreshBooths,
+  onToggleAutoSync,
+  onToggleAutoRefreshBooths,
+  healthChecks,
+  warnings
+}: SettingsContentProps) {
   return (
-    <div class="app-header">
-      <span class="app-header-title">
-        {'\uD83C\uDF6A'} Cookie Tracker <span class="app-header-version">v{packageJson.version}</span>
-      </span>
-      {!isWelcome && (
-        <div class="app-header-actions">
-          <div class="app-header-sync-pills">
-            <SyncPill label="Reports" group={groups.reports} />
-            {showBooths && <SyncPill label="Booths" group={groups.booths} />}
-          </div>
-          <button type="button" class="icon-btn has-tooltip" disabled={syncing || readOnly} onClick={onSync}>
-            {syncing ? <span class="spinner" /> : '\u21BB'}
-            <span class="btn-tooltip">Refresh Data</span>
-          </button>
-          <button type="button" class={`icon-btn has-tooltip${settingsActive ? ' active' : ''}`} onClick={onOpenSettings}>
-            {'\u2699'}
-            <span class="btn-tooltip">Settings</span>
-          </button>
-        </div>
-      )}
+    <div class="report-visual sync-tab">
+      <SettingsToggles
+        appConfig={appConfig}
+        readOnly={readOnly}
+        onUpdateConfig={onUpdateConfig}
+        activeProfile={activeProfile}
+        profiles={profiles}
+        onSwitchProfile={onSwitchProfile}
+        onImportProfile={onImportProfile}
+        onDeleteProfile={onDeleteProfile}
+        onExport={onExport}
+        onInjectDebug={onInjectDebug}
+        hasData={hasData}
+      />
+      <SettingsPage mode="settings" />
+      <SyncStatusSection
+        syncState={syncState}
+        availableBoothsEnabled={availableBoothsEnabled}
+        autoSyncEnabled={autoSyncEnabled}
+        autoRefreshBoothsEnabled={autoRefreshBoothsEnabled}
+        onSyncReports={onSyncReports}
+        onRefreshBooths={onRefreshBooths}
+        onToggleAutoSync={onToggleAutoSync}
+        onToggleAutoRefreshBooths={onToggleAutoRefreshBooths}
+        readOnly={readOnly}
+      />
+      {healthChecks && <DataHealthChecks healthChecks={healthChecks} warnings={warnings} />}
     </div>
+  );
+}
+
+// ============================================================================
+// MAIN CONTENT
+// ============================================================================
+
+interface MainContentProps {
+  activeReport: string | null;
+  unified: UnifiedDataset | null;
+  appConfig: AppConfig | null;
+  boothSyncState: EndpointSyncState;
+  boothResetKey: number;
+  readOnly: boolean;
+  availableSlotCount: number;
+  onSelectReport: (type: string) => void;
+  onIgnoreSlot: (boothId: number, date: string, startTime: string) => void;
+  onResetIgnored: () => void;
+  onRefreshBooths: () => void;
+  onSaveBoothIds: (ids: number[]) => void;
+  onSaveDayFilters: (filters: string[]) => void;
+}
+
+function MainContent({
+  activeReport,
+  unified,
+  appConfig,
+  boothSyncState,
+  boothResetKey,
+  readOnly,
+  availableSlotCount,
+  onSelectReport,
+  onIgnoreSlot,
+  onResetIgnored,
+  onRefreshBooths,
+  onSaveBoothIds,
+  onSaveDayFilters
+}: MainContentProps) {
+  if (activeReport === 'health-check' && unified) {
+    return <HealthCheckReport data={unified} availableSlotCount={availableSlotCount} onNavigate={onSelectReport} />;
+  }
+  return (
+    <ReportContent
+      activeReport={activeReport}
+      unified={unified}
+      appConfig={appConfig}
+      boothSyncState={boothSyncState}
+      boothResetKey={boothResetKey}
+      readOnly={readOnly}
+      onIgnoreSlot={onIgnoreSlot}
+      onResetIgnored={onResetIgnored}
+      onRefreshBooths={onRefreshBooths}
+      onSaveBoothIds={onSaveBoothIds}
+      onSaveDayFilters={onSaveDayFilters}
+    />
   );
 }
 
@@ -336,6 +422,57 @@ export function App() {
   const isWelcome = state.activePage === 'welcome';
   const readOnly = !!state.activeProfile && !state.activeProfile.isDefault;
 
+  // --- Render ---
+
+  let content: preact.JSX.Element;
+  if (isWelcome) {
+    content = <WelcomeContent onComplete={handleWelcomeComplete} />;
+  } else if (state.activeReport === 'settings') {
+    content = (
+      <SettingsContent
+        appConfig={state.appConfig}
+        readOnly={readOnly}
+        onUpdateConfig={handleUpdateConfig}
+        activeProfile={state.activeProfile}
+        profiles={state.profiles}
+        onSwitchProfile={handleSwitchProfile}
+        onImportProfile={handleImportProfile}
+        onDeleteProfile={handleDeleteProfile}
+        onExport={exportData}
+        onInjectDebug={injectDebug}
+        hasData={!!state.unified}
+        syncState={state.syncState}
+        availableBoothsEnabled={!!state.appConfig?.availableBoothsEnabled}
+        autoSyncEnabled={state.autoSyncEnabled}
+        autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
+        onSyncReports={sync}
+        onRefreshBooths={refreshBooths}
+        onToggleAutoSync={handleToggleAutoSync}
+        onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
+        healthChecks={state.unified?.metadata.healthChecks}
+        warnings={state.unified?.warnings || []}
+      />
+    );
+  } else {
+    content = (
+      <MainContent
+        activeReport={state.activeReport}
+        unified={state.unified}
+        appConfig={state.appConfig}
+        boothSyncState={state.syncState.endpoints['sc-booth-availability'] || { status: 'idle', lastSync: null }}
+        boothResetKey={boothResetKeyRef.current}
+        readOnly={readOnly}
+        availableSlotCount={availableSlotCount}
+        onSelectReport={handleSelectReport}
+        onIgnoreSlot={handleIgnoreSlot}
+        onResetIgnored={handleResetIgnored}
+        onRefreshBooths={refreshBooths}
+        onSaveBoothIds={handleSaveBoothIds}
+        onSaveDayFilters={handleSaveDayFilters}
+      />
+    );
+  }
+
   return (
     <div class="app-shell">
       {state.updateReady && (
@@ -374,60 +511,7 @@ export function App() {
         />
       )}
       <div class="app-content" ref={contentRef}>
-        {isWelcome || state.activeReport === 'settings' ? (
-          <div class="report-visual sync-tab">
-            {!isWelcome && (
-              <SettingsToggles
-                appConfig={state.appConfig}
-                readOnly={readOnly}
-                onUpdateConfig={handleUpdateConfig}
-                activeProfile={state.activeProfile}
-                profiles={state.profiles}
-                onSwitchProfile={handleSwitchProfile}
-                onImportProfile={handleImportProfile}
-                onDeleteProfile={handleDeleteProfile}
-                onExport={exportData}
-                onInjectDebug={injectDebug}
-                hasData={!!state.unified}
-              />
-            )}
-            <SettingsPage mode={isWelcome ? 'welcome' : 'settings'} onComplete={isWelcome ? handleWelcomeComplete : undefined} />
-            {!isWelcome && (
-              <>
-                <SyncStatusSection
-                  syncState={state.syncState}
-                  availableBoothsEnabled={!!state.appConfig?.availableBoothsEnabled}
-                  autoSyncEnabled={state.autoSyncEnabled}
-                  autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
-                  onSyncReports={sync}
-                  onRefreshBooths={refreshBooths}
-                  onToggleAutoSync={handleToggleAutoSync}
-                  onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
-                  readOnly={readOnly}
-                />
-                {state.unified?.metadata.healthChecks && (
-                  <DataHealthChecks healthChecks={state.unified.metadata.healthChecks} warnings={state.unified.warnings} />
-                )}
-              </>
-            )}
-          </div>
-        ) : state.activeReport === 'health-check' && state.unified ? (
-          <HealthCheckReport data={state.unified} availableSlotCount={availableSlotCount} onNavigate={handleSelectReport} />
-        ) : (
-          <ReportContent
-            activeReport={state.activeReport}
-            unified={state.unified}
-            appConfig={state.appConfig}
-            boothSyncState={state.syncState.endpoints['sc-booth-availability'] || { status: 'idle', lastSync: null }}
-            boothResetKey={boothResetKeyRef.current}
-            readOnly={readOnly}
-            onIgnoreSlot={handleIgnoreSlot}
-            onResetIgnored={handleResetIgnored}
-            onRefreshBooths={refreshBooths}
-            onSaveBoothIds={handleSaveBoothIds}
-            onSaveDayFilters={handleSaveDayFilters}
-          />
-        )}
+        {content}
       </div>
       {state.statusMessage && (
         <div class="toast-container">

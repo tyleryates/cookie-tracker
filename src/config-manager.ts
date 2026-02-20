@@ -1,5 +1,5 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { loadJsonFile, saveJsonFile } from './json-file-utils';
 import Logger from './logger';
 import type { AppConfig } from './types';
 
@@ -37,13 +37,9 @@ class ConfigManager {
   loadConfig(): AppConfig {
     const defaults = this.getDefaults();
     try {
-      if (!fs.existsSync(this.configPath)) {
-        this.saveConfig(defaults);
-        return defaults;
-      }
-      const raw = fs.readFileSync(this.configPath, 'utf8');
-      const disk = JSON.parse(raw);
-      if (typeof disk !== 'object' || disk === null) {
+      // Values are runtime-validated below before assignment to typed result
+      const disk = loadJsonFile<Record<string, any>>(this.configPath);
+      if (disk === null) {
         this.saveConfig(defaults);
         return defaults;
       }
@@ -82,15 +78,7 @@ class ConfigManager {
   }
 
   saveConfig(config: AppConfig): void {
-    try {
-      const dir = path.dirname(this.configPath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
-    } catch (error) {
-      Logger.error('Error saving config:', error);
-    }
+    saveJsonFile(this.configPath, config, 0o600);
   }
 
   updateConfig(partial: Partial<AppConfig>): AppConfig {

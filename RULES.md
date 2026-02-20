@@ -212,7 +212,7 @@ Some auto-sync to SC, others require manual entry:
 | In Person Delivery with Donation | Any | **No** | Create Virtual Cookie Share in SC |
 | Cookies in Hand with Donation | Any | **No** | Create Virtual Cookie Share in SC |
 
-**Key rule:** Auto-sync only occurs when payment is "CAPTURED" (credit card) AND order type is "Shipped" or "Donation" (exact). In-person delivery types NEVER auto-sync regardless of payment. CASH payment types NEVER auto-sync regardless of order type.
+**Key rule:** Auto-sync only occurs when payment is "CAPTURED" (credit card) AND order type contains "Shipped" or is exactly "Donation". In-person delivery types NEVER auto-sync regardless of payment. CASH payment types NEVER auto-sync regardless of order type.
 
 **Important:** Site orders (last name "Site") are excluded from DC Cookie Share tracking. Booth sale donations are handled by booth dividers (Source 2), not manual Virtual Cookie Share entry.
 

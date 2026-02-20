@@ -5,11 +5,34 @@ import { COOKIE_ABBR_MAP, COOKIE_COLUMN_MAP, COOKIE_ID_MAP, DC_COOKIE_COLUMNS, n
 import Logger from '../../logger';
 import type { CookieType, RawDataRow, Varieties } from '../../types';
 
+/** Safely parse an integer, logging a warning if the value is non-empty but not numeric */
+export function safeParseInt(value: unknown, context: string): number {
+  if (value == null || value === '') return 0;
+  const n = parseInt(String(value), 10);
+  if (Number.isNaN(n)) {
+    Logger.warn(`Non-numeric value "${value}" in ${context} — treating as 0`);
+    return 0;
+  }
+  return n;
+}
+
+/** Safely parse a float, logging a warning if the value is non-empty but not numeric */
+export function safeParseFloat(value: unknown, context: string): number {
+  if (value == null || value === '') return 0;
+  const cleaned = String(value).replace(/[$,]/g, '');
+  const n = parseFloat(cleaned);
+  if (Number.isNaN(n)) {
+    Logger.warn(`Non-numeric value "${value}" in ${context} — treating as 0`);
+    return 0;
+  }
+  return n;
+}
+
 /** Parse cookie varieties from Digital Cookie row */
 export function parseVarietiesFromDC(row: RawDataRow): Varieties {
   const varieties: Record<string, number> = {};
   for (const columnName of DC_COOKIE_COLUMNS) {
-    const count = parseInt(row[columnName], 10) || 0;
+    const count = safeParseInt(row[columnName], `DC variety "${columnName}"`);
     if (count > 0) {
       const cookieType = normalizeCookieName(columnName);
       if (!cookieType) {
@@ -33,8 +56,11 @@ export function parseVarietiesFromSCReport(row: RawDataRow): { varieties: Variet
   for (const [col, cookieType] of Object.entries(COOKIE_COLUMN_MAP)) {
     const value = row[col] || '0/0';
     const parts = String(value).split('/');
-    const cases = parseInt(parts[0], 10) || 0;
-    const packages = parseInt(parts[1], 10) || 0;
+    if (parts.length < 2) {
+      Logger.warn(`SC Report variety "${col}" has unexpected format "${value}" (expected "cases/packages") — treating as 0`);
+    }
+    const cases = safeParseInt(parts[0], `SC Report "${col}" cases`);
+    const packages = safeParseInt(parts[1], `SC Report "${col}" packages`);
     const total = cases * PACKAGES_PER_CASE + packages;
 
     if (total > 0) {
@@ -84,7 +110,7 @@ export function parseVarietiesFromSCTransfer(row: RawDataRow): Varieties {
   const varieties: Record<string, number> = {};
 
   for (const [abbr, cookieType] of Object.entries(COOKIE_ABBR_MAP)) {
-    const count = parseInt(row[abbr], 10) || 0;
+    const count = safeParseInt(row[abbr], `SC Transfer "${abbr}"`);
     if (count !== 0) {
       varieties[cookieType] = count;
     }

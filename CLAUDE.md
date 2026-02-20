@@ -28,7 +28,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **13 reports in 6 tab groups** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds, plus Inventory History when enabled), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, plus Booth Finder when enabled), Donations, Cookie Popularity
+- **13 reports in 5 tab groups + To-Do** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds, plus Inventory History when enabled), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, plus Booth Finder when enabled), Donations, Cookie Popularity
 - **Profile management** — Import, switch, and delete data profiles for managing multiple troops
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
@@ -36,7 +36,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 
 Three layers with strict boundaries:
 
-**Main process** (`src/main.ts`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers, scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
+**Main process** (`src/main.ts`, `src/ipc-handlers/`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers (organized by domain in `ipc-handlers/`), scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
 
 **Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (13 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings has its own tab; when `activeReport === 'settings'`, the SettingsPage component renders alongside sync status. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
 
@@ -52,7 +52,7 @@ Three layers with strict boundaries:
 | `src/constants.ts` | Business logic constants (transfer types, categories, allocation channels) |
 | `src/cookie-constants.ts` | Cookie names, pricing, variety mappings across DC/SC/API |
 | `src/data-store.ts` | DataStore creation and type — intermediate store between import and calculation |
-| `src/data-store-operations.ts` | Transfer/order creation, classification (`classifyTransferCategory`, `matchesTroopNumber`) |
+| `src/data-store-operations.ts` | Transfer/order creation with automatic category classification based on transfer flags |
 | `src/order-classification.ts` | DC order type/payment/owner classification |
 | `src/validators.ts` | Input validation for credentials and config |
 | `src/config-manager.ts` | App configuration persistence (booth IDs, filters) |
@@ -64,11 +64,44 @@ Three layers with strict boundaries:
 | `src/renderer/reports/available-booths-utils.ts` | Booth slot filtering, encoding, and summarization utilities |
 | `src/renderer/order-helpers.ts` | Order display helpers (status pills, tooltips, payment formatting) |
 | `src/profile-manager.ts` | Multi-profile data directory management |
+| `src/json-file-utils.ts` | Shared atomic JSON load/save helpers used by config, seasonal data, etc. |
+| `src/logger.ts` | Centralized logging for main and renderer processes |
+| `src/debug-mutations.ts` | Debug utility that injects test data to trigger all warning states |
+| `src/preload.ts` | Electron preload script — IPC bridge with whitelisted channels |
+| `src/renderer.ts` | Renderer process entry point (Preact app initialization) |
+
+### Scrapers
+
+| File | Purpose |
+|---|---|
+| `src/scrapers/index.ts` | ScraperOrchestrator — coordinates DC and SC scrapers |
+| `src/scrapers/base-scraper.ts` | Shared scraper utilities (progress callbacks, pipeline file I/O) |
+| `src/scrapers/dc-session.ts` | Digital Cookie HTTP session with CSRF token extraction and auto re-login |
+| `src/scrapers/sc-session.ts` | Smart Cookie HTTP session with XSRF token and auto re-login |
+| `src/scrapers/digital-cookie.ts` | DigitalCookieScraper — downloads DC Excel export |
+| `src/scrapers/smart-cookie.ts` | SmartCookieScraper — fetches SC API endpoints in phases |
+| `src/scrapers/booth-cache.ts` | Local caching for booth catalog and time slot data |
+| `src/scrapers/sc-types.ts` | TypeScript interfaces for Smart Cookie API responses |
+
+### IPC Handlers
+
+IPC handlers are organized by domain in `src/ipc-handlers/`:
+
+| File | Purpose |
+|---|---|
+| `index.ts` | `registerAllHandlers()` — wires all handler modules |
+| `data-handlers.ts` | load-data, load-data-debug, save-file |
+| `credential-handlers.ts` | load-credentials, save-credentials, verify-sc, verify-dc |
+| `config-handlers.ts` | load-config, update-config |
+| `scrape-handlers.ts` | scrape-websites, refresh-booth-locations, fetch-booth-catalog |
+| `profile-handlers.ts` | load-profiles, switch-profile, delete-profile, import-profile, export-data |
+| `misc-handlers.ts` | seasonal-data, timestamps, updates, iMessage, dock-badge, log-message |
 
 ### Renderer Components
 
 | Component | Purpose |
 |---|---|
+| `app-header.tsx` | AppHeader bar with sync pills, refresh/settings buttons |
 | `reports-section.tsx` | TabBar + ReportContent components, health banner, report rendering |
 | `sync-section.tsx` | Sync state utilities (`createInitialSyncState`, `computeGroupStatuses`), SyncStatusSection, DataHealthChecks |
 | `settings-page.tsx` | Credential setup (SettingsPage), app toggle switches + profile management + import modal (SettingsToggles) |
@@ -80,7 +113,8 @@ Three layers with strict boundaries:
 | `expandable-row.tsx` | Expandable/collapsible table row component |
 | `tooltip-cell.tsx` | Tooltip component for table cells |
 | `scout-credit-chips.tsx` | Shared chip display for per-scout allocation breakdowns |
-| `app-reducer.ts` | App state management via useReducer (all UI state, sync status, config) |
+
+Other renderer-level files: `app-reducer.ts` (state management via useReducer), `data-loader.ts` (IPC data loading), `format-utils.ts` (display formatting), `ipc.ts` (IPC wrapper).
 
 Hooks in `renderer/hooks/`: `use-app-init.ts` (app initialization lifecycle), `use-sync.ts` (sync orchestration), `use-status-message.ts` (transient status messages), `use-data-loader.ts` (data loading and refresh after sync).
 

@@ -6,7 +6,7 @@ import { createTransfer, mergeOrCreateOrder } from '../../data-store-operations'
 import type { SCFinanceTransaction, SCOrdersResponse } from '../../scrapers/sc-types';
 import type { FinancePayment, Order, RawDataRow, TransferInput } from '../../types';
 import { isC2TTransfer } from '../utils';
-import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSCTransfer } from './parsers';
+import { parseVarietiesFromAPI, parseVarietiesFromSCReport, parseVarietiesFromSCTransfer, safeParseFloat, safeParseInt } from './parsers';
 import { mergeDCOrderFromSC, recordImportMetadata, trackScoutFromAPITransfer, updateScoutData } from './scout-helpers';
 
 /** Import Smart Cookie Report data (ReportExport.xlsx) */
@@ -20,8 +20,8 @@ export function importSmartCookieReport(store: DataStore, reportData: RawDataRow
 
     // Parse total (also in "cases/packages" format)
     const totalParts = String(row[SC_REPORT_COLUMNS.TOTAL] || '0/0').split('/');
-    const fieldCases = parseInt(totalParts[0], 10) || 0;
-    const fieldPkgs = parseInt(totalParts[1], 10) || 0;
+    const fieldCases = safeParseInt(totalParts[0], 'SC Report total cases');
+    const fieldPkgs = safeParseInt(totalParts[1], 'SC Report total packages');
     const computed = fieldCases * PACKAGES_PER_CASE + fieldPkgs;
     const totalFromField = computed > 0 ? computed : totalPackages;
 
@@ -105,7 +105,7 @@ export function importSmartCookieOrders(store: DataStore, ordersData: SCOrdersRe
       packages: totalPackages,
       cases: Math.round(Math.abs(order.total_cases || 0) / PACKAGES_PER_CASE), // SC API total_cases is in packages despite the name
       varieties: varieties,
-      amount: Math.abs(parseFloat(totalValue) || 0),
+      amount: Math.abs(safeParseFloat(totalValue, `SC API order ${orderNum} amount`)),
       virtualBooth: order.virtual_booth || false,
       boothDivider: !!(order.smart_divider_id && !order.virtual_booth),
       status: order.status || '',
@@ -142,9 +142,9 @@ export function importSmartCookie(store: DataStore, scData: RawDataRow[]): void 
       orderNumber: orderNum,
       from: from,
       to: to,
-      packages: parseInt(row[SC_API_COLUMNS.TOTAL], 10) || 0,
+      packages: safeParseInt(row[SC_API_COLUMNS.TOTAL], `SC CSV order ${orderNum} total`),
       varieties: varieties,
-      amount: parseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT]) || 0,
+      amount: safeParseFloat(row[SC_API_COLUMNS.TOTAL_AMOUNT], `SC CSV order ${orderNum} amount`),
       troopNumber: store.troopNumber || undefined,
       troopName: store.troopName || undefined
     };

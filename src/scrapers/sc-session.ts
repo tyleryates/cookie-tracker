@@ -13,7 +13,7 @@ export class SmartCookieSession {
   troopId: string | null = null;
   meResponse: SCMeResponse | null = null;
   client: AxiosInstance;
-  userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36';
+  userAgent = '';
   private cookieJar: CookieJar;
   private credentials: { username: string; password: string } | null = null;
 

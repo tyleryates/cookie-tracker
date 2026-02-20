@@ -254,6 +254,44 @@ class SmartCookieScraper extends BaseScraper {
     return result;
   }
 
+  /** Fetch and attach availability dates + time slots for a single booth */
+  private async enrichBoothWithDates(booth: SCBoothLocationRaw, cache?: BoothCache, signal?: AbortSignal): Promise<void> {
+    const boothId = booth.id || booth.booth_id || 0;
+
+    let rawDates: BoothDatesData;
+    if (cache?.isDatesFresh(boothId)) {
+      rawDates = cache.getDates(boothId)!;
+    } else {
+      rawDates = await this.fetchBoothDates(boothId, signal);
+      cache?.setDates(boothId, rawDates);
+    }
+    const dates = Array.isArray(rawDates) ? rawDates : rawDates?.dates || [];
+
+    const availableDates: { date: string; timeSlots: SCBoothTimeSlot[] }[] = [];
+    for (const d of dates) {
+      const dateStr = typeof d === 'string' ? d : d.date || '';
+      if (!dateStr) continue;
+
+      let rawTimes: BoothTimesData;
+      if (cache?.isTimeSlotsFresh(boothId, dateStr)) {
+        rawTimes = cache.getTimeSlots(boothId, dateStr)!;
+      } else {
+        rawTimes = await this.fetchBoothTimes(boothId, dateStr, signal);
+        cache?.setTimeSlots(boothId, dateStr, rawTimes);
+      }
+      const slots = Array.isArray(rawTimes) ? rawTimes : rawTimes?.times || rawTimes?.slots || [];
+      availableDates.push({
+        date: dateStr,
+        timeSlots: slots.map((s: SCBoothTimeSlot) => ({
+          start_time: s.start_time || s.startTime || s.start || '',
+          end_time: s.end_time || s.endTime || s.end || ''
+        }))
+      });
+    }
+
+    booth.availableDates = availableDates;
+  }
+
   /** Fetch booth availability (dates + times) for selected booths, using cache */
   async fetchBoothAvailability(
     boothIds: number[],
@@ -262,48 +300,11 @@ class SmartCookieScraper extends BaseScraper {
     signal?: AbortSignal
   ): Promise<SCBoothLocationRaw[]> {
     const filtered = boothIds.length > 0 ? catalog.filter((b) => boothIds.includes(b.id || b.booth_id || 0)) : catalog;
-
     if (boothIds.length === 0) return filtered;
 
     for (const booth of filtered) {
-      const boothId = booth.id || booth.booth_id || 0;
-
-      // Tier 2: Dates
-      let rawDates: BoothDatesData;
-      if (cache?.isDatesFresh(boothId)) {
-        rawDates = cache.getDates(boothId)!;
-      } else {
-        rawDates = await this.fetchBoothDates(boothId, signal);
-        cache?.setDates(boothId, rawDates);
-      }
-      const dates = Array.isArray(rawDates) ? rawDates : rawDates?.dates || [];
-
-      const availableDates: { date: string; timeSlots: SCBoothTimeSlot[] }[] = [];
-      for (const d of dates) {
-        const dateStr = typeof d === 'string' ? d : d.date || '';
-        if (!dateStr) continue;
-
-        // Tier 3: Time slots
-        let rawTimes: BoothTimesData;
-        if (cache?.isTimeSlotsFresh(boothId, dateStr)) {
-          rawTimes = cache.getTimeSlots(boothId, dateStr)!;
-        } else {
-          rawTimes = await this.fetchBoothTimes(boothId, dateStr, signal);
-          cache?.setTimeSlots(boothId, dateStr, rawTimes);
-        }
-        const slots = Array.isArray(rawTimes) ? rawTimes : rawTimes?.times || rawTimes?.slots || [];
-        availableDates.push({
-          date: dateStr,
-          timeSlots: slots.map((s: SCBoothTimeSlot) => ({
-            start_time: s.start_time || s.startTime || s.start || '',
-            end_time: s.end_time || s.endTime || s.end || ''
-          }))
-        });
-      }
-
-      booth.availableDates = availableDates;
+      await this.enrichBoothWithDates(booth, cache, signal);
     }
-
     return filtered;
   }
 

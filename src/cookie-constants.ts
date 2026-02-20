@@ -222,6 +222,18 @@ const COOKIE_NAME_NORMALIZATION: Record<string, CookieType> = Object.fromEntries
   COOKIE_REGISTRY.flatMap((e) => e.nameVariations.map((v) => [v, e.type]))
 ) as Record<string, CookieType>;
 
+/** Sort varieties entries by preferred display order */
+export function sortVarietiesByOrder(entries: [string, number][]): [string, number][] {
+  return [...entries].sort((a: [string, number], b: [string, number]) => {
+    const indexA = COOKIE_ORDER.indexOf(a[0] as CookieType);
+    const indexB = COOKIE_ORDER.indexOf(b[0] as CookieType);
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    return 0;
+  });
+}
+
 // ============================================================================
 // TROOP PROCEEDS
 // ============================================================================

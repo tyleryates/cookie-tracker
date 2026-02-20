@@ -56,3 +56,49 @@ export function validateDCData(data: unknown): ValidationResult {
   }
   return fromZodResult(dcHeadersSchema.safeParse(data[0]));
 }
+
+// ============================================================================
+// IPC parameter schemas
+// ============================================================================
+
+const credentialEntrySchema = z
+  .object({
+    username: z.string().max(256).optional(),
+    password: z.string().max(256).optional(),
+    role: z.string().max(256).optional(),
+    councilId: z.union([z.string(), z.number()]).optional()
+  })
+  .strict();
+
+const credentialPatchSchema = z
+  .object({
+    smartCookie: credentialEntrySchema.optional(),
+    digitalCookie: credentialEntrySchema.optional()
+  })
+  .strict();
+
+/** Validate credential patch from IPC */
+export function validateCredentialPatch(data: unknown): ValidationResult {
+  return fromZodResult(credentialPatchSchema.safeParse(data));
+}
+
+const configPatchSchema = z
+  .object({
+    autoUpdateEnabled: z.boolean().optional(),
+    autoSyncEnabled: z.boolean().optional(),
+    autoRefreshBoothsEnabled: z.boolean().optional(),
+    availableBoothsEnabled: z.boolean().optional(),
+    boothAlertImessage: z.boolean().optional(),
+    boothAlertRecipient: z.string().max(256).optional(),
+    boothNotifiedSlots: z.array(z.string()).optional(),
+    boothIds: z.array(z.number()).optional(),
+    boothDayFilters: z.array(z.string()).optional(),
+    ignoredTimeSlots: z.array(z.string()).optional(),
+    inventoryHistoryEnabled: z.boolean().optional()
+  })
+  .strict();
+
+/** Validate config patch from IPC */
+export function validateConfigPatch(data: unknown): ValidationResult {
+  return fromZodResult(configPatchSchema.safeParse(data));
+}

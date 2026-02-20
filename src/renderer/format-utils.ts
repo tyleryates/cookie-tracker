@@ -1,54 +1,28 @@
 // Formatting and display utilities
 
 import { BOOTH_RESERVATION_TYPE, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../constants';
-import { COOKIE_ORDER, getCookieDisplayName } from '../cookie-constants';
-import type { Allocation, BoothReservationImported, BoothTimeSlot, CookieType, Scout, Transfer, Varieties } from '../types';
+import { COOKIE_ORDER, getCookieDisplayName, sortVarietiesByOrder } from '../cookie-constants';
+import type { Allocation, BoothReservationImported, BoothTimeSlot, Scout, Transfer, Varieties } from '../types';
 
-/** Sort varieties entries by preferred display order */
-function sortVarietiesByOrder(entries: [string, number][]): [string, number][] {
-  return [...entries].sort((a: [string, number], b: [string, number]) => {
-    const indexA = COOKIE_ORDER.indexOf(a[0] as CookieType);
-    const indexB = COOKIE_ORDER.indexOf(b[0] as CookieType);
+// ============================================================================
+// DATE FORMATTING
+// ============================================================================
 
-    // If both are in the order list, sort by position
-    if (indexA !== -1 && indexB !== -1) {
-      return indexA - indexB;
-    }
-    // If only A is in the list, it comes first
-    if (indexA !== -1) return -1;
-    // If only B is in the list, it comes first
-    if (indexB !== -1) return 1;
-    // Neither in list, maintain original order
-    return 0;
-  });
-}
-
-/** Get complete variety list with 0 for missing cookies */
-function getCompleteVarieties(varieties: Varieties | undefined): Record<string, number> {
-  const complete: Record<string, number> = {};
-  const safeVarieties = varieties || {}; // Handle undefined/null varieties
-  COOKIE_ORDER.forEach((variety) => {
-    complete[variety] = safeVarieties[variety] || 0;
-  });
-  return complete;
-}
-
-// Centralized date formatting utilities
+/** Centralized date formatting utilities */
 const DateFormatter = {
-  // Format date from YYYY/MM/DD to MM/DD/YYYY
+  /** Format date from YYYY/MM/DD to MM/DD/YYYY */
   toDisplay(dateStr: string | null | undefined): string {
     if (!dateStr) return '-';
     const str = String(dateStr);
-    // Match YYYY/MM/DD or YYYY-MM-DD format
     const match = str.match(/^(\d{4})[/-](\d{2})[/-](\d{2})/);
     if (match) {
       const [, year, month, day] = match;
       return `${month}/${day}/${year}`;
     }
-    return str; // Return as-is if format doesn't match
+    return str;
   },
 
-  // Format full timestamp for hover (e.g., "Feb 5, 2026, 3:45 PM")
+  /** Format full timestamp for hover (e.g., "Feb 5, 2026, 3:45 PM") */
   toFullTimestamp(date: string | Date | null | undefined): string {
     if (!date) return 'Never synced';
 
@@ -63,7 +37,7 @@ const DateFormatter = {
     });
   },
 
-  // Format friendly relative timestamp with time-of-day (e.g. "Today at 3:45 PM", "2 days ago")
+  /** Format friendly relative timestamp with time-of-day (e.g. "Today at 3:45 PM", "2 days ago") */
   toRelativeTimestamp(date: string | Date | null | undefined): string {
     if (!date) return 'Never';
 
@@ -72,17 +46,14 @@ const DateFormatter = {
     const diffMs = now.getTime() - then.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    // Format time as "3:45 PM"
     const timeStr = then.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
     });
 
-    // Check if same day
     const isToday = then.toDateString() === now.toDateString();
 
-    // Check if yesterday
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     const isYesterday = then.toDateString() === yesterday.toDateString();
@@ -93,22 +64,12 @@ const DateFormatter = {
     thenDay.setHours(0, 0, 0, 0);
     const daysDiff = Math.floor((nowDay.getTime() - thenDay.getTime()) / 86400000);
 
-    // Recent times (under 1 minute)
     if (diffMins < 1) return 'Just now';
-
-    // Under an hour
     if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
-
-    // Today
     if (isToday) return `Today at ${timeStr}`;
-
-    // Yesterday
     if (isYesterday) return `Yesterday at ${timeStr}`;
-
-    // This week (2-6 days ago)
     if (daysDiff < 7) return `${daysDiff} days ago at ${timeStr}`;
 
-    // Older - show full date and time
     const dateStr = then.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -118,49 +79,53 @@ const DateFormatter = {
   }
 };
 
-/** Parse a date string (ISO or US format) into [year, month, day] or null */
-function splitDateParts(str: string): [number, number, number] | null {
-  const iso = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-  if (iso) return [Number(iso[1]), Number(iso[2]), Number(iso[3])];
-  const us = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-  if (us) return [Number(us[3]), Number(us[1]), Number(us[2])];
-  return null;
-}
+/** Canonical date parser — handles ISO (YYYY-MM-DD) and US (MM/DD/YYYY) formats.
+ *  Single source of truth for date string parsing; all other date functions derive from this. */
+const DATE_ISO = /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/;
+const DATE_US = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/;
 
-/** Parse a date string in ISO (YYYY-MM-DD) or US (MM/DD/YYYY) format, returning { year, month, day } */
-function parseDateComponents(str: string): { year: number; month: number; day: number } | null {
-  const parts = splitDateParts(str);
-  if (!parts) return null;
-  return { year: parts[0], month: parts[1], day: parts[2] };
+function parseDateParts(str: string): { year: number; month: number; day: number } | null {
+  const iso = str.match(DATE_ISO);
+  if (iso) return { year: Number(iso[1]), month: Number(iso[2]), day: Number(iso[3]) };
+  const us = str.match(DATE_US);
+  if (us) return { year: Number(us[3]), month: Number(us[1]), day: Number(us[2]) };
+  return null;
 }
 
 /** Format date as "Sat 02/14" (short day of week + MM/DD, no year) */
 function formatShortDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   const str = String(dateStr);
-  const parts = parseDateComponents(str);
+  const parts = parseDateParts(str);
   if (!parts) return str;
   const d = new Date(parts.year, parts.month - 1, parts.day);
   const day = d.toLocaleDateString('en-US', { weekday: 'short' });
   return `${day} ${String(parts.month).padStart(2, '0')}/${String(parts.day).padStart(2, '0')}`;
 }
 
-function formatTimeRange(startTime: string | undefined, endTime: string | undefined): string {
-  if (startTime && endTime) return `${formatTime12h(startTime)} - ${formatTime12h(endTime)}`;
-  return startTime ? formatTime12h(startTime) : '-';
+/** Parse a date string (ISO or US format) to a local Date (midnight) */
+function parseLocalDate(dateStr: string): Date | null {
+  const parts = parseDateParts(dateStr);
+  if (!parts) return null;
+  return new Date(parts.year, parts.month - 1, parts.day);
 }
 
-function formatCurrency(value: number): string {
-  return `$${Math.round(value || 0)}`;
+/** Normalize date strings to YYYY-MM-DD for consistent grouping and sorting */
+function normalizeDate(dateStr: string): string {
+  const parts = parseDateParts(dateStr);
+  if (!parts) return dateStr;
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
 }
 
-/** Build variety tooltip as plain text lines */
-function buildVarietyTooltip(varieties: Varieties): string {
-  if (!varieties || Object.keys(varieties).length === 0) return '';
-  return sortVarietiesByOrder(Object.entries(varieties))
-    .map(([variety, count]) => `${getCookieDisplayName(variety)}: ${count}`)
-    .join('\n');
+/** Get today's date at local midnight */
+function todayMidnight(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
+
+// ============================================================================
+// TIME FORMATTING
+// ============================================================================
 
 /** Parse a time string into { hours (24h), minutes } or null */
 function parseTimeParts(time: string): { hours: number; minutes: number } | null {
@@ -185,14 +150,6 @@ function parseTimeToMinutes(time: string): number {
   return parts.hours * 60 + parts.minutes;
 }
 
-function slotOverlapsRange(slot: BoothTimeSlot, afterStr: string, beforeStr: string): boolean {
-  const after = parseTimeToMinutes(afterStr);
-  const before = parseTimeToMinutes(beforeStr);
-  const start = parseTimeToMinutes(slot.startTime);
-  if (after < 0 || before < 0 || start < 0) return true;
-  return start >= after && start < before;
-}
-
 /** Convert a 24h or 12h time string to a friendly 12h format (e.g., "4:00 pm") */
 function formatTime12h(time: string): string {
   const parts = parseTimeParts(time);
@@ -205,6 +162,41 @@ function formatTime12h(time: string): string {
   return `${hours}:${mins} ${period}`;
 }
 
+function formatTimeRange(startTime: string | undefined, endTime: string | undefined): string {
+  if (startTime && endTime) return `${formatTime12h(startTime)} - ${formatTime12h(endTime)}`;
+  return startTime ? formatTime12h(startTime) : '-';
+}
+
+/** Compact time parts { hour, period } — e.g. { hour: "4", period: "pm" }. Drops :00 minutes. */
+function formatCompactTime(time: string): { hour: string; period: string } {
+  const full = formatTime12h(time);
+  const match = full.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
+  if (!match) return { hour: full, period: '' };
+  const hour = match[2] === '00' ? match[1] : `${match[1]}:${match[2]}`;
+  return { hour, period: match[3] };
+}
+
+/** Format range like "4-6pm" or "10am-12pm" */
+function formatCompactRange(startTime: string, endTime: string): string {
+  const start = formatCompactTime(startTime);
+  const end = formatCompactTime(endTime);
+  if (start.period === end.period) return `${start.hour}-${end.hour}${end.period}`;
+  return `${start.hour}${start.period}-${end.hour}${end.period}`;
+}
+
+/** Check if a time slot overlaps a given range (start >= after && start < before) */
+function slotOverlapsRange(slot: BoothTimeSlot, afterStr: string, beforeStr: string): boolean {
+  const after = parseTimeToMinutes(afterStr);
+  const before = parseTimeToMinutes(beforeStr);
+  const start = parseTimeToMinutes(slot.startTime);
+  if (after < 0 || before < 0 || start < 0) return true;
+  return start >= after && start < before;
+}
+
+// ============================================================================
+// BOOTH DISPLAY HELPERS
+// ============================================================================
+
 /** Format a YYYY-MM-DD date string as "Mon MM/DD/YYYY" */
 function formatBoothDate(dateStr: string): string {
   const d = parseLocalDate(dateStr);
@@ -214,6 +206,33 @@ function formatBoothDate(dateStr: string): string {
     return `${dayName} ${parts[1]}/${parts[2]}/${parts[0]}`;
   }
   return dateStr;
+}
+
+/** Format booth time slot as compact range with fallback */
+function formatBoothTime(startTime: string | undefined, endTime: string | undefined): string {
+  if (startTime && endTime) return formatCompactRange(startTime, endTime);
+  return startTime || '-';
+}
+
+/** CSS class for booth reservation type badge */
+function boothTypeClass(reservationType: string | undefined): string {
+  if (reservationType === BOOTH_RESERVATION_TYPE.LOTTERY) return 'type-lottery';
+  if (reservationType === BOOTH_RESERVATION_TYPE.FCFS) return 'type-fcfs';
+  return 'type-default';
+}
+
+/** Check if a booth reservation type is virtual (excluded from most booth reports) */
+function isVirtualBooth(reservationType: string | undefined): boolean {
+  return (reservationType || '').toLowerCase().includes('virtual');
+}
+
+/** Haversine distance between two lat/lng points, in miles */
+function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8; // Earth radius in miles
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 /** Count non-virtual booth reservations that need distribution (past, or today after end time) */
@@ -238,92 +257,6 @@ function countBoothsNeedingDistribution(boothReservations: BoothReservationImpor
   }).length;
 }
 
-/** Compact time parts { hour, period } — e.g. { hour: "4", period: "pm" }. Drops :00 minutes. */
-function formatCompactTime(time: string): { hour: string; period: string } {
-  const full = formatTime12h(time); // e.g. "4:00 pm"
-  const match = full.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
-  if (!match) return { hour: full, period: '' };
-  const hour = match[2] === '00' ? match[1] : `${match[1]}:${match[2]}`;
-  return { hour, period: match[3] };
-}
-
-/** Format range like "4-6pm" or "10am-12pm" */
-function formatCompactRange(startTime: string, endTime: string): string {
-  const start = formatCompactTime(startTime);
-  const end = formatCompactTime(endTime);
-  if (start.period === end.period) return `${start.hour}-${end.hour}${end.period}`;
-  return `${start.hour}${start.period}-${end.hour}${end.period}`;
-}
-
-/** Parse a YYYY-MM-DD or YYYY/MM/DD date string to a local Date (midnight) */
-function parseLocalDate(dateStr: string): Date | null {
-  const parts = splitDateParts(dateStr);
-  if (!parts) return null;
-  return new Date(parts[0], parts[1] - 1, parts[2]);
-}
-
-/** Haversine distance between two lat/lng points, in miles */
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 3958.8; // Earth radius in miles
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-/** CSS class for booth reservation type badge */
-function boothTypeClass(reservationType: string | undefined): string {
-  if (reservationType === BOOTH_RESERVATION_TYPE.LOTTERY) return 'type-lottery';
-  if (reservationType === BOOTH_RESERVATION_TYPE.FCFS) return 'type-fcfs';
-  return 'type-default';
-}
-
-/** Format booth time slot as compact range with fallback */
-function formatBoothTime(startTime: string | undefined, endTime: string | undefined): string {
-  if (startTime && endTime) return formatCompactRange(startTime, endTime);
-  return startTime || '-';
-}
-
-/** Format millisecond duration as "123ms" or "1.2s" */
-function formatDuration(ms: number | undefined): string {
-  if (ms == null) return '';
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-/** Format byte count as "123 B", "45 KB", or "1.2 MB" */
-function formatDataSize(bytes: number | undefined): string {
-  if (bytes == null) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-/** Human-readable frequency label from milliseconds */
-function formatMaxAge(ms: number): string {
-  const minutes = ms / 60_000;
-  if (minutes < 60) return `${minutes} min`;
-  const hours = minutes / 60;
-  if (hours === 1) return 'Hourly';
-  return `${hours} hours`;
-}
-
-/** Check if a booth reservation type is virtual (excluded from most booth reports) */
-function isVirtualBooth(reservationType: string | undefined): boolean {
-  return (reservationType || '').toLowerCase().includes('virtual');
-}
-
-/** Check if a cookie variety is physical (not Cookie Share / donation-only) */
-function isPhysicalVariety(variety: string): boolean {
-  return variety !== 'COOKIE_SHARE';
-}
-
-/** Get today's date at local midnight */
-function todayMidnight(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
 /** Remove expired slot keys (boothId|YYYY-MM-DD|startTime) whose date is before today */
 function pruneExpiredSlots(slots: string[]): string[] {
   const now = new Date();
@@ -337,20 +270,50 @@ function pruneExpiredSlots(slots: string[]): string[] {
   });
 }
 
+// ============================================================================
+// VARIETY & COOKIE HELPERS
+// ============================================================================
+
+/** Get complete variety list with 0 for missing cookies */
+function getCompleteVarieties(varieties: Varieties | undefined): Record<string, number> {
+  const complete: Record<string, number> = {};
+  const safeVarieties = varieties || {};
+  COOKIE_ORDER.forEach((variety) => {
+    complete[variety] = safeVarieties[variety] || 0;
+  });
+  return complete;
+}
+
+/** Build variety tooltip as plain text lines */
+function buildVarietyTooltip(varieties: Varieties): string {
+  if (!varieties || Object.keys(varieties).length === 0) return '';
+  return sortVarietiesByOrder(Object.entries(varieties))
+    .map(([variety, count]) => `${getCookieDisplayName(variety)}: ${count}`)
+    .join('\n');
+}
+
+/** Check if a cookie variety is physical (not Cookie Share / donation-only) */
+function isPhysicalVariety(variety: string): boolean {
+  return variety !== 'COOKIE_SHARE';
+}
+
+/** Sum varieties across multiple allocations into a single Varieties map */
+function accumulateVarieties(allocations: Allocation[]): Varieties {
+  const result: Varieties = {};
+  for (const a of allocations)
+    for (const [v, n] of Object.entries(a.varieties)) result[v as keyof Varieties] = (result[v as keyof Varieties] || 0) + (n || 0);
+  return result;
+}
+
+// ============================================================================
+// SCOUT & TRANSFER HELPERS
+// ============================================================================
+
 /** Filter out site-order scouts, sort alphabetically by name */
 function getActiveScouts(scouts: Record<string, Scout>): Array<[string, Scout]> {
   return Object.entries(scouts)
     .filter(([, s]) => !s.isSiteOrder)
     .sort((a, b) => a[0].localeCompare(b[0]));
-}
-
-/** Normalize date strings to YYYY-MM-DD for consistent grouping and sorting */
-function normalizeDate(dateStr: string): string {
-  const iso = dateStr.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-  if (iso) return `${iso[1]}-${iso[2].padStart(2, '0')}-${iso[3].padStart(2, '0')}`;
-  const us = dateStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-  if (us) return `${us[3]}-${us[1].padStart(2, '0')}-${us[2].padStart(2, '0')}`;
-  return dateStr;
 }
 
 /** Inventory direction from the troop's perspective */
@@ -378,41 +341,69 @@ function getTransferDisplayInfo(transfer: Transfer): { typeLabel: string; from: 
   }
 }
 
-/** Sum varieties across multiple allocations into a single Varieties map */
-function accumulateVarieties(allocations: Allocation[]): Varieties {
-  const result: Varieties = {};
-  for (const a of allocations)
-    for (const [v, n] of Object.entries(a.varieties)) result[v as keyof Varieties] = (result[v as keyof Varieties] || 0) + (n || 0);
-  return result;
+// ============================================================================
+// GENERAL FORMATTING
+// ============================================================================
+
+function formatCurrency(value: number): string {
+  return `$${Math.round(value || 0)}`;
 }
+
+/** Format millisecond duration as "123ms" or "1.2s" */
+function formatDuration(ms: number | undefined): string {
+  if (ms == null) return '';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}
+
+/** Format byte count as "123 B", "45 KB", or "1.2 MB" */
+function formatDataSize(bytes: number | undefined): string {
+  if (bytes == null) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Human-readable frequency label from milliseconds */
+function formatMaxAge(ms: number): string {
+  const minutes = ms / 60_000;
+  if (minutes < 60) return `${minutes} min`;
+  const hours = minutes / 60;
+  if (hours === 1) return 'Hourly';
+  return `${hours} hours`;
+}
+
+// ============================================================================
+// EXPORTS
+// ============================================================================
 
 export {
   accumulateVarieties,
   boothTypeClass,
   buildVarietyTooltip,
-  sortVarietiesByOrder,
-  getActiveScouts,
-  getCompleteVarieties,
   countBoothsNeedingDistribution,
   DateFormatter,
-  getTransferDisplayInfo,
-  formatShortDate,
+  formatBoothDate,
   formatBoothTime,
+  formatCompactRange,
   formatCurrency,
   formatDataSize,
   formatDuration,
   formatMaxAge,
-  formatTimeRange,
-  formatCompactRange,
+  formatShortDate,
   formatTime12h,
-  formatBoothDate,
+  formatTimeRange,
+  getActiveScouts,
+  getCompleteVarieties,
+  getTransferDisplayInfo,
+  haversineDistance,
   isPhysicalVariety,
   isVirtualBooth,
   normalizeDate,
-  parseTimeToMinutes,
-  slotOverlapsRange,
   parseLocalDate,
-  todayMidnight,
-  haversineDistance,
-  pruneExpiredSlots
+  parseTimeToMinutes,
+  pruneExpiredSlots,
+  slotOverlapsRange,
+  sortVarietiesByOrder,
+  todayMidnight
 };

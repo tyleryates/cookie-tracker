@@ -76,10 +76,10 @@ function importVirtualCookieShares(store: DataStore, virtualCookieShares: SCVirt
 
 function formatBoothAddress(addr: unknown): string {
   if (!addr || typeof addr !== 'object') return typeof addr === 'string' ? addr : '';
-  const a = addr as Record<string, unknown>;
-  const parts = [a.street, a.city, a.state].filter(Boolean);
-  const base = parts.join(', ');
-  return a.zip ? `${base} ${a.zip}` : base;
+  const addressObj = addr as Record<string, unknown>;
+  const addressParts = [addressObj.street, addressObj.city, addressObj.state].filter(Boolean);
+  const baseAddress = addressParts.join(', ');
+  return addressObj.zip ? `${baseAddress} ${addressObj.zip}` : baseAddress;
 }
 
 /** Import booth reservation data from Smart Cookie reservations API */

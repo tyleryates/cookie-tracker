@@ -12,7 +12,7 @@ export class DigitalCookieSession {
   client: AxiosInstance;
   selectedRoleName: string | null = null;
   selectedRoleId: string | null = null;
-  userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36';
+  userAgent = '';
   private credentials: { username: string; password: string; role?: string } | null = null;
 
   constructor() {
@@ -167,9 +167,7 @@ export class DigitalCookieSession {
         return await this.client.get<T>(url, config);
       }
       if (isAxiosError(error) && error.response) {
-        const body =
-          typeof error.response.data === 'string' ? error.response.data.slice(0, 500) : JSON.stringify(error.response.data)?.slice(0, 500);
-        Logger.error(`DC HTTP ${error.response.status} on GET ${url}: ${body}`);
+        Logger.error(`DC HTTP ${error.response.status} on GET ${url}`);
       }
       throw error;
     }
