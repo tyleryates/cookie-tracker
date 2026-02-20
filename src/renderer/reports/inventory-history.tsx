@@ -3,7 +3,7 @@ import { ALLOCATION_CHANNEL, TRANSFER_TYPE } from '../../constants';
 import type { UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { TooltipCell } from '../components/tooltip-cell';
-import { describeTransfer, formatShortDate, normalizeDate } from '../format-utils';
+import { formatShortDate, getTransferDisplayInfo, normalizeDate } from '../format-utils';
 
 export function InventoryHistoryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
   if (!data?.transferBreakdowns) {
@@ -47,7 +47,7 @@ export function InventoryHistoryReport({ data, banner }: { data: UnifiedDataset;
     if (pkg === 0) continue;
     const key = normalizeDate(t.date);
     const entry = getEntry(key);
-    const { typeLabel, direction } = describeTransfer(t);
+    const { typeLabel, direction } = getTransferDisplayInfo(t);
     if (direction === 'in') {
       entry.in += pkg;
       entry.inDetails.set(typeLabel, (entry.inDetails.get(typeLabel) || 0) + pkg);

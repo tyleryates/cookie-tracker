@@ -709,21 +709,25 @@ ipcMain.handle(
     fs.mkdirSync(tempDir, { recursive: true });
     try {
       await new Promise<void>((resolve, reject) => {
-        execFile('ditto', ['-xk', zipPath, tempDir], (error) => {
+        execFile('ditto', ['-xk', zipPath, tempDir], { timeout: 30000 }, (error) => {
           if (error) reject(error);
           else resolve();
         });
       });
 
-      // Verify all extracted entries stay within the temp directory (path traversal check)
+      // Verify all extracted entries stay within the temp directory (path traversal + symlink check)
       const resolvedTemp = path.resolve(tempDir);
       const checkEntries = (dir: string) => {
         for (const entry of fs.readdirSync(dir)) {
           const fullPath = path.resolve(path.join(dir, entry));
+          const stat = fs.lstatSync(fullPath);
+          if (stat.isSymbolicLink()) {
+            throw new Error(`Symlink detected in ZIP: ${entry}`);
+          }
           if (!fullPath.startsWith(resolvedTemp + path.sep) && fullPath !== resolvedTemp) {
             throw new Error(`Path traversal detected in ZIP: ${entry}`);
           }
-          if (fs.statSync(fullPath).isDirectory()) checkEntries(fullPath);
+          if (stat.isDirectory()) checkEntries(fullPath);
         }
       };
       checkEntries(tempDir);
@@ -732,9 +736,21 @@ ipcMain.handle(
       const credInTemp = path.join(tempDir, 'credentials.enc');
       if (fs.existsSync(credInTemp)) fs.unlinkSync(credInTemp);
 
-      // Move validated contents to profile directory
+      // Move validated contents to profile directory (whitelist allowed file types)
+      const ALLOWED_EXTENSIONS = new Set(['.json', '.csv', '.xlsx', '.xls', '.html']);
       for (const entry of fs.readdirSync(tempDir)) {
-        fs.renameSync(path.join(tempDir, entry), path.join(newProfileDir, entry));
+        const entryPath = path.join(tempDir, entry);
+        const stat = fs.lstatSync(entryPath);
+        if (stat.isDirectory()) {
+          fs.renameSync(entryPath, path.join(newProfileDir, entry));
+          continue;
+        }
+        const ext = path.extname(entry).toLowerCase();
+        if (!ALLOWED_EXTENSIONS.has(ext)) {
+          Logger.warn(`Skipping unrecognized file type in profile import: ${entry}`);
+          continue;
+        }
+        fs.renameSync(entryPath, path.join(newProfileDir, entry));
       }
     } finally {
       // Clean up temp directory

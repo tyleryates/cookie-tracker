@@ -82,7 +82,6 @@ export interface Order {
 interface TransferActions {
   submittable?: boolean;
   approvable?: boolean;
-  saveable?: boolean;
 }
 
 export interface Transfer {

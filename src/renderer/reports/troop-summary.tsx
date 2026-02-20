@@ -15,6 +15,8 @@ export function TroopProceedsReport({ data, banner }: { data: UnifiedDataset; ba
   const packagesCredited = troopTotals.packagesCredited;
   const grossProceeds = troopTotals.grossProceeds;
 
+  // Sum shipped from scout orders (not troopTotals.directShip, which comes from transfer
+  // breakdowns and may differ from order-based totals when SC/DC data is incomplete)
   let totalShipped = 0;
   for (const scout of Object.values(data.scouts || {})) {
     totalShipped += scout.totals.shipped || 0;

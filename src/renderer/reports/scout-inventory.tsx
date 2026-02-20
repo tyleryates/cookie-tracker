@@ -54,6 +54,26 @@ function InventoryCell({
 }
 
 // ============================================================================
+// Shared helpers
+// ============================================================================
+
+/** Render variety count cells for a row of physical cookies */
+function VarietyCells({ varieties, physicalVarieties }: { varieties: Varieties; physicalVarieties: string[] }) {
+  return (
+    <>
+      {physicalVarieties.map((v) => {
+        const count = varieties[v as keyof Varieties] || 0;
+        return (
+          <td key={v} class="text-center">
+            {count > 0 ? count : <span class="muted-text">{'\u2014'}</span>}
+          </td>
+        );
+      })}
+    </>
+  );
+}
+
+// ============================================================================
 // Detail breakdown — variety-level inventory for a single scout
 // ============================================================================
 
@@ -180,14 +200,7 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
           {/* Picked Up */}
           <tr>
             <td>Picked Up</td>
-            {physicalVarieties.map((v) => {
-              const count = inventory.varieties[v as keyof Varieties] || 0;
-              return (
-                <td key={v} class="text-center">
-                  {count > 0 ? count : <span class="muted-text">—</span>}
-                </td>
-              );
-            })}
+            <VarietyCells varieties={inventory.varieties} physicalVarieties={physicalVarieties} />
           </tr>
 
           {/* Sold (Complete) */}
@@ -231,14 +244,7 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
                     typeText
                   )}
                 </td>
-                {physicalVarieties.map((v) => {
-                  const count = o.varieties[v as keyof Varieties] || 0;
-                  return (
-                    <td key={v} class="text-center">
-                      {count > 0 ? count : <span class="muted-text">—</span>}
-                    </td>
-                  );
-                })}
+                <VarietyCells varieties={o.varieties} physicalVarieties={physicalVarieties} />
               </tr>
             );
           })}
@@ -259,14 +265,7 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
                     typeText
                   )}
                 </td>
-                {physicalVarieties.map((v) => {
-                  const count = o.varieties[v as keyof Varieties] || 0;
-                  return (
-                    <td key={v} class="text-center">
-                      {count > 0 ? count : <span class="muted-text">—</span>}
-                    </td>
-                  );
-                })}
+                <VarietyCells varieties={o.varieties} physicalVarieties={physicalVarieties} />
               </tr>
             );
           })}

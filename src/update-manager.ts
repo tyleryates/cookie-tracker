@@ -131,15 +131,15 @@ export async function quitAndInstall(getMainWindow: () => BrowserWindow | null):
       const scriptPath = path.join(tempDir, 'update.sh');
       const scriptContent = [
         '#!/bin/bash',
-        `while kill -0 ${process.pid} 2>/dev/null; do sleep 0.5; done`,
-        `rm -rf "$1"`,
-        `mv "$2" "$1"`,
-        `open "$1"`,
-        `rm -rf "$3"`
+        'while kill -0 $4 2>/dev/null; do sleep 0.5; done',
+        'rm -rf "$1"',
+        'mv "$2" "$1"',
+        'open "$1"',
+        'rm -rf "$3"'
       ].join('\n');
-      fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
+      fs.writeFileSync(scriptPath, scriptContent, { mode: 0o700 });
 
-      spawn(scriptPath, [currentAppPath, newAppPath, tempDir], { detached: true, stdio: 'ignore' }).unref();
+      spawn(scriptPath, [currentAppPath, newAppPath, tempDir, String(process.pid)], { detached: true, stdio: 'ignore' }).unref();
       Logger.info('quit-and-install: update script spawned, exiting app');
       Logger.close();
       app.exit(0);

@@ -5,7 +5,7 @@ import type { Transfer, UnifiedDataset, Varieties } from '../../types';
 import { DataTable } from '../components/data-table';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, describeTransfer, formatShortDate, isPhysicalVariety } from '../format-utils';
+import { buildVarietyTooltip, formatShortDate, getTransferDisplayInfo, isPhysicalVariety } from '../format-utils';
 
 export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
   if (!data?.transferBreakdowns) {
@@ -31,7 +31,8 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
   const netInventory = troopTotals.inventory;
   const inventoryVarieties = varieties.inventory;
 
-  // Split C2T vs T2T In for the description
+  // Split C2T vs T2T In for the description (transferBreakdowns.totals doesn't have
+  // a separate t2tIn field, so we filter from c2tTransfers which includes both)
   const t2tInTotal = c2tTransfers.filter((t) => t.type === TRANSFER_TYPE.T2T).reduce((sum, t) => sum + (t.physicalPackages || 0), 0);
   const pureC2T = totalOrdered - t2tInTotal;
   const totalPackages = totalOrdered - totalT2TOut;
@@ -123,7 +124,7 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
               const statusText = isPending ? 'Pending' : 'Completed';
               const statusClass = isPending ? 'status-pill status-pill-warning' : 'status-pill status-pill-success';
 
-              const { typeLabel, from, to, direction } = describeTransfer(transfer);
+              const { typeLabel, from, to, direction } = getTransferDisplayInfo(transfer);
               const packages = transfer.packages || 0;
               const pkgDisplay = direction === 'out' ? `-${packages}` : `+${packages}`;
               const pkgClass = direction === 'out' ? 'pkg-out' : 'pkg-in';

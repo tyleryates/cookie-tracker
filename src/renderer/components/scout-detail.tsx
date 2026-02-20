@@ -3,19 +3,11 @@
 import type preact from 'preact';
 import { useState } from 'preact/hooks';
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
-import type { Allocation, Order, Scout, Varieties } from '../../types';
-import { buildVarietyTooltip, formatShortDate, formatTimeRange } from '../format-utils';
+import type { Order, Scout, Varieties } from '../../types';
+import { accumulateVarieties, buildVarietyTooltip, formatShortDate, formatTimeRange } from '../format-utils';
 import { buildOrderTooltip, getStatusStyle, isActionRequired } from '../order-helpers';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
-
-/** Sum varieties across multiple allocations into a single Varieties map */
-function accumulateVarieties(allocations: Allocation[]): Varieties {
-  const result: Varieties = {};
-  for (const a of allocations)
-    for (const [v, n] of Object.entries(a.varieties)) result[v as keyof Varieties] = (result[v as keyof Varieties] || 0) + (n || 0);
-  return result;
-}
 
 /** Render a packages cell with variety tooltip if available */
 function PackagesCell({ varieties, packages }: { varieties: Varieties; packages: number }) {
@@ -40,7 +32,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
     datedRows.push({
       date: a.date || '',
       row: (
-        <tr key={`bs-${datedRows.length}`}>
+        <tr key={`bs-${a.date}-${a.storeName || datedRows.length}`}>
           <td>{formatShortDate(a.date)}</td>
           <td>{DISPLAY_STRINGS[ALLOCATION_METHOD.BOOTH_SALES_DIVIDER]}</td>
           <td>{detail}</td>

@@ -2,7 +2,7 @@
 
 import { BOOTH_RESERVATION_TYPE, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../constants';
 import { COOKIE_ORDER, getCookieDisplayName } from '../cookie-constants';
-import type { BoothReservationImported, BoothTimeSlot, CookieType, Scout, Transfer, Varieties } from '../types';
+import type { Allocation, BoothReservationImported, BoothTimeSlot, CookieType, Scout, Transfer, Varieties } from '../types';
 
 /** Sort varieties entries by preferred display order */
 function sortVarietiesByOrder(entries: [string, number][]): [string, number][] {
@@ -118,13 +118,20 @@ const DateFormatter = {
   }
 };
 
+/** Parse a date string (ISO or US format) into [year, month, day] or null */
+function splitDateParts(str: string): [number, number, number] | null {
+  const iso = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
+  if (iso) return [Number(iso[1]), Number(iso[2]), Number(iso[3])];
+  const us = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (us) return [Number(us[3]), Number(us[1]), Number(us[2])];
+  return null;
+}
+
 /** Parse a date string in ISO (YYYY-MM-DD) or US (MM/DD/YYYY) format, returning { year, month, day } */
 function parseDateComponents(str: string): { year: number; month: number; day: number } | null {
-  const iso = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-  if (iso) return { year: Number(iso[1]), month: Number(iso[2]), day: Number(iso[3]) };
-  const us = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
-  if (us) return { year: Number(us[3]), month: Number(us[1]), day: Number(us[2]) };
-  return null;
+  const parts = splitDateParts(str);
+  if (!parts) return null;
+  return { year: parts[0], month: parts[1], day: parts[2] };
 }
 
 /** Format date as "Sat 02/14" (short day of week + MM/DD, no year) */
@@ -155,10 +162,10 @@ function buildVarietyTooltip(varieties: Varieties): string {
     .join('\n');
 }
 
-/** Parse a time string like "4:00 PM" or "16:00" to minutes since midnight */
-function parseTimeToMinutes(time: string): number {
+/** Parse a time string into { hours (24h), minutes } or null */
+function parseTimeParts(time: string): { hours: number; minutes: number } | null {
   const match24 = time.match(/^(\d{1,2}):(\d{2})$/);
-  if (match24) return Number(match24[1]) * 60 + Number(match24[2]);
+  if (match24) return { hours: Number(match24[1]), minutes: Number(match24[2]) };
   const match12 = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (match12) {
     let hours = Number(match12[1]);
@@ -166,9 +173,16 @@ function parseTimeToMinutes(time: string): number {
     const period = match12[3].toUpperCase();
     if (period === 'PM' && hours !== 12) hours += 12;
     if (period === 'AM' && hours === 12) hours = 0;
-    return hours * 60 + minutes;
+    return { hours, minutes };
   }
-  return -1;
+  return null;
+}
+
+/** Parse a time string like "4:00 PM" or "16:00" to minutes since midnight */
+function parseTimeToMinutes(time: string): number {
+  const parts = parseTimeParts(time);
+  if (!parts) return -1;
+  return parts.hours * 60 + parts.minutes;
 }
 
 function slotOverlapsRange(slot: BoothTimeSlot, afterStr: string, beforeStr: string): boolean {
@@ -181,18 +195,14 @@ function slotOverlapsRange(slot: BoothTimeSlot, afterStr: string, beforeStr: str
 
 /** Convert a 24h or 12h time string to a friendly 12h format (e.g., "4:00 pm") */
 function formatTime12h(time: string): string {
-  const match12 = time.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (match12) return `${Number(match12[1])}:${match12[2]} ${match12[3].toLowerCase()}`;
-  const match24 = time.match(/^(\d{1,2}):(\d{2})$/);
-  if (match24) {
-    let hours = Number(match24[1]);
-    const mins = match24[2];
-    const period = hours >= 12 ? 'pm' : 'am';
-    if (hours === 0) hours = 12;
-    else if (hours > 12) hours -= 12;
-    return `${hours}:${mins} ${period}`;
-  }
-  return time;
+  const parts = parseTimeParts(time);
+  if (!parts) return time;
+  let hours = parts.hours;
+  const mins = String(parts.minutes).padStart(2, '0');
+  const period = hours >= 12 ? 'pm' : 'am';
+  if (hours === 0) hours = 12;
+  else if (hours > 12) hours -= 12;
+  return `${hours}:${mins} ${period}`;
 }
 
 /** Format a YYYY-MM-DD date string as "Mon MM/DD/YYYY" */
@@ -247,9 +257,9 @@ function formatCompactRange(startTime: string, endTime: string): string {
 
 /** Parse a YYYY-MM-DD or YYYY/MM/DD date string to a local Date (midnight) */
 function parseLocalDate(dateStr: string): Date | null {
-  const parts = dateStr.split(/[-/]/);
-  if (parts.length < 3) return null;
-  return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  const parts = splitDateParts(dateStr);
+  if (!parts) return null;
+  return new Date(parts[0], parts[1] - 1, parts[2]);
 }
 
 /** Haversine distance between two lat/lng points, in miles */
@@ -347,7 +357,7 @@ function normalizeDate(dateStr: string): string {
 type InventoryDirection = 'in' | 'out';
 
 /** Build a human-readable type label, from/to, and direction for a transfer row */
-function describeTransfer(transfer: Transfer): { typeLabel: string; from: string; to: string; direction: InventoryDirection } {
+function getTransferDisplayInfo(transfer: Transfer): { typeLabel: string; from: string; to: string; direction: InventoryDirection } {
   switch (transfer.category) {
     case TRANSFER_CATEGORY.COUNCIL_TO_TROOP:
       if (transfer.type === TRANSFER_TYPE.T2T) {
@@ -368,7 +378,16 @@ function describeTransfer(transfer: Transfer): { typeLabel: string; from: string
   }
 }
 
+/** Sum varieties across multiple allocations into a single Varieties map */
+function accumulateVarieties(allocations: Allocation[]): Varieties {
+  const result: Varieties = {};
+  for (const a of allocations)
+    for (const [v, n] of Object.entries(a.varieties)) result[v as keyof Varieties] = (result[v as keyof Varieties] || 0) + (n || 0);
+  return result;
+}
+
 export {
+  accumulateVarieties,
   boothTypeClass,
   buildVarietyTooltip,
   sortVarietiesByOrder,
@@ -376,7 +395,7 @@ export {
   getCompleteVarieties,
   countBoothsNeedingDistribution,
   DateFormatter,
-  describeTransfer,
+  getTransferDisplayInfo,
   formatShortDate,
   formatBoothTime,
   formatCurrency,

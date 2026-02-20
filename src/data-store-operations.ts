@@ -37,6 +37,11 @@ function classifyTransferCategory(
     // because troop_id may be an internal SC ID that doesn't match the from field
     if (from && troopNumber && matchesTroopNumber(from, troopNumber)) return TRANSFER_CATEGORY.TROOP_OUTGOING;
     if (from && troopName && matchesTroopNumber(from, troopName)) return TRANSFER_CATEGORY.TROOP_OUTGOING;
+    if (!troopNumber && !troopName) {
+      Logger.warn(
+        `T2T transfer from="${from || '(empty)'}" cannot determine direction — no troopNumber or troopName available, defaulting to incoming`
+      );
+    }
     return TRANSFER_CATEGORY.COUNCIL_TO_TROOP;
   }
   if (type === TRANSFER_TYPE.G2T) return TRANSFER_CATEGORY.GIRL_RETURN;

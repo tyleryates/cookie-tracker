@@ -28,7 +28,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **13 reports in 5 tab groups + To-Do** — To-Do (Health Check, standalone button), Troop (Inventory & Transfers, Online Orders, Proceeds, plus Inventory History when enabled), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, plus Booth Finder when enabled), Donations, Cookie Popularity
+- **13 reports in 6 tab groups** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds, plus Inventory History when enabled), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, plus Booth Finder when enabled), Donations, Cookie Popularity
 - **Profile management** — Import, switch, and delete data profiles for managing multiple troops
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
@@ -38,7 +38,7 @@ Three layers with strict boundaries:
 
 **Main process** (`src/main.ts`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers, scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
 
-**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (13 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings is rendered as tab content (via `activeReport === 'settings'`), with sync status shown alongside it. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
+**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (13 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings has its own tab; when `activeReport === 'settings'`, the SettingsPage component renders alongside sync status. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
 
 **Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Sub-directories: `importers/` (parse raw files into DataStore), `calculators/` (compute UnifiedDataset from DataStore).
 
@@ -62,6 +62,7 @@ Three layers with strict boundaries:
 | `src/update-manager.ts` | Auto-update configuration, event handlers, quit-and-install logic |
 | `src/data-processing/utils.ts` | Shared helpers for data-processing layer (`mapToRecord`) |
 | `src/renderer/reports/available-booths-utils.ts` | Booth slot filtering, encoding, and summarization utilities |
+| `src/renderer/order-helpers.ts` | Order display helpers (status pills, tooltips, payment formatting) |
 | `src/profile-manager.ts` | Multi-profile data directory management |
 
 ### Renderer Components
@@ -79,6 +80,9 @@ Three layers with strict boundaries:
 | `expandable-row.tsx` | Expandable/collapsible table row component |
 | `tooltip-cell.tsx` | Tooltip component for table cells |
 | `scout-credit-chips.tsx` | Shared chip display for per-scout allocation breakdowns |
+| `app-reducer.ts` | App state management via useReducer (all UI state, sync status, config) |
+
+Hooks in `renderer/hooks/`: `use-app-init.ts` (app initialization lifecycle), `use-sync.ts` (sync orchestration), `use-status-message.ts` (transient status messages), `use-data-loader.ts` (data loading and refresh after sync).
 
 ### Layer Rules
 

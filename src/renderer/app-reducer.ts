@@ -116,7 +116,7 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         autoSyncEnabled: enabled,
-        ...(state.appConfig && { appConfig: { ...state.appConfig, autoSyncEnabled: enabled } })
+        appConfig: state.appConfig ? { ...state.appConfig, autoSyncEnabled: enabled } : state.appConfig
       };
     }
 
@@ -125,13 +125,15 @@ export function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         autoRefreshBoothsEnabled: enabled,
-        ...(state.appConfig && { appConfig: { ...state.appConfig, autoRefreshBoothsEnabled: enabled } })
+        appConfig: state.appConfig ? { ...state.appConfig, autoRefreshBoothsEnabled: enabled } : state.appConfig
       };
     }
 
     case 'SYNC_ENDPOINT_UPDATE': {
       const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };
       const isSyncing = action.status === 'syncing';
+      // Clear previous sync's timing/error when starting; preserve/update when finished
+      const keepOnEnd = <T>(val: T | undefined, prevVal: T | undefined): T | undefined => (isSyncing ? undefined : (val ?? prevVal));
       return {
         ...state,
         syncState: {
@@ -143,11 +145,10 @@ export function appReducer(state: AppState, action: Action): AppState {
               status: action.status,
               lastSync: action.lastSync ?? prev.lastSync,
               cached: action.cached,
-              // Clear previous sync's timing/error when starting a new sync; store when finished
-              durationMs: isSyncing ? undefined : (action.durationMs ?? prev.durationMs),
-              dataSize: isSyncing ? undefined : (action.dataSize ?? prev.dataSize),
-              httpStatus: isSyncing ? undefined : (action.httpStatus ?? prev.httpStatus),
-              error: isSyncing ? undefined : (action.error ?? prev.error)
+              durationMs: keepOnEnd(action.durationMs, prev.durationMs),
+              dataSize: keepOnEnd(action.dataSize, prev.dataSize),
+              httpStatus: keepOnEnd(action.httpStatus, prev.httpStatus),
+              error: keepOnEnd(action.error, prev.error)
             }
           }
         }

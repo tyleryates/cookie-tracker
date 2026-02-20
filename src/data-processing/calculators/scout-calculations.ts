@@ -8,39 +8,34 @@ import type { CookieType, Order, Scout, Varieties } from '../../types';
 import { buildPhysicalVarieties } from '../utils';
 import { calculateSalesByVariety, channelTotals, needsInventory, totalCredited } from './helpers';
 
-/** Check single variety for negative inventory */
-function checkVarietyInventory(
-  variety: CookieType,
-  scout: Scout,
-  salesByVariety: Varieties
-): {
-  variety: CookieType;
-  inventory: number;
-  sales: number;
-  shortfall: number;
-} | null {
-  const inventoryCount = scout.inventory.varieties[variety] || 0;
-  const salesCount = salesByVariety[variety] || 0;
-  const netInventory = inventoryCount - salesCount;
-
-  if (netInventory >= 0) return null;
-
-  return {
-    variety: variety,
-    inventory: inventoryCount,
-    sales: salesCount,
-    shortfall: Math.abs(netInventory)
-  };
+/** Compute net inventory balance per physical variety: inventory - sales */
+function computeInventoryBalances(scout: Scout, salesByVariety: Varieties): Varieties {
+  const balances: Varieties = {};
+  for (const variety of PHYSICAL_COOKIE_TYPES) {
+    const inventoryCount = scout.inventory.varieties[variety] || 0;
+    const salesCount = salesByVariety[variety] || 0;
+    balances[variety] = inventoryCount - salesCount;
+  }
+  return balances;
 }
 
-/** Detect negative inventory issues */
-function detectNegativeInventory(scout: Scout, salesByVariety: Varieties): void {
-  const negativeVarieties = PHYSICAL_COOKIE_TYPES.map((variety) => checkVarietyInventory(variety, scout, salesByVariety)).filter(
-    (issue) => issue !== null
-  );
+/** Detect negative inventory issues from pre-computed balances */
+function detectNegativeInventory(scout: Scout, balances: Varieties, salesByVariety: Varieties): void {
+  const negativeVarieties: Array<{ variety: CookieType; inventory: number; sales: number; shortfall: number }> = [];
+
+  for (const variety of PHYSICAL_COOKIE_TYPES) {
+    const net = balances[variety] || 0;
+    if (net < 0) {
+      negativeVarieties.push({
+        variety,
+        inventory: scout.inventory.varieties[variety] || 0,
+        sales: salesByVariety[variety] || 0,
+        shortfall: Math.abs(net)
+      });
+    }
+  }
 
   if (negativeVarieties.length === 0) return;
-
   scout.$issues = scout.$issues || {};
   scout.$issues.negativeInventory = negativeVarieties;
 }
@@ -128,22 +123,20 @@ function calculateFinancialTracking(scout: Scout): void {
   };
 }
 
-/** Calculate inventory display and detect issues */
+/** Calculate inventory display and detect issues (uses shared balance computation) */
 function calculateInventoryDisplay(scout: Scout, salesByVariety: Varieties): void {
-  // Net inventory by variety
-  scout.totals.$inventoryDisplay = {};
+  const balances = computeInventoryBalances(scout, salesByVariety);
+
+  // Store net inventory by variety for display
+  scout.totals.$inventoryDisplay = balances;
   let inventoryTotal = 0;
   for (const variety of PHYSICAL_COOKIE_TYPES) {
-    const inventoryCount = scout.inventory.varieties[variety] || 0;
-    const salesCount = salesByVariety[variety] || 0;
-    const net = inventoryCount - salesCount;
-    scout.totals.$inventoryDisplay[variety] = net;
-    inventoryTotal += net;
+    inventoryTotal += balances[variety] || 0;
   }
   scout.totals.inventory = inventoryTotal;
 
-  // Detect negative inventory issues
-  detectNegativeInventory(scout, salesByVariety);
+  // Detect negative inventory issues using same balances
+  detectNegativeInventory(scout, balances, salesByVariety);
 }
 
 /** Count order statuses for a scout */

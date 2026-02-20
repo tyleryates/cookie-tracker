@@ -119,12 +119,20 @@ class ProfileManager {
     if (!/^[a-z0-9-]+$/.test(dirName)) throw new Error(`Invalid profile directory name: ${dirName}`);
   }
 
+  /** Verify a profile directory is not a symlink (defense against symlink attacks) */
+  private validateNotSymlink(dirPath: string): void {
+    if (fs.existsSync(dirPath) && fs.lstatSync(dirPath).isSymbolicLink()) {
+      throw new Error(`Profile directory is a symlink: ${dirPath}`);
+    }
+  }
+
   deleteProfile(dirName: string): ProfilesConfig {
     if (dirName === 'default') throw new Error('Cannot delete the default profile');
     this.validateDirName(dirName);
 
     const config = this.loadProfiles();
     const profileDir = path.join(this.rootDataDir, dirName);
+    this.validateNotSymlink(profileDir);
     if (fs.existsSync(profileDir)) {
       fs.rmSync(profileDir, { recursive: true, force: true });
     }
@@ -143,9 +151,12 @@ class ProfileManager {
     const profile = config.profiles.find((p) => p.dirName === dirName);
     if (!profile) throw new Error(`Profile not found: ${dirName}`);
 
+    const profileDir = path.join(this.rootDataDir, dirName);
+    this.validateNotSymlink(profileDir);
+
     config.activeProfile = dirName;
     this.saveProfiles(config);
-    return { profileDir: path.join(this.rootDataDir, dirName), config };
+    return { profileDir, config };
   }
 
   private slugify(name: string, existing: ProfileInfo[]): string {

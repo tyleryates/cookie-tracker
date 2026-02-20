@@ -66,8 +66,9 @@ export function AvailableBoothsReport({
         if (addr?.latitude && addr?.longitude) {
           setTroopCoords({ lat: addr.latitude, lng: addr.longitude });
         }
-      } catch {
+      } catch (err) {
         // Non-critical — distance sorting is optional
+        console.warn('Failed to load troop coordinates for distance sorting:', err);
       }
     })();
   }, []);

@@ -18,21 +18,27 @@ interface SettingsPageProps {
 }
 
 export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
-  // Smart Cookie fields
-  const [scUsername, setScUsername] = useState('');
-  const [scPassword, setScPassword] = useState('');
-  const [scVerifying, setScVerifying] = useState(false);
-  const [scVerified, setScVerified] = useState<SCVerifyResult | null>(null);
-  const [scError, setScError] = useState<string | null>(null);
+  // Smart Cookie form state
+  const [sc, setSc] = useState({
+    username: '',
+    password: '',
+    verifying: false,
+    verified: null as SCVerifyResult | null,
+    error: null as string | null
+  });
+  const updateSc = (patch: Partial<typeof sc>) => setSc((prev) => ({ ...prev, ...patch }));
 
-  // Digital Cookie fields
-  const [dcUsername, setDcUsername] = useState('');
-  const [dcPassword, setDcPassword] = useState('');
-  const [dcVerifying, setDcVerifying] = useState(false);
-  const [dcRoles, setDcRoles] = useState<DCRole[]>([]);
-  const [dcSelectedRole, setDcSelectedRole] = useState('');
-  const [dcConfirmed, setDcConfirmed] = useState(false);
-  const [dcError, setDcError] = useState<string | null>(null);
+  // Digital Cookie form state
+  const [dc, setDc] = useState({
+    username: '',
+    password: '',
+    verifying: false,
+    roles: [] as DCRole[],
+    selectedRole: '',
+    confirmed: false,
+    error: null as string | null
+  });
+  const updateDc = (patch: Partial<typeof dc>) => setDc((prev) => ({ ...prev, ...patch }));
 
   // Load existing credentials + seasonal data on mount
   useEffect(() => {
@@ -40,29 +46,23 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
       try {
         const [creds, seasonal] = await Promise.all([ipcInvoke('load-credentials'), ipcInvoke('load-seasonal-data')]);
 
-        setScUsername(creds.smartCookie.username || '');
-        setDcUsername(creds.digitalCookie.username || '');
+        updateSc({ username: creds.smartCookie.username || '' });
+        updateDc({ username: creds.digitalCookie.username || '' });
 
         // Restore SC verification status only if full credentials (including password) are present
         if (seasonal.troop && creds.smartCookie.username && creds.smartCookie.hasPassword) {
-          setScVerified({
-            troopName: seasonal.troop.role?.troop_name || null,
-            cookieCount: seasonal.cookies?.length || 0
+          updateSc({
+            verified: {
+              troopName: seasonal.troop?.role?.troop_name || null,
+              cookieCount: seasonal.cookies?.length || 0
+            }
           });
         }
 
         // Restore DC roles only if full credentials (including password) are present
         if (seasonal.dcRoles && seasonal.dcRoles.length > 0 && creds.digitalCookie.username && creds.digitalCookie.hasPassword) {
-          setDcRoles(seasonal.dcRoles);
-          setDcConfirmed(true);
-
-          // Pre-select saved role, or auto-select first Troop role
-          if (creds.digitalCookie.role) {
-            setDcSelectedRole(creds.digitalCookie.role);
-          } else {
-            const troopRole = seasonal.dcRoles.find((r) => r.name.startsWith('Troop'));
-            if (troopRole) setDcSelectedRole(troopRole.name);
-          }
+          const selectedRole = creds.digitalCookie.role || seasonal.dcRoles.find((r) => r.name.startsWith('Troop'))?.name || '';
+          updateDc({ roles: seasonal.dcRoles, confirmed: true, selectedRole });
         }
       } catch (error) {
         Logger.error('Error loading settings:', error);
@@ -75,97 +75,81 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
   };
 
   const handleVerifySC = async () => {
-    if (!scUsername.trim() || !scPassword.trim()) {
-      setScError('Email and password are required');
+    if (!sc.username.trim() || !sc.password.trim()) {
+      updateSc({ error: 'Email and password are required' });
       return;
     }
 
-    setScVerifying(true);
-    setScError(null);
-    setScVerified(null);
+    updateSc({ verifying: true, error: null, verified: null });
 
     try {
       const result = await ipcInvoke('verify-sc', {
-        username: scUsername.trim(),
-        password: scPassword.trim()
+        username: sc.username.trim(),
+        password: sc.password.trim()
       });
 
-      setScVerified({
-        troopName: result.troop.role?.troop_name || null,
-        cookieCount: result.cookies?.length || 0
+      updateSc({
+        verified: {
+          troopName: result.troop.role?.troop_name || null,
+          cookieCount: result.cookies?.length || 0
+        },
+        password: '' // Clear password now that it's saved to keychain
       });
 
-      // Persist seasonal data + credentials (saveCredentials updates the ref)
       await Promise.all([
         ipcInvoke('save-seasonal-data', { troop: result.troop, cookies: result.cookies }),
-        saveCredentials({ smartCookie: { username: scUsername.trim(), password: scPassword.trim() } })
+        saveCredentials({ smartCookie: { username: sc.username.trim(), password: sc.password.trim() } })
       ]);
-      // Clear password from state now that it's saved to keychain
-      setScPassword('');
-      if (mode === 'welcome' && dcConfirmed) onComplete?.();
+      if (mode === 'welcome' && dc.confirmed) onComplete?.();
     } catch (error) {
-      setScError((error as Error).message);
+      updateSc({ error: (error as Error).message });
     } finally {
-      setScVerifying(false);
+      updateSc({ verifying: false });
     }
   };
 
   const handleVerifyDC = async () => {
-    if (!dcUsername.trim() || !dcPassword.trim()) {
-      setDcError('Email and password are required');
+    if (!dc.username.trim() || !dc.password.trim()) {
+      updateDc({ error: 'Email and password are required' });
       return;
     }
 
-    setDcVerifying(true);
-    setDcError(null);
-    setDcRoles([]);
+    updateDc({ verifying: true, error: null, roles: [] });
 
     try {
       const result = await ipcInvoke('verify-dc', {
-        username: dcUsername.trim(),
-        password: dcPassword.trim()
+        username: dc.username.trim(),
+        password: dc.password.trim()
       });
-
-      setDcRoles(result.roles);
 
       // Auto-select first Troop role
       const troopRole = result.roles.find((r) => r.name.startsWith('Troop'));
-      let selectedRole = '';
-      if (troopRole) {
-        selectedRole = troopRole.name;
-      } else if (result.roles.length > 0) {
-        selectedRole = result.roles[0].name;
-      }
-      setDcSelectedRole(selectedRole);
+      const selectedRole = troopRole?.name || (result.roles.length > 0 ? result.roles[0].name : '');
 
-      // Persist DC roles + credentials (saveCredentials updates the ref)
+      updateDc({ roles: result.roles, selectedRole, password: '' });
+
       await Promise.all([
         ipcInvoke('save-seasonal-data', { dcRoles: result.roles }),
         saveCredentials({
-          digitalCookie: { username: dcUsername.trim(), password: dcPassword.trim(), role: selectedRole || undefined }
+          digitalCookie: { username: dc.username.trim(), password: dc.password.trim(), role: selectedRole || undefined }
         })
       ]);
-      // Clear password from state now that it's saved to keychain
-      setDcPassword('');
     } catch (error) {
-      setDcError((error as Error).message);
+      updateDc({ error: (error as Error).message });
     } finally {
-      setDcVerifying(false);
+      updateDc({ verifying: false });
     }
   };
 
   const handleConfirmDC = async () => {
-    if (!dcSelectedRole) return;
-    await saveCredentials({ digitalCookie: { role: dcSelectedRole } });
-    setDcConfirmed(true);
-    if (mode === 'welcome' && scVerified) onComplete?.();
+    if (!dc.selectedRole) return;
+    await saveCredentials({ digitalCookie: { role: dc.selectedRole } });
+    updateDc({ confirmed: true });
+    if (mode === 'welcome' && sc.verified) onComplete?.();
   };
 
   const handleClearSC = async () => {
-    setScUsername('');
-    setScPassword('');
-    setScVerified(null);
-    setScError(null);
+    updateSc({ username: '', password: '', verified: null, error: null });
     await Promise.all([
       ipcInvoke('save-seasonal-data', { troop: null, cookies: null }),
       saveCredentials({ smartCookie: { username: '', password: '' } })
@@ -173,12 +157,7 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
   };
 
   const handleClearDC = async () => {
-    setDcUsername('');
-    setDcPassword('');
-    setDcRoles([]);
-    setDcSelectedRole('');
-    setDcConfirmed(false);
-    setDcError(null);
+    updateDc({ username: '', password: '', roles: [], selectedRole: '', confirmed: false, error: null });
     await Promise.all([
       ipcInvoke('save-seasonal-data', { dcRoles: null }),
       saveCredentials({ digitalCookie: { username: '', password: '' } })
@@ -206,7 +185,7 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
             class="settings-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (!scVerifying && !scVerified) handleVerifySC();
+              if (!sc.verifying && !sc.verified) handleVerifySC();
             }}
           >
             <div class="form-group">
@@ -216,9 +195,9 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
                 id="scUsername"
                 class="form-input"
                 placeholder="Enter email"
-                value={scUsername}
-                disabled={!!scVerified}
-                onInput={(e) => setScUsername((e.target as HTMLInputElement).value)}
+                value={sc.username}
+                disabled={!!sc.verified}
+                onInput={(e) => updateSc({ username: (e.target as HTMLInputElement).value })}
               />
             </div>
             <div class="form-group">
@@ -228,32 +207,32 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
                 id="scPassword"
                 class="form-input"
                 placeholder="Enter password"
-                value={scVerified ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : scPassword}
-                disabled={!!scVerified}
-                onInput={(e) => setScPassword((e.target as HTMLInputElement).value)}
+                value={sc.verified ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : sc.password}
+                disabled={!!sc.verified}
+                onInput={(e) => updateSc({ password: (e.target as HTMLInputElement).value })}
               />
             </div>
             <div class="settings-verify-row">
-              <button type="submit" class="btn btn-secondary" disabled={scVerifying || !!scVerified}>
-                {scVerified ? 'Verified' : scVerifying ? 'Verifying...' : 'Verify'}
+              <button type="submit" class="btn btn-secondary" disabled={sc.verifying || !!sc.verified}>
+                {sc.verified ? 'Verified' : sc.verifying ? 'Verifying...' : 'Verify'}
               </button>
-              {scVerified && (
+              {sc.verified && (
                 <button type="button" class="btn btn-secondary" onClick={handleClearSC}>
                   Clear
                 </button>
               )}
-              {scError && <span class="settings-error">{scError}</span>}
+              {sc.error && <span class="settings-error">{sc.error}</span>}
             </div>
-            {scVerified && (
+            {sc.verified && (
               <div class="settings-status-indicators">
-                {scVerified.troopName && (
+                {sc.verified.troopName && (
                   <span class="settings-status-ok">
-                    {'\u2713'} Troop {scVerified.troopName}
+                    {'\u2713'} Troop {sc.verified.troopName}
                   </span>
                 )}
-                {scVerified.cookieCount > 0 && (
+                {sc.verified.cookieCount > 0 && (
                   <span class="settings-status-ok">
-                    {'\u2713'} {scVerified.cookieCount} cookie types
+                    {'\u2713'} {sc.verified.cookieCount} cookie types
                   </span>
                 )}
               </div>
@@ -268,8 +247,8 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
             class="settings-form"
             onSubmit={(e) => {
               e.preventDefault();
-              if (dcRoles.length > 0 && !dcConfirmed) handleConfirmDC();
-              else if (!dcVerifying && dcRoles.length === 0) handleVerifyDC();
+              if (dc.roles.length > 0 && !dc.confirmed) handleConfirmDC();
+              else if (!dc.verifying && dc.roles.length === 0) handleVerifyDC();
             }}
           >
             <div class="form-group">
@@ -279,9 +258,9 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
                 id="dcUsername"
                 class="form-input"
                 placeholder="Enter email"
-                value={dcUsername}
-                disabled={dcRoles.length > 0}
-                onInput={(e) => setDcUsername((e.target as HTMLInputElement).value)}
+                value={dc.username}
+                disabled={dc.roles.length > 0}
+                onInput={(e) => updateDc({ username: (e.target as HTMLInputElement).value })}
               />
             </div>
             <div class="form-group">
@@ -291,40 +270,40 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
                 id="dcPassword"
                 class="form-input"
                 placeholder="Enter password"
-                value={dcRoles.length > 0 ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : dcPassword}
-                disabled={dcRoles.length > 0}
-                onInput={(e) => setDcPassword((e.target as HTMLInputElement).value)}
+                value={dc.roles.length > 0 ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : dc.password}
+                disabled={dc.roles.length > 0}
+                onInput={(e) => updateDc({ password: (e.target as HTMLInputElement).value })}
               />
             </div>
-            {dcRoles.length > 0 && (
+            {dc.roles.length > 0 && (
               <div class="form-group">
                 <label for="dcRoleSelect">Role:</label>
                 <select
                   id="dcRoleSelect"
                   class="form-input"
-                  value={dcSelectedRole}
-                  disabled={dcConfirmed}
-                  onChange={(e) => setDcSelectedRole((e.target as HTMLSelectElement).value)}
+                  value={dc.selectedRole}
+                  disabled={dc.confirmed}
+                  onChange={(e) => updateDc({ selectedRole: (e.target as HTMLSelectElement).value })}
                 >
-                  {dcRoles.map((role) => (
+                  {dc.roles.map((role) => (
                     <option key={role.id} value={role.name}>
                       {role.name}
                     </option>
                   ))}
                 </select>
-                {!dcConfirmed && <span class="settings-role-hint">Select the role associated with this troop</span>}
+                {!dc.confirmed && <span class="settings-role-hint">Select the role associated with this troop</span>}
               </div>
             )}
             <div class="settings-verify-row">
-              <button type="submit" class="btn btn-secondary" disabled={dcVerifying || dcConfirmed}>
-                {dcConfirmed ? 'Verified' : dcRoles.length > 0 ? 'Confirm' : dcVerifying ? 'Verifying...' : 'Verify'}
+              <button type="submit" class="btn btn-secondary" disabled={dc.verifying || dc.confirmed}>
+                {dc.confirmed ? 'Verified' : dc.roles.length > 0 ? 'Confirm' : dc.verifying ? 'Verifying...' : 'Verify'}
               </button>
-              {dcRoles.length > 0 && (
+              {dc.roles.length > 0 && (
                 <button type="button" class="btn btn-secondary" onClick={handleClearDC}>
                   Clear
                 </button>
               )}
-              {dcError && <span class="settings-error">{dcError}</span>}
+              {dc.error && <span class="settings-error">{dc.error}</span>}
             </div>
           </form>
         </div>

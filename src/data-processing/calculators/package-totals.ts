@@ -3,6 +3,7 @@
 // Customer sales totals come from scout data, not from this module.
 
 import { TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
+import Logger from '../../logger';
 import type { Transfer } from '../../types';
 
 interface PackageTotals {
@@ -26,6 +27,14 @@ const CATEGORY_TO_FIELD: Partial<Record<string, keyof PackageTotals>> = {
   [TRANSFER_CATEGORY.DIRECT_SHIP]: 'directShip'
 };
 
+/** Categories intentionally excluded from package totals — order/sales records, not inventory movements */
+const EXCLUDED_CATEGORIES: ReadonlySet<string> = new Set([
+  TRANSFER_CATEGORY.DC_ORDER_RECORD,
+  TRANSFER_CATEGORY.COOKIE_SHARE_RECORD,
+  TRANSFER_CATEGORY.BOOTH_COOKIE_SHARE,
+  TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION
+]);
+
 /** Calculate package totals across all transfers */
 function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
   const totals: PackageTotals = {
@@ -44,6 +53,8 @@ function calculatePackageTotals(transfers: Transfer[]): PackageTotals {
     const field = CATEGORY_TO_FIELD[transfer.category];
     if (field) {
       totals[field] += transfer.physicalPackages || 0;
+    } else if (!EXCLUDED_CATEGORIES.has(transfer.category)) {
+      Logger.warn(`Unmapped transfer category "${transfer.category}" in package totals — update CATEGORY_TO_FIELD`);
     }
   }
 

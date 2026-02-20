@@ -105,6 +105,8 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
 
   const sortedScouts = getActiveScouts(data.scouts).filter(([, scout]) => (scout.totals.totalSold || 0) > 0);
 
+  // tallyByType splits by in-hand vs delivery vs shipped WITH donations included,
+  // which scout.totals.delivered/shipped don't provide (they only count physicalPackages)
   let totalDelivered = 0;
   let totalShipped = 0;
   let totalInHand = 0;

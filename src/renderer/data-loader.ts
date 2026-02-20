@@ -4,27 +4,26 @@
 import { PIPELINE_FILES } from '../constants';
 import Logger from '../logger';
 import type { AppConfig, LoadDataResult, RawDataRow, UnifiedDataset } from '../types';
-import { ipcInvoke, ipcInvokeRaw } from './ipc';
+import { ipcInvoke } from './ipc';
 
 // ============================================================================
 // DATA LOADING (delegates to main process)
 // ============================================================================
 
 export async function loadDataFromDisk(): Promise<LoadDataResult | null> {
-  const result = await ipcInvokeRaw('load-data');
-
-  // Unwrap standardized IPC format { success, data }
-  if (!result?.success) return null;
-  const data = result.data;
-  if (!data) return null;
-
-  return data;
+  try {
+    return await ipcInvoke('load-data');
+  } catch {
+    return null;
+  }
 }
 
 export async function loadDebugData(): Promise<LoadDataResult | null> {
-  const result = await ipcInvokeRaw('load-data-debug');
-  if (!result?.success) return null;
-  return result.data ?? null;
+  try {
+    return await ipcInvoke('load-data-debug');
+  } catch {
+    return null;
+  }
 }
 
 // ============================================================================
@@ -51,15 +50,9 @@ export async function saveUnifiedDatasetToDisk(unified: UnifiedDataset): Promise
     const exportData = serializeUnifiedDataset(unified);
     const jsonStr = JSON.stringify(exportData, null, 2);
 
-    const result = await ipcInvokeRaw('save-file', { filename: PIPELINE_FILES.UNIFIED, content: jsonStr });
-
-    if (result.success) {
-      Logger.debug('Unified dataset saved');
-      // Record build timestamp
-      await ipcInvokeRaw('record-unified-build');
-    } else {
-      Logger.error('Failed to save unified dataset:', result.error);
-    }
+    await ipcInvoke('save-file', { filename: PIPELINE_FILES.UNIFIED, content: jsonStr });
+    Logger.debug('Unified dataset saved');
+    await ipcInvoke('record-unified-build');
   } catch (error) {
     Logger.error('Error saving unified dataset:', error);
   }
