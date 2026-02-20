@@ -6,7 +6,6 @@ import { DataTable } from '../components/data-table';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
 import { buildVarietyTooltip, formatShortDate, getTransferDisplayInfo, isPhysicalVariety } from '../format-utils';
-
 export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
   if (!data?.transferBreakdowns) {
     return (
@@ -81,8 +80,21 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
       </div>
       {banner}
 
+      {!hasTransferData && (
+        <div class="info-box info-box-warning">
+          <p class="meta-text">
+            <strong>No Smart Cookie Data</strong>
+          </p>
+          <p class="meta-text">
+            Inventory pickups (C2T transfers) come from Smart Cookies.
+            <br />
+            Click the refresh button in the header to download Smart Cookie data including Initial Order and Cupboard Order pickups.
+          </p>
+        </div>
+      )}
+
       <StatCards stats={stats} />
-      <table class="table-normal" style={{ marginTop: '20px' }}>
+      <table class="table-normal">
         <thead>
           <tr>
             {physicalVarieties.map((v) => {
@@ -155,25 +167,14 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
         </>
       )}
 
-      {c2tTransfers.length === 0 &&
-        (hasTransferData ? (
-          <div class="info-box info-box-neutral" style={{ margin: '30px 0' }}>
-            <p class="meta-text">
-              <strong>Note:</strong> No C2T (Council to Troop) inventory pickups found in Smart Cookie data. C2T transfers appear after
-              picking up your Initial Order on Delivery Day or Cupboard Orders during the season.
-            </p>
-          </div>
-        ) : (
-          <div class="info-box info-box-warning">
-            <p class="meta-text">
-              <strong>No Smart Cookie Data</strong>
-            </p>
-            <p class="meta-text">
-              Inventory pickups (C2T transfers) come from Smart Cookies. Click the refresh button in the header to download Smart Cookie
-              data including Initial Order and Cupboard Order pickups.
-            </p>
-          </div>
-        ))}
+      {c2tTransfers.length === 0 && hasTransferData && (
+        <div class="info-box info-box-neutral" style={{ margin: '30px 0' }}>
+          <p class="meta-text">
+            <strong>Note:</strong> No C2T (Council to Troop) inventory pickups found in Smart Cookie data. C2T transfers appear after
+            picking up your Initial Order on Delivery Day or Cupboard Orders during the season.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

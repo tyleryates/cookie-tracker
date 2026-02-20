@@ -282,7 +282,7 @@ body {
 
 /* Update Banner — full-width bar below header */
 .update-banner {
-  background: #1565c0;
+  background: var(--status-info-dark);
   color: #fff;
   text-align: center;
   padding: 8px 16px;

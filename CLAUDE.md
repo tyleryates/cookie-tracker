@@ -28,7 +28,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **11 core reports in 5 tab groups + To-Do + 2 optional** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming), Donations, Cookie Popularity. Optional toggles in Settings: Inventory History, Booth Finder
+- **11 reports in 5 tab groups + To-Do** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming), Donations, Cookie Popularity. Optional toggle in Settings: Booth Finder
 - **Profile management** — Import, switch, and delete data profiles for managing multiple troops
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
@@ -38,7 +38,7 @@ Three layers with strict boundaries:
 
 **Main process** (`src/main.ts`, `src/ipc-handlers/`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers (organized by domain in `ipc-handlers/`), scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
 
-**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (12 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings is a separate tab rendered directly in `app.tsx` (not through the reports switch) alongside sync status. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
+**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (11 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings is a separate tab rendered directly in `app.tsx` (not through the reports switch) alongside sync status. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
 
 **Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Two-stage pipeline: **importers** parse raw files into a `DataStore` (intermediate representation), then **calculators** compute the final `UnifiedDataset` from the DataStore. Sub-directories: `importers/`, `calculators/`.
 
@@ -95,7 +95,7 @@ Three layers with strict boundaries:
 | `src/profile-manager.ts` | Multi-profile data directory management |
 | `src/json-file-utils.ts` | Shared atomic JSON load/save helpers used by config, seasonal data, etc. |
 | `src/logger.ts` | Centralized logging for main and renderer processes |
-| `src/debug-mutations.ts` | Debug utility that injects test data to trigger all warning states |
+| `scripts/inject-debug.mjs` | Creates a "Debug" profile from default data with all warning states triggered |
 | `src/preload.ts` | Electron preload script — IPC bridge with whitelisted channels |
 | `src/renderer.ts` | Renderer process entry point (Preact app initialization) |
 
@@ -120,7 +120,7 @@ IPC handlers are organized by domain in `src/ipc-handlers/`:
 |---|---|
 | `index.ts` | `registerAllHandlers()` — wires all handler modules |
 | `types.ts` | HandlerDeps interface — shared dependency types for all handler modules |
-| `data-handlers.ts` | load-data, load-data-debug, save-file |
+| `data-handlers.ts` | load-data, save-file |
 | `credential-handlers.ts` | load-credentials, save-credentials, verify-sc, verify-dc |
 | `config-handlers.ts` | load-config, update-config |
 | `scrape-handlers.ts` | scrape-websites, refresh-booth-locations, fetch-booth-catalog |

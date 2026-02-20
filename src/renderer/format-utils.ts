@@ -114,13 +114,6 @@ function parseLocalDate(dateStr: string): Date | null {
   return new Date(parts.year, parts.month - 1, parts.day);
 }
 
-/** Normalize date strings to YYYY-MM-DD for consistent grouping and sorting */
-function normalizeDate(dateStr: string): string {
-  const parts = parseDateParts(dateStr);
-  if (!parts) return dateStr;
-  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
-}
-
 /** Get today's date at local midnight */
 function todayMidnight(): Date {
   const now = new Date();
@@ -405,7 +398,6 @@ export {
   haversineDistance,
   isPhysicalVariety,
   isVirtualBooth,
-  normalizeDate,
   parseLocalDate,
   parseTimeToMinutes,
   pruneExpiredSlots,

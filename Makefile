@@ -1,4 +1,4 @@
-.PHONY: help dev compile watch build build-win build-all clean install version lint format knip typecheck test \
+.PHONY: help dev dev-debug dev-empty dev-import compile watch build build-win build-all clean install version lint format knip typecheck test \
        publish publish-mac publish-win test-build \
        bump-patch bump-minor bump-major release-patch release-minor release-major commit-version \
        check-token pre-release show-releases dist-info check-signing git-status
@@ -9,6 +9,22 @@ dev: compile  ## Compile, start app, and auto-recompile on changes
 	@trap 'kill %1 2>/dev/null' EXIT; \
 	npx tsup --watch & \
 	sleep 2 && npx electron .
+
+dev-debug: compile  ## Create Debug profile from default data with warnings injected
+	@node scripts/inject-debug.mjs; \
+	trap 'kill %1 2>/dev/null' EXIT; \
+	npx tsup --watch & \
+	sleep 2 && npx electron .
+
+dev-empty: compile  ## Create Empty profile with empty data (shows empty report states)
+	@node scripts/write-empty-data.mjs; \
+	trap 'kill %1 2>/dev/null' EXIT; \
+	npx tsup --watch & \
+	sleep 2 && npx electron .
+
+dev-import:  ## Import a .zip export as a debug profile (usage: make dev-import ZIP=path/to/file.zip)
+	@if [ -z "$(ZIP)" ]; then echo "Usage: make dev-import ZIP=path/to/file.zip [NAME=profile-name]"; exit 1; fi
+	node scripts/import-profile.mjs "$(ZIP)" $(NAME)
 
 compile:  ## One-shot compile (tsup bundles main + renderer, copies assets)
 	@npx tsup

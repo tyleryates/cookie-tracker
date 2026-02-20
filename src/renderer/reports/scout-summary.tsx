@@ -149,7 +149,14 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
       {banner}
       {!data.metadata.lastImportDC && (
         <div class="info-box info-box-warning">
-          <p>Digital Cookie data was not loaded. Scout sales data may be incomplete.</p>
+          <p class="meta-text">
+            <strong>No Digital Cookie Data</strong>
+          </p>
+          <p class="meta-text">
+            Scout sales data may be incomplete.
+            <br />
+            Click the refresh button in the header to download Digital Cookie data.
+          </p>
         </div>
       )}
       <StatCards stats={stats} />

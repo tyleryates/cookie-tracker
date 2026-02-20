@@ -148,7 +148,14 @@ export function FinanceReport({ data, banner }: { data: UnifiedDataset; banner?:
       {banner}
       {!data.metadata.lastImportDC && (
         <div class="info-box info-box-warning">
-          <p>Digital Cookie data was not loaded. Cash owed amounts may be incomplete.</p>
+          <p class="meta-text">
+            <strong>No Digital Cookie Data</strong>
+          </p>
+          <p class="meta-text">
+            Cash owed amounts may be incomplete.
+            <br />
+            Click the refresh button in the header to download Digital Cookie data.
+          </p>
         </div>
       )}
 

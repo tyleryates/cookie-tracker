@@ -48,7 +48,7 @@ const initialState: AppState = {
 
 function WelcomeContent({ onComplete }: { onComplete: () => void }) {
   return (
-    <div class="report-visual sync-tab">
+    <div class="welcome-page">
       <SettingsPage mode="welcome" onComplete={onComplete} />
     </div>
   );
@@ -65,10 +65,8 @@ interface SettingsContentProps {
   activeProfile: ActiveProfile | null;
   profiles: ProfileInfo[];
   onSwitchProfile: (dirName: string) => void;
-  onImportProfile: (name: string) => void;
   onDeleteProfile: (dirName: string) => void;
   onExport: () => void;
-  onInjectDebug: () => void;
   hasData: boolean;
   syncState: SyncState;
   availableBoothsEnabled: boolean;
@@ -89,10 +87,8 @@ function SettingsContent({
   activeProfile,
   profiles,
   onSwitchProfile,
-  onImportProfile,
   onDeleteProfile,
   onExport,
-  onInjectDebug,
   hasData,
   syncState,
   availableBoothsEnabled,
@@ -114,10 +110,8 @@ function SettingsContent({
         activeProfile={activeProfile}
         profiles={profiles}
         onSwitchProfile={onSwitchProfile}
-        onImportProfile={onImportProfile}
         onDeleteProfile={onDeleteProfile}
         onExport={onExport}
-        onInjectDebug={onInjectDebug}
         hasData={hasData}
       />
       <SettingsPage mode="settings" />
@@ -145,6 +139,7 @@ interface MainContentProps {
   activeReport: string | null;
   unified: UnifiedDataset | null;
   appConfig: AppConfig | null;
+  syncing: boolean;
   boothSyncState: EndpointSyncState;
   boothResetKey: number;
   readOnly: boolean;
@@ -161,6 +156,7 @@ function MainContent({
   activeReport,
   unified,
   appConfig,
+  syncing,
   boothSyncState,
   boothResetKey,
   readOnly,
@@ -172,6 +168,14 @@ function MainContent({
   onSaveBoothIds,
   onSaveDayFilters
 }: MainContentProps) {
+  if (!unified && syncing) {
+    return (
+      <div class="loading-state">
+        <span class="loading-spinner" />
+        <p>Loading initial reports...</p>
+      </div>
+    );
+  }
   if (activeReport === 'health-check' && unified) {
     return <HealthCheckReport data={unified} availableSlotCount={availableSlotCount} onNavigate={onSelectReport} />;
   }
@@ -204,7 +208,7 @@ export function App() {
 
   // Hook chain
   const { showStatus } = useStatusMessage(dispatch, state.statusMessage);
-  const { loadData, exportData, injectDebug } = useDataLoader(dispatch, showStatus);
+  const { loadData, exportData } = useDataLoader(dispatch, showStatus);
   const { sync, refreshBooths } = useSync(
     dispatch,
     showStatus,
@@ -253,6 +257,8 @@ export function App() {
 
   const handleWelcomeComplete = useCallback(() => {
     dispatch({ type: 'SET_ACTIVE_REPORT', report: 'inventory' });
+    dispatch({ type: 'TOGGLE_AUTO_SYNC', enabled: true });
+    dispatch({ type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: true });
     sync();
   }, [sync]);
 
@@ -353,27 +359,6 @@ export function App() {
     [dispatchProfiles, reloadAfterSwitch, showStatus]
   );
 
-  const handleImportProfile = useCallback(
-    async (name: string) => {
-      try {
-        const pc = await ipcInvoke('import-profile', { name });
-        if (!pc) return; // user cancelled file dialog
-        // Switch to the newly imported profile (dispatches profiles + reloads data)
-        const imported = pc.profiles.find((p) => p.name === name);
-        if (imported) {
-          await handleSwitchProfile(imported.dirName);
-          // handleSwitchProfile already shows its own success message
-        } else {
-          dispatchProfiles(pc);
-          showStatus(`Profile "${name}" imported`, 'success');
-        }
-      } catch (error) {
-        showStatus(`Import failed: ${(error as Error).message}`, 'error');
-      }
-    },
-    [dispatchProfiles, handleSwitchProfile, showStatus]
-  );
-
   const handleDeleteProfile = useCallback(
     async (dirName: string) => {
       try {
@@ -438,10 +423,8 @@ export function App() {
         activeProfile={state.activeProfile}
         profiles={state.profiles}
         onSwitchProfile={handleSwitchProfile}
-        onImportProfile={handleImportProfile}
         onDeleteProfile={handleDeleteProfile}
         onExport={exportData}
-        onInjectDebug={injectDebug}
         hasData={!!state.unified}
         syncState={state.syncState}
         availableBoothsEnabled={!!state.appConfig?.availableBoothsEnabled}
@@ -461,6 +444,7 @@ export function App() {
         activeReport={state.activeReport}
         unified={state.unified}
         appConfig={state.appConfig}
+        syncing={state.syncState.syncing}
         boothSyncState={state.syncState.endpoints['sc-booth-availability'] || { status: 'idle', lastSync: null }}
         boothResetKey={boothResetKeyRef.current}
         readOnly={readOnly}

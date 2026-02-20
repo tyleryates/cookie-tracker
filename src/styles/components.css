@@ -163,7 +163,7 @@
   width: 100%;
   padding: 12px 14px;
   border: 2px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 1em;
   transition: all 0.2s;
   background: var(--surface);
@@ -185,14 +185,14 @@
   gap: 10px;
   padding: 10px;
   background: var(--surface-raised);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .stat-card {
   text-align: center;
   font-family: inherit;
   padding: 6px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
 }
 
@@ -214,7 +214,7 @@ button.stat-card {
 .stat-card-active,
 button.stat-card-active {
   background: var(--success-light);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   outline: 2px solid var(--primary);
 }
 
@@ -294,7 +294,7 @@ button.stat-card-active {
 /* Info Boxes */
 .info-box {
   padding: 12px 15px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   margin: 15px 0;
   border-left: 4px solid;
 }
@@ -319,9 +319,17 @@ button.stat-card-active {
   color: var(--status-warning-dark);
 }
 
+.info-box-warning .meta-text {
+  color: var(--status-warning-dark);
+}
+
 .info-box-error {
   background: var(--error-light);
   border-left-color: var(--status-error-dark);
+  color: var(--status-error-dark);
+}
+
+.info-box-error .meta-text {
   color: var(--status-error-dark);
 }
 
@@ -342,6 +350,12 @@ button.stat-card-active {
 .report-visual .report-header-row h3,
 .report-visual .report-header-row h4 {
   margin: 0;
+}
+
+/* Sub-section spacing — report sections after the first */
+.report-subsection {
+  margin-top: 20px;
+  margin-bottom: 8px;
 }
 
 .report-status-badge {
@@ -755,4 +769,29 @@ button.stat-card-active {
   justify-content: flex-end;
   gap: 8px;
   margin-top: 20px;
+}
+
+/* Loading state */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: var(--gray-500);
+}
+
+.loading-state p {
+  margin: 16px 0 0;
+  font-size: 1.05em;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--gray-300);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }

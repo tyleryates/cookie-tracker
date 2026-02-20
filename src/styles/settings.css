@@ -1,5 +1,36 @@
 /* Settings page */
 
+/* Welcome page */
+.welcome-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px var(--app-padding-x) 40px;
+}
+
+.welcome-page > div {
+  width: 100%;
+  max-width: 700px;
+}
+
+.welcome-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.welcome-icon {
+  font-size: 2.5em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.welcome-header h2 {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 6px 0;
+}
+
 .settings-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -13,11 +44,32 @@
   padding: 24px;
 }
 
-.settings-card h3 {
+.settings-card-done {
+  border-color: var(--primary);
+}
+
+.settings-card h3,
+.report-visual .settings-card h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   color: var(--primary);
   margin: 0 0 16px 0;
   font-size: 1.2em;
   font-weight: 600;
+}
+
+.settings-card-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  font-size: 0.8em;
+  font-weight: 700;
 }
 
 .settings-form .form-group:last-of-type {
@@ -72,10 +124,6 @@
   border-radius: var(--radius-lg);
 }
 
-.settings-toggle-sub {
-  padding-left: 28px;
-}
-
-.settings-toggle-sub .form-input {
+.settings-toggles .form-input {
   max-width: 300px;
 }

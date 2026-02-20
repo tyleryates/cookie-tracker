@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, ipcMain } from 'electron';
+import { ipcMain } from 'electron';
 import { loadData } from '../data-pipeline';
 import Logger from '../logger';
 import type { HandlerDeps } from './types';
@@ -18,20 +18,6 @@ export function registerDataHandlers(deps: HandlerDeps): void {
       return result;
     })
   );
-
-  // Handle load-data-debug: same as load-data but injects debug mutations before building
-  // Only available in development builds — disabled in packaged production builds
-  if (!app.isPackaged) {
-    ipcMain.handle(
-      'load-data-debug',
-      handleIpcError(async () => {
-        Logger.info('IPC: load-data-debug');
-        const result = await loadData(profileDir(), { debug: true });
-        Logger.info(`IPC: load-data-debug complete — ${result ? `${Object.keys(result.unified?.scouts || {}).length} scouts` : 'no data'}`);
-        return result;
-      })
-    );
-  }
 
   // Handle save file (for unified dataset caching — saves to current/)
   ipcMain.handle(

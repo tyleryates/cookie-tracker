@@ -53,7 +53,7 @@ function computeActions(data: UnifiedDataset, availableSlotCount: number): { pen
   const hasBoothIssues = needsDist > 0 || bs.hasWarning;
   if (hasBoothIssues || data.boothReservations.length > 0) {
     const details: string[] = [];
-    if (needsDist > 0) details.push(`${needsDist} booth${needsDist === 1 ? ' needs' : 's need'} distribution`);
+    if (needsDist > 0) details.push(`${needsDist} booth${needsDist === 1 ? '' : 's'} pending distribution`);
     if (bs.hasWarning) details.push(`${bs.unallocated} of ${bs.total} booth sale package${bs.total === 1 ? '' : 's'} undistributed`);
 
     const item = {
@@ -84,13 +84,13 @@ function computeActions(data: UnifiedDataset, availableSlotCount: number): { pen
   return { pending, done };
 }
 
-function computeWarnings(data: UnifiedDataset): TodoItem[] {
-  const warnings: TodoItem[] = [];
+function computeNotices(data: UnifiedDataset): TodoItem[] {
+  const notices: TodoItem[] = [];
 
   // Scout Negative Inventory
   const negInv = data.troopTotals.scouts.withNegativeInventory;
   if (negInv > 0) {
-    warnings.push({
+    notices.push({
       name: 'Scouts with negative inventory',
       detail: `${negInv} scout${negInv === 1 ? '' : 's'} with negative inventory`,
       link: 'scout-inventory'
@@ -101,14 +101,14 @@ function computeWarnings(data: UnifiedDataset): TodoItem[] {
   const scoutsWithUnapproved = getActiveScouts(data.scouts).filter(([, scout]) => scout.totals.$orderStatusCounts.needsApproval > 0);
   if (scoutsWithUnapproved.length > 0) {
     const totalUnapproved = scoutsWithUnapproved.reduce((sum, [, s]) => sum + s.totals.$orderStatusCounts.needsApproval, 0);
-    warnings.push({
+    notices.push({
       name: 'Scouts with unapproved orders',
       detail: `${totalUnapproved} order${totalUnapproved === 1 ? '' : 's'} across ${scoutsWithUnapproved.length} scout${scoutsWithUnapproved.length === 1 ? '' : 's'}`,
       link: 'summary'
     });
   }
 
-  return warnings;
+  return notices;
 }
 
 interface HealthCheckReportProps {
@@ -147,17 +147,17 @@ function TodoRow({
 
 export function HealthCheckReport({ data, availableSlotCount, onNavigate }: HealthCheckReportProps) {
   const { pending, done } = computeActions(data, availableSlotCount);
-  const warnings = computeWarnings(data);
+  const notices = computeNotices(data);
 
-  const totalPending = pending.length + warnings.length;
+  const totalPending = pending.length + notices.length;
   const badgeText =
     totalPending === 0
       ? 'All Done'
-      : pending.length > 0 && warnings.length > 0
-        ? `${pending.length} Action${pending.length === 1 ? '' : 's'}, ${warnings.length} Warning${warnings.length === 1 ? '' : 's'}`
+      : pending.length > 0 && notices.length > 0
+        ? `${pending.length} Action${pending.length === 1 ? '' : 's'}, ${notices.length} Notice${notices.length === 1 ? '' : 's'}`
         : pending.length > 0
-          ? `${pending.length} To-Do`
-          : `${warnings.length} Warning${warnings.length === 1 ? '' : 's'}`;
+          ? `${pending.length} Action${pending.length === 1 ? '' : 's'}`
+          : `${notices.length} Notice${notices.length === 1 ? '' : 's'}`;
 
   return (
     <div class="report-visual">
@@ -172,7 +172,7 @@ export function HealthCheckReport({ data, availableSlotCount, onNavigate }: Heal
 
       {pending.length > 0 && (
         <>
-          <h4 style={{ marginTop: '20px', marginBottom: '12px' }}>Action Required</h4>
+          <h4 class="report-subsection">Action Required</h4>
           <DataTable columns={['', 'Action', 'Detail']} columnAligns={['center', undefined, undefined]}>
             {pending.map((item) => (
               <TodoRow
@@ -188,11 +188,11 @@ export function HealthCheckReport({ data, availableSlotCount, onNavigate }: Heal
         </>
       )}
 
-      {warnings.length > 0 && (
+      {notices.length > 0 && (
         <>
-          <h4 style={{ marginTop: '28px', marginBottom: '12px' }}>Warnings</h4>
+          <h4 style={{ marginTop: '28px', marginBottom: '12px' }}>Notices</h4>
           <DataTable columns={['', 'Item', 'Detail']} columnAligns={['center', undefined, undefined]}>
-            {warnings.map((item) => (
+            {notices.map((item) => (
               <TodoRow
                 key={item.name}
                 item={item}

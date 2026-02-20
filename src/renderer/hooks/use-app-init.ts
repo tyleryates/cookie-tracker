@@ -54,10 +54,8 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
         ipcInvoke('update-config', { ignoredTimeSlots: pruned }).catch(() => {});
       }
 
-      dispatch({ type: 'LOAD_CONFIG', config });
-      await loadData({ showMessages: false });
-
-      // Check if both logins are verified — if not, show welcome page
+      // Check if both logins are verified BEFORE enabling auto-sync via LOAD_CONFIG.
+      // Otherwise auto-sync fires immediately and fails with "username is required".
       const [credsResult, seasonalResult] = await Promise.allSettled([ipcInvoke('load-credentials'), ipcInvoke('load-seasonal-data')]);
       if (credsResult.status === 'rejected') Logger.warn('Failed to load credentials:', credsResult.reason);
       if (seasonalResult.status === 'rejected') Logger.warn('Failed to load seasonal data:', seasonalResult.reason);
@@ -65,6 +63,15 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
       const seasonal = seasonalResult.status === 'fulfilled' ? seasonalResult.value : null;
       const scOk = !!(creds?.smartCookie?.username && creds?.smartCookie?.hasPassword && seasonal?.troop);
       const dcOk = !!(creds?.digitalCookie?.username && creds?.digitalCookie?.hasPassword && seasonal?.dcRoles?.length);
+
+      // Suppress auto-sync if credentials aren't set up yet
+      if (!scOk || !dcOk) {
+        config.autoSyncEnabled = false;
+      }
+
+      dispatch({ type: 'LOAD_CONFIG', config });
+      await loadData({ showMessages: false });
+
       if (!scOk || !dcOk) {
         dispatch({ type: 'SET_WELCOME' });
       }

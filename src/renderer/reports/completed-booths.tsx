@@ -27,7 +27,7 @@ function getBoothStatus(r: BoothReservationImported, todayLocal: Date, nowMinute
   if (r.booth.isDistributed) return { text: 'Completed', className: 'status-success' };
 
   const boothDate = r.timeslot.date ? parseLocalDate(r.timeslot.date) : null;
-  if (!boothDate) return { text: 'Needs Distribution', className: 'status-warning' };
+  if (!boothDate) return { text: 'Pending Distribution', className: 'status-warning' };
 
   const isToday = boothDate.getTime() === todayLocal.getTime();
   const isFuture = boothDate > todayLocal;
@@ -41,7 +41,7 @@ function getBoothStatus(r: BoothReservationImported, todayLocal: Date, nowMinute
     if (endMin >= 0 && nowMinutes < endMin) return { text: 'In Progress', className: 'status-info' };
   }
 
-  return { text: 'Needs Distribution', className: 'status-warning' };
+  return { text: 'Pending Distribution', className: 'status-warning' };
 }
 
 function classifyBooths(data: UnifiedDataset) {
@@ -55,7 +55,7 @@ function classifyBooths(data: UnifiedDataset) {
   const completed = nonVirtualReservations.filter((r) => r.booth.isDistributed);
   const needsDistribution = nonVirtualReservations.filter((r) => {
     if (r.booth.isDistributed) return false;
-    return getBoothStatus(r, todayLocal, nowMinutes).text === 'Needs Distribution';
+    return getBoothStatus(r, todayLocal, nowMinutes).text === 'Pending Distribution';
   });
   completed.sort((a, b) => (a.timeslot.date || '').localeCompare(b.timeslot.date || ''));
   needsDistribution.sort((a, b) => (a.timeslot.date || '').localeCompare(b.timeslot.date || ''));
@@ -155,10 +155,10 @@ function NeedsDistributionSection({ booths, hasBoothSaleWarning }: { booths: Boo
   if (totalNeedsDist === 0) return null;
   return (
     <>
-      <div class="report-header-row" style={{ marginTop: '20px', marginBottom: '8px' }}>
-        <h4>Needs Distribution</h4>
+      <div class="report-header-row report-subsection">
+        <h4>Pending Distribution</h4>
         <span class="report-status-badge report-status-warning">
-          {totalNeedsDist} item{totalNeedsDist === 1 ? '' : 's'} {totalNeedsDist === 1 ? 'needs' : 'need'} attention
+          {totalNeedsDist} booth{totalNeedsDist === 1 ? '' : 's'} pending distribution
           <TooltipCell
             tooltip={'Distribute in Smart Cookie\n(Booth \u2192 My Reservations \u2192 booth row \u2192 "...")'}
             tag="span"
@@ -170,8 +170,8 @@ function NeedsDistributionSection({ booths, hasBoothSaleWarning }: { booths: Boo
       </div>
       {booths.length > 0 && (
         <DataTable
-          columns={['Store', 'Type', 'Date', 'Time', 'Status']}
-          columnAligns={[undefined, 'center', undefined, undefined, 'center']}
+          columns={['Store', 'Type', 'Date', 'Time']}
+          columnAligns={[undefined, 'center', undefined, undefined]}
           className="table-normal booth-table"
         >
           {booths.map((r) => {
@@ -187,9 +187,6 @@ function NeedsDistributionSection({ booths, hasBoothSaleWarning }: { booths: Boo
                 </td>
                 <td>{r.timeslot.date ? formatShortDate(r.timeslot.date) : '-'}</td>
                 <td>{timeDisplay}</td>
-                <td class="text-center">
-                  <span class="status-pill status-pill-warning">Needs Distribution</span>
-                </td>
               </tr>
             );
           })}
@@ -218,7 +215,7 @@ export function CompletedBoothsReport({ data, banner }: { data: UnifiedDataset; 
     ...(booths.needsDistribution.length > 0
       ? [
           {
-            label: 'Needs Distribution',
+            label: 'Pending Distribution',
             value: booths.needsDistribution.length,
             description: 'Past booths not yet distributed',
             color: STAT_COLORS.ORANGE

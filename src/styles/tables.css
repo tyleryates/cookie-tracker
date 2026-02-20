@@ -35,7 +35,7 @@ tbody tr:hover {
 .table-normal {
   margin-top: 20px;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
@@ -49,7 +49,7 @@ tbody tr:hover {
   margin-top: 12px;
   font-size: 0.85em;
   background: var(--surface);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
 }
@@ -70,7 +70,7 @@ tbody tr:hover {
   margin-bottom: 12px;
   padding: 12px;
   background: var(--surface-raised);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border-left: 3px solid var(--primary-light);
 }
 
@@ -127,7 +127,7 @@ tbody tr:hover {
 .booth-card {
   margin: 16px 0;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -205,22 +205,22 @@ tbody tr:hover {
 /* Transfer type labels */
 
 .transfer-type-c2t {
-  color: #1565c0;
+  color: var(--status-info-dark);
   background: rgba(33, 150, 243, 0.12);
 }
 
 .transfer-type-t2t-out {
-  color: #c62828;
+  color: var(--status-error-dark);
   background: rgba(229, 57, 53, 0.12);
 }
 
 .transfer-type-t2g {
-  color: #2e7d32;
+  color: var(--status-success-dark);
   background: rgba(76, 175, 80, 0.12);
 }
 
 .transfer-type-g2t {
-  color: #e65100;
+  color: var(--status-warning-dark);
   background: rgba(255, 152, 0, 0.12);
 }
 
@@ -232,34 +232,34 @@ tbody tr:hover {
 
 /* Payment amount colors */
 .cash-amount {
-  color: #2e7d32;
+  color: var(--status-success-dark);
   font-weight: 600;
 }
 .digital-amount {
-  color: #1565c0;
+  color: var(--status-info-dark);
   font-weight: 600;
 }
 
 /* Order status pills */
 .status-pill-success {
-  color: #2e7d32;
+  color: var(--status-success-dark);
   background: rgba(76, 175, 80, 0.12);
 }
 .status-pill-warning {
-  color: #e65100;
+  color: var(--status-warning-dark);
   background: rgba(255, 152, 0, 0.12);
 }
 .status-pill-error {
-  color: #c62828;
+  color: var(--status-error-dark);
   background: rgba(229, 57, 53, 0.12);
 }
 /* Payment type pills */
 .payment-pill-cash {
-  color: #2e7d32;
+  color: var(--status-success-dark);
   background: rgba(76, 175, 80, 0.12);
 }
 .payment-pill-digital {
-  color: #1565c0;
+  color: var(--status-info-dark);
   background: rgba(33, 150, 243, 0.12);
 }
 

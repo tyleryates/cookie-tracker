@@ -539,7 +539,6 @@ export interface AppConfig {
   boothIds: number[];
   boothDayFilters: string[];
   ignoredTimeSlots: string[];
-  inventoryHistoryEnabled: boolean;
 }
 
 // ============================================================================
@@ -589,10 +588,6 @@ export interface Timestamps {
 
 export interface IpcChannelMap {
   'load-data': {
-    request: undefined;
-    response: LoadDataResult | null;
-  };
-  'load-data-debug': {
     request: undefined;
     response: LoadDataResult | null;
   };

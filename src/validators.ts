@@ -93,8 +93,7 @@ const configPatchSchema = z
     boothNotifiedSlots: z.array(z.string()).optional(),
     boothIds: z.array(z.number()).optional(),
     boothDayFilters: z.array(z.string()).optional(),
-    ignoredTimeSlots: z.array(z.string()).optional(),
-    inventoryHistoryEnabled: z.boolean().optional()
+    ignoredTimeSlots: z.array(z.string()).optional()
   })
   .strict();
 

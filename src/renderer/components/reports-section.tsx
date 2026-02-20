@@ -9,7 +9,6 @@ import { CompletedBoothsReport } from '../reports/completed-booths';
 import { DonationAlertReport } from '../reports/donation-alert';
 import { FinanceReport } from '../reports/finance';
 import { InventoryReport } from '../reports/inventory';
-import { InventoryHistoryReport } from '../reports/inventory-history';
 import { ScoutInventoryReport } from '../reports/scout-inventory';
 import { ScoutSummaryReport } from '../reports/scout-summary';
 import { TroopSalesReport } from '../reports/troop-sales';
@@ -72,8 +71,7 @@ const REPORT_TYPE_LABELS: Record<string, string> = {
   finance: 'Cash Report',
   'completed-booths': 'Completed Booths',
   'upcoming-booths': 'Upcoming Booths',
-  'available-booths': 'Booth Finder',
-  'inventory-history': 'Inventory History'
+  'available-booths': 'Booth Finder'
 };
 
 // ============================================================================
@@ -155,8 +153,6 @@ function renderReport({
       return <DonationAlertReport data={unified} />;
     case 'finance':
       return <FinanceReport data={unified} />;
-    case 'inventory-history':
-      return <InventoryHistoryReport data={unified} />;
     case 'upcoming-booths':
       return <UpcomingBoothsReport data={unified} />;
     case 'completed-booths':
@@ -198,15 +194,12 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
   // Dynamically extend tabs based on config
   const effectiveTabs = useMemo(() => {
     return REPORT_TABS.map((tab) => {
-      if (tab.id === 'troop' && appConfig?.inventoryHistoryEnabled) {
-        return { ...tab, types: [...tab.types, 'inventory-history'] as [string, ...string[]] };
-      }
       if (tab.id === 'booths' && appConfig?.availableBoothsEnabled) {
         return { ...tab, types: [...tab.types, 'available-booths'] as [string, ...string[]] };
       }
       return tab;
     });
-  }, [appConfig?.inventoryHistoryEnabled, appConfig?.availableBoothsEnabled]);
+  }, [appConfig?.availableBoothsEnabled]);
 
   // Compute count badges for dropdown items
   const dropdownCounts = useMemo<Record<string, number>>(() => {

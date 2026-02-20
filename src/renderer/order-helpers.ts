@@ -11,9 +11,9 @@ function titleCase(s: string): string {
 export function getStatusStyle(status: string | undefined): { className: string; text: string } {
   switch (classifyOrderStatus(status)) {
     case ORDER_STATUS_CLASS.NEEDS_APPROVAL:
-      return { className: 'status-pill status-pill-error', text: 'Needs Approval' };
+      return { className: 'status-pill status-pill-error', text: 'Awaiting Approval' };
     case ORDER_STATUS_CLASS.COMPLETED:
-      return { className: 'status-pill status-pill-success', text: 'Complete' };
+      return { className: 'status-pill status-pill-success', text: 'Completed' };
     case ORDER_STATUS_CLASS.PENDING:
       return { className: 'status-pill status-pill-warning', text: 'Pending' };
     default:

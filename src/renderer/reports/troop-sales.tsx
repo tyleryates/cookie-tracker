@@ -55,7 +55,7 @@ function OrderSection({
 
   return (
     <div>
-      <div class="report-header-row" style={{ marginTop: '20px', marginBottom: '8px' }}>
+      <div class="report-header-row report-subsection">
         <h4>{title}</h4>
         {category.hasWarning && (
           <span class="report-status-badge report-status-warning">
@@ -195,7 +195,14 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
       {banner}
       {!data.metadata.lastImportDC && (
         <div class="info-box info-box-warning">
-          <p>Digital Cookie data was not loaded. Online order details may be incomplete.</p>
+          <p class="meta-text">
+            <strong>No Digital Cookie Data</strong>
+          </p>
+          <p class="meta-text">
+            Online order details may be incomplete.
+            <br />
+            Click the refresh button in the header to download Digital Cookie data.
+          </p>
         </div>
       )}
       <StatCards stats={stats} />

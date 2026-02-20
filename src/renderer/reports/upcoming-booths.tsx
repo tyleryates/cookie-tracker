@@ -25,7 +25,7 @@ export function UpcomingBoothsReport({ data, banner }: { data: UnifiedDataset; b
       </div>
       {banner}
       {upcoming.length === 0 ? (
-        <p class="muted-text">No upcoming booths.</p>
+        <p class="muted-text">No upcoming booths scheduled.</p>
       ) : (
         <DataTable
           columns={['Store', 'Type', 'Date', 'Time']}

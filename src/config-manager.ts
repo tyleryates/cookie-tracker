@@ -20,7 +20,7 @@ class ConfigManager {
 
   getDefaults(): AppConfig {
     return {
-      autoUpdateEnabled: false,
+      autoUpdateEnabled: true,
       autoSyncEnabled: true,
       autoRefreshBoothsEnabled: true,
       availableBoothsEnabled: false,
@@ -29,8 +29,7 @@ class ConfigManager {
       boothNotifiedSlots: [],
       boothIds: [],
       boothDayFilters: [],
-      ignoredTimeSlots: [],
-      inventoryHistoryEnabled: false
+      ignoredTimeSlots: []
     };
   }
 

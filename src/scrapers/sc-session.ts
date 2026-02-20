@@ -31,7 +31,7 @@ export class SmartCookieSession {
         baseURL: 'https://app.abcsmartcookies.com',
         jar: this.cookieJar,
         withCredentials: true,
-        timeout: 30_000,
+        timeout: 60_000,
         maxRedirects: 5,
         headers: {
           'User-Agent': this.userAgent,

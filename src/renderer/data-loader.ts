@@ -18,14 +18,6 @@ export async function loadDataFromDisk(): Promise<LoadDataResult | null> {
   }
 }
 
-export async function loadDebugData(): Promise<LoadDataResult | null> {
-  try {
-    return await ipcInvoke('load-data-debug');
-  } catch {
-    return null;
-  }
-}
-
 // ============================================================================
 // DATA EXPORT
 // ============================================================================
@@ -64,7 +56,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
   } catch (err) {
     Logger.error('Failed to load config:', err);
     return {
-      autoUpdateEnabled: false,
+      autoUpdateEnabled: true,
       autoSyncEnabled: true,
       autoRefreshBoothsEnabled: true,
       availableBoothsEnabled: false,
@@ -73,8 +65,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
       boothNotifiedSlots: [],
       boothIds: [],
       boothDayFilters: [],
-      ignoredTimeSlots: [],
-      inventoryHistoryEnabled: false
+      ignoredTimeSlots: []
     };
   }
 }

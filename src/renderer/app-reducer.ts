@@ -100,7 +100,7 @@ const ACTION_HANDLERS: { [T in Action['type']]: ActionHandler<T> } = {
 
   SET_UNIFIED: (state, action) => ({ ...state, unified: action.unified }),
 
-  SET_ACTIVE_REPORT: (state, action) => ({ ...state, activeReport: action.report }),
+  SET_ACTIVE_REPORT: (state, action) => ({ ...state, activeReport: action.report, activePage: 'dashboard' }),
 
   DEFAULT_REPORT: (state) => (state.activeReport ? state : { ...state, activeReport: 'inventory' }),
 

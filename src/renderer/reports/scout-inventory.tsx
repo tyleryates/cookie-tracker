@@ -117,7 +117,7 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
   );
 
   if (!hasActivity) {
-    return <div class="scout-breakdown muted-text">No inventory activity.</div>;
+    return <div class="scout-breakdown muted-text">No inventory activity yet.</div>;
   }
 
   const varietyHeaderStyle = { fontSize: '0.75em', whiteSpace: 'nowrap' };
@@ -249,14 +249,14 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
             );
           })}
 
-          {/* Needs Approval orders — one row each */}
+          {/* Awaiting Approval orders — one row each */}
           {requestedOrders.map((o) => {
             const orderTip = buildOrderTooltip(o);
             const typeText = stripOrderStatus(o.dcOrderType);
             return (
               <tr key={o.orderNumber}>
                 <td>
-                  <span class="status-pill status-pill-error">Needs Approval</span>{' '}
+                  <span class="status-pill status-pill-error">Awaiting Approval</span>{' '}
                   {orderTip ? (
                     <TooltipCell tooltip={orderTip} tag="span" className="tooltip-cell">
                       {typeText}
@@ -394,7 +394,14 @@ export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; b
       {banner}
       {!data.metadata.lastImportDC && (
         <div class="info-box info-box-warning">
-          <p>Digital Cookie data was not loaded. Sold amounts and inventory may be incomplete.</p>
+          <p class="meta-text">
+            <strong>No Digital Cookie Data</strong>
+          </p>
+          <p class="meta-text">
+            Sold amounts and inventory may be incomplete.
+            <br />
+            Click the refresh button in the header to download Digital Cookie data.
+          </p>
         </div>
       )}
       <StatCards stats={stats} />
