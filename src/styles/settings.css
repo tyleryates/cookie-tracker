@@ -127,3 +127,48 @@
 .settings-toggles .form-input {
   max-width: 300px;
 }
+
+.imessage-setup {
+  padding-left: 54px; /* align with toggle label text */
+}
+
+.imessage-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.imessage-input-row .form-input {
+  flex: 1;
+}
+
+/* Profile list */
+.profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.profile-row-active .profile-name {
+  font-weight: 600;
+}
+
+.profile-name {
+  min-width: 100px;
+  font-size: 0.9em;
+}
+
+.profile-active-badge {
+  font-size: 0.75em;
+  font-weight: 500;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}

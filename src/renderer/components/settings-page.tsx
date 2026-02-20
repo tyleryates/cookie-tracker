@@ -389,6 +389,33 @@ export function SettingsToggles({
 
   return (
     <div>
+      {profiles.length > 1 && (
+        <>
+          <h3>Profiles</h3>
+          <div class="settings-toggles">
+            {profiles.map((p) => {
+              const isActive = p.dirName === (activeProfile?.dirName || 'default');
+              const isDefault = p.dirName === 'default';
+              return (
+                <div key={p.dirName} class={`profile-row ${isActive ? 'profile-row-active' : ''}`}>
+                  <span class="profile-name">{isDefault ? 'Default' : p.name}</span>
+                  {isActive && <span class="profile-active-badge">Active</span>}
+                  {!isActive && (
+                    <button type="button" class="btn btn-secondary btn-sm" onClick={() => onSwitchProfile(p.dirName)}>
+                      Load
+                    </button>
+                  )}
+                  {!isDefault && (
+                    <button type="button" class="btn btn-secondary btn-sm" onClick={() => onDeleteProfile(p.dirName)}>
+                      Delete
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
       <h3>Settings</h3>
       <div class="settings-toggles">
         <label class="toggle-switch">
@@ -426,16 +453,16 @@ export function SettingsToggles({
               <span class="toggle-label">iMessage Alerts</span>
             </label>
             {appConfig?.boothFinder?.imessage && (
-              <div style={{ marginTop: '8px' }}>
-                <input
-                  type="text"
-                  class="form-input"
-                  placeholder="Your phone number or Apple ID"
-                  value={appConfig.boothFinder?.imessageRecipient ? appConfig.boothFinder.imessageRecipient : imessageRecipient}
-                  disabled={!!appConfig.boothFinder?.imessageRecipient || imessageSending}
-                  onInput={(e) => setImessageRecipient((e.target as HTMLInputElement).value)}
-                />
-                <div class="settings-verify-row" style={{ marginTop: '8px' }}>
+              <div class="imessage-setup">
+                <div class="imessage-input-row">
+                  <input
+                    type="text"
+                    class="form-input"
+                    placeholder="Phone number or Apple ID"
+                    value={appConfig.boothFinder?.imessageRecipient ? appConfig.boothFinder.imessageRecipient : imessageRecipient}
+                    disabled={!!appConfig.boothFinder?.imessageRecipient || imessageSending}
+                    onInput={(e) => setImessageRecipient((e.target as HTMLInputElement).value)}
+                  />
                   {!appConfig.boothFinder?.imessageRecipient ? (
                     <button
                       type="button"
@@ -472,37 +499,14 @@ export function SettingsToggles({
                       Clear
                     </button>
                   )}
-                  {imessageError && <span class="settings-error">{imessageError}</span>}
                 </div>
+                {imessageError && <span class="settings-error">{imessageError}</span>}
                 {!appConfig.boothFinder?.imessageRecipient && (
                   <span class="settings-role-hint">A test message will be sent to verify delivery</span>
                 )}
               </div>
             )}
           </>
-        )}
-        {profiles.length > 1 && (
-          <div class="profile-list">
-            {profiles.map((p) => {
-              const isActive = p.dirName === (activeProfile?.dirName || 'default');
-              const isDefault = p.dirName === 'default';
-              return (
-                <div key={p.dirName} class={`profile-row ${isActive ? 'profile-row-active' : ''}`}>
-                  <span class="profile-name">{isDefault ? 'Default' : p.name}</span>
-                  {!isActive && (
-                    <button type="button" class="btn btn-secondary btn-sm" onClick={() => onSwitchProfile(p.dirName)}>
-                      Load
-                    </button>
-                  )}
-                  {!isDefault && (
-                    <button type="button" class="btn btn-secondary btn-sm" onClick={() => onDeleteProfile(p.dirName)}>
-                      Delete
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
         )}
         <button type="button" class="btn btn-secondary" style={{ alignSelf: 'flex-start' }} disabled={!hasData} onClick={onExport}>
           Export Data
