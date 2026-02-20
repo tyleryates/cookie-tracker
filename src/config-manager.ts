@@ -87,7 +87,7 @@ class ConfigManager {
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), 'utf8');
+      fs.writeFileSync(this.configPath, JSON.stringify(config, null, 2), { encoding: 'utf8', mode: 0o600 });
     } catch (error) {
       Logger.error('Error saving config:', error);
     }

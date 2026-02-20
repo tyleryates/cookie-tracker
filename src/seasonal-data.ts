@@ -49,7 +49,7 @@ class SeasonalData {
   private saveJson(name: string, data: unknown): void {
     try {
       this.ensureDir();
-      fs.writeFileSync(this.filePath(name), JSON.stringify(data, null, 2), 'utf8');
+      fs.writeFileSync(this.filePath(name), JSON.stringify(data, null, 2), { encoding: 'utf8', mode: 0o600 });
     } catch (err) {
       Logger.warn(`Could not save ${name}:`, (err as Error).message);
     }

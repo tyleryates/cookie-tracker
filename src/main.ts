@@ -538,17 +538,6 @@ ipcMain.handle(
   })
 );
 
-// Wipe logins (debug/testing utility)
-ipcMain.handle(
-  'wipe-logins',
-  handleIpcError(async () => {
-    scSession.reset();
-    dcSession.reset();
-    const credPath = path.join(rootDataDir, 'credentials.enc');
-    if (fs.existsSync(credPath)) fs.unlinkSync(credPath);
-  })
-);
-
 ipcMain.handle(
   'quit-and-install',
   handleIpcError(async () => quitAndInstall(() => mainWindow))
@@ -624,7 +613,7 @@ ipcMain.handle(
     const filePath = saveResult.filePath;
 
     // Defensive: exclude credentials even though they live at root, not in profile dirs
-    const EXCLUDED_FILES = new Set(['credentials.enc']);
+    const EXCLUDED_FILES = new Set(['credentials.enc', 'app.log']);
 
     const output = fs.createWriteStream(filePath);
     const archive = archiver('zip', { zlib: { level: 9 } });

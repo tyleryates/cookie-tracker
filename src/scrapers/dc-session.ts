@@ -195,7 +195,7 @@ export class DigitalCookieSession {
     const rolePageResponse = await this.client.get('/select-role');
     const { roleId, selectedRoleName } = this.extractRoleId(rolePageResponse.data, roleName);
 
-    const roleResponse = await this.client.get(`/select-role?id=${roleId}`);
+    const roleResponse = await this.client.get('/select-role', { params: { id: roleId } });
     if (roleResponse.status !== HTTP_STATUS.OK && roleResponse.status !== HTTP_STATUS.FOUND) {
       Logger.error(`DC session: role selection failed (HTTP ${roleResponse.status})`);
       throw new Error(`Role selection failed with status ${roleResponse.status}`);

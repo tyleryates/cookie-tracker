@@ -23,7 +23,6 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
   'load-seasonal-data',
   'load-timestamps',
   'record-unified-build',
-  'wipe-logins',
   'quit-and-install',
   'check-for-updates',
   'send-imessage',

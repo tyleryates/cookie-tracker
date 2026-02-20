@@ -628,10 +628,6 @@ export interface IpcChannelMap {
   'switch-profile': { request: { dirName: string }; response: ProfilesConfig };
   'delete-profile': { request: { dirName: string }; response: ProfilesConfig };
   'import-profile': { request: { name: string }; response: ProfilesConfig | null };
-  'wipe-logins': {
-    request: undefined;
-    response: undefined;
-  };
   'quit-and-install': {
     request: undefined;
     response: undefined;

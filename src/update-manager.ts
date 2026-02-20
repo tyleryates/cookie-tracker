@@ -145,6 +145,9 @@ export async function quitAndInstall(getMainWindow: () => BrowserWindow | null):
       app.exit(0);
     } catch (err) {
       Logger.error('quit-and-install: manual install failed:', err);
+      try {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      } catch {}
       // Fall through to Squirrel attempt
     }
   }
