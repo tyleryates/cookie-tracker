@@ -76,12 +76,12 @@ export function setupAutoUpdater(getMainWindow: () => BrowserWindow | null): voi
 }
 
 /** Check for updates on startup (delayed by 3s). Only runs in packaged builds with auto-update enabled. */
-export function checkForUpdatesOnStartup(autoUpdateEnabled: boolean): void {
+export function checkForUpdatesOnStartup(autoUpdate: boolean): void {
   if (!app.isPackaged) {
     Logger.info('Skipping update check in development');
     return;
   }
-  if (!autoUpdateEnabled) {
+  if (!autoUpdate) {
     Logger.info('Auto-update disabled in config, skipping update check');
     return;
   }
@@ -92,8 +92,8 @@ export function checkForUpdatesOnStartup(autoUpdateEnabled: boolean): void {
 }
 
 /** Trigger an update check (called from IPC handler). */
-export function checkForUpdates(autoUpdateEnabled: boolean): void {
-  if (app.isPackaged && autoUpdateEnabled) {
+export function checkForUpdates(autoUpdate: boolean): void {
+  if (app.isPackaged && autoUpdate) {
     autoUpdater.checkForUpdates().catch((err) => Logger.error('Update check failed:', err));
   }
 }

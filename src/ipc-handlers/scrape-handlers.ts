@@ -71,7 +71,7 @@ export function registerScrapeHandlers(deps: HandlerDeps): void {
 
         // Run scraping (pass configured booth IDs)
         const config = configManager().loadConfig();
-        const results = await scraper.scrapeAll(auth.credentials, config.availableBoothsEnabled ? config.boothIds : []);
+        const results = await scraper.scrapeAll(auth.credentials, config.boothFinder?.enabled ? config.boothFinder.ids : []);
 
         // Persist per-endpoint sync metadata for restart survival
         const ts = loadTimestamps();
@@ -103,7 +103,7 @@ export function registerScrapeHandlers(deps: HandlerDeps): void {
       if (profileReadOnly()) return [];
       Logger.info('IPC: refresh-booth-locations');
       const config = configManager().loadConfig();
-      if (!config.availableBoothsEnabled) return [];
+      if (!config.boothFinder?.enabled) return [];
 
       const progressCallback = (progress: ScrapeProgress) => event.sender.send('scrape-progress', progress);
 
@@ -125,7 +125,7 @@ export function registerScrapeHandlers(deps: HandlerDeps): void {
       // Track availability fetch with timing/size
       progressCallback({ endpoint: 'sc-booth-availability', status: 'syncing' });
       const availStart = Date.now();
-      const boothLocations = await scraper.fetchBoothAvailability(config.boothIds, catalog);
+      const boothLocations = await scraper.fetchBoothAvailability(config.boothFinder?.ids ?? [], catalog);
       progressCallback({
         endpoint: 'sc-booth-availability',
         status: 'synced',
@@ -134,7 +134,7 @@ export function registerScrapeHandlers(deps: HandlerDeps): void {
       });
 
       // Persist enriched booth locations to disk for the pipeline
-      if (boothLocations.length > 0 && config.boothIds.length > 0) {
+      if (boothLocations.length > 0 && (config.boothFinder?.ids?.length ?? 0) > 0) {
         savePipelineFile(profileDir(), PIPELINE_FILES.SC_BOOTH_LOCATIONS, boothLocations);
       }
 
@@ -154,7 +154,7 @@ export function registerScrapeHandlers(deps: HandlerDeps): void {
     'fetch-booth-catalog',
     handleIpcError(async () => {
       const config = configManager().loadConfig();
-      if (!config.availableBoothsEnabled) return [];
+      if (!config.boothFinder?.enabled) return [];
 
       await ensureSCSession(deps);
       const scraper = new SmartCookieScraper(profileDir(), null, scSession);

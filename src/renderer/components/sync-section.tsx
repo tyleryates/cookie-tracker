@@ -216,9 +216,9 @@ export function DataHealthChecks({ healthChecks, warnings }: { healthChecks: Hea
 
 interface SyncStatusSectionProps {
   syncState: SyncState;
-  availableBoothsEnabled: boolean;
-  autoSyncEnabled: boolean;
-  autoRefreshBoothsEnabled: boolean;
+  boothFinderEnabled: boolean;
+  autoSync: boolean;
+  boothAutoRefresh: boolean;
   onSyncReports: () => void;
   onRefreshBooths: () => void;
   onToggleAutoSync: (enabled: boolean) => void;
@@ -228,9 +228,9 @@ interface SyncStatusSectionProps {
 
 export function SyncStatusSection({
   syncState,
-  availableBoothsEnabled,
-  autoSyncEnabled,
-  autoRefreshBoothsEnabled,
+  boothFinderEnabled,
+  autoSync,
+  boothAutoRefresh,
   onSyncReports,
   onRefreshBooths,
   onToggleAutoSync,
@@ -248,10 +248,10 @@ export function SyncStatusSection({
         onRefresh={onSyncReports}
         refreshing={syncState.syncing}
         readOnly={readOnly}
-        autoEnabled={autoSyncEnabled}
+        autoEnabled={autoSync}
         onToggleAuto={onToggleAutoSync}
       />
-      {availableBoothsEnabled && (
+      {boothFinderEnabled && (
         <EndpointGroupTable
           endpoints={syncState.endpoints}
           group="booth-availability"
@@ -260,7 +260,7 @@ export function SyncStatusSection({
           onRefresh={onRefreshBooths}
           refreshing={syncState.refreshingBooths}
           readOnly={readOnly}
-          autoEnabled={autoRefreshBoothsEnabled}
+          autoEnabled={boothAutoRefresh}
           onToggleAuto={onToggleAutoRefreshBooths}
         />
       )}

@@ -16,8 +16,8 @@ export function useSync(
   loadData: (opts?: { showMessages?: boolean }) => Promise<boolean>,
   appConfig: AppConfig | null,
   syncState: SyncState,
-  autoSyncEnabled: boolean,
-  autoRefreshBoothsEnabled: boolean
+  autoSync: boolean,
+  boothAutoRefresh: boolean
 ) {
   const refreshBoothsRef = useRef<() => Promise<void>>();
   const appConfigRef = useRef(appConfig);
@@ -104,10 +104,10 @@ export function useSync(
 
       if (config) {
         // Prune past ignored time slots (by date, not time)
-        const prunedIgnored = pruneExpiredSlots(config.ignoredTimeSlots);
-        if (prunedIgnored.length !== config.ignoredTimeSlots.length) {
-          dispatch({ type: 'UPDATE_CONFIG', patch: { ignoredTimeSlots: prunedIgnored } });
-          ipcInvoke('update-config', { ignoredTimeSlots: prunedIgnored }).catch(() => {});
+        const prunedIgnored = pruneExpiredSlots(config.boothFinder?.ignoredSlots ?? []);
+        if (prunedIgnored.length !== (config.boothFinder?.ignoredSlots ?? []).length) {
+          dispatch({ type: 'UPDATE_CONFIG', patch: { boothFinder: { ignoredSlots: prunedIgnored } } });
+          ipcInvoke('update-config', { boothFinder: { ignoredSlots: prunedIgnored } }).catch(() => {});
         }
 
         // Build set of currently available slot keys from raw booth data
@@ -121,11 +121,11 @@ export function useSync(
         }
 
         // Prune notified slots no longer available — reopened slots will re-trigger
-        const prevNotifiedSlots = config.boothNotifiedSlots ?? [];
+        const prevNotifiedSlots = config.boothFinder?.notifiedSlots ?? [];
         const notified = new Set(prevNotifiedSlots.filter((key) => currentlyAvailable.has(key)));
         let notifiedDirty = notified.size !== prevNotifiedSlots.length;
 
-        const booths = summarizeAvailableSlots(updated, config.boothDayFilters, prunedIgnored);
+        const booths = summarizeAvailableSlots(updated, config.boothFinder?.dayFilters ?? [], prunedIgnored);
         const count = booths.reduce((sum, b) => sum + b.slotCount, 0);
         if (count > 0) {
           const notifBody = formatNotificationBody(booths);
@@ -134,13 +134,13 @@ export function useSync(
           } else {
             showStatus(`Booths available: ${notifBody}`, 'success');
           }
-          if (config.boothAlertImessage && config.boothAlertRecipient) {
+          if (config.boothFinder?.imessage && config.boothFinder?.imessageRecipient) {
             const newBooths = filterNewSlots(booths, notified);
             if (newBooths.length > 0) {
               markNotified(newBooths, notified);
               notifiedDirty = true;
               ipcInvoke('send-imessage', {
-                recipient: config.boothAlertRecipient,
+                recipient: config.boothFinder.imessageRecipient,
                 message: formatImessageBody(newBooths)
               }).catch(() => {});
             }
@@ -152,8 +152,8 @@ export function useSync(
         // Persist notified set if changed (pruned stale entries or added new ones)
         if (notifiedDirty) {
           const updatedSlots = [...notified];
-          dispatch({ type: 'UPDATE_CONFIG', patch: { boothNotifiedSlots: updatedSlots } });
-          ipcInvoke('update-config', { boothNotifiedSlots: updatedSlots }).catch(() => {});
+          dispatch({ type: 'UPDATE_CONFIG', patch: { boothFinder: { notifiedSlots: updatedSlots } } });
+          ipcInvoke('update-config', { boothFinder: { notifiedSlots: updatedSlots } }).catch(() => {});
         }
       }
     } catch (error) {
@@ -209,7 +209,7 @@ export function useSync(
 
   // Reports auto-sync effect
   useEffect(() => {
-    if (!autoSyncEnabled) return;
+    if (!autoSync) return;
 
     async function checkReports() {
       const state = syncStateRef.current;
@@ -236,11 +236,11 @@ export function useSync(
     checkReports();
     const interval = setInterval(checkReports, CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [autoSyncEnabled, sync]);
+  }, [autoSync, sync]);
 
   // Booths auto-refresh effect
   useEffect(() => {
-    if (!autoRefreshBoothsEnabled || !appConfig?.availableBoothsEnabled) return;
+    if (!boothAutoRefresh || !appConfig?.boothFinder?.enabled) return;
 
     async function checkBooths() {
       const state = syncStateRef.current;
@@ -267,7 +267,7 @@ export function useSync(
     checkBooths();
     const interval = setInterval(checkBooths, CHECK_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [autoRefreshBoothsEnabled, appConfig?.availableBoothsEnabled, refreshBooths]);
+  }, [boothAutoRefresh, appConfig?.boothFinder?.enabled, refreshBooths]);
 
   return { sync, refreshBooths };
 }

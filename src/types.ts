@@ -528,18 +528,30 @@ export function toActiveProfile(info: ProfileInfo): ActiveProfile {
 // APP CONFIG TYPES
 // ============================================================================
 
-export interface AppConfig {
-  autoUpdateEnabled: boolean;
-  autoSyncEnabled: boolean;
-  autoRefreshBoothsEnabled: boolean;
-  availableBoothsEnabled: boolean;
-  boothAlertImessage: boolean;
-  boothAlertRecipient: string;
-  boothNotifiedSlots: string[];
-  boothIds: number[];
-  boothDayFilters: string[];
-  ignoredTimeSlots: string[];
+export interface BoothFinderConfig {
+  enabled: boolean;
+  autoRefresh: boolean;
+  imessage: boolean;
+  imessageRecipient: string;
+  notifiedSlots: string[];
+  ids: number[];
+  dayFilters: string[];
+  ignoredSlots: string[];
 }
+
+export interface AppConfig {
+  autoUpdate: boolean;
+  autoSync: boolean;
+  /** Only present when manually added to config.json — the app never creates this key */
+  boothFinder?: BoothFinderConfig;
+}
+
+/** Patch type for update-config IPC — allows partial updates to nested boothFinder */
+export type AppConfigPatch = {
+  autoUpdate?: boolean;
+  autoSync?: boolean;
+  boothFinder?: Partial<BoothFinderConfig>;
+};
 
 // ============================================================================
 // IPC RESPONSE TYPE
@@ -595,7 +607,7 @@ export interface IpcChannelMap {
   'load-credentials': { request: undefined; response: CredentialsSummary };
   'save-credentials': { request: CredentialPatch; response: { success: boolean; error?: string; path?: string; encrypted?: boolean } };
   'load-config': { request: undefined; response: AppConfig };
-  'update-config': { request: Partial<AppConfig>; response: AppConfig };
+  'update-config': { request: AppConfigPatch; response: AppConfig };
   'scrape-websites': { request: undefined; response: ScrapeResults };
   'refresh-booth-locations': { request: undefined; response: BoothLocation[] };
   'fetch-booth-catalog': { request: undefined; response: BoothLocation[] };

@@ -2,7 +2,7 @@
 // Side effects (IPC calls, timers) stay in the component; only pure state
 // transitions live here.
 
-import type { ActiveProfile, AppConfig, EndpointSyncState, ProfileInfo, SyncState, UnifiedDataset } from '../types';
+import type { ActiveProfile, AppConfig, AppConfigPatch, EndpointSyncState, ProfileInfo, SyncState, UnifiedDataset } from '../types';
 
 // ============================================================================
 // STATE
@@ -16,8 +16,8 @@ export interface StatusMessage {
 export interface AppState {
   unified: UnifiedDataset | null;
   appConfig: AppConfig | null;
-  autoSyncEnabled: boolean;
-  autoRefreshBoothsEnabled: boolean;
+  autoSync: boolean;
+  boothAutoRefresh: boolean;
   activeReport: string | null;
   activePage: 'dashboard' | 'welcome';
   statusMessage: StatusMessage | null;
@@ -36,7 +36,7 @@ export type Action =
   | { type: 'CLEAR_STATUS' }
   | { type: 'SET_WELCOME' }
   | { type: 'LOAD_CONFIG'; config: AppConfig }
-  | { type: 'UPDATE_CONFIG'; patch: Partial<AppConfig> }
+  | { type: 'UPDATE_CONFIG'; patch: AppConfigPatch }
   | { type: 'SET_UNIFIED'; unified: UnifiedDataset }
   | { type: 'SET_ACTIVE_REPORT'; report: string | null }
   | { type: 'DEFAULT_REPORT' }
@@ -83,18 +83,23 @@ const ACTION_HANDLERS: { [T in Action['type']]: ActionHandler<T> } = {
     return {
       ...state,
       appConfig: action.config,
-      autoSyncEnabled: readOnly ? false : (action.config.autoSyncEnabled ?? true),
-      autoRefreshBoothsEnabled: readOnly ? false : (action.config.autoRefreshBoothsEnabled ?? true)
+      autoSync: readOnly ? false : (action.config.autoSync ?? true),
+      boothAutoRefresh: readOnly ? false : (action.config.boothFinder?.autoRefresh ?? false)
     };
   },
 
   UPDATE_CONFIG: (state, action) => {
     if (!state.appConfig) return state;
-    const merged = { ...state.appConfig, ...action.patch };
+    const { boothFinder: boothPatch, ...rest } = action.patch;
+    const merged: AppConfig = { ...state.appConfig, ...rest };
+    if (boothPatch && state.appConfig.boothFinder) {
+      merged.boothFinder = { ...state.appConfig.boothFinder, ...boothPatch };
+    }
     const result: AppState = { ...state, appConfig: merged };
-    if ('autoSyncEnabled' in action.patch) result.autoSyncEnabled = merged.autoSyncEnabled ?? state.autoSyncEnabled;
-    if ('autoRefreshBoothsEnabled' in action.patch)
-      result.autoRefreshBoothsEnabled = merged.autoRefreshBoothsEnabled ?? state.autoRefreshBoothsEnabled;
+    if ('autoSync' in rest) result.autoSync = merged.autoSync;
+    if (boothPatch && 'autoRefresh' in boothPatch) {
+      result.boothAutoRefresh = merged.boothFinder?.autoRefresh ?? state.boothAutoRefresh;
+    }
     return result;
   },
 
@@ -108,17 +113,21 @@ const ACTION_HANDLERS: { [T in Action['type']]: ActionHandler<T> } = {
     const enabled = isReadOnly(state) ? false : action.enabled;
     return {
       ...state,
-      autoSyncEnabled: enabled,
-      appConfig: state.appConfig ? { ...state.appConfig, autoSyncEnabled: enabled } : state.appConfig
+      autoSync: enabled,
+      appConfig: state.appConfig ? { ...state.appConfig, autoSync: enabled } : state.appConfig
     };
   },
 
   TOGGLE_AUTO_REFRESH_BOOTHS: (state, action) => {
     const enabled = isReadOnly(state) ? false : action.enabled;
+    if (!state.appConfig?.boothFinder) return state;
     return {
       ...state,
-      autoRefreshBoothsEnabled: enabled,
-      appConfig: state.appConfig ? { ...state.appConfig, autoRefreshBoothsEnabled: enabled } : state.appConfig
+      boothAutoRefresh: enabled,
+      appConfig: {
+        ...state.appConfig,
+        boothFinder: { ...state.appConfig.boothFinder, autoRefresh: enabled }
+      }
     };
   },
 

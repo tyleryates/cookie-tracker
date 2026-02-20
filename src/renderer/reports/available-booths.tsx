@@ -111,7 +111,7 @@ function BoothCard({
 
 interface AvailableBoothsConfig {
   filters: string[];
-  ignoredTimeSlots: string[];
+  ignoredSlots: string[];
 }
 
 interface AvailableBoothsProps {
@@ -145,9 +145,9 @@ export function AvailableBoothsReport({
   const [filtering, setFiltering] = useState(false);
   const [troopCoords, setTroopCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  const { filters, ignoredTimeSlots } = config;
-  const ignoredSet = new Set(ignoredTimeSlots);
-  const boothIds = appConfig?.boothIds || [];
+  const { filters, ignoredSlots } = config;
+  const ignoredSet = new Set(ignoredSlots);
+  const boothIds = appConfig?.boothFinder?.ids || [];
   const boothCount = boothIds.length;
   const filterCount = filters.length;
   const isFullyConfigured = boothCount > 0 && filterCount > 0;
@@ -338,11 +338,11 @@ export function AvailableBoothsReport({
                 <div class="config-value muted-text">No days selected</div>
               )}
             </div>
-            {!readOnly && ignoredTimeSlots.length > 0 && (
+            {!readOnly && ignoredSlots.length > 0 && (
               <div class="config-section">
                 <div class="config-section-header">
                   <span class="config-value">
-                    {ignoredTimeSlots.length} ignored time slot{ignoredTimeSlots.length === 1 ? '' : 's'}
+                    {ignoredSlots.length} ignored time slot{ignoredSlots.length === 1 ? '' : 's'}
                   </span>
                   <button type="button" class="btn btn-secondary btn-sm" onClick={onResetIgnored}>
                     Reset

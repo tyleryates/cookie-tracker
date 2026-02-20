@@ -25,7 +25,7 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
       const config = await loadAppConfig();
 
       // Hydrate per-endpoint sync timestamps BEFORE enabling auto-sync.
-      // LOAD_CONFIG sets autoSyncEnabled which triggers the auto-sync effect,
+      // LOAD_CONFIG sets autoSync which triggers the auto-sync effect,
       // so timestamps must be in state first to avoid a spurious full sync.
       try {
         const timestamps = await ipcInvoke('load-timestamps');
@@ -48,10 +48,11 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
       }
 
       // Prune past ignored time slots on startup
-      const pruned = pruneExpiredSlots(config.ignoredTimeSlots);
-      if (pruned.length !== config.ignoredTimeSlots.length) {
-        config.ignoredTimeSlots = pruned;
-        ipcInvoke('update-config', { ignoredTimeSlots: pruned }).catch(() => {});
+      const ignoredSlots = config.boothFinder?.ignoredSlots || [];
+      const pruned = pruneExpiredSlots(ignoredSlots);
+      if (pruned.length !== ignoredSlots.length) {
+        config.boothFinder = { ...config.boothFinder!, ignoredSlots: pruned };
+        ipcInvoke('update-config', { boothFinder: { ignoredSlots: pruned } }).catch(() => {});
       }
 
       // Check if both logins are verified BEFORE enabling auto-sync via LOAD_CONFIG.
@@ -66,7 +67,7 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
 
       // Suppress auto-sync if credentials aren't set up yet
       if (!scOk || !dcOk) {
-        config.autoSyncEnabled = false;
+        config.autoSync = false;
       }
 
       dispatch({ type: 'LOAD_CONFIG', config });

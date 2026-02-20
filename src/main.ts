@@ -230,7 +230,7 @@ app.whenReady().then(() => {
 
   createWindow();
 
-  checkForUpdatesOnStartup(configManager.loadConfig().autoUpdateEnabled);
+  checkForUpdatesOnStartup(configManager.loadConfig().autoUpdate);
 });
 
 app.on('window-all-closed', () => {

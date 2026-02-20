@@ -163,8 +163,8 @@ function renderReport({
           key={boothResetKey}
           data={unified}
           config={{
-            filters: appConfig?.boothDayFilters || [],
-            ignoredTimeSlots: appConfig?.ignoredTimeSlots || []
+            filters: appConfig?.boothFinder?.dayFilters || [],
+            ignoredSlots: appConfig?.boothFinder?.ignoredSlots || []
           }}
           appConfig={appConfig}
           syncState={boothSyncState}
@@ -194,12 +194,12 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
   // Dynamically extend tabs based on config
   const effectiveTabs = useMemo(() => {
     return REPORT_TABS.map((tab) => {
-      if (tab.id === 'booths' && appConfig?.availableBoothsEnabled) {
+      if (tab.id === 'booths' && appConfig?.boothFinder?.enabled) {
         return { ...tab, types: [...tab.types, 'available-booths'] as [string, ...string[]] };
       }
       return tab;
     });
-  }, [appConfig?.availableBoothsEnabled]);
+  }, [appConfig?.boothFinder?.enabled]);
 
   // Compute count badges for dropdown items
   const dropdownCounts = useMemo<Record<string, number>>(() => {
@@ -237,8 +237,8 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
     const needsDist = countBoothsNeedingDistribution(reservations);
     if (completed + needsDist > 0) counts['completed-booths'] = completed + needsDist;
     if (upcoming > 0) counts['upcoming-booths'] = upcoming;
-    const filters = appConfig?.boothDayFilters || [];
-    const ignored = appConfig?.ignoredTimeSlots || [];
+    const filters = appConfig?.boothFinder?.dayFilters || [];
+    const ignored = appConfig?.boothFinder?.ignoredSlots || [];
     const availableSlots = summarizeAvailableSlots(unified.boothLocations || [], filters, ignored).reduce((sum, b) => sum + b.slotCount, 0);
     if (availableSlots > 0) counts['available-booths'] = availableSlots;
 

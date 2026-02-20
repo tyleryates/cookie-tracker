@@ -75,6 +75,17 @@ export function ensureProfile(name, { copyFrom } = {}) {
         fs.copyFileSync(src, dest);
       }
     }
+  } else {
+    // Always copy credentials and seasonal data from default so the app
+    // doesn't show the welcome page on dev profiles
+    const defaultDir = path.join(ROOT_DATA_DIR, 'default');
+    const identityFiles = ['credentials.enc', 'sc-troop.json', 'sc-cookies.json', 'dc-roles.json'];
+    for (const file of identityFiles) {
+      const src = path.join(defaultDir, file);
+      if (fs.existsSync(src)) {
+        fs.copyFileSync(src, path.join(profileDir, file));
+      }
+    }
   }
 
   // Register profile and set as active
@@ -88,8 +99,8 @@ export function ensureProfile(name, { copyFrom } = {}) {
   if (fs.existsSync(configPath)) {
     appConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   }
-  appConfig.autoSyncEnabled = false;
-  appConfig.autoRefreshBoothsEnabled = false;
+  appConfig.autoSync = false;
+  if (appConfig.boothFinder) appConfig.boothFinder.autoRefresh = false;
   fs.writeFileSync(configPath, JSON.stringify(appConfig, null, 2), 'utf8');
 
   return profileDir;

@@ -60,7 +60,7 @@ export function registerMiscHandlers(deps: HandlerDeps): void {
 
   ipcMain.handle(
     'check-for-updates',
-    handleIpcError(async () => checkForUpdates(configManager().loadConfig().autoUpdateEnabled))
+    handleIpcError(async () => checkForUpdates(configManager().loadConfig().autoUpdate))
   );
 
   // Handle send iMessage via AppleScript

@@ -56,16 +56,8 @@ export async function loadAppConfig(): Promise<AppConfig> {
   } catch (err) {
     Logger.error('Failed to load config:', err);
     return {
-      autoUpdateEnabled: true,
-      autoSyncEnabled: true,
-      autoRefreshBoothsEnabled: true,
-      availableBoothsEnabled: false,
-      boothAlertImessage: false,
-      boothAlertRecipient: '',
-      boothNotifiedSlots: [],
-      boothIds: [],
-      boothDayFilters: [],
-      ignoredTimeSlots: []
+      autoUpdate: true,
+      autoSync: true
     };
   }
 }

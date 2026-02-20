@@ -82,18 +82,25 @@ export function validateCredentialPatch(data: unknown): ValidationResult {
   return fromZodResult(credentialPatchSchema.safeParse(data));
 }
 
+const boothFinderPatchSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    autoRefresh: z.boolean().optional(),
+    imessage: z.boolean().optional(),
+    imessageRecipient: z.string().max(256).optional(),
+    notifiedSlots: z.array(z.string()).optional(),
+    ids: z.array(z.number()).optional(),
+    dayFilters: z.array(z.string()).optional(),
+    ignoredSlots: z.array(z.string()).optional()
+  })
+  .strict()
+  .optional();
+
 const configPatchSchema = z
   .object({
-    autoUpdateEnabled: z.boolean().optional(),
-    autoSyncEnabled: z.boolean().optional(),
-    autoRefreshBoothsEnabled: z.boolean().optional(),
-    availableBoothsEnabled: z.boolean().optional(),
-    boothAlertImessage: z.boolean().optional(),
-    boothAlertRecipient: z.string().max(256).optional(),
-    boothNotifiedSlots: z.array(z.string()).optional(),
-    boothIds: z.array(z.number()).optional(),
-    boothDayFilters: z.array(z.string()).optional(),
-    ignoredTimeSlots: z.array(z.string()).optional()
+    autoUpdate: z.boolean().optional(),
+    autoSync: z.boolean().optional(),
+    boothFinder: boothFinderPatchSchema
   })
   .strict();
 

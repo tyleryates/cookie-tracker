@@ -5,7 +5,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import Logger from '../../logger';
 import type { DCRole } from '../../seasonal-data';
-import type { AppConfig, CredentialPatch } from '../../types';
+import type { AppConfig, AppConfigPatch, CredentialPatch } from '../../types';
 import { ipcInvoke, ipcInvokeRaw } from '../ipc';
 
 interface SCVerifyResult {
@@ -359,7 +359,7 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
 interface SettingsTogglesProps {
   appConfig: AppConfig | null;
   readOnly: boolean;
-  onUpdateConfig: (patch: Partial<AppConfig>) => void;
+  onUpdateConfig: (patch: AppConfigPatch) => void;
   activeProfile: import('../../types').ActiveProfile | null;
   profiles: import('../../types').ProfileInfo[];
   onSwitchProfile: (dirName: string) => void;
@@ -384,8 +384,8 @@ export function SettingsToggles({
   const [imessageError, setImessageError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (appConfig?.boothAlertRecipient) setImessageRecipient(appConfig.boothAlertRecipient);
-  }, [appConfig?.boothAlertRecipient]);
+    if (appConfig?.boothFinder?.imessageRecipient) setImessageRecipient(appConfig.boothFinder.imessageRecipient);
+  }, [appConfig?.boothFinder?.imessageRecipient]);
 
   return (
     <div>
@@ -394,37 +394,49 @@ export function SettingsToggles({
         <label class="toggle-switch">
           <input
             type="checkbox"
-            checked={appConfig?.autoUpdateEnabled ?? false}
+            checked={appConfig?.autoUpdate ?? false}
             disabled={readOnly}
-            onChange={(e) => onUpdateConfig({ autoUpdateEnabled: (e.target as HTMLInputElement).checked })}
+            onChange={(e) => onUpdateConfig({ autoUpdate: (e.target as HTMLInputElement).checked })}
           />
           <span class="toggle-slider" />
           <span class="toggle-label">Check for Updates</span>
         </label>
-        {appConfig?.availableBoothsEnabled && (
+        {appConfig?.boothFinder && (
+          <label class="toggle-switch">
+            <input
+              type="checkbox"
+              checked={appConfig?.boothFinder?.enabled ?? false}
+              disabled={readOnly}
+              onChange={(e) => onUpdateConfig({ boothFinder: { enabled: (e.target as HTMLInputElement).checked } })}
+            />
+            <span class="toggle-slider" />
+            <span class="toggle-label">Booth Finder</span>
+          </label>
+        )}
+        {appConfig?.boothFinder?.enabled && (
           <>
             <label class="toggle-switch">
               <input
                 type="checkbox"
-                checked={appConfig?.boothAlertImessage ?? false}
+                checked={appConfig?.boothFinder?.imessage ?? false}
                 disabled={readOnly}
-                onChange={(e) => onUpdateConfig({ boothAlertImessage: (e.target as HTMLInputElement).checked })}
+                onChange={(e) => onUpdateConfig({ boothFinder: { imessage: (e.target as HTMLInputElement).checked } })}
               />
               <span class="toggle-slider" />
               <span class="toggle-label">iMessage Alerts</span>
             </label>
-            {appConfig?.boothAlertImessage && (
+            {appConfig?.boothFinder?.imessage && (
               <div style={{ marginTop: '8px' }}>
                 <input
                   type="text"
                   class="form-input"
                   placeholder="Your phone number or Apple ID"
-                  value={appConfig.boothAlertRecipient ? appConfig.boothAlertRecipient : imessageRecipient}
-                  disabled={!!appConfig.boothAlertRecipient || imessageSending}
+                  value={appConfig.boothFinder?.imessageRecipient ? appConfig.boothFinder.imessageRecipient : imessageRecipient}
+                  disabled={!!appConfig.boothFinder?.imessageRecipient || imessageSending}
                   onInput={(e) => setImessageRecipient((e.target as HTMLInputElement).value)}
                 />
                 <div class="settings-verify-row" style={{ marginTop: '8px' }}>
-                  {!appConfig.boothAlertRecipient ? (
+                  {!appConfig.boothFinder?.imessageRecipient ? (
                     <button
                       type="button"
                       class="btn btn-secondary"
@@ -437,7 +449,7 @@ export function SettingsToggles({
                             recipient: imessageRecipient.trim(),
                             message: 'Cookie Tracker iMessage alerts are now active!'
                           });
-                          onUpdateConfig({ boothAlertRecipient: imessageRecipient.trim() });
+                          onUpdateConfig({ boothFinder: { imessageRecipient: imessageRecipient.trim() } });
                         } catch (err) {
                           setImessageError((err as Error).message);
                         } finally {
@@ -454,7 +466,7 @@ export function SettingsToggles({
                       onClick={() => {
                         setImessageRecipient('');
                         setImessageError(null);
-                        onUpdateConfig({ boothAlertRecipient: '' });
+                        onUpdateConfig({ boothFinder: { imessageRecipient: '' } });
                       }}
                     >
                       Clear
@@ -462,7 +474,9 @@ export function SettingsToggles({
                   )}
                   {imessageError && <span class="settings-error">{imessageError}</span>}
                 </div>
-                {!appConfig.boothAlertRecipient && <span class="settings-role-hint">A test message will be sent to verify delivery</span>}
+                {!appConfig.boothFinder?.imessageRecipient && (
+                  <span class="settings-role-hint">A test message will be sent to verify delivery</span>
+                )}
               </div>
             )}
           </>

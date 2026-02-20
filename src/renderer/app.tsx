@@ -7,6 +7,7 @@ import Logger from '../logger';
 import type {
   ActiveProfile,
   AppConfig,
+  AppConfigPatch,
   EndpointSyncState,
   HealthChecks,
   ProfileInfo,
@@ -31,8 +32,8 @@ import { HealthCheckReport } from './reports/health-check';
 const initialState: AppState = {
   unified: null,
   appConfig: null,
-  autoSyncEnabled: false,
-  autoRefreshBoothsEnabled: false,
+  autoSync: false,
+  boothAutoRefresh: false,
   activeReport: null,
   activePage: 'dashboard',
   statusMessage: null,
@@ -61,7 +62,7 @@ function WelcomeContent({ onComplete }: { onComplete: () => void }) {
 interface SettingsContentProps {
   appConfig: AppConfig | null;
   readOnly: boolean;
-  onUpdateConfig: (patch: Partial<AppConfig>) => void;
+  onUpdateConfig: (patch: AppConfigPatch) => void;
   activeProfile: ActiveProfile | null;
   profiles: ProfileInfo[];
   onSwitchProfile: (dirName: string) => void;
@@ -69,9 +70,9 @@ interface SettingsContentProps {
   onExport: () => void;
   hasData: boolean;
   syncState: SyncState;
-  availableBoothsEnabled: boolean;
-  autoSyncEnabled: boolean;
-  autoRefreshBoothsEnabled: boolean;
+  boothFinderEnabled: boolean;
+  autoSync: boolean;
+  boothAutoRefresh: boolean;
   onSyncReports: () => void;
   onRefreshBooths: () => void;
   onToggleAutoSync: (enabled: boolean) => void;
@@ -91,9 +92,9 @@ function SettingsContent({
   onExport,
   hasData,
   syncState,
-  availableBoothsEnabled,
-  autoSyncEnabled,
-  autoRefreshBoothsEnabled,
+  boothFinderEnabled,
+  autoSync,
+  boothAutoRefresh,
   onSyncReports,
   onRefreshBooths,
   onToggleAutoSync,
@@ -117,9 +118,9 @@ function SettingsContent({
       <SettingsPage mode="settings" />
       <SyncStatusSection
         syncState={syncState}
-        availableBoothsEnabled={availableBoothsEnabled}
-        autoSyncEnabled={autoSyncEnabled}
-        autoRefreshBoothsEnabled={autoRefreshBoothsEnabled}
+        boothFinderEnabled={boothFinderEnabled}
+        autoSync={autoSync}
+        boothAutoRefresh={boothAutoRefresh}
         onSyncReports={onSyncReports}
         onRefreshBooths={onRefreshBooths}
         onToggleAutoSync={onToggleAutoSync}
@@ -215,8 +216,8 @@ export function App() {
     loadData,
     state.appConfig,
     state.syncState,
-    state.autoSyncEnabled,
-    state.autoRefreshBoothsEnabled
+    state.autoSync,
+    state.boothAutoRefresh
   );
   useAppInit(dispatch, loadData);
 
@@ -226,13 +227,13 @@ export function App() {
 
   const handleHeaderSync = useCallback(() => {
     sync();
-    if (state.appConfig?.availableBoothsEnabled) refreshBooths();
-  }, [sync, refreshBooths, state.appConfig?.availableBoothsEnabled]);
+    if (state.appConfig?.boothFinder?.enabled) refreshBooths();
+  }, [sync, refreshBooths, state.appConfig?.boothFinder?.enabled]);
 
   const handleToggleAutoSync = useCallback(
     (enabled: boolean) => {
       dispatch({ type: 'TOGGLE_AUTO_SYNC', enabled });
-      ipcInvoke('update-config', { autoSyncEnabled: enabled });
+      ipcInvoke('update-config', { autoSync: enabled });
       showStatus(enabled ? 'Auto sync enabled' : 'Auto sync disabled', 'success');
     },
     [showStatus]
@@ -241,7 +242,7 @@ export function App() {
   const handleToggleAutoRefreshBooths = useCallback(
     (enabled: boolean) => {
       dispatch({ type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled });
-      ipcInvoke('update-config', { autoRefreshBoothsEnabled: enabled });
+      ipcInvoke('update-config', { boothFinder: { autoRefresh: enabled } });
       showStatus(enabled ? 'Auto refresh booths enabled' : 'Auto refresh booths disabled', 'success');
     },
     [showStatus]
@@ -265,9 +266,13 @@ export function App() {
   const handleSaveBoothIds = useCallback(
     (boothIds: number[]) => {
       const current = stateRef.current.appConfig;
-      if (current) dispatch({ type: 'LOAD_CONFIG', config: { ...current, boothIds } });
+      if (current)
+        dispatch({
+          type: 'LOAD_CONFIG',
+          config: { ...current, boothFinder: current.boothFinder ? { ...current.boothFinder, ids: boothIds } : undefined }
+        });
       showStatus(`Booth selection saved (${boothIds.length} booth${boothIds.length === 1 ? '' : 's'})`, 'success');
-      ipcInvoke('update-config', { boothIds });
+      ipcInvoke('update-config', { boothFinder: { ids: boothIds } });
       refreshBooths();
     },
     [showStatus, refreshBooths]
@@ -276,9 +281,13 @@ export function App() {
   const handleSaveDayFilters = useCallback(
     (filters: string[]) => {
       const current = stateRef.current.appConfig;
-      if (current) dispatch({ type: 'LOAD_CONFIG', config: { ...current, boothDayFilters: filters } });
+      if (current)
+        dispatch({
+          type: 'LOAD_CONFIG',
+          config: { ...current, boothFinder: current.boothFinder ? { ...current.boothFinder, dayFilters: filters } : undefined }
+        });
       showStatus('Booth day filters saved', 'success');
-      ipcInvoke('update-config', { boothDayFilters: filters });
+      ipcInvoke('update-config', { boothFinder: { dayFilters: filters } });
     },
     [showStatus]
   );
@@ -286,22 +295,28 @@ export function App() {
   const handleResetIgnored = useCallback(async () => {
     const config = stateRef.current.appConfig;
     if (config) {
-      dispatch({ type: 'IGNORE_SLOT', config: { ...config, ignoredTimeSlots: [] } });
+      dispatch({
+        type: 'IGNORE_SLOT',
+        config: { ...config, boothFinder: config.boothFinder ? { ...config.boothFinder, ignoredSlots: [] } : undefined }
+      });
     }
-    await ipcInvoke('update-config', { ignoredTimeSlots: [] });
+    await ipcInvoke('update-config', { boothFinder: { ignoredSlots: [] } });
     showStatus('Ignored time slots cleared', 'success');
   }, [showStatus]);
 
   const handleIgnoreSlot = useCallback(async (boothId: number, date: string, startTime: string) => {
     const config = stateRef.current.appConfig;
-    const ignored = [...(config?.ignoredTimeSlots || []), encodeSlotKey(boothId, date, startTime)];
+    const ignored = [...(config?.boothFinder?.ignoredSlots || []), encodeSlotKey(boothId, date, startTime)];
     if (config) {
-      dispatch({ type: 'IGNORE_SLOT', config: { ...config, ignoredTimeSlots: ignored } });
+      dispatch({
+        type: 'IGNORE_SLOT',
+        config: { ...config, boothFinder: config.boothFinder ? { ...config.boothFinder, ignoredSlots: ignored } : undefined }
+      });
     }
-    await ipcInvoke('update-config', { ignoredTimeSlots: ignored });
+    await ipcInvoke('update-config', { boothFinder: { ignoredSlots: ignored } });
   }, []);
 
-  const handleUpdateConfig = useCallback((patch: Partial<AppConfig>) => {
+  const handleUpdateConfig = useCallback((patch: AppConfigPatch) => {
     dispatch({ type: 'UPDATE_CONFIG', patch });
     ipcInvoke('update-config', patch);
   }, []);
@@ -379,8 +394,8 @@ export function App() {
     const u = state.unified;
     const c = state.appConfig;
     if (!u?.boothLocations) return 0;
-    const filters = c?.boothDayFilters || [];
-    const ignored = c?.ignoredTimeSlots || [];
+    const filters = c?.boothFinder?.dayFilters || [];
+    const ignored = c?.boothFinder?.ignoredSlots || [];
     return summarizeAvailableSlots(u.boothLocations, filters, ignored).reduce((sum, b) => sum + b.slotCount, 0);
   }, [state.unified, state.appConfig]);
 
@@ -427,9 +442,9 @@ export function App() {
         onExport={exportData}
         hasData={!!state.unified}
         syncState={state.syncState}
-        availableBoothsEnabled={!!state.appConfig?.availableBoothsEnabled}
-        autoSyncEnabled={state.autoSyncEnabled}
-        autoRefreshBoothsEnabled={state.autoRefreshBoothsEnabled}
+        boothFinderEnabled={!!state.appConfig?.boothFinder?.enabled}
+        autoSync={state.autoSync}
+        boothAutoRefresh={state.boothAutoRefresh}
         onSyncReports={sync}
         onRefreshBooths={refreshBooths}
         onToggleAutoSync={handleToggleAutoSync}
@@ -480,7 +495,7 @@ export function App() {
         syncing={state.syncState.syncing}
         readOnly={readOnly}
         groups={groups}
-        showBooths={!!state.appConfig?.availableBoothsEnabled}
+        showBooths={!!state.appConfig?.boothFinder?.enabled}
         settingsActive={state.activeReport === 'settings'}
         onSync={handleHeaderSync}
         onOpenSettings={() => handleSelectReport('settings')}

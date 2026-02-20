@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import type { AppConfig } from '../types';
+import type { AppConfigPatch } from '../types';
 import { validateConfigPatch } from '../validators';
 import type { HandlerDeps } from './types';
 
@@ -16,7 +16,7 @@ export function registerConfigHandlers(deps: HandlerDeps): void {
 
   ipcMain.handle(
     'update-config',
-    handleIpcError(async (_event: Electron.IpcMainInvokeEvent, partial: Partial<AppConfig>) => {
+    handleIpcError(async (_event: Electron.IpcMainInvokeEvent, partial: AppConfigPatch) => {
       if (profileReadOnly()) return configManager().loadConfig();
       const validation = validateConfigPatch(partial);
       if (!validation.valid) throw new Error(`Invalid config patch: ${validation.issues.join(', ')}`);

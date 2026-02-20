@@ -27,8 +27,8 @@ function makeState(overrides?: Partial<AppState>): AppState {
   return {
     unified: null,
     appConfig: null,
-    autoSyncEnabled: true,
-    autoRefreshBoothsEnabled: true,
+    autoSync: true,
+    boothAutoRefresh: false,
     activeReport: null,
     activePage: 'dashboard' as const,
     statusMessage: null,
@@ -42,17 +42,27 @@ function makeState(overrides?: Partial<AppState>): AppState {
 
 function makeAppConfig(overrides?: Partial<AppConfig>): AppConfig {
   return {
-    autoUpdateEnabled: false,
-    autoSyncEnabled: true,
-    autoRefreshBoothsEnabled: true,
-    availableBoothsEnabled: false,
-    boothAlertImessage: false,
-    boothAlertRecipient: '',
-    boothNotifiedSlots: [],
-    boothIds: [],
-    boothDayFilters: [],
-    ignoredTimeSlots: [],
+    autoUpdate: false,
+    autoSync: true,
     ...overrides
+  };
+}
+
+function makeAppConfigWithBooth(boothOverrides?: Partial<AppConfig['boothFinder'] & object>): AppConfig {
+  return {
+    autoUpdate: false,
+    autoSync: true,
+    boothFinder: {
+      enabled: true,
+      autoRefresh: false,
+      imessage: false,
+      imessageRecipient: '',
+      notifiedSlots: [],
+      ids: [],
+      dayFilters: [],
+      ignoredSlots: [],
+      ...boothOverrides
+    }
   };
 }
 
@@ -176,41 +186,40 @@ describe('SET_WELCOME', () => {
 
 describe('LOAD_CONFIG', () => {
   it('sets appConfig from action', () => {
-    const config = makeAppConfig({ boothIds: [1, 2, 3] });
+    const config = makeAppConfigWithBooth({ ids: [1, 2, 3] });
     const state = makeState();
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
     expect(result.appConfig).toBe(config);
   });
 
-  it('sets autoSyncEnabled from config', () => {
-    const config = makeAppConfig({ autoSyncEnabled: false });
-    const state = makeState({ autoSyncEnabled: true });
+  it('sets autoSync from config', () => {
+    const config = makeAppConfig({ autoSync: false });
+    const state = makeState({ autoSync: true });
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.autoSyncEnabled).toBe(false);
+    expect(result.autoSync).toBe(false);
   });
 
-  it('defaults autoSyncEnabled to true when config omits it', () => {
+  it('defaults autoSync to true when config omits it', () => {
     const config = makeAppConfig();
     // Force undefined to test the nullish coalescing
-    (config as any).autoSyncEnabled = undefined;
-    const state = makeState({ autoSyncEnabled: false });
+    (config as any).autoSync = undefined;
+    const state = makeState({ autoSync: false });
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.autoSyncEnabled).toBe(true);
+    expect(result.autoSync).toBe(true);
   });
 
-  it('sets autoRefreshBoothsEnabled from config', () => {
-    const config = makeAppConfig({ autoRefreshBoothsEnabled: false });
-    const state = makeState({ autoRefreshBoothsEnabled: true });
+  it('sets boothAutoRefresh from config', () => {
+    const config = makeAppConfigWithBooth({ autoRefresh: true });
+    const state = makeState({ boothAutoRefresh: false });
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.autoRefreshBoothsEnabled).toBe(false);
+    expect(result.boothAutoRefresh).toBe(true);
   });
 
-  it('defaults autoRefreshBoothsEnabled to true when config omits it', () => {
+  it('defaults boothAutoRefresh to false when config has no boothFinder', () => {
     const config = makeAppConfig();
-    (config as any).autoRefreshBoothsEnabled = undefined;
-    const state = makeState({ autoRefreshBoothsEnabled: false });
+    const state = makeState({ boothAutoRefresh: true });
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.autoRefreshBoothsEnabled).toBe(true);
+    expect(result.boothAutoRefresh).toBe(false);
   });
 
   it('does not modify sync state', () => {
@@ -281,16 +290,16 @@ describe('DEFAULT_REPORT', () => {
 // =============================================================================
 
 describe('TOGGLE_AUTO_SYNC', () => {
-  it('sets autoSyncEnabled to true', () => {
-    const state = makeState({ autoSyncEnabled: false });
+  it('sets autoSync to true', () => {
+    const state = makeState({ autoSync: false });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_SYNC', enabled: true });
-    expect(result.autoSyncEnabled).toBe(true);
+    expect(result.autoSync).toBe(true);
   });
 
-  it('sets autoSyncEnabled to false', () => {
-    const state = makeState({ autoSyncEnabled: true });
+  it('sets autoSync to false', () => {
+    const state = makeState({ autoSync: true });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_SYNC', enabled: false });
-    expect(result.autoSyncEnabled).toBe(false);
+    expect(result.autoSync).toBe(false);
   });
 });
 
@@ -299,16 +308,16 @@ describe('TOGGLE_AUTO_SYNC', () => {
 // =============================================================================
 
 describe('TOGGLE_AUTO_REFRESH_BOOTHS', () => {
-  it('sets autoRefreshBoothsEnabled to true', () => {
-    const state = makeState({ autoRefreshBoothsEnabled: false });
+  it('sets boothAutoRefresh to true', () => {
+    const state = makeState({ boothAutoRefresh: false, appConfig: makeAppConfigWithBooth() });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: true });
-    expect(result.autoRefreshBoothsEnabled).toBe(true);
+    expect(result.boothAutoRefresh).toBe(true);
   });
 
-  it('sets autoRefreshBoothsEnabled to false', () => {
-    const state = makeState({ autoRefreshBoothsEnabled: true });
+  it('sets boothAutoRefresh to false', () => {
+    const state = makeState({ boothAutoRefresh: true, appConfig: makeAppConfigWithBooth({ autoRefresh: true }) });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: false });
-    expect(result.autoRefreshBoothsEnabled).toBe(false);
+    expect(result.boothAutoRefresh).toBe(false);
   });
 });
 
@@ -613,8 +622,8 @@ describe('UPDATE_BOOTH_LOCATIONS', () => {
 
 describe('IGNORE_SLOT', () => {
   it('sets appConfig from action', () => {
-    const config = makeAppConfig({
-      ignoredTimeSlots: ['42|2025-02-01|10:00']
+    const config = makeAppConfigWithBooth({
+      ignoredSlots: ['42|2025-02-01|10:00']
     });
     const state = makeState();
     const result = appReducer(state, { type: 'IGNORE_SLOT', config });
@@ -622,12 +631,12 @@ describe('IGNORE_SLOT', () => {
   });
 
   it('replaces existing appConfig', () => {
-    const oldConfig = makeAppConfig({ boothIds: [1] });
-    const newConfig = makeAppConfig({ boothIds: [1, 2, 3] });
+    const oldConfig = makeAppConfigWithBooth({ ids: [1] });
+    const newConfig = makeAppConfigWithBooth({ ids: [1, 2, 3] });
     const state = makeState({ appConfig: oldConfig });
     const result = appReducer(state, { type: 'IGNORE_SLOT', config: newConfig });
     expect(result.appConfig).toBe(newConfig);
-    expect(result.appConfig!.boothIds).toEqual([1, 2, 3]);
+    expect(result.appConfig!.boothFinder!.ids).toEqual([1, 2, 3]);
   });
 });
 
@@ -668,39 +677,40 @@ describe('SET_PROFILES', () => {
 // =============================================================================
 
 describe('LOAD_CONFIG with non-default profile', () => {
-  it('forces autoSyncEnabled to false on non-default profile', () => {
-    const config = makeAppConfig({ autoSyncEnabled: true });
+  it('forces autoSync to false on non-default profile', () => {
+    const config = makeAppConfig({ autoSync: true });
     const state = makeState({
       activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false }
     });
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.autoSyncEnabled).toBe(false);
+    expect(result.autoSync).toBe(false);
   });
 
-  it('forces autoRefreshBoothsEnabled to false on non-default profile', () => {
-    const config = makeAppConfig({ autoRefreshBoothsEnabled: true });
+  it('forces boothAutoRefresh to false on non-default profile', () => {
+    const config = makeAppConfigWithBooth({ autoRefresh: true });
     const state = makeState({
       activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false }
     });
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.autoRefreshBoothsEnabled).toBe(false);
+    expect(result.boothAutoRefresh).toBe(false);
   });
 
   it('respects config values on default profile', () => {
-    const config = makeAppConfig({ autoSyncEnabled: true, autoRefreshBoothsEnabled: true });
+    const config = makeAppConfigWithBooth({ autoRefresh: true });
+    config.autoSync = true;
     const state = makeState({
       activeProfile: { dirName: 'default', name: 'default', isDefault: true }
     });
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.autoSyncEnabled).toBe(true);
-    expect(result.autoRefreshBoothsEnabled).toBe(true);
+    expect(result.autoSync).toBe(true);
+    expect(result.boothAutoRefresh).toBe(true);
   });
 
   it('respects config values when activeProfile is null', () => {
-    const config = makeAppConfig({ autoSyncEnabled: true });
+    const config = makeAppConfig({ autoSync: true });
     const state = makeState({ activeProfile: null });
     const result = appReducer(state, { type: 'LOAD_CONFIG', config });
-    expect(result.autoSyncEnabled).toBe(true);
+    expect(result.autoSync).toBe(true);
   });
 });
 
@@ -712,37 +722,39 @@ describe('TOGGLE actions on non-default profile', () => {
   it('TOGGLE_AUTO_SYNC stays false on non-default profile', () => {
     const state = makeState({
       activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false },
-      autoSyncEnabled: false
+      autoSync: false
     });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_SYNC', enabled: true });
-    expect(result.autoSyncEnabled).toBe(false);
+    expect(result.autoSync).toBe(false);
   });
 
   it('TOGGLE_AUTO_REFRESH_BOOTHS stays false on non-default profile', () => {
     const state = makeState({
       activeProfile: { dirName: 'snapshot', name: 'snapshot', isDefault: false },
-      autoRefreshBoothsEnabled: false
+      boothAutoRefresh: false,
+      appConfig: makeAppConfigWithBooth()
     });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: true });
-    expect(result.autoRefreshBoothsEnabled).toBe(false);
+    expect(result.boothAutoRefresh).toBe(false);
   });
 
   it('TOGGLE_AUTO_SYNC works on default profile', () => {
     const state = makeState({
       activeProfile: { dirName: 'default', name: 'default', isDefault: true },
-      autoSyncEnabled: false
+      autoSync: false
     });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_SYNC', enabled: true });
-    expect(result.autoSyncEnabled).toBe(true);
+    expect(result.autoSync).toBe(true);
   });
 
   it('TOGGLE_AUTO_REFRESH_BOOTHS works on default profile', () => {
     const state = makeState({
       activeProfile: { dirName: 'default', name: 'default', isDefault: true },
-      autoRefreshBoothsEnabled: false
+      boothAutoRefresh: false,
+      appConfig: makeAppConfigWithBooth()
     });
     const result = appReducer(state, { type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled: true });
-    expect(result.autoRefreshBoothsEnabled).toBe(true);
+    expect(result.boothAutoRefresh).toBe(true);
   });
 });
 
