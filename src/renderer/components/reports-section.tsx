@@ -304,6 +304,8 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
                 type="button"
                 class={`tab-bar-item${isActive ? ' active' : ''}`}
                 disabled={disabled}
+                aria-expanded={openDropdown === tab.id}
+                aria-haspopup="true"
                 onClick={() => toggleDropdown(tab.id)}
               >
                 {tab.label}

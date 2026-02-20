@@ -1,6 +1,6 @@
 // Formatting and display utilities
 
-import { BOOTH_RESERVATION_TYPE, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../constants';
+import { BOOTH_RESERVATION_TYPE, MS_PER_DAY, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../constants';
 import { COOKIE_ORDER, getCookieDisplayName, sortVarietiesByOrder } from '../cookie-constants';
 import type { Allocation, BoothReservationImported, BoothTimeSlot, Scout, Transfer, Varieties } from '../types';
 
@@ -62,7 +62,7 @@ const DateFormatter = {
     nowDay.setHours(0, 0, 0, 0);
     const thenDay = new Date(then);
     thenDay.setHours(0, 0, 0, 0);
-    const daysDiff = Math.floor((nowDay.getTime() - thenDay.getTime()) / 86400000);
+    const daysDiff = Math.floor((nowDay.getTime() - thenDay.getTime()) / MS_PER_DAY);
 
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
@@ -229,9 +229,12 @@ function isVirtualBooth(reservationType: string | undefined): boolean {
 /** Haversine distance between two lat/lng points, in miles */
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3958.8; // Earth radius in miles
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const sinDLat2 = Math.sin(dLat / 2) ** 2;
+  const sinDLng2 = Math.sin(dLng / 2) ** 2;
+  const a = sinDLat2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * sinDLng2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
@@ -274,8 +277,8 @@ function pruneExpiredSlots(slots: string[]): string[] {
 // VARIETY & COOKIE HELPERS
 // ============================================================================
 
-/** Get complete variety list with 0 for missing cookies */
-function getCompleteVarieties(varieties: Varieties | undefined): Record<string, number> {
+/** Get variety list with 0-filled defaults for missing cookies */
+function getVarietiesWithDefaults(varieties: Varieties | undefined): Record<string, number> {
   const complete: Record<string, number> = {};
   const safeVarieties = varieties || {};
   COOKIE_ORDER.forEach((variety) => {
@@ -298,7 +301,7 @@ function isPhysicalVariety(variety: string): boolean {
 }
 
 /** Sum varieties across multiple allocations into a single Varieties map */
-function accumulateVarieties(allocations: Allocation[]): Varieties {
+function sumAllocatedVarieties(allocations: Allocation[]): Varieties {
   const result: Varieties = {};
   for (const a of allocations)
     for (const [v, n] of Object.entries(a.varieties)) result[v as keyof Varieties] = (result[v as keyof Varieties] || 0) + (n || 0);
@@ -378,7 +381,6 @@ function formatMaxAge(ms: number): string {
 // ============================================================================
 
 export {
-  accumulateVarieties,
   boothTypeClass,
   buildVarietyTooltip,
   countBoothsNeedingDistribution,
@@ -394,8 +396,8 @@ export {
   formatTime12h,
   formatTimeRange,
   getActiveScouts,
-  getCompleteVarieties,
   getTransferDisplayInfo,
+  getVarietiesWithDefaults,
   haversineDistance,
   isPhysicalVariety,
   isVirtualBooth,
@@ -404,6 +406,6 @@ export {
   parseTimeToMinutes,
   pruneExpiredSlots,
   slotOverlapsRange,
-  sortVarietiesByOrder,
+  sumAllocatedVarieties,
   todayMidnight
 };

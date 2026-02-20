@@ -5,79 +5,10 @@ import { CHECK_INTERVAL_MS, SYNC_ENDPOINTS } from '../../constants';
 import Logger from '../../logger';
 import type { AppConfig, SyncState } from '../../types';
 import type { Action } from '../app-reducer';
-import { formatCompactRange, formatShortDate, pruneExpiredSlots } from '../format-utils';
+import { pruneExpiredSlots } from '../format-utils';
 import { ipcInvoke, ipcInvokeRaw, onIpcEvent } from '../ipc';
-import { type BoothSlotSummary, encodeSlotKey, summarizeAvailableSlots } from '../reports/available-booths-utils';
-
-// ============================================================================
-// AUTO-SYNC — staleness-based polling
-// ============================================================================
-
-function isStale(lastSync: string | undefined | null, maxAgeMs: number): boolean {
-  if (!lastSync) return true;
-  return Date.now() - new Date(lastSync).getTime() > maxAgeMs;
-}
-
-// ============================================================================
-// NOTIFICATION FORMATTING
-// ============================================================================
-
-function formatSlotTime(slot: { date: string; startTime: string; endTime: string }): string {
-  return `${formatShortDate(slot.date)} ${formatCompactRange(slot.startTime, slot.endTime)}`;
-}
-
-function formatBoothCompact(b: BoothSlotSummary): string {
-  return b.slotCount === 1 ? `${b.storeName} ${formatSlotTime(b.slots[0])}` : `${b.storeName} (${b.slotCount} slots)`;
-}
-
-/** Short body for OS notification banner — verbose times when single location, capped at 2 */
-function formatNotificationBody(booths: BoothSlotSummary[]): string {
-  if (booths.length === 1 && booths[0].slotCount > 1) {
-    const b = booths[0];
-    const shown = b.slots
-      .slice(0, 2)
-      .map((s) => formatSlotTime(s))
-      .join(', ');
-    const remaining = b.slotCount - 2;
-    return remaining > 0 ? `${b.storeName}: ${shown} +${remaining} more` : `${b.storeName}: ${shown}`;
-  }
-  return booths.map(formatBoothCompact).join(', ');
-}
-
-/** Filter booth summaries to only slots not yet notified, returns new summaries (or empty) */
-function filterNewSlots(booths: BoothSlotSummary[], notified: Set<string>): BoothSlotSummary[] {
-  const result: BoothSlotSummary[] = [];
-  for (const b of booths) {
-    const newSlots = b.slots.filter((s) => !notified.has(encodeSlotKey(b.id, s.date, s.startTime)));
-    if (newSlots.length > 0) {
-      result.push({ ...b, slotCount: newSlots.length, slots: newSlots });
-    }
-  }
-  return result;
-}
-
-/** Mark all slots in the summaries as notified */
-function markNotified(booths: BoothSlotSummary[], notified: Set<string>): void {
-  for (const b of booths) {
-    for (const s of b.slots) notified.add(encodeSlotKey(b.id, s.date, s.startTime));
-  }
-}
-
-/** Detailed body for iMessage — verbose with address when single location */
-function formatImessageBody(booths: BoothSlotSummary[]): string {
-  const total = booths.reduce((sum, b) => sum + b.slotCount, 0);
-  const header = `${total} booth opening${total === 1 ? '' : 's'}`;
-  const lines = [header];
-  for (const b of booths) {
-    lines.push('', b.storeName, b.address, '');
-    for (const s of b.slots) lines.push(formatSlotTime(s));
-  }
-  return lines.join('\n');
-}
-
-// ============================================================================
-// HOOK
-// ============================================================================
+import { encodeSlotKey, summarizeAvailableSlots } from '../reports/available-booths-utils';
+import { filterNewSlots, formatImessageBody, formatNotificationBody, formatSyncResult, isStale, markNotified } from './sync-formatters';
 
 export function useSync(
   dispatch: (action: Action) => void,
@@ -132,12 +63,14 @@ export function useSync(
             dispatch({
               type: 'SYNC_ENDPOINT_UPDATE',
               endpoint,
-              status: info.status,
-              lastSync: info.lastSync,
-              durationMs: info.durationMs,
-              dataSize: info.dataSize,
-              httpStatus: info.httpStatus,
-              error: info.error
+              update: {
+                status: info.status,
+                lastSync: info.lastSync,
+                durationMs: info.durationMs,
+                dataSize: info.dataSize,
+                httpStatus: info.httpStatus,
+                error: info.error
+              }
             });
           }
         }
@@ -148,19 +81,9 @@ export function useSync(
         await loadData({ showMessages: false });
       }
 
-      if (parts.length > 0 && errors.length === 0) {
-        Logger.info(`Sync: complete — ${parts.join(', ')}`);
-        showStatus(`Sync complete! ${parts.join(', ')}`, 'success');
-      } else if (parts.length > 0 && errors.length > 0) {
-        Logger.warn(`Sync: partial — ${parts.join(', ')}. Errors: ${errors.join('; ')}`);
-        showStatus(`Partial sync: ${parts.join(', ')}. Errors: ${errors.join('; ')}`, 'warning');
-      } else if (errors.length > 0) {
-        Logger.error(`Sync: failed — ${errors.join('; ')}`);
-        showStatus(`Sync failed: ${errors.join('; ')}`, 'error');
-      } else {
-        Logger.warn('Sync: completed with warnings');
-        showStatus('Sync completed with warnings', 'warning');
-      }
+      const syncMessage = formatSyncResult(parts, errors);
+      Logger[syncMessage.logLevel](`Sync: ${syncMessage.logMsg}`);
+      showStatus(syncMessage.userMsg, syncMessage.type);
     } catch (error) {
       showStatus(`Error: ${(error as Error).message}`, 'error');
       Logger.error('Sync error:', error);
@@ -250,13 +173,15 @@ export function useSync(
       dispatch({
         type: 'SYNC_ENDPOINT_UPDATE',
         endpoint: progress.endpoint,
-        status: progress.status,
-        lastSync: progress.status === 'synced' ? new Date().toISOString() : undefined,
-        cached: progress.cached,
-        durationMs: progress.durationMs,
-        dataSize: progress.dataSize,
-        httpStatus: progress.httpStatus,
-        error: progress.error
+        update: {
+          status: progress.status,
+          lastSync: progress.status === 'synced' ? new Date().toISOString() : undefined,
+          cached: progress.cached,
+          durationMs: progress.durationMs,
+          dataSize: progress.dataSize,
+          httpStatus: progress.httpStatus,
+          error: progress.error
+        }
       });
     });
 

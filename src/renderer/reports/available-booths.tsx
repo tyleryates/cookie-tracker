@@ -4,6 +4,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
+import Logger from '../../logger';
 import type { AppConfig, BoothAvailableDate, BoothLocation, BoothTimeSlot, EndpointSyncState, UnifiedDataset } from '../../types';
 import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
@@ -165,7 +166,7 @@ export function AvailableBoothsReport({
         }
       } catch (err) {
         // Non-critical — distance sorting is optional
-        console.warn('Failed to load troop coordinates for distance sorting:', err);
+        Logger.warn('Failed to load troop coordinates for distance sorting:', err);
       }
     })();
   }, []);

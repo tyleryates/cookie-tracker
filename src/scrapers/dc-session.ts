@@ -14,6 +14,8 @@ export class DigitalCookieSession {
   selectedRoleId: string | null = null;
   userAgent = '';
   private credentials: { username: string; password: string; role?: string } | null = null;
+  private lastActivityAt = 0;
+  private static readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor() {
     this.client = this.createClient();
@@ -134,6 +136,19 @@ export class DigitalCookieSession {
     }
   }
 
+  /** Update activity timestamp */
+  private touch(): void {
+    this.lastActivityAt = Date.now();
+  }
+
+  /** Clear stored credentials if session has been idle too long */
+  private expireIdleCredentials(): void {
+    if (this.credentials && this.lastActivityAt > 0 && Date.now() - this.lastActivityAt > DigitalCookieSession.SESSION_TIMEOUT_MS) {
+      Logger.info('DC session: idle timeout, clearing stored credentials');
+      this.credentials = null;
+    }
+  }
+
   /** Check if an error is an authentication error (401, 403, or HTML response on API endpoint) */
   private isAuthError(error: unknown): boolean {
     if (!isAxiosError(error) || !error.response) return false;
@@ -146,6 +161,8 @@ export class DigitalCookieSession {
 
   /** Authenticated GET request with automatic re-login on auth failure */
   async authenticatedGet<T>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> {
+    this.expireIdleCredentials();
+    this.touch();
     // Add AJAX headers for API endpoints
     if (url.startsWith('/ajaxCall/')) {
       config = {
@@ -202,6 +219,7 @@ export class DigitalCookieSession {
     Logger.info(`DC session: login successful (role=${selectedRoleName}, id=${roleId})`);
     this.selectedRoleName = selectedRoleName;
     this.selectedRoleId = roleId;
+    this.touch();
     return true;
   }
 
@@ -216,6 +234,7 @@ export class DigitalCookieSession {
     this.selectedRoleName = null;
     this.selectedRoleId = null;
     this.credentials = null;
+    this.lastActivityAt = 0;
     this.client = this.createClient();
   }
 }

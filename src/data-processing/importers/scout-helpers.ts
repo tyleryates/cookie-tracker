@@ -8,6 +8,11 @@ import type { SCDividerGirl } from '../../scrapers/sc-types';
 import type { CookieType, RawScoutData, Varieties } from '../../types';
 import { parseVarietiesFromAPI } from './parsers';
 
+/** Build a scout display name from first/last name parts */
+export function buildScoutName(firstName: string, lastName: string): string {
+  return `${firstName.trim()} ${lastName.trim()}`.trim();
+}
+
 /** Record import metadata (timestamp + source entry) */
 export function recordImportMetadata(
   store: DataStore,
@@ -47,7 +52,7 @@ export function updateScoutData(store: DataStore, scoutName: string, data: Parti
 
 /** Register a scout by girlId, creating the scout entry if needed */
 export function registerScout(store: DataStore, girlId: number, girl: SCDividerGirl): void {
-  const scoutName = `${girl.first_name || ''} ${girl.last_name || ''}`.trim();
+  const scoutName = buildScoutName(girl.first_name || '', girl.last_name || '');
   if (!girlId || !scoutName) return;
 
   if (!store.scouts.has(scoutName)) {

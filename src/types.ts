@@ -9,7 +9,8 @@ import type {
   Owner,
   PaymentMethod,
   TransferCategory,
-  TransferType
+  TransferType,
+  WarningType
 } from './constants';
 import type { SCCookieMapEntry, SCMeResponse } from './scrapers/sc-types';
 import type { DCRole, SeasonalDataFiles } from './seasonal-data';
@@ -266,8 +267,6 @@ export interface RawScoutData {
 // ============================================================================
 // WARNING TYPE
 // ============================================================================
-
-type WarningType = 'UNKNOWN_ORDER_TYPE' | 'UNKNOWN_PAYMENT_METHOD' | 'UNKNOWN_TRANSFER_TYPE' | 'UNKNOWN_COOKIE_ID' | 'SC_TRANSFER_SKIPPED';
 
 export interface Warning {
   type: WarningType;

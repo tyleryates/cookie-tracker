@@ -1,6 +1,7 @@
 // SettingsPage — Credential management with verification
 // SettingsToggles — App toggle settings, profile management, import modal
 
+import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import Logger from '../../logger';
 import type { DCRole } from '../../seasonal-data';
@@ -15,6 +16,95 @@ interface SCVerifyResult {
 interface SettingsPageProps {
   mode: 'welcome' | 'settings';
   onComplete?: () => void;
+}
+
+interface CredentialFormProps {
+  label: string;
+  idPrefix: string;
+  username: string;
+  password: string;
+  onUpdateUsername: (value: string) => void;
+  onUpdatePassword: (value: string) => void;
+  onSubmit: () => void;
+  verifying: boolean;
+  verified: boolean;
+  confirmed: boolean;
+  disabled: boolean;
+  buttonLabel: string;
+  error: string | null;
+  onClear: () => void;
+  extraFields?: ComponentChildren;
+  statusIndicators?: ComponentChildren;
+}
+
+function CredentialForm({
+  label,
+  idPrefix,
+  username,
+  password,
+  onUpdateUsername,
+  onUpdatePassword,
+  onSubmit,
+  verifying,
+  verified,
+  confirmed,
+  disabled,
+  buttonLabel,
+  error,
+  onClear,
+  extraFields,
+  statusIndicators
+}: CredentialFormProps) {
+  return (
+    <div class="settings-card">
+      <h3>{label}</h3>
+      <form
+        class="settings-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+      >
+        <div class="form-group">
+          <label for={`${idPrefix}Username`}>Email:</label>
+          <input
+            type="text"
+            id={`${idPrefix}Username`}
+            class="form-input"
+            placeholder="Enter email"
+            value={username}
+            disabled={disabled}
+            onInput={(e) => onUpdateUsername((e.target as HTMLInputElement).value)}
+          />
+        </div>
+        <div class="form-group">
+          <label for={`${idPrefix}Password`}>Password:</label>
+          <input
+            type="password"
+            id={`${idPrefix}Password`}
+            class="form-input"
+            placeholder="Enter password"
+            value={disabled ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : password}
+            disabled={disabled}
+            onInput={(e) => onUpdatePassword((e.target as HTMLInputElement).value)}
+          />
+        </div>
+        {extraFields}
+        <div class="settings-verify-row">
+          <button type="submit" class="btn btn-secondary" disabled={verifying || confirmed}>
+            {buttonLabel}
+          </button>
+          {verified && (
+            <button type="button" class="btn btn-secondary" onClick={onClear}>
+              Clear
+            </button>
+          )}
+          {error && <span class="settings-error">{error}</span>}
+        </div>
+        {statusIndicators}
+      </form>
+    </div>
+  );
 }
 
 export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
@@ -178,52 +268,25 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
         <h3>Logins</h3>
       )}
       <div class="settings-cards">
-        {/* Smart Cookie Section */}
-        <div class="settings-card">
-          <h3>Smart Cookie</h3>
-          <form
-            class="settings-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!sc.verifying && !sc.verified) handleVerifySC();
-            }}
-          >
-            <div class="form-group">
-              <label for="scUsername">Email:</label>
-              <input
-                type="text"
-                id="scUsername"
-                class="form-input"
-                placeholder="Enter email"
-                value={sc.username}
-                disabled={!!sc.verified}
-                onInput={(e) => updateSc({ username: (e.target as HTMLInputElement).value })}
-              />
-            </div>
-            <div class="form-group">
-              <label for="scPassword">Password:</label>
-              <input
-                type="password"
-                id="scPassword"
-                class="form-input"
-                placeholder="Enter password"
-                value={sc.verified ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : sc.password}
-                disabled={!!sc.verified}
-                onInput={(e) => updateSc({ password: (e.target as HTMLInputElement).value })}
-              />
-            </div>
-            <div class="settings-verify-row">
-              <button type="submit" class="btn btn-secondary" disabled={sc.verifying || !!sc.verified}>
-                {sc.verified ? 'Verified' : sc.verifying ? 'Verifying...' : 'Verify'}
-              </button>
-              {sc.verified && (
-                <button type="button" class="btn btn-secondary" onClick={handleClearSC}>
-                  Clear
-                </button>
-              )}
-              {sc.error && <span class="settings-error">{sc.error}</span>}
-            </div>
-            {sc.verified && (
+        <CredentialForm
+          label="Smart Cookie"
+          idPrefix="sc"
+          username={sc.username}
+          password={sc.password}
+          onUpdateUsername={(value) => updateSc({ username: value })}
+          onUpdatePassword={(value) => updateSc({ password: value })}
+          onSubmit={() => {
+            if (!sc.verifying && !sc.verified) handleVerifySC();
+          }}
+          verifying={sc.verifying}
+          verified={!!sc.verified}
+          confirmed={!!sc.verified}
+          disabled={!!sc.verified}
+          buttonLabel={sc.verified ? 'Verified' : sc.verifying ? 'Verifying...' : 'Verify'}
+          error={sc.error}
+          onClear={handleClearSC}
+          statusIndicators={
+            sc.verified && (
               <div class="settings-status-indicators">
                 {sc.verified.troopName && (
                   <span class="settings-status-ok">
@@ -236,46 +299,29 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
                   </span>
                 )}
               </div>
-            )}
-          </form>
-        </div>
-
-        {/* Digital Cookie Section */}
-        <div class="settings-card">
-          <h3>Digital Cookie</h3>
-          <form
-            class="settings-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (dc.roles.length > 0 && !dc.confirmed) handleConfirmDC();
-              else if (!dc.verifying && dc.roles.length === 0) handleVerifyDC();
-            }}
-          >
-            <div class="form-group">
-              <label for="dcUsername">Email:</label>
-              <input
-                type="text"
-                id="dcUsername"
-                class="form-input"
-                placeholder="Enter email"
-                value={dc.username}
-                disabled={dc.roles.length > 0}
-                onInput={(e) => updateDc({ username: (e.target as HTMLInputElement).value })}
-              />
-            </div>
-            <div class="form-group">
-              <label for="dcPassword">Password:</label>
-              <input
-                type="password"
-                id="dcPassword"
-                class="form-input"
-                placeholder="Enter password"
-                value={dc.roles.length > 0 ? '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022' : dc.password}
-                disabled={dc.roles.length > 0}
-                onInput={(e) => updateDc({ password: (e.target as HTMLInputElement).value })}
-              />
-            </div>
-            {dc.roles.length > 0 && (
+            )
+          }
+        />
+        <CredentialForm
+          label="Digital Cookie"
+          idPrefix="dc"
+          username={dc.username}
+          password={dc.password}
+          onUpdateUsername={(value) => updateDc({ username: value })}
+          onUpdatePassword={(value) => updateDc({ password: value })}
+          onSubmit={() => {
+            if (dc.roles.length > 0 && !dc.confirmed) handleConfirmDC();
+            else if (!dc.verifying && dc.roles.length === 0) handleVerifyDC();
+          }}
+          verifying={dc.verifying}
+          verified={dc.roles.length > 0}
+          confirmed={dc.confirmed}
+          disabled={dc.roles.length > 0}
+          buttonLabel={dc.confirmed ? 'Verified' : dc.roles.length > 0 ? 'Confirm' : dc.verifying ? 'Verifying...' : 'Verify'}
+          error={dc.error}
+          onClear={handleClearDC}
+          extraFields={
+            dc.roles.length > 0 && (
               <div class="form-group">
                 <label for="dcRoleSelect">Role:</label>
                 <select
@@ -293,20 +339,9 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
                 </select>
                 {!dc.confirmed && <span class="settings-role-hint">Select the role associated with this troop</span>}
               </div>
-            )}
-            <div class="settings-verify-row">
-              <button type="submit" class="btn btn-secondary" disabled={dc.verifying || dc.confirmed}>
-                {dc.confirmed ? 'Verified' : dc.roles.length > 0 ? 'Confirm' : dc.verifying ? 'Verifying...' : 'Verify'}
-              </button>
-              {dc.roles.length > 0 && (
-                <button type="button" class="btn btn-secondary" onClick={handleClearDC}>
-                  Clear
-                </button>
-              )}
-              {dc.error && <span class="settings-error">{dc.error}</span>}
-            </div>
-          </form>
-        </div>
+            )
+          }
+        />
       </div>
     </div>
   );
@@ -347,11 +382,12 @@ function ImportModal({ onImport, onClose }: { onImport: (name: string) => void; 
       class="modal-overlay"
       ref={backdropRef}
       role="dialog"
+      aria-labelledby="import-modal-title"
       onClick={(e) => e.target === backdropRef.current && onClose()}
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
       <div class="modal-content">
-        <h3>Import Data</h3>
+        <h3 id="import-modal-title">Import Data</h3>
         <p class="muted-text">Import a previously exported .zip file as a read-only snapshot.</p>
         <form
           onSubmit={(e) => {
@@ -370,6 +406,7 @@ function ImportModal({ onImport, onClose }: { onImport: (name: string) => void; 
               class="form-input"
               placeholder="e.g. Week 3 Backup"
               value={name}
+              aria-required="true"
               // biome-ignore lint/a11y/noAutofocus: modal focus
               autoFocus
               onInput={(e) => setName((e.target as HTMLInputElement).value)}

@@ -1,6 +1,7 @@
 // useAppInit — app initialization (load config, data, hydrate sync timestamps)
 
 import { useEffect } from 'preact/hooks';
+import Logger from '../../logger';
 import { toActiveProfile } from '../../types';
 import type { Action } from '../app-reducer';
 import { loadAppConfig } from '../data-loader';
@@ -32,12 +33,14 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
           dispatch({
             type: 'SYNC_ENDPOINT_UPDATE',
             endpoint,
-            status: meta.status,
-            lastSync: meta.lastSync ?? undefined,
-            durationMs: meta.durationMs,
-            dataSize: meta.dataSize,
-            httpStatus: meta.httpStatus,
-            error: meta.error
+            update: {
+              status: meta.status,
+              lastSync: meta.lastSync ?? undefined,
+              durationMs: meta.durationMs,
+              dataSize: meta.dataSize,
+              httpStatus: meta.httpStatus,
+              error: meta.error
+            }
           });
         }
       } catch {
@@ -56,6 +59,8 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
 
       // Check if both logins are verified — if not, show welcome page
       const [credsResult, seasonalResult] = await Promise.allSettled([ipcInvoke('load-credentials'), ipcInvoke('load-seasonal-data')]);
+      if (credsResult.status === 'rejected') Logger.warn('Failed to load credentials:', credsResult.reason);
+      if (seasonalResult.status === 'rejected') Logger.warn('Failed to load seasonal data:', seasonalResult.reason);
       const creds = credsResult.status === 'fulfilled' ? credsResult.value : null;
       const seasonal = seasonalResult.status === 'fulfilled' ? seasonalResult.value : null;
       const scOk = !!(creds?.smartCookie?.username && creds?.smartCookie?.hasPassword && seasonal?.troop);

@@ -2,7 +2,7 @@
 
 import * as packageJson from '../../../package.json';
 import { DateFormatter } from '../format-utils';
-import type { computeGroupStatuses, GroupStatus } from './sync-section';
+import type { computeGroupStatuses, GroupStatus } from '../sync-utils';
 
 // ============================================================================
 // SYNC PILL
@@ -65,11 +65,16 @@ export function AppHeader({
             <SyncPill label="Reports" group={groups.reports} />
             {showBooths && <SyncPill label="Booths" group={groups.booths} />}
           </div>
-          <button type="button" class="icon-btn has-tooltip" disabled={syncing || readOnly} onClick={onSync}>
+          <button type="button" class="icon-btn has-tooltip" disabled={syncing || readOnly} onClick={onSync} aria-label="Refresh data">
             {syncing ? <span class="spinner" /> : '\u21BB'}
             <span class="btn-tooltip">Refresh Data</span>
           </button>
-          <button type="button" class={`icon-btn has-tooltip${settingsActive ? ' active' : ''}`} onClick={onOpenSettings}>
+          <button
+            type="button"
+            class={`icon-btn has-tooltip${settingsActive ? ' active' : ''}`}
+            onClick={onOpenSettings}
+            aria-label="Settings"
+          >
             {'\u2699'}
             <span class="btn-tooltip">Settings</span>
           </button>

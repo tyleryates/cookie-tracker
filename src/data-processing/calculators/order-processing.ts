@@ -10,12 +10,14 @@ import {
   ORDER_TYPE,
   OWNER,
   PAYMENT_METHOD,
-  SPECIAL_IDENTIFIERS
+  SPECIAL_IDENTIFIERS,
+  WARNING_TYPE
 } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import Logger from '../../logger';
 import type { Order, RawDataRow, Scout, Varieties, Warning } from '../../types';
 import { parseVarietiesFromDC } from '../importers/parsers';
+import { buildScoutName } from '../importers/scout-helpers';
 
 /** Classify payment method from DC payment status string */
 function classifyPaymentMethod(paymentStatus: string): PaymentMethod | null {
@@ -127,9 +129,9 @@ function recordClassificationWarning(warnings: Warning[], warningData: Warning):
   warnings.push(warningData);
 
   const { type, orderNumber, orderType, paymentStatus } = warningData;
-  if (type === 'UNKNOWN_ORDER_TYPE') {
+  if (type === WARNING_TYPE.UNKNOWN_ORDER_TYPE) {
     Logger.warn(`Unknown Digital Cookie order type "${orderType}" (order ${orderNumber})`);
-  } else if (type === 'UNKNOWN_PAYMENT_METHOD') {
+  } else if (type === WARNING_TYPE.UNKNOWN_PAYMENT_METHOD) {
     Logger.warn(`Unknown payment status "${paymentStatus}" (order ${orderNumber})`);
   }
 }
@@ -145,7 +147,7 @@ function parseAndClassifyOrder(row: RawDataRow, lastName: string, warnings: Warn
 
   if (!classification.orderType) {
     recordClassificationWarning(warnings, {
-      type: 'UNKNOWN_ORDER_TYPE',
+      type: WARNING_TYPE.UNKNOWN_ORDER_TYPE,
       orderNumber: basicInfo.orderNumber,
       orderType: basicInfo.dcOrderType,
       scout: `${row[DC_COLUMNS.GIRL_FIRST_NAME] || ''} ${lastName}`.trim()
@@ -157,7 +159,7 @@ function parseAndClassifyOrder(row: RawDataRow, lastName: string, warnings: Warn
 
   if (!paymentMethod) {
     recordClassificationWarning(warnings, {
-      type: 'UNKNOWN_PAYMENT_METHOD',
+      type: WARNING_TYPE.UNKNOWN_PAYMENT_METHOD,
       orderNumber: basicInfo.orderNumber,
       paymentStatus: basicInfo.paymentStatus,
       scout: `${row[DC_COLUMNS.GIRL_FIRST_NAME] || ''} ${lastName}`.trim()
@@ -172,7 +174,7 @@ function addDCOrders(scoutDataset: Map<string, Scout>, rawDCData: RawDataRow[], 
   for (const row of rawDCData) {
     const firstName = row[DC_COLUMNS.GIRL_FIRST_NAME] || '';
     const lastName = row[DC_COLUMNS.GIRL_LAST_NAME] || '';
-    const name = `${firstName} ${lastName}`.trim();
+    const name = buildScoutName(String(firstName), String(lastName));
 
     const scout = scoutDataset.get(name);
     if (!scout) continue;

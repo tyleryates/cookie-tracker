@@ -42,9 +42,17 @@ function timestamp(): string {
   return `${hh}:${mm}:${ss}.${ms}`;
 }
 
+/** Scrub potentially sensitive values (tokens, passwords) from log output */
+function redact(text: string): string {
+  return text
+    .replace(/(["']?password["']?\s*[:=]\s*)["'][^"']*["']/gi, '$1"***"')
+    .replace(/(["']?token["']?\s*[:=]\s*)["'][^"']*["']/gi, '$1"***"')
+    .replace(/(xsrf|csrf|authorization|x-xsrf-token)["']?\s*[:=]\s*[^\s,;}'"]+/gi, '$1=***');
+}
+
 function writeLine(level: string, message: string, data: unknown): void {
   const prefix = isRenderer ? 'R' : 'M';
-  const line = `${timestamp()} [${prefix}] [${level}] ${message}${formatData(data)}\n`;
+  const line = `${timestamp()} [${prefix}] [${level}] ${message}${redact(formatData(data))}\n`;
 
   // Always log to console
   if (level === 'ERROR') console.error(line.trimEnd());

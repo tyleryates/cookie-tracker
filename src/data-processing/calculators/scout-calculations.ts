@@ -171,11 +171,17 @@ function calculateVarietyTotals(scout: Scout): void {
   const salesByVariety = calculateSalesByVariety(scout);
   scout.totals.$salesByVariety = salesByVariety;
   calculateInventoryDisplay(scout, salesByVariety);
-  scout.$allocationsByChannel = {
-    booth: scout.allocations.filter((a) => a.channel === ALLOCATION_CHANNEL.BOOTH),
-    directShip: scout.allocations.filter((a) => a.channel === ALLOCATION_CHANNEL.DIRECT_SHIP),
-    virtualBooth: scout.allocations.filter((a) => a.channel === ALLOCATION_CHANNEL.VIRTUAL_BOOTH)
+  const byChannel: { booth: typeof scout.allocations; directShip: typeof scout.allocations; virtualBooth: typeof scout.allocations } = {
+    booth: [],
+    directShip: [],
+    virtualBooth: []
   };
+  for (const a of scout.allocations) {
+    if (a.channel === ALLOCATION_CHANNEL.BOOTH) byChannel.booth.push(a);
+    else if (a.channel === ALLOCATION_CHANNEL.DIRECT_SHIP) byChannel.directShip.push(a);
+    else if (a.channel === ALLOCATION_CHANNEL.VIRTUAL_BOOTH) byChannel.virtualBooth.push(a);
+  }
+  scout.$allocationsByChannel = byChannel;
   scout.totals.$allocationSummary = {
     booth: channelTotals(scout.$allocationsByChannel.booth),
     directShip: channelTotals(scout.$allocationsByChannel.directShip),

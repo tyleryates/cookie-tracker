@@ -5,7 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import ExcelJS from 'exceljs';
-import { DC_COLUMNS, PIPELINE_FILES } from './constants';
+import { DC_COLUMNS, PIPELINE_FILES, WARNING_TYPE } from './constants';
 import { buildUnifiedDataset } from './data-processing/calculators/index';
 import type { AllocationData } from './data-processing/importers';
 import {
@@ -168,24 +168,36 @@ async function loadExcelFile(
 }
 
 // ============================================================================
-// PUBLIC API
+// ALLOCATION DATA LOADING
 // ============================================================================
 
-/**
- * Load and build unified dataset from files on disk.
- * Reads sync data from sync/ (API responses, DC export) and
- * legacy manual files from data/in/ (ReportExport, CookieOrders).
- */
-export async function loadData(dataDir: string, options?: { debug?: boolean }): Promise<LoadDataResult | null> {
-  const currentDir = path.join(dataDir, 'sync');
-  const inDir = path.join(dataDir, 'in');
+/** Read all allocation-related pipeline files from current/ into an AllocationData bundle */
+function readAllocationData(currentDir: string): AllocationData {
+  const cookieSharesKeyed = readPipelineFile<Record<string, SCVirtualCookieShare>>(currentDir, PIPELINE_FILES.SC_COOKIE_SHARES, isObject);
+  const boothDividersKeyed = readPipelineFile<Record<string, SCBoothDividerResult>>(
+    currentDir,
+    PIPELINE_FILES.SC_BOOTH_ALLOCATIONS,
+    isObject
+  );
 
-  const store = createDataStore();
-  const loaded: LoadedSources = { sc: false, dc: false, scReport: false, scTransfer: false, issues: [] };
+  return {
+    directShipDivider: readPipelineFile<SCDirectShipDivider>(currentDir, PIPELINE_FILES.SC_DIRECT_SHIP, isObject) ?? null,
+    virtualCookieShares: cookieSharesKeyed ? Object.values(cookieSharesKeyed) : [],
+    reservations: readPipelineFile<SCReservationsResponse>(currentDir, PIPELINE_FILES.SC_RESERVATIONS, isObject) ?? null,
+    boothDividers: boothDividersKeyed ? Object.values(boothDividersKeyed) : [],
+    boothLocations: readPipelineFile<SCBoothLocationRaw[]>(currentDir, PIPELINE_FILES.SC_BOOTH_LOCATIONS, isArray) ?? [],
+    cookieIdMap: readPipelineFile<Record<string, CookieType>>(currentDir, PIPELINE_FILES.SC_COOKIE_ID_MAP, isObject) ?? null
+  };
+}
 
-  // Pre-set troop identity from seasonal data (sc-troop.json) so T2T direction is known during import
-  // troop_id is an internal SC database ID; troop_name is the human-readable name (e.g. "Troop 3990")
-  // Both are needed because the from/to fields in orders may match either format
+// ============================================================================
+// IMPORT PHASE HELPERS
+// ============================================================================
+
+/** Pre-set troop identity from seasonal data (sc-troop.json) so T2T direction is known during import.
+ *  troop_id is an internal SC database ID; troop_name is the human-readable name (e.g. "Troop 3990").
+ *  Both are needed because the from/to fields in orders may match either format. */
+function loadTroopIdentity(store: ReturnType<typeof createDataStore>, dataDir: string): void {
   const troopData = readPipelineFile<SCMeResponse>(dataDir, 'sc-troop.json', isObject);
   if (troopData?.role?.troop_id) {
     store.troopNumber = String(troopData.role.troop_id);
@@ -193,8 +205,10 @@ export async function loadData(dataDir: string, options?: { debug?: boolean }): 
   if (troopData?.role?.troop_name) {
     store.troopName = String(troopData.role.troop_name);
   }
+}
 
-  // 1. Smart Cookie API data from current/ pipeline files
+/** Load Smart Cookie API data from current/ pipeline files (orders, allocations, finance). */
+function loadSmartCookieData(store: ReturnType<typeof createDataStore>, currentDir: string, loaded: LoadedSources): void {
   const ordersData = readPipelineFile<SCOrdersResponse>(currentDir, PIPELINE_FILES.SC_ORDERS, isObject);
   if (ordersData?.orders) {
     const validation = validateSCOrders(ordersData);
@@ -203,31 +217,17 @@ export async function loadData(dataDir: string, options?: { debug?: boolean }): 
     }
     importSmartCookieOrders(store, ordersData);
 
-    // Import allocations from individual pipeline files
-    const cookieSharesKeyed = readPipelineFile<Record<string, SCVirtualCookieShare>>(currentDir, PIPELINE_FILES.SC_COOKIE_SHARES, isObject);
-    const boothDividersKeyed = readPipelineFile<Record<string, SCBoothDividerResult>>(
-      currentDir,
-      PIPELINE_FILES.SC_BOOTH_ALLOCATIONS,
-      isObject
-    );
-
-    const allocationData: AllocationData = {
-      directShipDivider: readPipelineFile<SCDirectShipDivider>(currentDir, PIPELINE_FILES.SC_DIRECT_SHIP, isObject) ?? null,
-      virtualCookieShares: cookieSharesKeyed ? Object.values(cookieSharesKeyed) : [],
-      reservations: readPipelineFile<SCReservationsResponse>(currentDir, PIPELINE_FILES.SC_RESERVATIONS, isObject) ?? null,
-      boothDividers: boothDividersKeyed ? Object.values(boothDividersKeyed) : [],
-      boothLocations: readPipelineFile<SCBoothLocationRaw[]>(currentDir, PIPELINE_FILES.SC_BOOTH_LOCATIONS, isArray) ?? [],
-      cookieIdMap: readPipelineFile<Record<string, CookieType>>(currentDir, PIPELINE_FILES.SC_COOKIE_ID_MAP, isObject) ?? null
-    };
-    importAllocations(store, allocationData);
+    importAllocations(store, readAllocationData(currentDir));
 
     const financeRaw = readPipelineFile<SCFinanceTransaction[]>(currentDir, PIPELINE_FILES.SC_FINANCE, isArray);
     if (financeRaw) importFinancePayments(store, financeRaw);
 
     loaded.sc = true;
   }
+}
 
-  // 2. Digital Cookie export from current/dc-export.xlsx
+/** Load Digital Cookie export from current/dc-export.xlsx. */
+async function loadDigitalCookieData(store: ReturnType<typeof createDataStore>, currentDir: string, loaded: LoadedSources): Promise<void> {
   const dcExportPath = path.join(currentDir, PIPELINE_FILES.DC_EXPORT);
   if (fs.existsSync(dcExportPath)) {
     const buffer = fs.readFileSync(dcExportPath);
@@ -243,8 +243,10 @@ export async function loadData(dataDir: string, options?: { debug?: boolean }): 
       loaded.issues.push('Digital Cookie export not recognized');
     }
   }
+}
 
-  // 3. Legacy manual files from data/in/ (SC Report exports, transfer exports)
+/** Load legacy manual files from data/in/ (SC Report exports, transfer exports). */
+async function loadLegacyFiles(store: ReturnType<typeof createDataStore>, inDir: string, loaded: LoadedSources): Promise<void> {
   const legacyFiles = scanLegacyFiles(inDir);
 
   const scReportFile = findFileByIncludes(legacyFiles, 'ReportExport', '.xlsx');
@@ -270,9 +272,31 @@ export async function loadData(dataDir: string, options?: { debug?: boolean }): 
     loaded.scTransfer = r.loaded;
     if (r.issue) loaded.issues.push(r.issue);
   } else if (loaded.sc && scTransferFile) {
-    store.metadata.warnings.push({ type: 'SC_TRANSFER_SKIPPED', reason: 'SC API data present', file: scTransferFile.name });
+    store.metadata.warnings.push({ type: WARNING_TYPE.SC_TRANSFER_SKIPPED, reason: 'SC API data present', file: scTransferFile.name });
     Logger.warn('Skipping CookieOrders.xlsx import because SC API data is present.');
   }
+}
+
+// ============================================================================
+// PUBLIC API
+// ============================================================================
+
+/**
+ * Load and build unified dataset from files on disk.
+ * Reads sync data from sync/ (API responses, DC export) and
+ * legacy manual files from data/in/ (ReportExport, CookieOrders).
+ */
+export async function loadData(dataDir: string, options?: { debug?: boolean }): Promise<LoadDataResult | null> {
+  const currentDir = path.join(dataDir, 'sync');
+  const inDir = path.join(dataDir, 'in');
+
+  const store = createDataStore();
+  const loaded: LoadedSources = { sc: false, dc: false, scReport: false, scTransfer: false, issues: [] };
+
+  loadTroopIdentity(store, dataDir);
+  loadSmartCookieData(store, currentDir, loaded);
+  await loadDigitalCookieData(store, currentDir, loaded);
+  await loadLegacyFiles(store, inDir, loaded);
 
   const anyLoaded = loaded.sc || loaded.dc || loaded.scReport || loaded.scTransfer;
   if (!anyLoaded) return null;

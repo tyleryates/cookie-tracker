@@ -1,7 +1,7 @@
 // Transfer Breakdowns
 // Pre-classifies transfers into categories (C2T, T2G, G2T) with totals
 
-import { TRANSFER_CATEGORY, TRANSFER_TYPE } from '../../constants';
+import { TRANSFER_CATEGORY, TRANSFER_TYPE, WARNING_TYPE } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
 import Logger from '../../logger';
 import type { Transfer, TransferBreakdowns, Warning } from '../../types';
@@ -26,7 +26,7 @@ function buildTransferBreakdowns(store: ReadonlyDataStore, warnings: Warning[]):
       seenUnknownTypes.add(transfer.type);
       Logger.warn(`Unknown Smart Cookie transfer type "${transfer.type}" — update TRANSFER_TYPE in constants.ts`);
       warnings.push({
-        type: 'UNKNOWN_TRANSFER_TYPE',
+        type: WARNING_TYPE.UNKNOWN_TRANSFER_TYPE,
         message: `Unknown transfer type "${transfer.type}"`,
         orderNumber: transfer.orderNumber,
         reason: transfer.type,

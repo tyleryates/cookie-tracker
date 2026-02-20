@@ -55,7 +55,7 @@ export function TooltipCell({ tooltip, children, style, tag, className }: Toolti
   useEffect(() => removeTip, [removeTip]);
 
   return (
-    <Tag ref={ref} class={className || 'tooltip-cell'} style={style} onMouseEnter={onEnter} onMouseLeave={removeTip}>
+    <Tag ref={ref} class={className || 'tooltip-cell'} style={style} aria-label={tooltip} onMouseEnter={onEnter} onMouseLeave={removeTip}>
       {children}
     </Tag>
   );

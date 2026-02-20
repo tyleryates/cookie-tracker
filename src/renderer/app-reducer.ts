@@ -45,13 +45,7 @@ export type Action =
   | {
       type: 'SYNC_ENDPOINT_UPDATE';
       endpoint: string;
-      status: EndpointSyncState['status'];
-      lastSync?: string;
-      cached?: boolean;
-      durationMs?: number;
-      dataSize?: number;
-      httpStatus?: number;
-      error?: string;
+      update: { status: EndpointSyncState['status'] } & Partial<Omit<EndpointSyncState, 'status'>>;
     }
   | { type: 'SYNC_STARTED' }
   | { type: 'SYNC_FINISHED' }
@@ -71,119 +65,121 @@ function isReadOnly(state: AppState): boolean {
   return state.activeProfile != null && !state.activeProfile.isDefault;
 }
 
-export function appReducer(state: AppState, action: Action): AppState {
-  switch (action.type) {
-    case 'SET_STATUS':
-      return { ...state, statusMessage: { msg: action.msg, type: action.statusType } };
+type ActionOfType<T extends Action['type']> = Extract<Action, { type: T }>;
+type ActionHandler<T extends Action['type']> = (state: AppState, action: ActionOfType<T>) => AppState;
 
-    case 'CLEAR_STATUS':
-      return { ...state, statusMessage: null };
+const ACTION_HANDLERS: { [T in Action['type']]: ActionHandler<T> } = {
+  SET_STATUS: (state, action) => ({
+    ...state,
+    statusMessage: { msg: action.msg, type: action.statusType }
+  }),
 
-    case 'SET_WELCOME':
-      return { ...state, activePage: 'welcome' };
+  CLEAR_STATUS: (state) => ({ ...state, statusMessage: null }),
 
-    case 'LOAD_CONFIG': {
-      const readOnly = isReadOnly(state);
-      return {
-        ...state,
-        appConfig: action.config,
-        autoSyncEnabled: readOnly ? false : (action.config.autoSyncEnabled ?? true),
-        autoRefreshBoothsEnabled: readOnly ? false : (action.config.autoRefreshBoothsEnabled ?? true)
-      };
-    }
+  SET_WELCOME: (state) => ({ ...state, activePage: 'welcome' }),
 
-    case 'UPDATE_CONFIG': {
-      if (!state.appConfig) return state;
-      const merged = { ...state.appConfig, ...action.patch };
-      const result: AppState = { ...state, appConfig: merged };
-      if ('autoSyncEnabled' in action.patch) result.autoSyncEnabled = merged.autoSyncEnabled ?? state.autoSyncEnabled;
-      if ('autoRefreshBoothsEnabled' in action.patch)
-        result.autoRefreshBoothsEnabled = merged.autoRefreshBoothsEnabled ?? state.autoRefreshBoothsEnabled;
-      return result;
-    }
+  LOAD_CONFIG: (state, action) => {
+    const readOnly = isReadOnly(state);
+    return {
+      ...state,
+      appConfig: action.config,
+      autoSyncEnabled: readOnly ? false : (action.config.autoSyncEnabled ?? true),
+      autoRefreshBoothsEnabled: readOnly ? false : (action.config.autoRefreshBoothsEnabled ?? true)
+    };
+  },
 
-    case 'SET_UNIFIED':
-      return { ...state, unified: action.unified };
+  UPDATE_CONFIG: (state, action) => {
+    if (!state.appConfig) return state;
+    const merged = { ...state.appConfig, ...action.patch };
+    const result: AppState = { ...state, appConfig: merged };
+    if ('autoSyncEnabled' in action.patch) result.autoSyncEnabled = merged.autoSyncEnabled ?? state.autoSyncEnabled;
+    if ('autoRefreshBoothsEnabled' in action.patch)
+      result.autoRefreshBoothsEnabled = merged.autoRefreshBoothsEnabled ?? state.autoRefreshBoothsEnabled;
+    return result;
+  },
 
-    case 'SET_ACTIVE_REPORT':
-      return { ...state, activeReport: action.report };
+  SET_UNIFIED: (state, action) => ({ ...state, unified: action.unified }),
 
-    case 'DEFAULT_REPORT':
-      return state.activeReport ? state : { ...state, activeReport: 'inventory' };
+  SET_ACTIVE_REPORT: (state, action) => ({ ...state, activeReport: action.report }),
 
-    case 'TOGGLE_AUTO_SYNC': {
-      const enabled = isReadOnly(state) ? false : action.enabled;
-      return {
-        ...state,
-        autoSyncEnabled: enabled,
-        appConfig: state.appConfig ? { ...state.appConfig, autoSyncEnabled: enabled } : state.appConfig
-      };
-    }
+  DEFAULT_REPORT: (state) => (state.activeReport ? state : { ...state, activeReport: 'inventory' }),
 
-    case 'TOGGLE_AUTO_REFRESH_BOOTHS': {
-      const enabled = isReadOnly(state) ? false : action.enabled;
-      return {
-        ...state,
-        autoRefreshBoothsEnabled: enabled,
-        appConfig: state.appConfig ? { ...state.appConfig, autoRefreshBoothsEnabled: enabled } : state.appConfig
-      };
-    }
+  TOGGLE_AUTO_SYNC: (state, action) => {
+    const enabled = isReadOnly(state) ? false : action.enabled;
+    return {
+      ...state,
+      autoSyncEnabled: enabled,
+      appConfig: state.appConfig ? { ...state.appConfig, autoSyncEnabled: enabled } : state.appConfig
+    };
+  },
 
-    case 'SYNC_ENDPOINT_UPDATE': {
-      const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };
-      const isSyncing = action.status === 'syncing';
-      // Clear previous sync's timing/error when starting; preserve/update when finished
-      const preserveOnSyncEnd = <T>(val: T | undefined, prevVal: T | undefined): T | undefined =>
-        isSyncing ? undefined : (val ?? prevVal);
-      return {
-        ...state,
-        syncState: {
-          ...state.syncState,
-          endpoints: {
-            ...state.syncState.endpoints,
-            [action.endpoint]: {
-              ...prev,
-              status: action.status,
-              lastSync: action.lastSync ?? prev.lastSync,
-              cached: action.cached,
-              durationMs: preserveOnSyncEnd(action.durationMs, prev.durationMs),
-              dataSize: preserveOnSyncEnd(action.dataSize, prev.dataSize),
-              httpStatus: preserveOnSyncEnd(action.httpStatus, prev.httpStatus),
-              error: preserveOnSyncEnd(action.error, prev.error)
-            }
+  TOGGLE_AUTO_REFRESH_BOOTHS: (state, action) => {
+    const enabled = isReadOnly(state) ? false : action.enabled;
+    return {
+      ...state,
+      autoRefreshBoothsEnabled: enabled,
+      appConfig: state.appConfig ? { ...state.appConfig, autoRefreshBoothsEnabled: enabled } : state.appConfig
+    };
+  },
+
+  SYNC_ENDPOINT_UPDATE: (state, action) => {
+    const { update } = action;
+    const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };
+    const isSyncing = update.status === 'syncing';
+    // Clear previous sync's timing/error when starting; preserve/update when finished
+    const preserveOnSyncEnd = <T>(val: T | undefined, prevVal: T | undefined): T | undefined => (isSyncing ? undefined : (val ?? prevVal));
+    return {
+      ...state,
+      syncState: {
+        ...state.syncState,
+        endpoints: {
+          ...state.syncState.endpoints,
+          [action.endpoint]: {
+            ...prev,
+            status: update.status,
+            lastSync: update.lastSync ?? prev.lastSync,
+            cached: update.cached,
+            durationMs: preserveOnSyncEnd(update.durationMs, prev.durationMs),
+            dataSize: preserveOnSyncEnd(update.dataSize, prev.dataSize),
+            httpStatus: preserveOnSyncEnd(update.httpStatus, prev.httpStatus),
+            error: preserveOnSyncEnd(update.error, prev.error)
           }
         }
-      };
-    }
+      }
+    };
+  },
 
-    case 'SYNC_STARTED':
-      return { ...state, syncState: { ...state.syncState, syncing: true } };
+  SYNC_STARTED: (state) => ({ ...state, syncState: { ...state.syncState, syncing: true } }),
 
-    case 'SYNC_FINISHED':
-      return { ...state, syncState: { ...state.syncState, syncing: false } };
+  SYNC_FINISHED: (state) => ({ ...state, syncState: { ...state.syncState, syncing: false } }),
 
-    case 'BOOTH_REFRESH_STARTED':
-      return { ...state, syncState: { ...state.syncState, refreshingBooths: true } };
+  BOOTH_REFRESH_STARTED: (state) => ({ ...state, syncState: { ...state.syncState, refreshingBooths: true } }),
 
-    case 'BOOTH_REFRESH_FINISHED':
-      return { ...state, syncState: { ...state.syncState, refreshingBooths: false } };
+  BOOTH_REFRESH_FINISHED: (state) => ({ ...state, syncState: { ...state.syncState, refreshingBooths: false } }),
 
-    case 'UPDATE_BOOTH_LOCATIONS':
-      return state.unified ? { ...state, unified: { ...state.unified, boothLocations: action.boothLocations } } : state;
+  UPDATE_BOOTH_LOCATIONS: (state, action) =>
+    state.unified ? { ...state, unified: { ...state.unified, boothLocations: action.boothLocations } } : state,
 
-    case 'IGNORE_SLOT':
-      return { ...state, appConfig: action.config };
+  IGNORE_SLOT: (state, action) => ({ ...state, appConfig: action.config }),
 
-    case 'RESET_DATA':
-      return { ...state, unified: null, appConfig: null, activeReport: null, syncState: action.syncState };
+  RESET_DATA: (state, action) => ({
+    ...state,
+    unified: null,
+    appConfig: null,
+    activeReport: null,
+    syncState: action.syncState
+  }),
 
-    case 'UPDATE_DOWNLOADED':
-      return { ...state, updateReady: action.version };
+  UPDATE_DOWNLOADED: (state, action) => ({ ...state, updateReady: action.version }),
 
-    case 'SET_PROFILES':
-      return { ...state, profiles: action.profiles, activeProfile: action.activeProfile };
+  SET_PROFILES: (state, action) => ({
+    ...state,
+    profiles: action.profiles,
+    activeProfile: action.activeProfile
+  })
+};
 
-    default:
-      return state;
-  }
+export function appReducer(state: AppState, action: Action): AppState {
+  const handler = ACTION_HANDLERS[action.type] as (state: AppState, action: Action) => AppState;
+  return handler ? handler(state, action) : state;
 }

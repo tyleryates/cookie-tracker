@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BOOTH_RESERVATION_TYPE } from '../../constants';
-import { COOKIE_ORDER } from '../../cookie-constants';
+import { COOKIE_ORDER, sortVarietiesByOrder } from '../../cookie-constants';
 import type { BoothReservationImported, BoothTimeSlot } from '../../types';
 import {
   boothTypeClass,
@@ -17,14 +17,13 @@ import {
   formatShortDate,
   formatTime12h,
   formatTimeRange,
-  getCompleteVarieties,
+  getVarietiesWithDefaults,
   haversineDistance,
   isPhysicalVariety,
   isVirtualBooth,
   parseLocalDate,
   parseTimeToMinutes,
   slotOverlapsRange,
-  sortVarietiesByOrder,
   todayMidnight
 } from '../format-utils';
 
@@ -159,22 +158,22 @@ describe('formatTimeRange', () => {
   });
 });
 
-describe('getCompleteVarieties', () => {
+describe('getVarietiesWithDefaults', () => {
   it('fills missing cookies with 0', () => {
-    const result = getCompleteVarieties({});
+    const result = getVarietiesWithDefaults({});
     for (const type of COOKIE_ORDER) {
       expect(result[type]).toBe(0);
     }
   });
 
   it('includes provided values', () => {
-    const result = getCompleteVarieties({ THIN_MINTS: 10, TREFOILS: 5 });
+    const result = getVarietiesWithDefaults({ THIN_MINTS: 10, TREFOILS: 5 });
     expect(result.THIN_MINTS).toBe(10);
     expect(result.TREFOILS).toBe(5);
   });
 
   it('has an entry for every cookie in COOKIE_ORDER', () => {
-    const result = getCompleteVarieties({ THIN_MINTS: 3 });
+    const result = getVarietiesWithDefaults({ THIN_MINTS: 3 });
     expect(Object.keys(result).length).toBe(COOKIE_ORDER.length);
     for (const type of COOKIE_ORDER) {
       expect(result).toHaveProperty(type);
@@ -182,7 +181,7 @@ describe('getCompleteVarieties', () => {
   });
 
   it('handles undefined input', () => {
-    const result = getCompleteVarieties(undefined);
+    const result = getVarietiesWithDefaults(undefined);
     for (const type of COOKIE_ORDER) {
       expect(result[type]).toBe(0);
     }

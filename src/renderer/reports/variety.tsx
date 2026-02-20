@@ -1,9 +1,16 @@
 import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
-import { COOKIE_ORDER, COUNCIL_AVERAGES, getCookieColor, getCookieDisplayName, LOW_SALES_THRESHOLD } from '../../cookie-constants';
+import {
+  COOKIE_ORDER,
+  COUNCIL_AVERAGES,
+  getCookieColor,
+  getCookieDisplayName,
+  LOW_SALES_THRESHOLD,
+  sortVarietiesByOrder
+} from '../../cookie-constants';
 import type { CookieType, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
-import { getCompleteVarieties, isPhysicalVariety, sortVarietiesByOrder } from '../format-utils';
+import { getVarietiesWithDefaults, isPhysicalVariety } from '../format-utils';
 
 function EstimateDistributionModal({
   varietyStats,
@@ -189,7 +196,9 @@ export function VarietyReport({ data, banner }: { data: UnifiedDataset; banner?:
   const varieties = data.varieties;
   const varietyStats = varieties.byCookie;
 
-  const rows = sortVarietiesByOrder(Object.entries(getCompleteVarieties(varietyStats))).filter(([variety]) => isPhysicalVariety(variety));
+  const rows = sortVarietiesByOrder(Object.entries(getVarietiesWithDefaults(varietyStats))).filter(([variety]) =>
+    isPhysicalVariety(variety)
+  );
 
   return (
     <div class="report-visual">
@@ -226,7 +235,7 @@ export function VarietyReport({ data, banner }: { data: UnifiedDataset; banner?:
       </DataTable>
       {showModal && (
         <EstimateDistributionModal
-          varietyStats={getCompleteVarieties(varietyStats)}
+          varietyStats={getVarietiesWithDefaults(varietyStats)}
           total={varieties.total}
           inventory={varieties.inventory || {}}
           defaultInput={data.troopTotals.inventory}

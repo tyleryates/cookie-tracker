@@ -1,6 +1,14 @@
 // Smart Cookie Import Functions
 
-import { DATA_SOURCES, PACKAGES_PER_CASE, SC_API_COLUMNS, SC_REPORT_COLUMNS, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../../constants';
+import {
+  DATA_SOURCES,
+  PACKAGES_PER_CASE,
+  SC_API_COLUMNS,
+  SC_REPORT_COLUMNS,
+  SPECIAL_IDENTIFIERS,
+  TRANSFER_TYPE,
+  WARNING_TYPE
+} from '../../constants';
 import type { DataStore } from '../../data-store';
 import { createTransfer, mergeOrCreateOrder } from '../../data-store-operations';
 import type { SCFinanceTransaction, SCOrdersResponse } from '../../scrapers/sc-types';
@@ -87,7 +95,7 @@ export function importSmartCookieOrders(store: DataStore, ordersData: SCOrdersRe
     const { varieties, totalPackages, unknownCookieIds } = parseVarietiesFromAPI(order.cookies);
     for (const id of unknownCookieIds) {
       store.metadata.warnings.push({
-        type: 'UNKNOWN_COOKIE_ID',
+        type: WARNING_TYPE.UNKNOWN_COOKIE_ID,
         message: `Unknown cookie ID ${id} in order ${orderNum}`,
         orderNumber: orderNum
       });

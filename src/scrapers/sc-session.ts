@@ -16,6 +16,8 @@ export class SmartCookieSession {
   userAgent = '';
   private cookieJar: CookieJar;
   private credentials: { username: string; password: string } | null = null;
+  private lastActivityAt = 0;
+  private static readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor() {
     this.cookieJar = new CookieJar();
@@ -100,6 +102,7 @@ export class SmartCookieSession {
       // Non-fatal — troopId can be extracted from C2T orders as fallback
     }
 
+    this.touch();
     return true;
   }
 
@@ -120,6 +123,19 @@ export class SmartCookieSession {
     return this.meResponse;
   }
 
+  /** Update activity timestamp */
+  private touch(): void {
+    this.lastActivityAt = Date.now();
+  }
+
+  /** Clear stored credentials if session has been idle too long */
+  private expireIdleCredentials(): void {
+    if (this.credentials && this.lastActivityAt > 0 && Date.now() - this.lastActivityAt > SmartCookieSession.SESSION_TIMEOUT_MS) {
+      Logger.info('SC session: idle timeout, clearing stored credentials');
+      this.credentials = null;
+    }
+  }
+
   private get authHeaders() {
     return { 'x-xsrf-token': this.xsrfToken!, Referer: 'https://app.abcsmartcookies.com/' };
   }
@@ -138,6 +154,8 @@ export class SmartCookieSession {
 
   /** Execute an authenticated request with automatic re-login on auth failure */
   private async authenticatedRequest<T>(requestFn: () => Promise<AxiosResponse<T>>, label: string): Promise<T> {
+    this.expireIdleCredentials();
+    this.touch();
     if (!this.xsrfToken) throw new Error('Not authenticated. Must login first.');
 
     try {
@@ -178,6 +196,7 @@ export class SmartCookieSession {
     this.troopId = null;
     this.meResponse = null;
     this.credentials = null;
+    this.lastActivityAt = 0;
     this.cookieJar = new CookieJar();
     this.client = this.createClient();
   }

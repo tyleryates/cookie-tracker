@@ -319,7 +319,7 @@ describe('TOGGLE_AUTO_REFRESH_BOOTHS', () => {
 describe('SYNC_ENDPOINT_UPDATE', () => {
   it('updates a single endpoint status', () => {
     const state = makeState();
-    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', update: { status: 'syncing' } });
     expect(result.syncState.endpoints['sc-orders'].status).toBe('syncing');
     expect(result.syncState.endpoints['sc-orders'].lastSync).toBeNull();
   });
@@ -329,8 +329,7 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
     const result = appReducer(state, {
       type: 'SYNC_ENDPOINT_UPDATE',
       endpoint: 'dc-troop-report',
-      status: 'synced',
-      lastSync: '2025-01-15T12:00:00Z'
+      update: { status: 'synced', lastSync: '2025-01-15T12:00:00Z' }
     });
     expect(result.syncState.endpoints['dc-troop-report'].status).toBe('synced');
     expect(result.syncState.endpoints['dc-troop-report'].lastSync).toBe('2025-01-15T12:00:00Z');
@@ -342,7 +341,7 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
         endpointOverrides: { 'sc-orders': { status: 'synced', lastSync: '2025-01-14T08:00:00Z' } }
       })
     });
-    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', update: { status: 'syncing' } });
     expect(result.syncState.endpoints['sc-orders'].status).toBe('syncing');
     expect(result.syncState.endpoints['sc-orders'].lastSync).toBe('2025-01-14T08:00:00Z');
   });
@@ -353,14 +352,14 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
         endpointOverrides: { 'dc-troop-report': { status: 'synced', lastSync: '2025-01-14T08:00:00Z' } }
       })
     });
-    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', update: { status: 'syncing' } });
     expect(result.syncState.endpoints['dc-troop-report'].status).toBe('synced');
     expect(result.syncState.endpoints['sc-orders'].status).toBe('syncing');
   });
 
   it('sets error status', () => {
     const state = makeState();
-    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-reservations', status: 'error' });
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-reservations', update: { status: 'error' } });
     expect(result.syncState.endpoints['sc-reservations'].status).toBe('error');
   });
 
@@ -369,10 +368,7 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
     const result = appReducer(state, {
       type: 'SYNC_ENDPOINT_UPDATE',
       endpoint: 'sc-orders',
-      status: 'synced',
-      lastSync: '2025-01-15T12:00:00Z',
-      durationMs: 1200,
-      dataSize: 245000
+      update: { status: 'synced', lastSync: '2025-01-15T12:00:00Z', durationMs: 1200, dataSize: 245000 }
     });
     expect(result.syncState.endpoints['sc-orders'].durationMs).toBe(1200);
     expect(result.syncState.endpoints['sc-orders'].dataSize).toBe(245000);
@@ -384,7 +380,7 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
         endpointOverrides: { 'sc-orders': { status: 'synced', lastSync: '2025-01-14T08:00:00Z', durationMs: 500, dataSize: 1000 } }
       })
     });
-    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', update: { status: 'syncing' } });
     expect(result.syncState.endpoints['sc-orders'].durationMs).toBeUndefined();
     expect(result.syncState.endpoints['sc-orders'].dataSize).toBeUndefined();
   });
@@ -398,8 +394,7 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
     const result = appReducer(state, {
       type: 'SYNC_ENDPOINT_UPDATE',
       endpoint: 'sc-orders',
-      status: 'synced',
-      lastSync: '2025-01-15T10:00:00Z'
+      update: { status: 'synced', lastSync: '2025-01-15T10:00:00Z' }
     });
     expect(result.syncState.endpoints['sc-orders'].durationMs).toBe(500);
     expect(result.syncState.endpoints['sc-orders'].dataSize).toBe(1000);
@@ -410,9 +405,7 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
     const result = appReducer(state, {
       type: 'SYNC_ENDPOINT_UPDATE',
       endpoint: 'sc-orders',
-      status: 'error',
-      httpStatus: 401,
-      error: 'Unauthorized'
+      update: { status: 'error', httpStatus: 401, error: 'Unauthorized' }
     });
     expect(result.syncState.endpoints['sc-orders'].httpStatus).toBe(401);
     expect(result.syncState.endpoints['sc-orders'].error).toBe('Unauthorized');
@@ -426,7 +419,7 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
         }
       })
     });
-    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', status: 'syncing' });
+    const result = appReducer(state, { type: 'SYNC_ENDPOINT_UPDATE', endpoint: 'sc-orders', update: { status: 'syncing' } });
     expect(result.syncState.endpoints['sc-orders'].httpStatus).toBeUndefined();
     expect(result.syncState.endpoints['sc-orders'].error).toBeUndefined();
   });
@@ -442,7 +435,7 @@ describe('SYNC_ENDPOINT_UPDATE', () => {
     const result = appReducer(state, {
       type: 'SYNC_ENDPOINT_UPDATE',
       endpoint: 'sc-orders',
-      status: 'error'
+      update: { status: 'error' }
     });
     expect(result.syncState.endpoints['sc-orders'].httpStatus).toBe(403);
     expect(result.syncState.endpoints['sc-orders'].error).toBe('Forbidden');

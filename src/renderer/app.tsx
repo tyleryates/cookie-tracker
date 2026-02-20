@@ -320,12 +320,14 @@ export function App() {
         dispatch({
           type: 'SYNC_ENDPOINT_UPDATE',
           endpoint,
-          status: meta.status,
-          lastSync: meta.lastSync ?? undefined,
-          durationMs: meta.durationMs,
-          dataSize: meta.dataSize,
-          httpStatus: meta.httpStatus,
-          error: meta.error
+          update: {
+            status: meta.status,
+            lastSync: meta.lastSync ?? undefined,
+            durationMs: meta.durationMs,
+            dataSize: meta.dataSize,
+            httpStatus: meta.httpStatus,
+            error: meta.error
+          }
         });
       }
     } catch {

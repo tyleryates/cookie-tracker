@@ -5,7 +5,7 @@ import type { DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
 import type { RawDataRow } from '../../types';
 import { parseExcelDate, parseVarietiesFromDC, safeParseFloat, safeParseInt } from './parsers';
-import { recordImportMetadata, updateScoutData } from './scout-helpers';
+import { buildScoutName, recordImportMetadata, updateScoutData } from './scout-helpers';
 
 /** Import Digital Cookie order data from Excel export */
 export function importDigitalCookie(store: DataStore, dcData: RawDataRow[]): void {
@@ -13,7 +13,7 @@ export function importDigitalCookie(store: DataStore, dcData: RawDataRow[]): voi
 
   for (const row of dcData) {
     const orderNum = String(row[DC_COLUMNS.ORDER_NUMBER]);
-    const scout = `${row[DC_COLUMNS.GIRL_FIRST_NAME] || ''} ${row[DC_COLUMNS.GIRL_LAST_NAME] || ''}`.trim();
+    const scout = buildScoutName(String(row[DC_COLUMNS.GIRL_FIRST_NAME] || ''), String(row[DC_COLUMNS.GIRL_LAST_NAME] || ''));
 
     const varieties = parseVarietiesFromDC(row);
 

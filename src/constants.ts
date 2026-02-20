@@ -273,6 +273,20 @@ export const DC_ORDER_TYPE_STRINGS = {
 } as const;
 
 // ============================================================================
+// WARNING TYPES — data health check categories
+// ============================================================================
+
+export const WARNING_TYPE = {
+  UNKNOWN_ORDER_TYPE: 'UNKNOWN_ORDER_TYPE',
+  UNKNOWN_PAYMENT_METHOD: 'UNKNOWN_PAYMENT_METHOD',
+  UNKNOWN_TRANSFER_TYPE: 'UNKNOWN_TRANSFER_TYPE',
+  UNKNOWN_COOKIE_ID: 'UNKNOWN_COOKIE_ID',
+  SC_TRANSFER_SKIPPED: 'SC_TRANSFER_SKIPPED'
+} as const;
+
+export type WarningType = (typeof WARNING_TYPE)[keyof typeof WARNING_TYPE];
+
+// ============================================================================
 // CONFIGURATION
 // ============================================================================
 

@@ -4,6 +4,7 @@
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
 import type { RawDataRow, Scout } from '../../types';
+import { buildScoutName } from '../importers/scout-helpers';
 
 /** Initialize scouts from Digital Cookie and Smart Cookie data */
 function initializeScouts(store: ReadonlyDataStore, rawDCData: RawDataRow[]): Map<string, Scout> {
@@ -13,7 +14,7 @@ function initializeScouts(store: ReadonlyDataStore, rawDCData: RawDataRow[]): Ma
   for (const row of rawDCData) {
     const firstName = row[DC_COLUMNS.GIRL_FIRST_NAME] || '';
     const lastName = row[DC_COLUMNS.GIRL_LAST_NAME] || '';
-    const name = `${firstName} ${lastName}`.trim();
+    const name = buildScoutName(String(firstName), String(lastName));
 
     if (!scoutDataset.has(name)) {
       const isSiteOrder = lastName === SPECIAL_IDENTIFIERS.SITE_ORDER_LASTNAME;

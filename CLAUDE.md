@@ -28,7 +28,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **13 reports in 5 tab groups + To-Do** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds, plus Inventory History when enabled), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, plus Booth Finder when enabled), Donations, Cookie Popularity
+- **12 reports in 5 tab groups + To-Do** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming), Donations, Cookie Popularity. Optional toggles in Settings: Inventory History, Booth Finder
 - **Profile management** — Import, switch, and delete data profiles for managing multiple troops
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
@@ -38,11 +38,39 @@ Three layers with strict boundaries:
 
 **Main process** (`src/main.ts`, `src/ipc-handlers/`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers (organized by domain in `ipc-handlers/`), scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
 
-**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (13 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings has its own tab; when `activeReport === 'settings'`, the SettingsPage component renders alongside sync status. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
+**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (12 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings is a separate tab rendered directly in `app.tsx` (not through the reports switch) alongside sync status. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
 
-**Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Sub-directories: `importers/` (parse raw files into DataStore), `calculators/` (compute UnifiedDataset from DataStore).
+**Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Two-stage pipeline: **importers** parse raw files into a `DataStore` (intermediate representation), then **calculators** compute the final `UnifiedDataset` from the DataStore. Sub-directories: `importers/`, `calculators/`.
 
-**Scrapers** (`src/scrapers/`) — API clients for DC and SC. Each scraper has a separate session class (`dc-session.ts`, `sc-session.ts`) that owns auth state, with automatic re-login on 401/403.
+**Scrapers** (`src/scrapers/`) — API clients for DC and SC. Each scraper has a separate session class (`dc-session.ts`, `sc-session.ts`) that owns auth state, with automatic re-login on 401/403 and 30-minute idle credential timeout.
+
+### Data Processing Files
+
+**Importers** (`src/data-processing/importers/`) — parse raw files into DataStore:
+
+| File | Purpose |
+|---|---|
+| `digital-cookie.ts` | Parse DC Excel export into orders |
+| `smart-cookie.ts` | Parse SC API responses into orders, transfers, scouts |
+| `allocations.ts` | Parse SC allocation data (T2G inventory distributions) |
+| `parsers.ts` | Low-level field parsers (dates, booleans, varieties, cases/packages) |
+| `scout-helpers.ts` | Scout name normalization, ID matching across systems |
+
+**Calculators** (`src/data-processing/calculators/`) — compute UnifiedDataset from DataStore:
+
+| File | Purpose |
+|---|---|
+| `scout-initialization.ts` | Build Scout records from raw imported data |
+| `scout-calculations.ts` | Compute per-scout financials, inventory balances, sales breakdowns |
+| `order-processing.ts` | DC order merging, classification, status aggregation |
+| `allocation-processing.ts` | T2G inventory allocations and channel breakdowns |
+| `site-orders.ts` | Troop booth order tracking and distribution |
+| `transfer-breakdowns.ts` | Transfer categorization and inventory flow summaries |
+| `cookie-share-tracking.ts` | Cookie Share reconciliation between DC and SC |
+| `package-totals.ts` | Package count aggregation across all sources |
+| `varieties.ts` | Cookie variety popularity and inventory totals |
+| `troop-totals.ts` | Top-level troop financial and inventory aggregation |
+| `metadata.ts` | HealthChecks, warnings, data source metadata |
 
 ### Key Source Files
 
@@ -90,6 +118,7 @@ IPC handlers are organized by domain in `src/ipc-handlers/`:
 | File | Purpose |
 |---|---|
 | `index.ts` | `registerAllHandlers()` — wires all handler modules |
+| `types.ts` | HandlerDeps interface — shared dependency types for all handler modules |
 | `data-handlers.ts` | load-data, load-data-debug, save-file |
 | `credential-handlers.ts` | load-credentials, save-credentials, verify-sc, verify-dc |
 | `config-handlers.ts` | load-config, update-config |
@@ -116,7 +145,14 @@ IPC handlers are organized by domain in `src/ipc-handlers/`:
 
 Other renderer-level files: `app-reducer.ts` (state management via useReducer), `data-loader.ts` (IPC data loading), `format-utils.ts` (display formatting), `ipc.ts` (IPC wrapper).
 
-Hooks in `renderer/hooks/`: `use-app-init.ts` (app initialization lifecycle), `use-sync.ts` (sync orchestration), `use-status-message.ts` (transient status messages), `use-data-loader.ts` (data loading and refresh after sync).
+Hooks in `renderer/hooks/`:
+
+| Hook | Purpose |
+|---|---|
+| `use-app-init.ts` | App initialization lifecycle — loads profile, config, timestamps, triggers initial data load and auto-sync |
+| `use-sync.ts` | Sync orchestration — scrape handler, booth refresh, auto-sync polling, IPC event listeners, OS notifications |
+| `use-data-loader.ts` | Data loading via IPC, refresh after sync, error handling |
+| `use-status-message.ts` | Transient status notification display with auto-dismiss timer |
 
 ### Layer Rules
 
@@ -124,12 +160,13 @@ Hooks in `renderer/hooks/`: `use-app-init.ts` (app initialization lifecycle), `u
 - **Data-processing MUST NOT import from renderer or scrapers** — it's pure functions operating on data.
 - **Shared types/constants** live in `src/types.ts`, `src/constants.ts`, and `src/cookie-constants.ts` (cookie names, pricing, variety mappings) — both layers import from these.
 - **Seasonal data** (`src/seasonal-data.ts`) — Persists SC session data (troop info, cookie ID map) across syncs so the pipeline knows troop identity before importing orders.
+- **Warning propagation** — Importers detect unknowns (order types, payment methods, transfer types, cookie IDs) and add warnings to `DataStore.metadata.warnings[]`. Calculators pass these through to `UnifiedDataset.metadata`. The `metadata.ts` calculator builds `HealthChecks` (counts by category) from the accumulated warnings. The renderer's `DataHealthChecks` component displays them in the To-Do tab.
 
 ### Conventions
 
 - All files use **kebab-case** naming
 - Constants use **`as const` objects** with derived types: `type Foo = (typeof FOO)[keyof typeof FOO]`
-- Computed fields on data types use a **`$` prefix** (e.g., `$financials`, `$orderStatusCounts`, `$issues`) to distinguish them from raw data fields
+- Computed fields on data types use a **`$` prefix** to distinguish them from raw data fields. Scout computed fields: `$financials` (proceeds, cash owed, balance), `$inventoryDisplay` (formatted inventory), `$salesByVariety` (physical sales breakdown), `$allocationSummary` (packages by channel), `$orderStatusCounts` (order status aggregation), `$allocationsByChannel` (per-channel allocation detail), `$issues` (per-scout warnings)
 - Business logic strings (transfer types, allocation channels, order statuses) should be **constants in `constants.ts`**, not raw strings
 
 ## Key Documentation

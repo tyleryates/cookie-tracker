@@ -1,79 +1,12 @@
-// SyncSection — Sync utilities and health check components
+// SyncSection — Sync status display and health check components
 
 import { useState } from 'preact/hooks';
-import { SYNC_ENDPOINTS } from '../../constants';
+import { SYNC_ENDPOINTS, WARNING_TYPE } from '../../constants';
 import type { EndpointSyncState, HealthChecks, SyncState, Warning } from '../../types';
 import { DateFormatter, formatDataSize, formatDuration, formatMaxAge } from '../format-utils';
 
-// ============================================================================
-// HELPERS
-// ============================================================================
-
-export function createInitialSyncState(): SyncState {
-  const endpoints: Record<string, EndpointSyncState> = {};
-  for (const ep of SYNC_ENDPOINTS) {
-    endpoints[ep.id] = { status: 'idle', lastSync: null };
-  }
-  return { syncing: false, refreshingBooths: false, endpoints };
-}
-
-type OverallStatus = 'idle' | 'syncing' | 'synced' | 'partial' | 'error';
-
-export interface GroupStatus {
-  status: OverallStatus;
-  lastSync: string | null;
-}
-
-export function computeGroupStatuses(
-  endpoints: Record<string, EndpointSyncState>,
-  syncFlags?: { syncing: boolean; refreshingBooths: boolean }
-): {
-  reports: GroupStatus;
-  booths: GroupStatus;
-} {
-  function compute(group: string): GroupStatus {
-    const eps = SYNC_ENDPOINTS.filter((ep) => ep.group === group);
-    let syncedCount = 0;
-    let errorCount = 0;
-    let syncingCount = 0;
-    let lastSync: string | null = null;
-
-    for (const ep of eps) {
-      const s = endpoints[ep.id];
-      if (!s) continue;
-      if (s.status === 'synced') syncedCount++;
-      else if (s.status === 'error') errorCount++;
-      else if (s.status === 'syncing') syncingCount++;
-      if (s.lastSync && (!lastSync || s.lastSync > lastSync)) lastSync = s.lastSync;
-    }
-
-    let status: OverallStatus = 'idle';
-    if (syncingCount > 0) status = 'syncing';
-    else if (syncedCount === eps.length) status = 'synced';
-    else if (errorCount > 0 && syncedCount > 0) status = 'partial';
-    else if (errorCount > 0) status = 'error';
-    else if (syncedCount > 0) status = 'partial';
-
-    return { status, lastSync };
-  }
-
-  const reports = compute('reports');
-  const booths = compute('booth-availability');
-
-  // Override: if the top-level syncing flag is on AND some endpoints in the group
-  // haven't resolved yet, force 'syncing' to prevent flicker when one platform
-  // finishes before the other starts. Once all group endpoints are resolved
-  // (synced/error), stop overriding so the group reflects its true status even if
-  // other groups (e.g. booth availability) are still in-flight.
-  if (syncFlags?.syncing && reports.status !== 'synced' && reports.status !== 'error' && reports.status !== 'partial') {
-    reports.status = 'syncing';
-  }
-  if (syncFlags?.refreshingBooths && booths.status !== 'synced' && booths.status !== 'error' && booths.status !== 'partial') {
-    booths.status = 'syncing';
-  }
-
-  return { reports, booths };
-}
+// Re-export sync utilities from their dedicated module
+export { computeGroupStatuses, createInitialSyncState } from '../sync-utils';
 
 // ============================================================================
 // SUB-COMPONENTS
@@ -101,8 +34,13 @@ function EndpointRow({
 }) {
   const [hovered, setHovered] = useState(false);
 
-  const statusClass =
-    epState.status === 'synced' ? 'synced' : epState.status === 'error' ? 'error' : epState.status === 'syncing' ? 'syncing' : 'not-synced';
+  const STATUS_CLASS: Record<EndpointSyncState['status'], string> = {
+    synced: 'synced',
+    error: 'error',
+    syncing: 'syncing',
+    idle: 'not-synced'
+  };
+  const statusClass = STATUS_CLASS[epState.status];
 
   const timestampDisplay = epState.lastSync
     ? hovered
@@ -223,10 +161,10 @@ function EndpointGroupTable({
 // ============================================================================
 
 const DATA_CHECKS: { key: keyof HealthChecks; label: string; warningType: string }[] = [
-  { key: 'unknownOrderTypes', label: 'Order Types', warningType: 'UNKNOWN_ORDER_TYPE' },
-  { key: 'unknownPaymentMethods', label: 'Payment Methods', warningType: 'UNKNOWN_PAYMENT_METHOD' },
-  { key: 'unknownTransferTypes', label: 'Transfer Types', warningType: 'UNKNOWN_TRANSFER_TYPE' },
-  { key: 'unknownCookieIds', label: 'Cookie IDs', warningType: 'UNKNOWN_COOKIE_ID' }
+  { key: 'unknownOrderTypes', label: 'Order Types', warningType: WARNING_TYPE.UNKNOWN_ORDER_TYPE },
+  { key: 'unknownPaymentMethods', label: 'Payment Methods', warningType: WARNING_TYPE.UNKNOWN_PAYMENT_METHOD },
+  { key: 'unknownTransferTypes', label: 'Transfer Types', warningType: WARNING_TYPE.UNKNOWN_TRANSFER_TYPE },
+  { key: 'unknownCookieIds', label: 'Cookie IDs', warningType: WARNING_TYPE.UNKNOWN_COOKIE_ID }
 ];
 
 export function DataHealthChecks({ healthChecks, warnings }: { healthChecks: HealthChecks; warnings: Warning[] }) {

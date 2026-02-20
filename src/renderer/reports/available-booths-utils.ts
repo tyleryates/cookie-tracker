@@ -2,8 +2,8 @@
 // Extracted from available-booths.tsx for use by other modules
 
 import { BOOTH_TIME_SLOTS } from '../../constants';
-import type { BoothAvailableDate, BoothLocation } from '../../types';
-import { parseLocalDate, slotOverlapsRange } from '../format-utils';
+import type { BoothAvailableDate, BoothLocation, BoothTimeSlot } from '../../types';
+import { parseLocalDate, slotOverlapsRange, todayMidnight } from '../format-utils';
 
 /** Encode a slot as "boothId|date|startTime" for ignored/notified tracking */
 export function encodeSlotKey(boothId: number, date: string, startTime: string): string {
@@ -46,32 +46,29 @@ function isSlotIgnored(boothId: number, date: string, startTime: string, ignored
   return ignored.has(encodeSlotKey(boothId, date, startTime));
 }
 
+/** Check if a time slot matches the allowed filter starts (exact match or overlap) */
+function isSlotAllowed(slot: BoothTimeSlot, allowedStarts: Set<string>): boolean {
+  if (allowedStarts.size === 0) return true; // day with no time constraint
+  if (allowedStarts.has(slot.startTime)) return true;
+  return [...allowedStarts].some((start) => {
+    const end = slotEndTime(start);
+    return end ? slotOverlapsRange(slot, start, end) : false;
+  });
+}
+
 export function filterAvailableDates(dates: BoothAvailableDate[], filters: string[]): BoothAvailableDate[] {
   const byDay = parseFiltersByDay(filters);
-  const now = new Date();
-  const todayInt = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+  const today = todayMidnight();
   const result: BoothAvailableDate[] = [];
 
   for (const d of dates) {
     const dateObj = parseLocalDate(d.date);
-    if (!dateObj) continue;
-    const dateInt = dateObj.getFullYear() * 10000 + (dateObj.getMonth() + 1) * 100 + dateObj.getDate();
-    if (dateInt < todayInt) continue;
+    if (!dateObj || dateObj < today) continue;
 
-    const dayOfWeek = dateObj.getDay();
-    const allowedStarts = byDay.get(dayOfWeek);
+    const allowedStarts = byDay.get(dateObj.getDay());
     if (!allowedStarts) continue;
 
-    const slots = d.timeSlots.filter((s) => {
-      if (allowedStarts.size === 0) return true; // day with no time constraint
-      return (
-        allowedStarts.has(s.startTime) ||
-        [...allowedStarts].some((start) => {
-          const end = slotEndTime(start);
-          return end ? slotOverlapsRange(s, start, end) : false;
-        })
-      );
-    });
+    const slots = d.timeSlots.filter((s) => isSlotAllowed(s, allowedStarts));
     if (slots.length > 0) result.push({ date: d.date, timeSlots: slots });
   }
   return result;

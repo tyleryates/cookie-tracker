@@ -27,7 +27,18 @@ export function ExpandableRow({ firstCell, cells, detail, colSpan, rowClass, det
 
   return (
     <>
-      <tr class={rowClass || 'scout-row'} onClick={() => setExpanded(!expanded)}>
+      <tr
+        class={rowClass || 'scout-row'}
+        tabIndex={0}
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e: KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
+      >
         {separateCaret ? (
           <>
             <td class="expand-cell">
