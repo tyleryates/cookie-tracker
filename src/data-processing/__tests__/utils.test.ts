@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TRANSFER_TYPE } from '../../constants';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { Varieties } from '../../types';
-import { accumulateVarieties, buildPhysicalVarieties, isC2TTransfer, isKnownTransferType, sumPhysicalPackages } from '../utils';
+import { accumulateVarietiesInto, buildPhysicalVarieties, isC2TTransfer, isKnownTransferType, sumPhysicalPackages } from '../utils';
 
 // =============================================================================
 // isC2TTransfer
@@ -93,33 +93,33 @@ describe('sumPhysicalPackages', () => {
 });
 
 // =============================================================================
-// accumulateVarieties
+// accumulateVarietiesInto
 // =============================================================================
 
-describe('accumulateVarieties', () => {
+describe('accumulateVarietiesInto', () => {
   it('accumulates source into target', () => {
     const target: Varieties = { THIN_MINTS: 2 };
-    accumulateVarieties({ THIN_MINTS: 3, TREFOILS: 5 }, target);
+    accumulateVarietiesInto({ THIN_MINTS: 3, TREFOILS: 5 }, target);
     expect(target.THIN_MINTS).toBe(5);
     expect(target.TREFOILS).toBe(5);
   });
 
   it('respects excludeCookieShare option', () => {
     const target: Varieties = {};
-    accumulateVarieties({ THIN_MINTS: 3, COOKIE_SHARE: 2 }, target, { excludeCookieShare: true });
+    accumulateVarietiesInto({ THIN_MINTS: 3, COOKIE_SHARE: 2 }, target, { excludeCookieShare: true });
     expect(target.THIN_MINTS).toBe(3);
     expect(target.COOKIE_SHARE).toBeUndefined();
   });
 
   it('respects sign: -1 option', () => {
     const target: Varieties = { THIN_MINTS: 10 };
-    accumulateVarieties({ THIN_MINTS: 3 }, target, { sign: -1 });
+    accumulateVarietiesInto({ THIN_MINTS: 3 }, target, { sign: -1 });
     expect(target.THIN_MINTS).toBe(7);
   });
 
   it('combines excludeCookieShare and sign options', () => {
     const target: Varieties = { THIN_MINTS: 10, COOKIE_SHARE: 5 };
-    accumulateVarieties({ THIN_MINTS: 2, COOKIE_SHARE: 3 }, target, { excludeCookieShare: true, sign: -1 });
+    accumulateVarietiesInto({ THIN_MINTS: 2, COOKIE_SHARE: 3 }, target, { excludeCookieShare: true, sign: -1 });
     expect(target.THIN_MINTS).toBe(8);
     expect(target.COOKIE_SHARE).toBe(5); // unchanged
   });

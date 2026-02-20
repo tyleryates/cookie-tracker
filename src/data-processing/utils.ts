@@ -56,7 +56,11 @@ export function isKnownTransferType(transferType: string): boolean {
 }
 
 /** Accumulate variety counts into a target, optionally excluding Cookie Share */
-export function accumulateVarieties(source: Varieties, target: Varieties, options?: { excludeCookieShare?: boolean; sign?: number }): void {
+export function accumulateVarietiesInto(
+  source: Varieties,
+  target: Varieties,
+  options?: { excludeCookieShare?: boolean; sign?: number }
+): void {
   const sign = options?.sign ?? 1;
   const excludeCS = options?.excludeCookieShare ?? false;
   for (const [variety, count] of Object.entries(source)) {
@@ -72,6 +76,11 @@ export function mapToRecord<V>(map: ReadonlyMap<string | number, V>): Record<str
   const result: Record<string, V> = {};
   for (const [k, v] of map) result[String(k)] = v;
   return result;
+}
+
+/** Build a scout display name from first/last name parts */
+export function buildScoutName(firstName: string, lastName: string): string {
+  return `${firstName.trim()} ${lastName.trim()}`.trim();
 }
 
 /** Build physical varieties (everything except Cookie Share) from a full varieties map */

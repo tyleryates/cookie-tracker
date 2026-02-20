@@ -142,7 +142,8 @@ function mutateUnknownTransferType(store: DataStore): number {
     physicalPackages: 0,
     cases: 0,
     varieties: {},
-    physicalVarieties: {}
+    physicalVarieties: {},
+    actions: { submittable: false, approvable: false }
   };
   store.transfers.push(fakeTransfer);
   log('Pushed transfer with unknown type "XYZZY"');

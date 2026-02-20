@@ -294,6 +294,32 @@ export type WarningType = (typeof WARNING_TYPE)[keyof typeof WARNING_TYPE];
 export const DEFAULT_COUNCIL_ID = '623';
 
 // ============================================================================
+// ORDER STATUS CLASSIFICATION
+// ============================================================================
+
+export const ORDER_STATUS_CLASS = {
+  NEEDS_APPROVAL: 'NEEDS_APPROVAL',
+  COMPLETED: 'COMPLETED',
+  PENDING: 'PENDING',
+  UNKNOWN: 'UNKNOWN'
+} as const;
+
+export type OrderStatusClass = (typeof ORDER_STATUS_CLASS)[keyof typeof ORDER_STATUS_CLASS];
+
+// ============================================================================
+// SYNC STATUS
+// ============================================================================
+
+export const SYNC_STATUS = {
+  IDLE: 'idle',
+  SYNCING: 'syncing',
+  SYNCED: 'synced',
+  ERROR: 'error'
+} as const;
+
+export type SyncStatus = (typeof SYNC_STATUS)[keyof typeof SYNC_STATUS];
+
+// ============================================================================
 // HTTP STATUS CODES
 // ============================================================================
 

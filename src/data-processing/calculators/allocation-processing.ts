@@ -5,7 +5,7 @@ import { ALLOCATION_CHANNEL, ALLOCATION_SOURCE, SCOUT_PHYSICAL_CATEGORIES, TRANS
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { ReadonlyDataStore } from '../../data-store';
 import type { Scout } from '../../types';
-import { accumulateVarieties } from '../utils';
+import { accumulateVarietiesInto } from '../utils';
 
 import { buildGirlIdToNameMap, findScoutByGirlId } from './helpers';
 
@@ -54,7 +54,7 @@ function addInventory(store: ReadonlyDataStore, scoutDataset: Map<string, Scout>
 
     const sign = isPickup ? 1 : -1;
     scout.inventory.total += sign * (transfer.physicalPackages || 0);
-    accumulateVarieties(transfer.physicalVarieties, scout.inventory.varieties, { sign });
+    accumulateVarietiesInto(transfer.physicalVarieties, scout.inventory.varieties, { sign });
   }
 }
 

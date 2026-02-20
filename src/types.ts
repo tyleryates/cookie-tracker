@@ -8,6 +8,7 @@ import type {
   OrderType,
   Owner,
   PaymentMethod,
+  SyncStatus,
   TransferCategory,
   TransferType,
   WarningType
@@ -81,8 +82,8 @@ export interface Order {
 // ============================================================================
 
 interface TransferActions {
-  submittable?: boolean;
-  approvable?: boolean;
+  submittable: boolean;
+  approvable: boolean;
 }
 
 export interface Transfer {
@@ -99,7 +100,7 @@ export interface Transfer {
   physicalVarieties: Varieties;
   amount?: number;
   status?: string;
-  actions?: TransferActions;
+  actions: TransferActions;
 }
 
 export type TransferInput = Partial<Transfer> & {
@@ -290,7 +291,7 @@ export interface Warning {
 
 export interface ScrapeProgress {
   endpoint: string;
-  status: 'syncing' | 'synced' | 'error';
+  status: Exclude<SyncStatus, 'idle'>;
   cached?: boolean;
   durationMs?: number;
   dataSize?: number;
@@ -305,7 +306,7 @@ export type ProgressCallback = ((progress: ScrapeProgress) => void) | null;
 // ============================================================================
 
 export interface EndpointSyncState {
-  status: 'idle' | 'syncing' | 'synced' | 'error';
+  status: SyncStatus;
   lastSync: string | null;
   cached?: boolean;
   durationMs?: number;
@@ -574,7 +575,7 @@ export interface ScrapeResults {
 
 export interface EndpointMetadata {
   lastSync: string | null;
-  status: 'synced' | 'error';
+  status: Extract<SyncStatus, 'synced' | 'error'>;
   durationMs?: number;
   dataSize?: number;
   httpStatus?: number;

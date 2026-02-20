@@ -4,7 +4,7 @@
 import { DC_COLUMNS, SPECIAL_IDENTIFIERS } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
 import type { RawDataRow, Scout } from '../../types';
-import { buildScoutName } from '../importers/scout-helpers';
+import { buildScoutName } from '../utils';
 
 /** Initialize scouts from Digital Cookie and Smart Cookie data */
 function initializeScouts(store: ReadonlyDataStore, rawDCData: RawDataRow[]): Map<string, Scout> {

@@ -17,7 +17,7 @@ import { COOKIE_TYPE } from '../../cookie-constants';
 import Logger from '../../logger';
 import type { Order, RawDataRow, Scout, Varieties, Warning } from '../../types';
 import { parseVarietiesFromDC } from '../importers/parsers';
-import { buildScoutName } from '../importers/scout-helpers';
+import { buildScoutName } from '../utils';
 
 /** Classify payment method from DC payment status string */
 function classifyPaymentMethod(paymentStatus: string): PaymentMethod | null {

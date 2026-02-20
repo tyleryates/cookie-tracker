@@ -4,7 +4,7 @@ import { DATA_SOURCE_METADATA_KEY, type DataSource, OWNER, TRANSFER_CATEGORY, TR
 import { buildPhysicalVarieties, isC2TTransfer, sumPhysicalPackages } from './data-processing/utils';
 import type { DataStore } from './data-store';
 import Logger from './logger';
-import type { Order, OrderMetadata, Transfer, TransferInput } from './types';
+import type { Order, Transfer, TransferInput } from './types';
 
 /** Check if a from/to field matches our troop number.
  *  Handles format mismatch: troopNumber is a numeric ID (e.g. "3990")
@@ -136,13 +136,11 @@ export function createTransfer(data: TransferInput): Transfer {
     physicalVarieties: physicalVarieties,
     amount: data.amount,
     status: data.status || '',
-    actions: data.actions || {}
+    actions: {
+      submittable: data.actions?.submittable ?? false,
+      approvable: data.actions?.approvable ?? false
+    }
   };
-}
-
-/** Get the metadata key for a data source */
-function getMetadataKey(source: DataSource): keyof OrderMetadata {
-  return DATA_SOURCE_METADATA_KEY[source];
 }
 
 /** Merge into existing order or create new one, storing it in the data store */
@@ -154,7 +152,7 @@ export function mergeOrCreateOrder(
   rawData: Record<string, unknown>,
   enrichmentFn?: ((existing: Order, newData: Partial<Order>) => void) | null
 ): Order {
-  const metadataKey = getMetadataKey(source);
+  const metadataKey = DATA_SOURCE_METADATA_KEY[source];
 
   if (store.orders.has(orderNum)) {
     const existing = store.orders.get(orderNum)!;

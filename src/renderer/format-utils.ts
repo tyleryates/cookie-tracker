@@ -8,75 +8,79 @@ import type { Allocation, BoothReservationImported, BoothTimeSlot, Scout, Transf
 // DATE FORMATTING
 // ============================================================================
 
-/** Centralized date formatting utilities */
-const DateFormatter = {
-  /** Format date from YYYY/MM/DD to MM/DD/YYYY */
-  toDisplay(dateStr: string | null | undefined): string {
-    if (!dateStr) return '-';
-    const str = String(dateStr);
-    const match = str.match(/^(\d{4})[/-](\d{2})[/-](\d{2})/);
-    if (match) {
-      const [, year, month, day] = match;
-      return `${month}/${day}/${year}`;
-    }
-    return str;
-  },
-
-  /** Format full timestamp for hover (e.g., "Feb 5, 2026, 3:45 PM") */
-  toFullTimestamp(date: string | Date | null | undefined): string {
-    if (!date) return 'Never synced';
-
-    const then = new Date(date);
-    return then.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-  },
-
-  /** Format friendly relative timestamp with time-of-day (e.g. "Today at 3:45 PM", "2 days ago") */
-  toRelativeTimestamp(date: string | Date | null | undefined): string {
-    if (!date) return 'Never';
-
-    const now = new Date();
-    const then = new Date(date);
-    const diffMs = now.getTime() - then.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-
-    const timeStr = then.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-
-    const isToday = then.toDateString() === now.toDateString();
-
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const isYesterday = then.toDateString() === yesterday.toDateString();
-
-    const nowDay = new Date(now);
-    nowDay.setHours(0, 0, 0, 0);
-    const thenDay = new Date(then);
-    thenDay.setHours(0, 0, 0, 0);
-    const daysDiff = Math.floor((nowDay.getTime() - thenDay.getTime()) / MS_PER_DAY);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
-    if (isToday) return `Today at ${timeStr}`;
-    if (isYesterday) return `Yesterday at ${timeStr}`;
-    if (daysDiff < 7) return `${daysDiff} days ago at ${timeStr}`;
-
-    const dateStr = then.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: then.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-    });
-    return `${dateStr} at ${timeStr}`;
+/** Format date from YYYY/MM/DD to MM/DD/YYYY */
+function formatDateForDisplay(dateStr: string | null | undefined): string {
+  if (!dateStr) return '-';
+  const str = String(dateStr);
+  const match = str.match(/^(\d{4})[/-](\d{2})[/-](\d{2})/);
+  if (match) {
+    const [, year, month, day] = match;
+    return `${month}/${day}/${year}`;
   }
+  return str;
+}
+
+/** Format full timestamp for hover (e.g., "Feb 5, 2026, 3:45 PM") */
+function formatFullTimestamp(date: string | Date | null | undefined): string {
+  if (!date) return 'Never synced';
+
+  const then = new Date(date);
+  return then.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+/** Format friendly relative timestamp with time-of-day (e.g. "Today at 3:45 PM", "2 days ago") */
+function formatRelativeTimestamp(date: string | Date | null | undefined): string {
+  if (!date) return 'Never';
+
+  const now = new Date();
+  const then = new Date(date);
+  const diffMs = now.getTime() - then.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+
+  const timeStr = then.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  const isToday = then.toDateString() === now.toDateString();
+
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = then.toDateString() === yesterday.toDateString();
+
+  const nowDay = new Date(now);
+  nowDay.setHours(0, 0, 0, 0);
+  const thenDay = new Date(then);
+  thenDay.setHours(0, 0, 0, 0);
+  const daysDiff = Math.floor((nowDay.getTime() - thenDay.getTime()) / MS_PER_DAY);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
+  if (isToday) return `Today at ${timeStr}`;
+  if (isYesterday) return `Yesterday at ${timeStr}`;
+  if (daysDiff < 7) return `${daysDiff} days ago at ${timeStr}`;
+
+  const dateStr = then.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: then.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+  });
+  return `${dateStr} at ${timeStr}`;
+}
+
+/** Backwards-compatible namespace — delegates to plain functions above */
+const DateFormatter = {
+  toDisplay: formatDateForDisplay,
+  toFullTimestamp: formatFullTimestamp,
+  toRelativeTimestamp: formatRelativeTimestamp
 };
 
 /** Canonical date parser — handles ISO (YYYY-MM-DD) and US (MM/DD/YYYY) formats.

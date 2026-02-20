@@ -1,7 +1,7 @@
 // Scout-Level Calculations
 // Handles all per-scout totals, variety calculations, and financial tracking
 
-import { ALLOCATION_CHANNEL, ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
+import { ALLOCATION_CHANNEL, ORDER_STATUS_CLASS, ORDER_TYPE, OWNER, PAYMENT_METHOD } from '../../constants';
 import { calculateRevenue, PHYSICAL_COOKIE_TYPES } from '../../cookie-constants';
 import { classifyOrderStatus } from '../../order-classification';
 import type { CookieType, Order, Scout, Varieties } from '../../types';
@@ -146,13 +146,13 @@ function countOrderStatuses(scout: Scout): { needsApproval: number; pending: num
   let completed = 0;
   for (const order of scout.orders) {
     switch (classifyOrderStatus(order.status)) {
-      case 'NEEDS_APPROVAL':
+      case ORDER_STATUS_CLASS.NEEDS_APPROVAL:
         needsApproval++;
         break;
-      case 'PENDING':
+      case ORDER_STATUS_CLASS.PENDING:
         pending++;
         break;
-      case 'COMPLETED':
+      case ORDER_STATUS_CLASS.COMPLETED:
         completed++;
         break;
     }

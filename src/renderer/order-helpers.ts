@@ -1,5 +1,6 @@
 // Shared order display helpers — status styling, tooltips, name formatting
 
+import { ORDER_STATUS_CLASS } from '../constants';
 import { classifyOrderStatus } from '../order-classification';
 import type { Order } from '../types';
 
@@ -9,11 +10,11 @@ function titleCase(s: string): string {
 
 export function getStatusStyle(status: string | undefined): { className: string; text: string } {
   switch (classifyOrderStatus(status)) {
-    case 'NEEDS_APPROVAL':
+    case ORDER_STATUS_CLASS.NEEDS_APPROVAL:
       return { className: 'status-pill status-pill-error', text: 'Needs Approval' };
-    case 'COMPLETED':
+    case ORDER_STATUS_CLASS.COMPLETED:
       return { className: 'status-pill status-pill-success', text: 'Complete' };
-    case 'PENDING':
+    case ORDER_STATUS_CLASS.PENDING:
       return { className: 'status-pill status-pill-warning', text: 'Pending' };
     default:
       return { className: '', text: status || '' };
@@ -22,7 +23,7 @@ export function getStatusStyle(status: string | undefined): { className: string;
 
 export function isActionRequired(status: string | undefined): boolean {
   const s = classifyOrderStatus(status);
-  return s === 'NEEDS_APPROVAL' || s === 'PENDING';
+  return s === ORDER_STATUS_CLASS.NEEDS_APPROVAL || s === ORDER_STATUS_CLASS.PENDING;
 }
 
 /** Extract customer name from DC metadata for tooltip display */

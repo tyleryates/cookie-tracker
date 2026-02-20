@@ -27,6 +27,7 @@ const rootDataDir = path.join(userDataPath, 'data');
 
 // Initialize logger at root level first so migration logs go to a file
 Logger.init(rootDataDir);
+if (app.isPackaged) Logger.disableConsole();
 
 // Credentials + profiles live at root (shared across profiles)
 const credentialsManager = new CredentialsManager(rootDataDir);

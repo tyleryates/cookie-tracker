@@ -81,7 +81,7 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   async fetchOrders(signal?: AbortSignal): Promise<SCOrdersResponse> {
-    this.checkAborted(signal);
+    this.throwIfAborted(signal);
 
     await this.initializeOrdersContext(signal);
 
@@ -107,7 +107,7 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   async fetchDirectShipDivider(signal?: AbortSignal): Promise<SCDirectShipDivider> {
-    this.checkAborted(signal);
+    this.throwIfAborted(signal);
     return this.session.apiGet<SCDirectShipDivider>('/webapi/api/troops/directship/smart-directship-divider', 'Direct ship', signal);
   }
 
@@ -116,7 +116,7 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   async fetchAllVirtualCookieShares(ordersData: SCOrdersResponse, signal?: AbortSignal): Promise<Record<string, SCVirtualCookieShare>> {
-    this.checkAborted(signal);
+    this.throwIfAborted(signal);
 
     const keyedShares: Record<string, SCVirtualCookieShare> = {};
 
@@ -127,7 +127,7 @@ class SmartCookieScraper extends BaseScraper {
     });
 
     for (const order of cookieShareOrders) {
-      this.checkAborted(signal);
+      this.throwIfAborted(signal);
       const orderId = String(order.id || order.order_id || '');
       if (orderId) {
         try {
@@ -175,7 +175,7 @@ class SmartCookieScraper extends BaseScraper {
   }
 
   async fetchFinanceList(signal?: AbortSignal): Promise<SCFinanceTransaction[]> {
-    this.checkAborted(signal);
+    this.throwIfAborted(signal);
     return this.session.apiGet<SCFinanceTransaction[]>('/ported/finance/list?troop=false', 'Finance list', signal);
   }
 
@@ -201,7 +201,7 @@ class SmartCookieScraper extends BaseScraper {
 
     // Process in batches of BOOTH_DIVIDER_CONCURRENCY
     for (let i = 0; i < distributed.length; i += BOOTH_DIVIDER_CONCURRENCY) {
-      this.checkAborted(signal);
+      this.throwIfAborted(signal);
       const batch = distributed.slice(i, i + BOOTH_DIVIDER_CONCURRENCY);
 
       const batchResults = await Promise.all(
@@ -364,7 +364,7 @@ class SmartCookieScraper extends BaseScraper {
     }
 
     try {
-      this.checkAborted(signal);
+      this.throwIfAborted(signal);
 
       // Phase 1: Login
       this.sendEndpointStatus('sc-login', 'syncing');
@@ -378,7 +378,7 @@ class SmartCookieScraper extends BaseScraper {
       }
       this.sendEndpointStatus('sc-login', 'synced');
 
-      this.checkAborted(signal);
+      this.throwIfAborted(signal);
 
       // Phase 2: Independent fetches in parallel
       const storedCookies = seasonalData?.loadCookies();
@@ -413,7 +413,7 @@ class SmartCookieScraper extends BaseScraper {
       if (cookieIdMap) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_COOKIE_ID_MAP, cookieIdMap);
       if (financeData.length > 0) savePipelineFile(this.dataDir, PIPELINE_FILES.SC_FINANCE, financeData);
 
-      this.checkAborted(signal);
+      this.throwIfAborted(signal);
 
       // Phase 3: Dependent fetches
       const [cookieShares, boothAllocations, boothLocations] = await Promise.all([

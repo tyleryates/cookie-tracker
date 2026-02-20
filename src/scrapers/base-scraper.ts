@@ -2,6 +2,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import type { SyncStatus } from '../constants';
 import Logger from '../logger';
 import type { ProgressCallback } from '../types';
 
@@ -35,7 +36,7 @@ export abstract class BaseScraper {
 
   sendEndpointStatus(
     endpoint: string,
-    status: 'syncing' | 'synced' | 'error',
+    status: Exclude<SyncStatus, 'idle'>,
     cached?: boolean,
     durationMs?: number,
     dataSize?: number,
@@ -47,7 +48,7 @@ export abstract class BaseScraper {
     }
   }
 
-  protected checkAborted(signal?: AbortSignal): void {
+  protected throwIfAborted(signal?: AbortSignal): void {
     if (signal?.aborted) throw new Error('Sync cancelled');
   }
 }

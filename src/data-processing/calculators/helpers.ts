@@ -3,7 +3,7 @@
 
 import { ORDER_TYPE, OWNER } from '../../constants';
 import type { Allocation, Order, Scout, Varieties } from '../../types';
-import { accumulateVarieties } from '../utils';
+import { accumulateVarietiesInto } from '../utils';
 
 /**
  * Whether an order draws from the scout's physical inventory.
@@ -35,7 +35,7 @@ function channelTotals(allocations: Allocation[]): { packages: number; donations
     packages += a.packages;
     donations += a.donations;
     if (a.varieties) {
-      accumulateVarieties(a.varieties, varieties);
+      accumulateVarietiesInto(a.varieties, varieties);
     }
   }
   return { packages, donations, varieties };
@@ -53,7 +53,7 @@ function calculateSalesByVariety(scout: Scout): Varieties {
   const inventoryOrders = scout.orders.filter((order) => needsInventory(order));
 
   for (const order of inventoryOrders) {
-    accumulateVarieties(order.varieties, salesByVariety, { excludeCookieShare: true });
+    accumulateVarietiesInto(order.varieties, salesByVariety, { excludeCookieShare: true });
   }
 
   return salesByVariety;

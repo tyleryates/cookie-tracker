@@ -21,6 +21,7 @@ try {
 let logStream: import('node:fs').WriteStream | null = null;
 let logFilePath: string | null = null;
 let isRenderer = false;
+let consoleEnabled = true;
 
 function formatData(data: unknown): string {
   if (data === null || data === undefined) return '';
@@ -42,22 +43,26 @@ function timestamp(): string {
   return `${hh}:${mm}:${ss}.${ms}`;
 }
 
-/** Scrub potentially sensitive values (tokens, passwords) from log output */
+/** Scrub potentially sensitive values (tokens, passwords, secrets, keys) from log output */
 function redact(text: string): string {
   return text
-    .replace(/(["']?password["']?\s*[:=]\s*)["'][^"']*["']/gi, '$1"***"')
+    .replace(
+      /(["']?(?:password|passwd|secret|secretKey|api_key|apiKey|access_token|refresh_token)["']?\s*[:=]\s*)["'][^"']*["']/gi,
+      '$1"***"'
+    )
     .replace(/(["']?token["']?\s*[:=]\s*)["'][^"']*["']/gi, '$1"***"')
-    .replace(/(xsrf|csrf|authorization|x-xsrf-token)["']?\s*[:=]\s*[^\s,;}'"]+/gi, '$1=***');
+    .replace(/(xsrf|csrf|authorization|x-xsrf-token|cookie)["']?\s*[:=]\s*[^\s,;}'"]+/gi, '$1=***');
 }
 
 function writeLine(level: string, message: string, data: unknown): void {
   const prefix = isRenderer ? 'R' : 'M';
   const line = `${timestamp()} [${prefix}] [${level}] ${message}${redact(formatData(data))}\n`;
 
-  // Always log to console
-  if (level === 'ERROR') console.error(line.trimEnd());
-  else if (level === 'WARN') console.warn(line.trimEnd());
-  else console.log(line.trimEnd());
+  if (consoleEnabled) {
+    if (level === 'ERROR') console.error(line.trimEnd());
+    else if (level === 'WARN') console.warn(line.trimEnd());
+    else console.log(line.trimEnd());
+  }
 
   if (isRenderer) {
     // Fire-and-forget to main process
@@ -105,6 +110,11 @@ const Logger = {
   /** Call from renderer process to mark logs with [R] prefix */
   initRenderer(): void {
     isRenderer = true;
+  },
+
+  /** Disable console output (call in production builds to avoid leaking data via crash reports) */
+  disableConsole(): void {
+    consoleEnabled = false;
   },
 
   /** Append a raw line from the renderer (called by main IPC handler) */

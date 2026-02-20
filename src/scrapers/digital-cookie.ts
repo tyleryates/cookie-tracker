@@ -23,7 +23,7 @@ class DigitalCookieScraper extends BaseScraper {
 
   /** Download export file */
   async downloadExport(councilId = DEFAULT_COUNCIL_ID, signal?: AbortSignal): Promise<string> {
-    this.checkAborted(signal);
+    this.throwIfAborted(signal);
 
     const { troopId, serviceUnitId } = this.session.extractTroopInfo(this.session.selectedRoleName!);
 
@@ -60,7 +60,7 @@ class DigitalCookieScraper extends BaseScraper {
       throw new Error(errMsg);
     }
 
-    this.checkAborted(signal);
+    this.throwIfAborted(signal);
 
     // Sanitize server-provided filename to prevent path traversal in URL
     const fileName = encodeURIComponent(rawFileName.replace(/[^a-zA-Z0-9._-]/g, '_'));
@@ -95,7 +95,7 @@ class DigitalCookieScraper extends BaseScraper {
     }
 
     try {
-      this.checkAborted(signal);
+      this.throwIfAborted(signal);
       const councilId = credentials.councilId || DEFAULT_COUNCIL_ID;
 
       // Login via session
@@ -112,7 +112,7 @@ class DigitalCookieScraper extends BaseScraper {
         throw loginError;
       }
 
-      this.checkAborted(signal);
+      this.throwIfAborted(signal);
 
       // Download export
       Logger.info('dc-troop-report: downloading...');

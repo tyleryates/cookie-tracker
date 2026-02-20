@@ -28,7 +28,7 @@ Electron desktop app that syncs and reconciles Girl Scout cookie sales data from
 - **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
 - **Reconciliation** — Matches orders across systems, detects discrepancies
 - **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **12 reports in 5 tab groups + To-Do** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming), Donations, Cookie Popularity. Optional toggles in Settings: Inventory History, Booth Finder
+- **11 core reports in 5 tab groups + To-Do + 2 optional** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming), Donations, Cookie Popularity. Optional toggles in Settings: Inventory History, Booth Finder
 - **Profile management** — Import, switch, and delete data profiles for managing multiple troops
 - **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
 
@@ -71,6 +71,7 @@ Three layers with strict boundaries:
 | `varieties.ts` | Cookie variety popularity and inventory totals |
 | `troop-totals.ts` | Top-level troop financial and inventory aggregation |
 | `metadata.ts` | HealthChecks, warnings, data source metadata |
+| `helpers.ts` | Shared utility functions for scout calculations (`needsInventory`, `totalCredited`, `channelTotals`, `calculateSalesByVariety`) |
 
 ### Key Source Files
 
@@ -153,6 +154,7 @@ Hooks in `renderer/hooks/`:
 | `use-sync.ts` | Sync orchestration — scrape handler, booth refresh, auto-sync polling, IPC event listeners, OS notifications |
 | `use-data-loader.ts` | Data loading via IPC, refresh after sync, error handling |
 | `use-status-message.ts` | Transient status notification display with auto-dismiss timer |
+| `sync-formatters.ts` | Sync notification formatting — log/user messages for sync results |
 
 ### Layer Rules
 

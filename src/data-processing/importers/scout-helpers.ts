@@ -6,12 +6,11 @@ import type { DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
 import type { SCDividerGirl } from '../../scrapers/sc-types';
 import type { CookieType, RawScoutData, Varieties } from '../../types';
+import { buildScoutName } from '../utils';
 import { parseVarietiesFromAPI } from './parsers';
 
-/** Build a scout display name from first/last name parts */
-export function buildScoutName(firstName: string, lastName: string): string {
-  return `${firstName.trim()} ${lastName.trim()}`.trim();
-}
+// Re-export so existing importer-layer imports don't break
+export { buildScoutName } from '../utils';
 
 /** Record import metadata (timestamp + source entry) */
 export function recordImportMetadata(
@@ -43,11 +42,14 @@ export function updateScoutData(store: DataStore, scoutName: string, data: Parti
   const scout = store.scouts.get(scoutName);
   if (!scout) return;
 
-  for (const key of Object.keys(data) as Array<keyof RawScoutData>) {
-    if (data[key] !== null && data[key] !== undefined) {
-      (scout as Record<string, any>)[key] = data[key];
-    }
-  }
+  if (data.name != null) scout.name = data.name;
+  if (data.scoutId != null) scout.scoutId = data.scoutId;
+  if (data.gsusaId != null) scout.gsusaId = data.gsusaId;
+  if (data.gradeLevel != null) scout.gradeLevel = data.gradeLevel;
+  if (data.serviceUnit != null) scout.serviceUnit = data.serviceUnit;
+  if (data.troopId != null) scout.troopId = data.troopId;
+  if (data.council != null) scout.council = data.council;
+  if (data.district != null) scout.district = data.district;
 }
 
 /** Register a scout by girlId, creating the scout entry if needed */

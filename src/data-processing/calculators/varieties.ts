@@ -4,7 +4,7 @@
 import { ORDER_TYPE, T2G_CATEGORIES, TRANSFER_CATEGORY, TRANSFER_TYPE, TROOP_INVENTORY_IN_CATEGORIES } from '../../constants';
 import type { ReadonlyDataStore } from '../../data-store';
 import type { Scout, Varieties, VarietiesResult } from '../../types';
-import { accumulateVarieties } from '../utils';
+import { accumulateVarietiesInto } from '../utils';
 import { needsInventory } from './helpers';
 
 /**
@@ -30,13 +30,13 @@ function buildVarieties(store: ReadonlyDataStore, scouts: Record<string, Scout>)
     // Girl delivery + direct ship orders
     for (const order of scout.orders) {
       if (needsInventory(order) || order.orderType === ORDER_TYPE.DIRECT_SHIP) {
-        accumulateVarieties(order.varieties, byCookie, { excludeCookieShare: true });
+        accumulateVarietiesInto(order.varieties, byCookie, { excludeCookieShare: true });
       }
     }
     // Credited allocations (booth sales, virtual booth, direct ship)
     if (!scout.isSiteOrder) {
       for (const alloc of scout.allocations) {
-        accumulateVarieties(alloc.varieties, byCookie, { excludeCookieShare: true });
+        accumulateVarietiesInto(alloc.varieties, byCookie, { excludeCookieShare: true });
       }
     }
   }
@@ -47,9 +47,9 @@ function buildVarieties(store: ReadonlyDataStore, scouts: Record<string, Scout>)
   for (const transfer of store.transfers) {
     if (transfer.type === TRANSFER_TYPE.PLANNED) continue;
     if (TROOP_INVENTORY_IN_CATEGORIES.has(transfer.category)) {
-      accumulateVarieties(transfer.physicalVarieties, inventory);
+      accumulateVarietiesInto(transfer.physicalVarieties, inventory);
     } else if (T2G_CATEGORIES.has(transfer.category) || transfer.category === TRANSFER_CATEGORY.TROOP_OUTGOING) {
-      accumulateVarieties(transfer.physicalVarieties, inventory, { sign: -1 });
+      accumulateVarietiesInto(transfer.physicalVarieties, inventory, { sign: -1 });
     }
   }
 

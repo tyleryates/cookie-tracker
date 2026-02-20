@@ -1,6 +1,6 @@
 import type preact from 'preact';
 import type { ComponentChildren } from 'preact';
-import { ORDER_TYPE, OWNER } from '../../constants';
+import { ORDER_STATUS_CLASS, ORDER_TYPE, OWNER } from '../../constants';
 import { COOKIE_ORDER, getCookieAbbreviation, getCookieColor, getCookieDisplayName } from '../../cookie-constants';
 import { classifyOrderStatus } from '../../order-classification';
 import type { CookieType, Scout, Transfer, TransferBreakdowns, UnifiedDataset, Varieties } from '../../types';
@@ -85,7 +85,7 @@ function splitSalesByType(scout: Scout): { inPerson: Varieties; delivery: Variet
   for (const order of scout.orders) {
     if (order.owner !== OWNER.GIRL) continue;
     if (order.orderType !== ORDER_TYPE.IN_HAND && order.orderType !== ORDER_TYPE.DELIVERY) continue;
-    const isRequested = classifyOrderStatus(order.status) === 'NEEDS_APPROVAL';
+    const isRequested = classifyOrderStatus(order.status) === ORDER_STATUS_CLASS.NEEDS_APPROVAL;
     const target = isRequested ? requested : order.orderType === ORDER_TYPE.IN_HAND ? inPerson : delivery;
     for (const [v, count] of Object.entries(order.varieties)) {
       if (!isPhysicalVariety(v)) continue;
@@ -141,9 +141,9 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
   const girlOrders = scout.orders.filter(
     (o) => o.owner === OWNER.GIRL && (o.orderType === ORDER_TYPE.DELIVERY || o.orderType === ORDER_TYPE.IN_HAND)
   );
-  const completeOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === 'COMPLETED');
-  const pendingOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === 'PENDING');
-  const requestedOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === 'NEEDS_APPROVAL');
+  const completeOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === ORDER_STATUS_CLASS.COMPLETED);
+  const pendingOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === ORDER_STATUS_CLASS.PENDING);
+  const requestedOrders = girlOrders.filter((o) => classifyOrderStatus(o.status) === ORDER_STATUS_CLASS.NEEDS_APPROVAL);
 
   // Complete varieties + in-person/delivery split for tooltip
   const completeVarieties: Varieties = {};
