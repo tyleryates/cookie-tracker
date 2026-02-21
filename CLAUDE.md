@@ -197,4 +197,3 @@ Hooks in `renderer/hooks/`:
 - **`RULES.md`** — Business rules, data classification, inventory, financials, health checks (single source of truth for how the app should behave)
 - **`docs/DESIGN-PRINCIPLES.md`** — Architecture principles: classify once, positive sums, reports calculate own needs
 - **`docs/DOMAIN.md`** — Cookie program domain knowledge, data format reference, scraper authentication, glossary
-- **`docs/DISTRIBUTION-UPDATES.md`** — Build, version, and release procedures
