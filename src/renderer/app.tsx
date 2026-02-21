@@ -216,12 +216,9 @@ function dispatchAndPersistBoothConfig(
   patch: Partial<BoothFinderConfig>,
   dispatch: (action: { type: 'LOAD_CONFIG' | 'IGNORE_SLOT'; config: AppConfig }) => void,
   actionType: 'LOAD_CONFIG' | 'IGNORE_SLOT' = 'LOAD_CONFIG'
-): Promise<void> {
+): void {
   if (config) dispatch({ type: actionType, config: updateBoothConfig(config, patch) });
-  return ipcInvoke('update-config', { boothFinder: patch }).then(
-    () => {},
-    () => {}
-  );
+  ipcInvoke('update-config', { boothFinder: patch }).catch(() => {});
 }
 
 // ============================================================================

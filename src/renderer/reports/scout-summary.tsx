@@ -143,6 +143,7 @@ export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
       <DataTable
         columns={['Scout', 'Orders', 'Delivered', 'In Person', 'Shipped', 'Credits', 'Total', 'Cash Collected', 'Digital Payments']}
         className="table-normal scout-table"
+        hint="Click a row to see order details and allocation breakdown."
       >
         {sortedScouts.map(([name, scout]) => {
           const { totals } = scout;

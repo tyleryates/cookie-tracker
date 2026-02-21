@@ -94,7 +94,7 @@ Three layers with strict boundaries:
 | `src/data-pipeline.ts` | Orchestrates: scan files, import, build UnifiedDataset |
 | `src/update-manager.ts` | Auto-update configuration, event handlers, quit-and-install logic |
 | `src/data-processing/utils.ts` | Shared helpers for data-processing layer (`mapToRecord`) |
-| `src/renderer/reports/available-booths-utils.ts` | Booth slot filtering, encoding, and summarization utilities |
+| `src/renderer/available-booths-utils.ts` | Booth slot filtering, encoding, and summarization utilities |
 | `src/renderer/order-helpers.ts` | Order display helpers (status pills, tooltips, payment formatting) |
 | `src/profile-manager.ts` | Multi-profile data directory management |
 | `src/json-file-utils.ts` | Shared atomic JSON load/save helpers used by config, seasonal data, etc. |
@@ -150,8 +150,9 @@ IPC handlers are organized by domain in `src/ipc-handlers/`:
 |---|---|
 | `app-header.tsx` | AppHeader bar with sync pills, refresh/settings buttons |
 | `reports-section.tsx` | TabBar + ReportContent components, health banner, report rendering |
-| `sync-section.tsx` | Sync state utilities (`createInitialSyncState`, `computeGroupStatuses`), SyncStatusSection, DataHealthChecks |
-| `settings-page.tsx` | Credential setup (SettingsPage), app toggle switches + profile management + import modal (SettingsToggles) |
+| `sync-section.tsx` | SyncStatusSection, DataHealthChecks, EndpointGroupTable |
+| `settings-credentials.tsx` | SettingsPage credential setup with SC/DC verification forms |
+| `settings-toggles.tsx` | SettingsToggles app settings, BoothFinderSettings, profile management |
 | `booth-selector.tsx` | Multi-select UI for choosing booth locations to track |
 | `booth-day-filter.tsx` | Day/time filter configuration for Available Booths report |
 | `scout-detail.tsx` | Expandable scout detail panel (orders, inventory, allocations) |
@@ -160,8 +161,11 @@ IPC handlers are organized by domain in `src/ipc-handlers/`:
 | `expandable-row.tsx` | Expandable/collapsible table row component |
 | `tooltip-cell.tsx` | Tooltip component for table cells |
 | `scout-credit-chips.tsx` | Shared chip display for per-scout allocation breakdowns |
+| `booth-info-row.tsx` | Shared booth row component for completed/upcoming booth tables |
+| `cookie-label.tsx` | Cookie variety label with color dot |
+| `no-dc-data-warning.tsx` | Reusable "No Digital Cookie data" warning banner |
 
-Other renderer-level files: `app-reducer.ts` (state management via useReducer), `data-loader.ts` (IPC data loading), `format-utils.ts` (display formatting), `ipc.ts` (IPC wrapper).
+Other renderer-level files: `app-reducer.ts` (state management via useReducer), `data-loader.ts` (IPC data loading), `format-utils.ts` (display formatting), `ipc.ts` (IPC wrapper), `sync-utils.ts` (sync state initialization, endpoint hydration, group status computation), `available-booths-utils.ts` (booth slot filtering, encoding, summarization), `order-helpers.ts` (order display helpers).
 
 Hooks in `renderer/hooks/`:
 

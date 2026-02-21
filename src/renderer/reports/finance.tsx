@@ -2,7 +2,7 @@ import type { Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { NoDCDataWarning } from '../components/no-dc-data-warning';
-import { STAT_COLORS, StatCards } from '../components/stat-cards';
+import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { formatCurrency, formatShortDate, getActiveScouts } from '../format-utils';
 
 // ============================================================================
@@ -13,56 +13,50 @@ function FinanceDetail({ scout }: { scout: Scout }) {
   const f = scout.totals.$financials;
   const payments = [...scout.payments].sort((a, b) => b.date.localeCompare(a.date));
 
+  const detailStats: Stat[] = [
+    { label: 'Pickup Value', value: formatCurrency(f.inventoryValue), description: 'Cookies picked up', color: STAT_COLORS.BLUE }
+  ];
+
+  if (f.electronicPayments > 0) {
+    detailStats.push({
+      label: 'Electronic',
+      value: formatCurrency(f.electronicPayments),
+      description: 'Digital payments',
+      color: STAT_COLORS.TEAL,
+      operator: '\u2212'
+    });
+  }
+
+  detailStats.push({
+    label: 'Cash Owed',
+    value: formatCurrency(f.cashOwed),
+    description: f.electronicPayments > 0 ? 'After digital payments' : 'Total owed',
+    color: STAT_COLORS.BLUE,
+    operator: f.electronicPayments > 0 ? '=' : undefined,
+    highlight: f.paymentsTurnedIn === 0
+  });
+
+  if (f.paymentsTurnedIn > 0) {
+    detailStats.push({
+      label: 'Paid',
+      value: formatCurrency(f.paymentsTurnedIn),
+      description: 'Turned in to troop',
+      color: STAT_COLORS.GREEN,
+      operator: '\u2212'
+    });
+    detailStats.push({
+      label: 'Cash Due',
+      value: formatCurrency(f.cashDue),
+      description: f.cashDue > 0 ? 'Still owed' : 'Fully paid',
+      color: f.cashDue > 0 ? STAT_COLORS.RED : STAT_COLORS.GREEN,
+      operator: '=',
+      highlight: true
+    });
+  }
+
   return (
     <div class="scout-breakdown">
-      <div class="section-break-sm">
-        <DataTable columns={['', '']} className="table-compact">
-          <tr>
-            <td>Pickup value</td>
-            <td>{formatCurrency(f.inventoryValue)}</td>
-          </tr>
-          {f.electronicPayments > 0 && (
-            <tr>
-              <td>Electronic payments</td>
-              <td>-{formatCurrency(f.electronicPayments)}</td>
-            </tr>
-          )}
-          {f.cashCollected > 0 && (
-            <tr>
-              <td>Sales cash</td>
-              <td>{formatCurrency(f.cashCollected)}</td>
-            </tr>
-          )}
-          {f.unsoldValue > 0 && (
-            <tr>
-              <td>Unsold inventory</td>
-              <td>{formatCurrency(f.unsoldValue)}</td>
-            </tr>
-          )}
-          <tr>
-            <td>
-              <strong>Cash owed</strong>
-            </td>
-            <td>
-              <strong>{formatCurrency(f.cashOwed)}</strong>
-            </td>
-          </tr>
-          {f.paymentsTurnedIn > 0 && (
-            <tr>
-              <td>Payments turned in</td>
-              <td>-{formatCurrency(f.paymentsTurnedIn)}</td>
-            </tr>
-          )}
-          <tr>
-            <td>
-              <strong>Cash due</strong>
-            </td>
-            <td>
-              <strong>{formatCurrency(f.cashDue)}</strong>
-            </td>
-          </tr>
-        </DataTable>
-      </div>
+      <StatCards stats={detailStats} />
 
       {payments.length > 0 && (
         <div class="section-break">
@@ -72,7 +66,9 @@ function FinanceDetail({ scout }: { scout: Scout }) {
               {payments.map((p) => (
                 <tr key={p.id}>
                   <td>{formatShortDate(p.date)}</td>
-                  <td>{formatCurrency(p.amount)}</td>
+                  <td>
+                    <span class="cash-amount">{formatCurrency(p.amount)}</span>
+                  </td>
                   <td>{p.method}</td>
                   <td>{p.reference || '\u2014'}</td>
                 </tr>
@@ -140,11 +136,14 @@ export function FinanceReport({ data }: { data: UnifiedDataset }) {
       {!data.metadata.lastImportDC && <NoDCDataWarning>Cash owed amounts may be incomplete.</NoDCDataWarning>}
 
       <StatCards stats={stats} />
-      <DataTable columns={['Scout', 'Cash Owed', 'Paid', 'Cash Due']} className="table-normal scout-table">
+      <DataTable
+        columns={['Scout', 'Cash Owed', 'Paid', 'Cash Due']}
+        className="table-normal scout-table"
+        hint="Click a row to see payment breakdown."
+      >
         {sortedScouts.map(([name, scout]) => {
           const f = scout.totals.$financials;
           const cashDue = Math.round(f.cashDue);
-          const cashDueClass = cashDue > 0 ? 'status-error-dark' : 'success-text';
 
           return (
             <ExpandableRow
@@ -152,9 +151,15 @@ export function FinanceReport({ data }: { data: UnifiedDataset }) {
               rowClass="scout-row"
               firstCell={<strong>{name}</strong>}
               cells={[
-                formatCurrency(f.cashOwed),
-                f.paymentsTurnedIn > 0 ? formatCurrency(f.paymentsTurnedIn) : '\u2014',
-                cashDue > 0 ? <span class={cashDueClass}>{formatCurrency(f.cashDue)}</span> : '\u2014'
+                <span class="digital-amount">{formatCurrency(f.cashOwed)}</span>,
+                f.paymentsTurnedIn > 0 ? <span class="cash-amount">{formatCurrency(f.paymentsTurnedIn)}</span> : '\u2014',
+                cashDue > 0 ? (
+                  <span class="cash-due-pill">{formatCurrency(f.cashDue)}</span>
+                ) : f.paymentsTurnedIn > 0 ? (
+                  <span class="cash-paid-pill">{'\u2713 Paid'}</span>
+                ) : (
+                  '\u2014'
+                )
               ]}
               detail={<FinanceDetail scout={scout} />}
               colSpan={COLUMN_COUNT}

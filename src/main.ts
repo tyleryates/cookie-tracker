@@ -5,7 +5,7 @@ import ConfigManager from './config-manager';
 import CredentialsManager from './credentials-manager';
 import { registerAllHandlers } from './ipc-handlers';
 import { saveJsonFile } from './json-file-utils';
-import Logger from './logger';
+import Logger, { getErrorMessage } from './logger';
 import ProfileManager from './profile-manager';
 import type ScraperOrchestrator from './scrapers';
 import BoothCache from './scrapers/booth-cache';
@@ -148,7 +148,7 @@ function handleIpcError<T>(handler: (...args: any[]) => Promise<T>): (...args: a
       Logger.error('IPC Handler Error:', error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : String(error)
+        error: getErrorMessage(error)
       };
     }
   };

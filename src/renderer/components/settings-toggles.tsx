@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import { getErrorMessage } from '../../logger';
-import type { AppConfig, AppConfigPatch } from '../../types';
+import type { ActiveProfile, AppConfig, AppConfigPatch, ProfileInfo } from '../../types';
 import { ipcInvoke } from '../ipc';
 
 // ============================================================================
@@ -116,8 +116,8 @@ interface SettingsTogglesProps {
   appConfig: AppConfig | null;
   readOnly: boolean;
   onUpdateConfig: (patch: AppConfigPatch) => void;
-  activeProfile: import('../../types').ActiveProfile | null;
-  profiles: import('../../types').ProfileInfo[];
+  activeProfile: ActiveProfile | null;
+  profiles: ProfileInfo[];
   onSwitchProfile: (dirName: string) => void;
   onDeleteProfile: (dirName: string) => void;
   onExport: () => void;
