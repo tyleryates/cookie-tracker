@@ -447,22 +447,7 @@ SC Reports use `"cases/packages"` format: `"2/5"` = 2 cases + 5 packages = (2 ×
 
 ### Cookie ID Mapping (SC API)
 
-SC API uses numeric cookie IDs, not names:
-
-| ID | Cookie |
-|----|--------|
-| 1 | Caramel deLites |
-| 2 | Peanut Butter Patties |
-| 3 | Trefoils |
-| 4 | Thin Mints |
-| 5 | Peanut Butter Sandwich |
-| 34 | Lemonades |
-| 37 | Cookie Share |
-| 48 | Adventurefuls |
-| 52 | Caramel Chocolate Chip |
-| 56 | Exploremores |
-
-These IDs are stable within a season but may change between years. Verify by comparing SC CSV export to API data. If a new cookie variety appears in the SC API with an unknown name, the app logs a warning. To add it, update `COOKIE_NAME_NORMALIZATION` in `src/cookie-constants.ts`.
+SC API uses numeric cookie IDs, not names. See `COOKIE_ID_MAP` in `src/cookie-constants.ts` for the current mapping. IDs are stable within a season but may change between years. If a new cookie variety appears with an unknown ID, the app logs a warning — update `COOKIE_NAME_NORMALIZATION` in `cookie-constants.ts`.
 
 ### Order Number Formats and Matching
 
@@ -537,7 +522,7 @@ When a new cookie variety, order type, payment method, or transfer type appears:
 
 ## Reports
 
-The app provides twelve reports in five tab groups plus To-Do:
+The app provides eleven reports in five tab groups plus To-Do:
 
 **To-Do** tab:
 1. **Health Check** — Aggregates all actionable items and warnings into a single view with three sections:
@@ -558,13 +543,12 @@ The app provides twelve reports in five tab groups plus To-Do:
 **Booths** tab (dropdown):
 8. **Completed Booths** — Distributed booths, needs-distribution status, per-scout allocations
 9. **Upcoming Booths** — Reserved booths that haven't happened yet
-10. **Booth Finder** — Available time slots at selected booth locations with day/time filters (toggle in Settings)
 
 **Donations** tab:
-11. **Cookie Share Reconciliation** — DC vs SC Cookie Share comparison, adjustments needed per scout
+10. **Cookie Share Reconciliation** — DC vs SC Cookie Share comparison, adjustments needed per scout
 
 **Cookie Popularity** tab:
-12. **Cookie Popularity** — Sales breakdown by cookie variety with percentages and distribution estimator
+11. **Cookie Popularity** — Sales breakdown by cookie variety with percentages and distribution estimator
 
 ### Stat Card Color Palette
 

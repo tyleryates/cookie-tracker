@@ -6,7 +6,7 @@ Desktop app for Girl Scout troops to sync and manage cookie sales from Digital C
 
 - **One-Click Sync** — Download data from both platforms automatically
 - **Auto-Sync** — Background sync every hour
-- **12 Reports + To-Do** — Inventory & transfers, online orders, proceeds, scout sales summary, scout inventory, cash report, health check (To-Do), completed booths, upcoming booths, donations, cookie popularity. Optional: Booth Finder, Inventory History
+- **Reports + To-Do** — Inventory & transfers, online orders, proceeds, scout sales summary, scout inventory, cash report, health check (To-Do), completed booths, upcoming booths, donations, cookie popularity
 - **Inventory Tracking** — Track troop and per-scout inventory by variety
 - **Secure** — Credentials encrypted locally; data never leaves your computer
 

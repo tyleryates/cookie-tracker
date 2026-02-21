@@ -242,16 +242,6 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
   const unknownTypes = hc?.unknownOrderTypes || 0;
   const isBlocked = unknownTypes > 0;
 
-  // Dynamically extend tabs based on config
-  const effectiveTabs = useMemo(() => {
-    return REPORT_TABS.map((tab) => {
-      if (tab.id === 'booths' && appConfig?.boothFinder?.enabled) {
-        return { ...tab, types: [...tab.types, 'available-booths'] as [string, ...string[]] };
-      }
-      return tab;
-    });
-  }, [appConfig?.boothFinder?.enabled]);
-
   // Compute count badges for dropdown items
   const dropdownCounts = useMemo(() => computeDropdownCounts(unified, appConfig), [unified, appConfig]);
 
@@ -289,7 +279,7 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
 
   return (
     <nav class="tab-bar">
-      {effectiveTabs.map((tab) => {
+      {REPORT_TABS.map((tab) => {
         const isActive = activeReport !== null && tab.types.includes(activeReport);
         const isPaired = tab.types.length > 1;
         const disabled = !hasData || isBlocked;
@@ -352,10 +342,22 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
           </button>
         );
       })}
+      {appConfig?.boothFinder?.enabled && (
+        <button
+          type="button"
+          class={`tab-bar-item${activeReport === 'available-booths' ? ' active' : ''}`}
+          style={{ marginLeft: 'auto' }}
+          disabled={!hasData || isBlocked}
+          onClick={() => onSelectReport('available-booths')}
+        >
+          Booth Finder
+          {dropdownCounts['available-booths'] != null && <span class="tab-todo-badge-info">{dropdownCounts['available-booths']}</span>}
+        </button>
+      )}
       <button
         type="button"
         class={`tab-bar-item${activeReport === 'health-check' ? ' active' : ''}`}
-        style={{ marginLeft: 'auto' }}
+        style={appConfig?.boothFinder?.enabled ? undefined : { marginLeft: 'auto' }}
         disabled={!hasData || isBlocked}
         onClick={() => onSelectReport('health-check')}
       >

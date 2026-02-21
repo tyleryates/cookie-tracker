@@ -25,175 +25,55 @@ This is a small internal tool — do NOT add full WCAG/accessibility support (er
 
 Electron desktop app that syncs and reconciles Girl Scout cookie sales data from **Digital Cookie** (customer-facing online sales) and **Smart Cookie** (troop management system). These are separate platforms that don't auto-sync — this app downloads from both and reconciles them.
 
-**Smart Cookie is the source of truth** for billing, inventory, and official sales reporting. Digital Cookie is one sales channel that eventually syncs to Smart Cookie. When numbers differ, Smart Cookie is correct. Reports should use SC as the baseline with DC providing supplemental detail.
+**Smart Cookie is the source of truth** for billing, inventory, and official sales reporting. Digital Cookie is one sales channel that eventually syncs to Smart Cookie. When numbers differ, Smart Cookie is correct.
 
-### Key Features
-
-- **Data sync** — Scrapes DC (HTML/Excel) and SC (JSON API) via authenticated sessions
-- **Reconciliation** — Matches orders across systems, detects discrepancies
-- **Health checks** — Warns on unknown order types, payment methods, transfer types, cookie IDs (see RULES.md)
-- **12 reports in 5 tab groups + To-Do** — To-Do (Health Check), Troop (Inventory & Transfers, Online Orders, Proceeds), Scout (Sales Summary, Inventory, Cash Report), Booths (Completed, Upcoming, Booth Finder), Donations, Cookie Popularity. Optional toggles in Settings: Inventory History, Booth Finder
-- **Profile management** — Import, switch, and delete data profiles for managing multiple troops
-- **Auto-updates** — Silent download via electron-updater, non-blocking restart banner
-
-## How the Code Is Organized
+## Architecture
 
 Three layers with strict boundaries:
 
-**Main process** (`src/main.ts`, `src/ipc-handlers/`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers (organized by domain in `ipc-handlers/`), scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files, parse, build UnifiedDataset, return to renderer.
+**Main process** (`src/main.ts`, `src/ipc-handlers/`, `src/data-pipeline.ts`, `src/update-manager.ts`) — IPC handlers organized by domain in `ipc-handlers/`, scraper orchestration, credentials, file system, auto-updates. Owns the full data pipeline: scan files → parse → build UnifiedDataset → return to renderer.
 
-**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (see `app-reducer.ts`), passes props down. Reports in `renderer/reports/` (12 report components, one per file). Components in `renderer/components/`, hooks in `renderer/hooks/`. Settings is a separate tab rendered directly in `app.tsx` (not through the reports switch) alongside sync status. Only "welcome" mode uses a dedicated `activePage`. IPC wrapper in `renderer/ipc.ts`, data loading in `renderer/data-loader.ts`, formatting utilities in `renderer/format-utils.ts`.
+**Renderer** (`src/renderer/`) — Preact component tree. `app.tsx` owns all state via `useReducer` (`app-reducer.ts`), passes props down. Reports in `renderer/reports/`, components in `renderer/components/`, hooks in `renderer/hooks/`. IPC wrapper in `renderer/ipc.ts`.
 
-**Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Two-stage pipeline: **importers** parse raw files into a `DataStore` (intermediate representation), then **calculators** compute the final `UnifiedDataset` from the DataStore. Sub-directories: `importers/`, `calculators/`.
+**Data processing** (`src/data-processing/`) — Pure functions that build a `UnifiedDataset` from raw imported data. Two-stage pipeline: **importers/** parse raw files into a `DataStore`, then **calculators/** compute the final `UnifiedDataset`.
 
-**Scrapers** (`src/scrapers/`) — API clients for DC and SC. Each scraper has a separate session class (`dc-session.ts`, `sc-session.ts`) that owns auth state, with automatic re-login on 401/403 and 30-minute idle credential timeout.
+**Scrapers** (`src/scrapers/`) — API clients for DC and SC. Session classes (`dc-session.ts`, `sc-session.ts`) own auth state with automatic re-login on 401/403 and 30-minute idle credential timeout.
 
-### Data Processing Files
+### Key Files
 
-**Importers** (`src/data-processing/importers/`) — parse raw files into DataStore:
-
-| File | Purpose |
-|---|---|
-| `digital-cookie.ts` | Parse DC Excel export into orders |
-| `smart-cookie.ts` | Parse SC API responses into orders, transfers, scouts |
-| `allocations.ts` | Parse SC allocation data (T2G inventory distributions) |
-| `parsers.ts` | Low-level field parsers (dates, booleans, varieties, cases/packages) |
-| `scout-helpers.ts` | Scout name normalization, ID matching across systems |
-
-**Calculators** (`src/data-processing/calculators/`) — compute UnifiedDataset from DataStore:
-
-| File | Purpose |
-|---|---|
-| `scout-initialization.ts` | Build Scout records from raw imported data |
-| `scout-calculations.ts` | Compute per-scout financials, inventory balances, sales breakdowns |
-| `order-processing.ts` | DC order merging, classification, status aggregation |
-| `allocation-processing.ts` | T2G inventory allocations and channel breakdowns |
-| `site-orders.ts` | Troop booth order tracking and distribution |
-| `transfer-breakdowns.ts` | Transfer categorization and inventory flow summaries |
-| `cookie-share-tracking.ts` | Cookie Share reconciliation between DC and SC |
-| `package-totals.ts` | Package count aggregation across all sources |
-| `varieties.ts` | Cookie variety popularity and inventory totals |
-| `troop-totals.ts` | Top-level troop financial and inventory aggregation |
-| `metadata.ts` | HealthChecks, warnings, data source metadata |
-| `helpers.ts` | Shared utility functions for scout calculations (`needsInventory`, `totalCredited`, `channelTotals`, `calculateSalesByVariety`) |
-
-### Key Source Files
-
-| File | Purpose |
-|---|---|
-| `src/types.ts` | All shared types (Order, Transfer, Scout, UnifiedDataset, IPC maps) |
-| `src/constants.ts` | Business logic constants (transfer types, categories, allocation channels) |
-| `src/cookie-constants.ts` | Cookie names, pricing, variety mappings across DC/SC/API |
-| `src/data-store.ts` | DataStore creation and type — intermediate store between import and calculation |
-| `src/data-store-operations.ts` | Transfer/order creation with automatic category classification based on transfer flags |
-| `src/order-classification.ts` | DC order type/payment/owner classification |
-| `src/validators.ts` | Input validation for credentials and config |
-| `src/config-manager.ts` | App configuration persistence, config migration (see below) |
-| `src/credentials-manager.ts` | Encrypted credential storage |
-| `src/seasonal-data.ts` | Persists SC session data (troop info, cookie ID map) across syncs |
-| `src/data-pipeline.ts` | Orchestrates: scan files, import, build UnifiedDataset |
-| `src/update-manager.ts` | Auto-update configuration, event handlers, quit-and-install logic |
-| `src/data-processing/utils.ts` | Shared helpers for data-processing layer (`mapToRecord`) |
-| `src/renderer/available-booths-utils.ts` | Booth slot filtering, encoding, and summarization utilities |
-| `src/renderer/order-helpers.ts` | Order display helpers (status pills, tooltips, payment formatting) |
-| `src/profile-manager.ts` | Multi-profile data directory management |
-| `src/json-file-utils.ts` | Shared atomic JSON load/save helpers used by config, seasonal data, etc. |
-| `src/logger.ts` | Centralized logging for main and renderer processes |
-| `scripts/inject-debug.mjs` | Creates a "Debug" profile from default data with all warning states triggered |
-| `scripts/import-profile.mjs` | Imports a .zip export as a named profile for local debugging |
-| `scripts/write-empty-data.mjs` | Creates an "Empty" profile with minimal pipeline files for empty report states |
-| `scripts/profile-helpers.mjs` | Shared profile management helpers (profile CRUD, slugify, data dir paths) |
-| `src/preload.ts` | Electron preload script — IPC bridge with whitelisted channels |
-| `src/renderer.ts` | Renderer process entry point (Preact app initialization) |
-
-### BoothFinderConfig & Config Migration
-
-The `boothFinder` key in `AppConfig` is **optional** and acts as a secret feature unlock — its presence in `config.json` enables the Booth Finder feature. The app never creates this key on its own; users must manually add it. Once present, `config-manager.ts` preserves and validates it against `BoothFinderConfig` defaults (enabled, autoRefresh, imessage, imessageRecipient, notifiedSlots, ids, dayFilters, ignoredSlots).
-
-**Config migration** (`config-manager.ts`): On load, the config manager migrates legacy formats from v1.12/v1.13:
-- **Flat booth keys** — Old top-level keys (`availableBoothsEnabled`, `autoRefreshBoothsEnabled`, `boothAlertImessage`, `boothAlertRecipient`, `boothNotifiedSlots`, `boothIds`, `boothDayFilters`, `ignoredTimeSlots`) are migrated into the nested `boothFinder` object.
-- **Object-format arrays** — Old `DayFilter` objects (`{ day, timeAfter?, timeBefore? }`) are migrated to `"day|startTime"` strings. Old `IgnoredTimeSlot` objects (`{ boothId, date, startTime }`) are migrated to `"boothId|date|startTime"` strings.
-- **Top-level key renames** — `autoUpdateEnabled` is renamed to `autoUpdate`, `autoSyncEnabled` to `autoSync`.
-- Migration is automatic and writes the healed config back to disk.
-
-### Scrapers
-
-| File | Purpose |
-|---|---|
-| `src/scrapers/index.ts` | ScraperOrchestrator — coordinates DC and SC scrapers |
-| `src/scrapers/base-scraper.ts` | Shared scraper utilities (progress callbacks, pipeline file I/O) |
-| `src/scrapers/dc-session.ts` | Digital Cookie HTTP session with CSRF token extraction and auto re-login |
-| `src/scrapers/sc-session.ts` | Smart Cookie HTTP session with XSRF token and auto re-login |
-| `src/scrapers/digital-cookie.ts` | DigitalCookieScraper — downloads DC Excel export |
-| `src/scrapers/smart-cookie.ts` | SmartCookieScraper — fetches SC API endpoints in phases |
-| `src/scrapers/booth-cache.ts` | Local caching for booth catalog and time slot data |
-| `src/scrapers/sc-types.ts` | TypeScript interfaces for Smart Cookie API responses |
-
-### IPC Handlers
-
-IPC handlers are organized by domain in `src/ipc-handlers/`:
-
-| File | Purpose |
-|---|---|
-| `index.ts` | `registerAllHandlers()` — wires all handler modules |
-| `types.ts` | HandlerDeps interface — shared dependency types for all handler modules |
-| `data-handlers.ts` | load-data, save-file |
-| `credential-handlers.ts` | load-credentials, save-credentials, verify-sc, verify-dc |
-| `config-handlers.ts` | load-config, update-config |
-| `scrape-handlers.ts` | scrape-websites, refresh-booth-locations, fetch-booth-catalog |
-| `profile-handlers.ts` | load-profiles, switch-profile, delete-profile, import-profile, export-data |
-| `misc-handlers.ts` | seasonal-data, timestamps, updates, iMessage, dock-badge, log-message |
-
-### Renderer Components
-
-| Component | Purpose |
-|---|---|
-| `app-header.tsx` | AppHeader bar with sync pills, refresh/settings buttons |
-| `reports-section.tsx` | TabBar + ReportContent components, health banner, report rendering |
-| `sync-section.tsx` | SyncStatusSection, DataHealthChecks, EndpointGroupTable |
-| `settings-credentials.tsx` | SettingsPage credential setup with SC/DC verification forms |
-| `settings-toggles.tsx` | SettingsToggles app settings, BoothFinderSettings, profile management |
-| `booth-selector.tsx` | Multi-select UI for choosing booth locations to track |
-| `booth-day-filter.tsx` | Day/time filter configuration for Available Booths report |
-| `scout-detail.tsx` | Expandable scout detail panel (orders, inventory, allocations) |
-| `data-table.tsx` | Reusable sortable table component |
-| `stat-cards.tsx` | Reusable stat card grid component |
-| `expandable-row.tsx` | Expandable/collapsible table row component |
-| `tooltip-cell.tsx` | Tooltip component for table cells |
-| `scout-credit-chips.tsx` | Shared chip display for per-scout allocation breakdowns |
-| `booth-info-row.tsx` | Shared booth row component for completed/upcoming booth tables |
-| `cookie-label.tsx` | Cookie variety label with color dot |
-| `no-dc-data-warning.tsx` | Reusable "No Digital Cookie data" warning banner |
-
-Other renderer-level files: `app-reducer.ts` (state management via useReducer), `data-loader.ts` (IPC data loading), `format-utils.ts` (display formatting), `ipc.ts` (IPC wrapper), `sync-utils.ts` (sync state initialization, endpoint hydration, group status computation), `available-booths-utils.ts` (booth slot filtering, encoding, summarization), `order-helpers.ts` (order display helpers).
-
-Hooks in `renderer/hooks/`:
-
-| Hook | Purpose |
-|---|---|
-| `use-app-init.ts` | App initialization lifecycle — loads profile, config, timestamps, triggers initial data load and auto-sync |
-| `use-sync.ts` | Sync orchestration — scrape handler, booth refresh, auto-sync polling, IPC event listeners, OS notifications |
-| `use-data-loader.ts` | Data loading via IPC, refresh after sync, error handling |
-| `use-status-message.ts` | Transient status notification display with auto-dismiss timer |
-| `sync-formatters.ts` | Sync notification formatting — log/user messages for sync results |
+- `src/types.ts` — All shared types (Order, Transfer, Scout, UnifiedDataset, IPC maps)
+- `src/constants.ts` — Business logic constants (transfer types, categories, allocation channels)
+- `src/cookie-constants.ts` — Cookie names, pricing, variety mappings across DC/SC/API
+- `src/data-store.ts` — DataStore type (intermediate representation between import and calculation)
+- `src/data-store-operations.ts` — Transfer/order creation with automatic category classification
+- `src/order-classification.ts` — DC order type/payment/owner classification
+- `src/config-manager.ts` — App config persistence and migration
 
 ### Layer Rules
 
-- **Renderer MUST NOT import from `data-processing/`** — all data arrives via IPC as a finished UnifiedDataset. If a renderer file needs a calculation, either pre-compute it in the data-processing layer or put the helper in `renderer/format-utils.ts`. Type-only imports from shared files (`types.ts`, `constants.ts`) are allowed.
-- **Data-processing MUST NOT import from renderer or scrapers** — it's pure functions operating on data.
-- **Shared types/constants** live in `src/types.ts`, `src/constants.ts`, and `src/cookie-constants.ts` (cookie names, pricing, variety mappings) — both layers import from these.
-- **Seasonal data** (`src/seasonal-data.ts`) — Persists SC session data (troop info, cookie ID map) across syncs so the pipeline knows troop identity before importing orders.
-- **Warning propagation** — Importers detect unknowns (order types, payment methods, transfer types, cookie IDs) and add warnings to `DataStore.metadata.warnings[]`. Calculators pass these through to `UnifiedDataset.metadata`. The `metadata.ts` calculator builds `HealthChecks` (counts by category) from the accumulated warnings. The renderer's `DataHealthChecks` component displays them in the To-Do tab.
+- **Renderer MUST NOT import from `data-processing/`** — all data arrives via IPC as a finished UnifiedDataset. If a renderer file needs a calculation, pre-compute it in the data-processing layer or put the helper in `renderer/format-utils.ts`. Type-only imports from shared files (`types.ts`, `constants.ts`) are allowed.
+- **Data-processing MUST NOT import from renderer or scrapers** — pure functions only.
+- **Shared types/constants** live in `src/types.ts`, `src/constants.ts`, and `src/cookie-constants.ts`.
+- **Warning propagation** — Importers detect unknowns and add warnings to `DataStore.metadata.warnings[]`. Calculators pass these through to `UnifiedDataset.metadata`. The `metadata.ts` calculator builds `HealthChecks` (counts by category). The renderer's `DataHealthChecks` component displays them in the To-Do tab.
 
 ### Conventions
 
 - All files use **kebab-case** naming
 - Constants use **`as const` objects** with derived types: `type Foo = (typeof FOO)[keyof typeof FOO]`
-- Computed fields on data types use a **`$` prefix** to distinguish them from raw data fields. Scout computed fields: `$financials` (proceeds, cash owed, balance), `$inventoryDisplay` (formatted inventory), `$salesByVariety` (physical sales breakdown), `$allocationSummary` (packages by channel), `$orderStatusCounts` (order status aggregation), `$allocationsByChannel` (per-channel allocation detail), `$issues` (per-scout warnings)
+- Computed fields on data types use a **`$` prefix** (e.g., `$financials`, `$inventoryDisplay`, `$salesByVariety`, `$issues`)
 - Business logic strings (transfer types, allocation channels, order statuses) should be **constants in `constants.ts`**, not raw strings
+
+### BoothFinderConfig & Config Migration
+
+The `boothFinder` key in `AppConfig` is **optional** and acts as a secret feature unlock — its presence in `config.json` enables the Booth Finder tab. The app never creates this key on its own; users must manually add it. Once present, `config-manager.ts` preserves and validates it against `BoothFinderConfig` defaults.
+
+**Config migration** (`config-manager.ts`): On load, the config manager migrates legacy formats from v1.12/v1.13:
+- **Flat booth keys** — Old top-level keys (`availableBoothsEnabled`, `autoRefreshBoothsEnabled`, etc.) are migrated into the nested `boothFinder` object.
+- **Object-format arrays** — Old `DayFilter` objects migrated to `"day|startTime"` strings. Old `IgnoredTimeSlot` objects migrated to `"boothId|date|startTime"` strings.
+- **Top-level key renames** — `autoUpdateEnabled` → `autoUpdate`, `autoSyncEnabled` → `autoSync`.
 
 ## Key Documentation
 
 - **`RULES.md`** — Business rules, data classification, inventory, financials, health checks (single source of truth for how the app should behave)
 - **`docs/DESIGN-PRINCIPLES.md`** — Architecture principles: classify once, positive sums, reports calculate own needs
-- **`docs/DOMAIN.md`** — Cookie program domain knowledge, data format reference, scraper authentication, glossary
+- **`docs/DOMAIN.md`** — Cookie program domain knowledge, glossary, season reference
