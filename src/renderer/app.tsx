@@ -67,20 +67,19 @@ interface SettingsContentProps {
   appConfig: AppConfig | null;
   readOnly: boolean;
   onUpdateConfig: (patch: AppConfigPatch) => void;
-  activeProfile: ActiveProfile | null;
-  profiles: ProfileInfo[];
-  onSwitchProfile: (dirName: string) => void;
-  onDeleteProfile: (dirName: string) => void;
+  profile: { active: ActiveProfile | null; all: ProfileInfo[]; onSwitch: (dirName: string) => void; onDelete: (dirName: string) => void };
   onExport: () => void;
   hasData: boolean;
-  syncState: SyncState;
-  boothFinderEnabled: boolean;
-  autoSync: boolean;
-  boothAutoRefresh: boolean;
-  onSyncReports: () => void;
-  onRefreshBooths: () => void;
-  onToggleAutoSync: (enabled: boolean) => void;
-  onToggleAutoRefreshBooths: (enabled: boolean) => void;
+  sync: {
+    state: SyncState;
+    boothFinderEnabled: boolean;
+    autoSync: boolean;
+    boothAutoRefresh: boolean;
+    onSyncReports: () => void;
+    onRefreshBooths: () => void;
+    onToggleAutoSync: (enabled: boolean) => void;
+    onToggleAutoRefreshBooths: (enabled: boolean) => void;
+  };
   healthChecks: HealthChecks | undefined;
   warnings: Warning[];
 }
@@ -89,20 +88,10 @@ function SettingsContent({
   appConfig,
   readOnly,
   onUpdateConfig,
-  activeProfile,
-  profiles,
-  onSwitchProfile,
-  onDeleteProfile,
+  profile,
   onExport,
   hasData,
-  syncState,
-  boothFinderEnabled,
-  autoSync,
-  boothAutoRefresh,
-  onSyncReports,
-  onRefreshBooths,
-  onToggleAutoSync,
-  onToggleAutoRefreshBooths,
+  sync,
   healthChecks,
   warnings
 }: SettingsContentProps) {
@@ -112,23 +101,23 @@ function SettingsContent({
         appConfig={appConfig}
         readOnly={readOnly}
         onUpdateConfig={onUpdateConfig}
-        activeProfile={activeProfile}
-        profiles={profiles}
-        onSwitchProfile={onSwitchProfile}
-        onDeleteProfile={onDeleteProfile}
+        activeProfile={profile.active}
+        profiles={profile.all}
+        onSwitchProfile={profile.onSwitch}
+        onDeleteProfile={profile.onDelete}
         onExport={onExport}
         hasData={hasData}
       />
       <SettingsPage mode="settings" />
       <SyncStatusSection
-        syncState={syncState}
-        boothFinderEnabled={boothFinderEnabled}
-        autoSync={autoSync}
-        boothAutoRefresh={boothAutoRefresh}
-        onSyncReports={onSyncReports}
-        onRefreshBooths={onRefreshBooths}
-        onToggleAutoSync={onToggleAutoSync}
-        onToggleAutoRefreshBooths={onToggleAutoRefreshBooths}
+        syncState={sync.state}
+        boothFinderEnabled={sync.boothFinderEnabled}
+        autoSync={sync.autoSync}
+        boothAutoRefresh={sync.boothAutoRefresh}
+        onSyncReports={sync.onSyncReports}
+        onRefreshBooths={sync.onRefreshBooths}
+        onToggleAutoSync={sync.onToggleAutoSync}
+        onToggleAutoRefreshBooths={sync.onToggleAutoRefreshBooths}
         readOnly={readOnly}
       />
       {healthChecks && <DataHealthChecks healthChecks={healthChecks} warnings={warnings} />}
@@ -420,20 +409,19 @@ export function App() {
         appConfig={state.appConfig}
         readOnly={readOnly}
         onUpdateConfig={handleUpdateConfig}
-        activeProfile={state.activeProfile}
-        profiles={state.profiles}
-        onSwitchProfile={handleSwitchProfile}
-        onDeleteProfile={handleDeleteProfile}
+        profile={{ active: state.activeProfile, all: state.profiles, onSwitch: handleSwitchProfile, onDelete: handleDeleteProfile }}
         onExport={exportData}
         hasData={!!state.unified}
-        syncState={state.syncState}
-        boothFinderEnabled={!!state.appConfig?.boothFinder?.enabled}
-        autoSync={state.autoSync}
-        boothAutoRefresh={state.boothAutoRefresh}
-        onSyncReports={sync}
-        onRefreshBooths={refreshBooths}
-        onToggleAutoSync={handleToggleAutoSync}
-        onToggleAutoRefreshBooths={handleToggleAutoRefreshBooths}
+        sync={{
+          state: state.syncState,
+          boothFinderEnabled: !!state.appConfig?.boothFinder?.enabled,
+          autoSync: state.autoSync,
+          boothAutoRefresh: state.boothAutoRefresh,
+          onSyncReports: sync,
+          onRefreshBooths: refreshBooths,
+          onToggleAutoSync: handleToggleAutoSync,
+          onToggleAutoRefreshBooths: handleToggleAutoRefreshBooths
+        }}
         healthChecks={state.unified?.metadata.healthChecks}
         warnings={state.unified?.warnings || []}
       />

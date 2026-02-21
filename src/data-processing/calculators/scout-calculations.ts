@@ -73,53 +73,45 @@ function physicalOrderRevenue(order: Order): number {
   return calculateRevenue(buildPhysicalVarieties(order.varieties));
 }
 
-/** Calculate financial tracking (cash vs electronic payments) */
-function calculateFinancialTracking(scout: Scout): void {
-  let allCashCollected = 0; // ALL cash from girl orders (scout must turn this in)
-  let inventoryElectronic = 0; // Electronic payments for physical inventory orders
-  let inventoryCashPhysical = 0; // Cash payments for physical inventory orders
+/** Accumulate cash and electronic payment totals from girl orders */
+function accumulatePaymentTotals(orders: Order[]): { cashCollected: number; inventoryElectronic: number; inventoryCashPhysical: number } {
+  let cashCollected = 0;
+  let inventoryElectronic = 0;
+  let inventoryCashPhysical = 0;
 
-  for (const order of scout.orders) {
+  for (const order of orders) {
     if (order.owner !== OWNER.GIRL) continue;
 
     const isElectronic = order.paymentMethod != null && order.paymentMethod !== PAYMENT_METHOD.CASH;
-
     if (isElectronic) {
-      // Only inventory orders reduce what's owed for physical cookies
-      if (needsInventory(order)) {
-        inventoryElectronic += physicalOrderRevenue(order);
-      }
+      if (needsInventory(order)) inventoryElectronic += physicalOrderRevenue(order);
     } else {
-      // ALL cash must be turned in (delivery, booth, donation — doesn't matter)
-      allCashCollected += order.amount;
-      // Track physical portion separately for inventory accounting
-      if (needsInventory(order)) {
-        inventoryCashPhysical += physicalOrderRevenue(order);
-      }
+      cashCollected += order.amount;
+      if (needsInventory(order)) inventoryCashPhysical += physicalOrderRevenue(order);
     }
   }
 
-  // Total value of all inventory picked up (scouts are financially responsible)
-  const inventoryValue = calculateRevenue(scout.inventory.varieties);
+  return { cashCollected, inventoryElectronic, inventoryCashPhysical };
+}
 
-  // Cash owed = all cash collected + value of any unsold inventory
-  // Unsold = inventory value minus everything sold (electronic + cash physical portions)
+/** Calculate financial tracking (cash vs electronic payments) */
+function calculateFinancialTracking(scout: Scout): void {
+  const { cashCollected, inventoryElectronic, inventoryCashPhysical } = accumulatePaymentTotals(scout.orders);
+
+  const inventoryValue = calculateRevenue(scout.inventory.varieties);
   const totalInventorySold = inventoryElectronic + inventoryCashPhysical;
   const unsoldValue = Math.max(0, inventoryValue - totalInventorySold);
-  const cashOwed = allCashCollected + unsoldValue;
-
-  // Payments already turned in to the troop
+  const cashOwed = cashCollected + unsoldValue;
   const paymentsTurnedIn = scout.payments.reduce((sum, p) => sum + p.amount, 0);
-  const cashDue = cashOwed - paymentsTurnedIn;
 
   scout.totals.$financials = {
-    cashCollected: allCashCollected,
+    cashCollected,
     electronicPayments: inventoryElectronic,
-    inventoryValue: inventoryValue,
-    unsoldValue: unsoldValue,
-    cashOwed: cashOwed,
-    paymentsTurnedIn: paymentsTurnedIn,
-    cashDue: cashDue
+    inventoryValue,
+    unsoldValue,
+    cashOwed,
+    paymentsTurnedIn,
+    cashDue: cashOwed - paymentsTurnedIn
   };
 }
 

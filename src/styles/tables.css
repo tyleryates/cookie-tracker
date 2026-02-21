@@ -190,10 +190,9 @@ tbody tr:hover {
   background: var(--gray-100);
 }
 
-/* Shared pill base — transfer, status, payment, and troop pills */
+/* Shared pill base — transfer, status, and troop pills */
 .transfer-type-label,
 .status-pill,
-.payment-pill,
 .troop-pill {
   padding: 2px 8px;
   border-radius: 10px;
@@ -203,18 +202,6 @@ tbody tr:hover {
 }
 
 /* Transfer type labels */
-
-.transfer-type-c2t,
-.transfer-type-t2t-in {
-  color: var(--status-info-dark);
-  background: rgba(33, 150, 243, 0.12);
-}
-
-.transfer-type-t2t-out {
-  color: var(--status-error-dark);
-  background: rgba(229, 57, 53, 0.12);
-}
-
 .transfer-type-t2g {
   color: var(--status-success-dark);
   background: rgba(76, 175, 80, 0.12);
@@ -272,16 +259,6 @@ tbody tr:hover {
   color: var(--status-error-dark);
   background: rgba(229, 57, 53, 0.12);
 }
-/* Payment type pills */
-.payment-pill-cash {
-  color: var(--status-success-dark);
-  background: rgba(76, 175, 80, 0.12);
-}
-.payment-pill-digital {
-  color: var(--status-info-dark);
-  background: rgba(33, 150, 243, 0.12);
-}
-
 /* Positive/negative difference display */
 .pkg-in {
   color: var(--success);

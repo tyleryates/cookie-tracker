@@ -16,6 +16,19 @@ function statusIcon(ep: EndpointSyncState) {
   return '';
 }
 
+const STATUS_CLASS: Record<EndpointSyncState['status'], string> = {
+  [SYNC_STATUS.SYNCED]: 'synced',
+  [SYNC_STATUS.ERROR]: 'error',
+  [SYNC_STATUS.SYNCING]: 'syncing',
+  [SYNC_STATUS.IDLE]: 'not-synced'
+};
+
+function getTimestampDisplay(epState: EndpointSyncState, hovered: boolean): string {
+  if (epState.lastSync) return hovered ? formatFullTimestamp(epState.lastSync) : formatRelativeTimestamp(epState.lastSync);
+  if (epState.status === SYNC_STATUS.ERROR) return 'Failed';
+  return '';
+}
+
 function EndpointRow({
   name,
   source,
@@ -30,22 +43,8 @@ function EndpointRow({
   showFrequency: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
-
-  const STATUS_CLASS: Record<EndpointSyncState['status'], string> = {
-    [SYNC_STATUS.SYNCED]: 'synced',
-    [SYNC_STATUS.ERROR]: 'error',
-    [SYNC_STATUS.SYNCING]: 'syncing',
-    [SYNC_STATUS.IDLE]: 'not-synced'
-  };
   const statusClass = STATUS_CLASS[epState.status];
-
-  const timestampDisplay = epState.lastSync
-    ? hovered
-      ? formatFullTimestamp(epState.lastSync)
-      : formatRelativeTimestamp(epState.lastSync)
-    : epState.status === SYNC_STATUS.ERROR
-      ? 'Failed'
-      : '';
+  const timestampDisplay = getTimestampDisplay(epState, hovered);
 
   const timestampColor = epState.status === SYNC_STATUS.ERROR && !epState.lastSync ? '#EF4444' : undefined;
 

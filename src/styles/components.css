@@ -419,10 +419,6 @@ button.stat-card-active {
 }
 
 /* Utility Classes */
-.success-text {
-  color: var(--success);
-}
-
 .muted-text {
   color: var(--gray-500);
   font-style: italic;
@@ -457,8 +453,7 @@ button.stat-card-active {
 .status-success,
 .status-info,
 .status-warning,
-.status-error,
-.status-error-dark {
+.status-error {
   font-weight: 600;
 }
 .status-success {
@@ -472,9 +467,6 @@ button.stat-card-active {
 }
 .status-error {
   color: var(--error);
-}
-.status-error-dark {
-  color: var(--status-error-dark);
 }
 
 .tab-todo-badge,

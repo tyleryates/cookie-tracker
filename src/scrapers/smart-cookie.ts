@@ -197,40 +197,22 @@ class SmartCookieScraper extends BaseScraper {
     const distributed = reservations.filter((r: SCReservation) => r.booth?.is_distributed || r.is_distributed);
     if (distributed.length === 0) return {};
 
-    const keyedDividers: Record<string, SCBoothDividerResult> = {};
-
-    // Process in batches of BOOTH_DIVIDER_CONCURRENCY
-    for (let i = 0; i < distributed.length; i += BOOTH_DIVIDER_CONCURRENCY) {
-      this.throwIfAborted(signal);
-      const batch = distributed.slice(i, i + BOOTH_DIVIDER_CONCURRENCY);
-
-      const batchResults = await Promise.all(
-        batch.map(async (reservation: SCReservation) => {
-          const reservationId = reservation.id || reservation.reservation_id;
-          if (!reservationId) return null;
-
-          try {
-            const divider = await this.fetchSmartBoothDivider(reservationId, signal);
-            return {
-              reservationId,
-              booth: reservation.booth || {},
-              timeslot: reservation.timeslot || {},
-              divider
-            };
-          } catch (error) {
-            Logger.warn(`Warning: Could not fetch booth divider for reservation ${reservationId}:`, getErrorMessage(error));
-            return null;
-          }
-        })
-      );
-
-      for (const result of batchResults) {
-        if (result) {
-          keyedDividers[result.reservationId] = result;
-        }
+    const results = await this.processBatched(distributed, BOOTH_DIVIDER_CONCURRENCY, signal, async (reservation) => {
+      const reservationId = reservation.id || reservation.reservation_id;
+      if (!reservationId) return null;
+      try {
+        const divider = await this.fetchSmartBoothDivider(reservationId, signal);
+        return { reservationId, booth: reservation.booth || {}, timeslot: reservation.timeslot || {}, divider };
+      } catch (error) {
+        Logger.warn(`Warning: Could not fetch booth divider for reservation ${reservationId}:`, getErrorMessage(error));
+        return null;
       }
-    }
+    });
 
+    const keyedDividers: Record<string, SCBoothDividerResult> = {};
+    for (const result of results) {
+      if (result) keyedDividers[result.reservationId] = result;
+    }
     return keyedDividers;
   }
 

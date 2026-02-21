@@ -31,27 +31,23 @@ function classifyPaymentMethod(paymentStatus: string): PaymentMethod | null {
   return null;
 }
 
+/** Order type classification rules — matched in order against lowercase dcOrderType */
+const DC_ORDER_TYPE_RULES: Array<{ test: (lc: string) => boolean; getType: (isSiteOrder: boolean) => OrderType }> = [
+  { test: (lc) => lc === DC_ORDER_TYPE_STRINGS.DONATION.toLowerCase(), getType: () => ORDER_TYPE.DONATION },
+  { test: (lc) => lc.includes(DC_ORDER_TYPE_STRINGS.SHIPPED.toLowerCase()), getType: () => ORDER_TYPE.DIRECT_SHIP },
+  { test: (lc) => lc.includes('cookies in hand'), getType: (isSite) => (isSite ? ORDER_TYPE.BOOTH : ORDER_TYPE.IN_HAND) },
+  {
+    test: (lc) => lc.includes('in-person delivery') || lc.includes('in person delivery') || lc.includes('pick up'),
+    getType: () => ORDER_TYPE.DELIVERY
+  }
+];
+
 /** Classify a DC order into owner + orderType dimensions */
 function classifyDCOrder(isSiteOrder: boolean, dcOrderType: string): { owner: Owner; orderType: OrderType | null } {
   const owner = isSiteOrder ? OWNER.TROOP : OWNER.GIRL;
   const lc = dcOrderType.toLowerCase();
-
-  if (lc === DC_ORDER_TYPE_STRINGS.DONATION.toLowerCase()) {
-    return { owner, orderType: ORDER_TYPE.DONATION };
-  }
-  if (lc.includes(DC_ORDER_TYPE_STRINGS.SHIPPED.toLowerCase())) {
-    return { owner, orderType: ORDER_TYPE.DIRECT_SHIP };
-  }
-  if (lc.includes('cookies in hand')) {
-    return { owner, orderType: isSiteOrder ? ORDER_TYPE.BOOTH : ORDER_TYPE.IN_HAND };
-  }
-  // In-Person Delivery, In Person Delivery, Pick Up — all are DELIVERY
-  if (lc.includes('in-person delivery') || lc.includes('in person delivery') || lc.includes('pick up')) {
-    return { owner, orderType: ORDER_TYPE.DELIVERY };
-  }
-
-  // Unknown — caller handles warning
-  return { owner, orderType: null };
+  const match = DC_ORDER_TYPE_RULES.find((rule) => rule.test(lc));
+  return { owner, orderType: match ? match.getType(isSiteOrder) : null };
 }
 
 /** Extract basic order information from DC row */

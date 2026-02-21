@@ -51,4 +51,20 @@ export abstract class BaseScraper {
   protected throwIfAborted(signal?: AbortSignal): void {
     if (signal?.aborted) throw new Error('Sync cancelled');
   }
+
+  /** Process items in batches with concurrency limiting and abort support */
+  protected async processBatched<T, R>(
+    items: T[],
+    batchSize: number,
+    signal: AbortSignal | undefined,
+    fn: (item: T) => Promise<R>
+  ): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      this.throwIfAborted(signal);
+      const batch = items.slice(i, i + batchSize);
+      results.push(...(await Promise.all(batch.map(fn))));
+    }
+    return results;
+  }
 }

@@ -1,6 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow } from 'electron';
+
+// Workaround for Chromium fontations (Rust font engine) crash during V8 init on some macOS versions.
+// Disables the font scanner that can panic on broken/incompatible system fonts.
+app.commandLine.appendSwitch('disable-features', 'FontationsFontScanner');
+
 import ConfigManager from './config-manager';
 import CredentialsManager from './credentials-manager';
 import { registerAllHandlers } from './ipc-handlers';
