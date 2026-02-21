@@ -265,6 +265,33 @@ button.stat-card-active {
   animation: fadeIn 0.15s ease;
 }
 
+/* Compact stat cards — for use inside detail/expanded rows */
+.stat-cards-compact {
+  margin: 0;
+}
+.stat-cards-compact .stat-cards {
+  padding: 6px;
+  gap: 6px;
+  border: 1px solid var(--gray-200);
+}
+.stat-cards-compact .stat-card {
+  padding: 4px;
+}
+.stat-cards-compact .stat-card-label {
+  font-size: 0.78em;
+  margin-bottom: 4px;
+}
+.stat-cards-compact .stat-card-value {
+  font-size: 1.3em;
+}
+.stat-cards-compact .stat-card-description {
+  font-size: 0.72em;
+  margin-top: 3px;
+}
+.stat-cards-compact .stat-operator {
+  font-size: 1.5em;
+}
+
 .stat-operator {
   display: flex;
   align-items: center;

@@ -27,16 +27,14 @@ function FinanceDetail({ scout }: { scout: Scout }) {
     });
   }
 
-  detailStats.push({
-    label: 'Cash Owed',
-    value: formatCurrency(f.cashOwed),
-    description: f.electronicPayments > 0 ? 'After digital payments' : 'Total owed',
-    color: STAT_COLORS.BLUE,
-    operator: f.electronicPayments > 0 ? '=' : undefined,
-    highlight: f.paymentsTurnedIn === 0
-  });
-
   if (f.paymentsTurnedIn > 0) {
+    detailStats.push({
+      label: 'Cash Owed',
+      value: formatCurrency(f.cashOwed),
+      description: f.electronicPayments > 0 ? 'After digital payments' : 'Total owed',
+      color: STAT_COLORS.BLUE,
+      operator: f.electronicPayments > 0 ? '=' : undefined
+    });
     detailStats.push({
       label: 'Paid',
       value: formatCurrency(f.paymentsTurnedIn),
@@ -44,19 +42,20 @@ function FinanceDetail({ scout }: { scout: Scout }) {
       color: STAT_COLORS.GREEN,
       operator: '\u2212'
     });
-    detailStats.push({
-      label: 'Cash Due',
-      value: formatCurrency(f.cashDue),
-      description: f.cashDue > 0 ? 'Still owed' : 'Fully paid',
-      color: f.cashDue > 0 ? STAT_COLORS.RED : STAT_COLORS.GREEN,
-      operator: '=',
-      highlight: true
-    });
   }
+
+  detailStats.push({
+    label: 'Cash Due',
+    value: formatCurrency(f.cashDue),
+    description: f.cashDue > 0 ? 'Still owed' : 'Fully paid',
+    color: f.cashDue > 0 ? STAT_COLORS.RED : STAT_COLORS.GREEN,
+    operator: '=',
+    highlight: true
+  });
 
   return (
     <div class="scout-breakdown">
-      <StatCards stats={detailStats} />
+      <StatCards stats={detailStats} compact />
 
       {payments.length > 0 && (
         <div class="section-break">

@@ -25,7 +25,7 @@ export interface Stat {
   detail?: ComponentChildren; // expandable drill-down content
 }
 
-export function StatCards({ stats, defaultExpanded }: { stats: Stat[]; defaultExpanded?: number }) {
+export function StatCards({ stats, defaultExpanded, compact }: { stats: Stat[]; defaultExpanded?: number; compact?: boolean }) {
   const [expanded, setExpanded] = useState<number | null>(defaultExpanded ?? null);
   const hasOperators = stats.some((s) => s.operator);
 
@@ -48,7 +48,7 @@ export function StatCards({ stats, defaultExpanded }: { stats: Stat[]; defaultEx
   };
 
   return (
-    <div class="stat-cards-wrapper">
+    <div class={`stat-cards-wrapper${compact ? ' stat-cards-compact' : ''}`}>
       <div class="stat-cards" style={{ gridTemplateColumns: columns }}>
         {stats.map((stat, i) => {
           const cardClass = `stat-card${stat.highlight ? ' stat-card-highlight' : ''}${stat.detail ? ' stat-card-expandable' : ''}${expanded === i ? ' stat-card-active' : ''}`;
