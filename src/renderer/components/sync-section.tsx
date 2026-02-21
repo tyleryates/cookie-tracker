@@ -1,21 +1,18 @@
 // SyncSection — Sync status display and health check components
 
 import { useState } from 'preact/hooks';
-import { SYNC_ENDPOINTS, WARNING_TYPE } from '../../constants';
+import { SYNC_ENDPOINTS, SYNC_STATUS, WARNING_TYPE } from '../../constants';
 import type { EndpointSyncState, HealthChecks, SyncState, Warning } from '../../types';
-import { DateFormatter, formatDataSize, formatDuration, formatMaxAge } from '../format-utils';
-
-// Re-export sync utilities from their dedicated module
-export { computeGroupStatuses, createInitialSyncState } from '../sync-utils';
+import { formatDataSize, formatDuration, formatFullTimestamp, formatMaxAge, formatRelativeTimestamp } from '../format-utils';
 
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
 
 function statusIcon(ep: EndpointSyncState) {
-  if (ep.status === 'syncing') return <span class="spinner" />;
-  if (ep.status === 'error') return ep.httpStatus || '\u2717';
-  if (ep.status === 'synced') return ep.cached ? 'cached' : 200;
+  if (ep.status === SYNC_STATUS.SYNCING) return <span class="spinner" />;
+  if (ep.status === SYNC_STATUS.ERROR) return ep.httpStatus || '\u2717';
+  if (ep.status === SYNC_STATUS.SYNCED) return ep.cached ? 'cached' : 200;
   return '';
 }
 
@@ -35,22 +32,22 @@ function EndpointRow({
   const [hovered, setHovered] = useState(false);
 
   const STATUS_CLASS: Record<EndpointSyncState['status'], string> = {
-    synced: 'synced',
-    error: 'error',
-    syncing: 'syncing',
-    idle: 'not-synced'
+    [SYNC_STATUS.SYNCED]: 'synced',
+    [SYNC_STATUS.ERROR]: 'error',
+    [SYNC_STATUS.SYNCING]: 'syncing',
+    [SYNC_STATUS.IDLE]: 'not-synced'
   };
   const statusClass = STATUS_CLASS[epState.status];
 
   const timestampDisplay = epState.lastSync
     ? hovered
-      ? DateFormatter.toFullTimestamp(epState.lastSync)
-      : DateFormatter.toRelativeTimestamp(epState.lastSync)
-    : epState.status === 'error'
+      ? formatFullTimestamp(epState.lastSync)
+      : formatRelativeTimestamp(epState.lastSync)
+    : epState.status === SYNC_STATUS.ERROR
       ? 'Failed'
       : '';
 
-  const timestampColor = epState.status === 'error' && !epState.lastSync ? '#EF4444' : undefined;
+  const timestampColor = epState.status === SYNC_STATUS.ERROR && !epState.lastSync ? '#EF4444' : undefined;
 
   const statusTooltip = epState.cached ? 'Cached' : undefined;
 
@@ -139,7 +136,7 @@ function EndpointGroupTable({
           </td>
         </tr>
         {eps.map((ep) => {
-          const epState = endpoints[ep.id] || { status: 'idle', lastSync: null };
+          const epState = endpoints[ep.id] || { status: SYNC_STATUS.IDLE, lastSync: null };
           return (
             <EndpointRow
               key={ep.id}

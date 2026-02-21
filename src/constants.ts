@@ -107,8 +107,7 @@ export type TransferCategory = (typeof TRANSFER_CATEGORY)[keyof typeof TRANSFER_
 export const T2G_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
   TRANSFER_CATEGORY.GIRL_PICKUP,
   TRANSFER_CATEGORY.VIRTUAL_BOOTH_ALLOCATION,
-  TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION,
-  TRANSFER_CATEGORY.DIRECT_SHIP_ALLOCATION
+  TRANSFER_CATEGORY.BOOTH_SALES_ALLOCATION
 ]);
 
 export const TROOP_INVENTORY_IN_CATEGORIES: ReadonlySet<TransferCategory> = new Set([
@@ -170,7 +169,11 @@ export const DC_COLUMNS = {
   CURRENT_SALE_AMOUNT: 'Current Sale Amount',
   ORDER_STATUS: 'Order Status',
   PAYMENT_STATUS: 'Payment Status',
-  DONATION: 'Donation'
+  DONATION: 'Donation',
+  SHIPPING_FIRST_NAME: 'Shipping First Name',
+  SHIPPING_LAST_NAME: 'Shipping Last Name',
+  BILLING_FIRST_NAME: 'Billing First Name',
+  BILLING_LAST_NAME: 'Billing Last Name'
 } as const;
 
 // Smart Cookie Report CSV Column Names
@@ -214,8 +217,8 @@ export const DISPLAY_STRINGS: Record<(typeof ALLOCATION_METHOD)[keyof typeof ALL
 // DATE & TIME
 // ============================================================================
 
-export const EXCEL_EPOCH = new Date(1899, 11, 30); // Excel date serialization epoch
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;
+export const SESSION_TIMEOUT_MS = 30 * 60 * 1000; // Scraper session idle timeout (30 minutes)
 export const CHECK_INTERVAL_MS = 60_000; // Auto-sync polling interval
 export const IMESSAGE_TIMEOUT_MS = 30_000; // Kill osascript if iMessage send hangs
 

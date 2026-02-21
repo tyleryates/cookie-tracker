@@ -4,8 +4,8 @@
 import axios, { type AxiosInstance, type AxiosResponse, isAxiosError } from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { type Cookie, CookieJar } from 'tough-cookie';
-import { HTTP_STATUS, SPECIAL_IDENTIFIERS } from '../constants';
-import Logger from '../logger';
+import { HTTP_STATUS, SESSION_TIMEOUT_MS, SPECIAL_IDENTIFIERS } from '../constants';
+import Logger, { getErrorMessage } from '../logger';
 import type { SCMeResponse } from './sc-types';
 
 export class SmartCookieSession {
@@ -17,7 +17,6 @@ export class SmartCookieSession {
   private cookieJar: CookieJar;
   private credentials: { username: string; password: string } | null = null;
   private lastActivityAt = 0;
-  private static readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor() {
     this.cookieJar = new CookieJar();
@@ -130,7 +129,7 @@ export class SmartCookieSession {
 
   /** Clear stored credentials if session has been idle too long */
   private expireIdleCredentials(): void {
-    if (this.credentials && this.lastActivityAt > 0 && Date.now() - this.lastActivityAt > SmartCookieSession.SESSION_TIMEOUT_MS) {
+    if (this.credentials && this.lastActivityAt > 0 && Date.now() - this.lastActivityAt > SESSION_TIMEOUT_MS) {
       Logger.info('SC session: idle timeout, clearing stored credentials');
       this.credentials = null;
     }
@@ -144,7 +143,7 @@ export class SmartCookieSession {
     if (isAxiosError(error) && error.response) {
       return new Error(`${label} failed: ${error.response.status} ${error.response.statusText}`);
     }
-    return new Error(`${label} failed: ${(error as Error).message}`);
+    return new Error(`${label} failed: ${getErrorMessage(error)}`);
   }
 
   /** Check if an error is an authentication error (401 or 403) */

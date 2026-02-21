@@ -1,7 +1,7 @@
 // useDataLoader — data loading and export
 
 import { useCallback } from 'preact/hooks';
-import Logger from '../../logger';
+import Logger, { getErrorMessage } from '../../logger';
 import type { Action } from '../app-reducer';
 import { loadDataFromDisk, saveUnifiedDatasetToDisk } from '../data-loader';
 import { ipcInvoke } from '../ipc';
@@ -40,7 +40,7 @@ export function useDataLoader(
       } catch (error) {
         // Always show load errors — even when showMessages is false (called from sync/init),
         // errors should be visible to the user
-        showStatus(`Error loading files: ${(error as Error).message}`, 'error');
+        showStatus(`Error loading files: ${getErrorMessage(error)}`, 'error');
         Logger.error('Data load error:', error);
         return false;
       }
@@ -53,7 +53,7 @@ export function useDataLoader(
       const result = await ipcInvoke('export-data');
       if (result) showStatus('Data exported', 'success');
     } catch (error) {
-      showStatus(`Export failed: ${(error as Error).message}`, 'error');
+      showStatus(`Export failed: ${getErrorMessage(error)}`, 'error');
     }
   }, [showStatus]);
 

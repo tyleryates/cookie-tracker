@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { CookieType } from '../../types';
 import {
-  parseExcelDate,
   parseVarietiesFromAPI,
   parseVarietiesFromDC,
   parseVarietiesFromSCReport,
@@ -116,35 +115,5 @@ describe('parseVarietiesFromDC', () => {
   it('ignores zero and negative quantities', () => {
     const varieties = parseVarietiesFromDC({ 'Thin Mints': '0' });
     expect(Object.keys(varieties)).toHaveLength(0);
-  });
-});
-
-describe('parseExcelDate', () => {
-  it('converts Excel date number to ISO string', () => {
-    // Excel date 45000 ≈ 2023-03-15
-    const result = parseExcelDate(45000);
-    expect(result).toBeTruthy();
-    expect(result).toContain('2023');
-  });
-
-  it('returns null for null input', () => {
-    expect(parseExcelDate(null)).toBeNull();
-  });
-
-  it('returns null for undefined input', () => {
-    expect(parseExcelDate(undefined)).toBeNull();
-  });
-
-  it('returns null for non-number input', () => {
-    expect(parseExcelDate('not a number' as any)).toBeNull();
-  });
-
-  it('returns null for zero', () => {
-    expect(parseExcelDate(0)).toBeNull();
-  });
-
-  it('produces valid ISO date strings', () => {
-    const result = parseExcelDate(44927); // ~2023-01-01
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 });

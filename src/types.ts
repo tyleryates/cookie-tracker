@@ -178,7 +178,7 @@ interface AllocationSummary {
   virtualBooth: AllocationChannelSummary;
 }
 
-export interface ScoutTotals {
+interface ScoutTotals {
   orders: number;
   delivered: number;
   shipped: number;
@@ -201,7 +201,7 @@ export interface ScoutTotals {
   $orderStatusCounts: { needsApproval: number; pending: number; completed: number };
 }
 
-export interface ScoutInventory {
+interface ScoutInventory {
   total: number;
   varieties: Varieties;
 }

@@ -1,12 +1,6 @@
 /* Buttons, toggles, forms, stat cards, tooltips, info boxes, modals, utilities */
 
 /* Buttons */
-.button-group {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .btn {
   padding: 10px 20px;
   border: 1px solid var(--gray-300);
@@ -141,6 +135,20 @@
   opacity: 0.9;
 }
 
+.toggle-switch input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.filter-toggle:focus-visible,
+.booth-slot-dismiss:focus-visible,
+.modal-close:focus-visible,
+.health-check-link:focus-visible,
+button.stat-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .toggle-label {
   font-size: 0.875em;
   color: var(--gray-700);
@@ -232,7 +240,7 @@ button.stat-card-active {
 
 .stat-card-description {
   font-size: 0.8em;
-  color: var(--gray-400);
+  color: var(--gray-500);
   margin-top: 5px;
 }
 
@@ -389,7 +397,7 @@ button.stat-card-active {
 }
 
 .muted-text {
-  color: var(--gray-400);
+  color: var(--gray-500);
   font-style: italic;
 }
 
@@ -400,7 +408,7 @@ button.stat-card-active {
 
 .note-text {
   font-size: 0.85em;
-  color: var(--gray-400);
+  color: var(--gray-500);
   margin-top: 4px;
   font-weight: normal;
 }
@@ -762,13 +770,6 @@ button.stat-card-active {
 .modal-input-row input:focus {
   outline: none;
   border-color: var(--primary);
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 20px;
 }
 
 /* Loading state */

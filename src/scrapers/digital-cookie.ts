@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { isAxiosError } from 'axios';
 import { DEFAULT_COUNCIL_ID, PIPELINE_FILES } from '../constants';
-import Logger from '../logger';
+import Logger, { getErrorMessage } from '../logger';
 import type { ProgressCallback, ScrapeSourceResult } from '../types';
 import { BaseScraper } from './base-scraper';
 import { DigitalCookieSession } from './dc-session';
@@ -107,8 +107,8 @@ class DigitalCookieScraper extends BaseScraper {
         this.sendEndpointStatus('dc-login', 'synced');
       } catch (loginError) {
         const httpStatus = isAxiosError(loginError) ? loginError.response?.status : undefined;
-        Logger.error(`dc-login: failed (HTTP ${httpStatus ?? '?'}) ${(loginError as Error).message}`);
-        this.sendEndpointStatus('dc-login', 'error', false, undefined, undefined, httpStatus, (loginError as Error).message);
+        Logger.error(`dc-login: failed (HTTP ${httpStatus ?? '?'}) ${getErrorMessage(loginError)}`);
+        this.sendEndpointStatus('dc-login', 'error', false, undefined, undefined, httpStatus, getErrorMessage(loginError));
         throw loginError;
       }
 
@@ -125,7 +125,7 @@ class DigitalCookieScraper extends BaseScraper {
         return { success: false, source: 'Digital Cookie', error: 'Sync cancelled' };
       }
       Logger.error('Digital Cookie scrape failed:', error);
-      return { success: false, source: 'Digital Cookie', error: (error as Error).message };
+      return { success: false, source: 'Digital Cookie', error: getErrorMessage(error) };
     }
   }
 }

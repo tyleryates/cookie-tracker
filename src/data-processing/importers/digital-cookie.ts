@@ -4,7 +4,7 @@ import { DATA_SOURCES, DC_COLUMNS } from '../../constants';
 import type { DataStore } from '../../data-store';
 import { mergeOrCreateOrder } from '../../data-store-operations';
 import type { RawDataRow } from '../../types';
-import { parseExcelDate, parseVarietiesFromDC, safeParseFloat, safeParseInt } from './parsers';
+import { parseVarietiesFromDC, safeParseFloat, safeParseInt } from './parsers';
 import { buildScoutName, recordImportMetadata, updateScoutData } from './scout-helpers';
 
 /** Import Digital Cookie order data from Excel export */
@@ -20,7 +20,7 @@ export function importDigitalCookie(store: DataStore, dcData: RawDataRow[]): voi
     const orderData = {
       orderNumber: orderNum,
       scout: scout,
-      date: parseExcelDate(row[DC_COLUMNS.ORDER_DATE]) ?? undefined,
+      date: row[DC_COLUMNS.ORDER_DATE] || '',
       packages:
         safeParseInt(row[DC_COLUMNS.TOTAL_PACKAGES], `DC order ${orderNum} total`) -
         safeParseInt(row[DC_COLUMNS.REFUNDED_PACKAGES], `DC order ${orderNum} refunded`),

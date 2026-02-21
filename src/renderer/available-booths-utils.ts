@@ -1,16 +1,16 @@
 // Available Booths — Utility functions and types
 // Extracted from available-booths.tsx for use by other modules
 
-import { BOOTH_TIME_SLOTS } from '../../constants';
-import type { BoothAvailableDate, BoothLocation, BoothTimeSlot } from '../../types';
-import { parseLocalDate, slotOverlapsRange, todayMidnight } from '../format-utils';
+import { BOOTH_TIME_SLOTS } from '../constants';
+import type { BoothAvailableDate, BoothLocation, BoothTimeSlot } from '../types';
+import { parseLocalDate, slotOverlapsRange, todayMidnight } from './format-utils';
 
 /** Encode a slot as "boothId|date|startTime" for ignored/notified tracking */
 export function encodeSlotKey(boothId: number, date: string, startTime: string): string {
   return `${boothId}|${date}|${startTime}`;
 }
 
-export interface SlotDetail {
+interface SlotDetail {
   date: string;
   startTime: string;
   endTime: string;

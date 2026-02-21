@@ -1,4 +1,3 @@
-import type { ComponentChildren } from 'preact';
 import { useState } from 'preact/hooks';
 import {
   COOKIE_ORDER,
@@ -12,24 +11,12 @@ import type { CookieType, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { getVarietiesWithDefaults, isPhysicalVariety } from '../format-utils';
 
-function EstimateDistributionModal({
-  varietyStats,
-  total,
-  inventory,
-  defaultInput,
-  onClose
-}: {
-  varietyStats: Record<string, number>;
-  total: number;
-  inventory: Partial<Record<string, number>>;
-  defaultInput: number;
-  onClose: () => void;
-}) {
-  const [selectedVariety, setSelectedVariety] = useState<'total' | CookieType>('total');
-  const [inputValue, setInputValue] = useState(defaultInput > 0 ? String(defaultInput) : '');
-  const [showInventory, setShowInventory] = useState(true);
-
-  const input = Number(inputValue) || 0;
+function computeEstimates(
+  varietyStats: Record<string, number>,
+  total: number,
+  selectedVariety: 'total' | CookieType,
+  input: number
+): { ratios: Map<CookieType, number>; estimates: Map<CookieType, number | null> | null; estimatedTotal: number; usingCouncilAvg: boolean } {
   const usingCouncilAvg = total < LOW_SALES_THRESHOLD;
 
   // Build ratios from current popularity data or council averages
@@ -76,13 +63,39 @@ function EstimateDistributionModal({
     }
   }
 
+  return { ratios, estimates, estimatedTotal, usingCouncilAvg };
+}
+
+function EstimateDistributionModal({
+  varietyStats,
+  total,
+  inventory,
+  defaultInput,
+  onClose
+}: {
+  varietyStats: Record<string, number>;
+  total: number;
+  inventory: Partial<Record<string, number>>;
+  defaultInput: number;
+  onClose: () => void;
+}) {
+  const [selectedVariety, setSelectedVariety] = useState<'total' | CookieType>('total');
+  const [inputValue, setInputValue] = useState(defaultInput > 0 ? String(defaultInput) : '');
+  const [showInventory, setShowInventory] = useState(true);
+
+  const input = Number(inputValue) || 0;
+  const physicalInventoryTotal = Object.entries(inventory).reduce((s, [k, v]) => s + (isPhysicalVariety(k) ? v || 0 : 0), 0);
+  const { estimates, estimatedTotal, usingCouncilAvg } = computeEstimates(varietyStats, total, selectedVariety, input);
+
+  const totalDiff = estimatedTotal > 0 ? physicalInventoryTotal - estimatedTotal : null;
+
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop dismiss
     <div class="modal-overlay" role="presentation" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
       <div class="modal-content" role="dialog" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
         <div class="modal-header">
           <h3 style={{ margin: 0 }}>Estimate Distribution</h3>
-          <button type="button" class="modal-close" onClick={onClose}>
+          <button type="button" class="modal-close" aria-label="Close" onClick={onClose}>
             ✕
           </button>
         </div>
@@ -101,10 +114,7 @@ function EstimateDistributionModal({
               const v = (e.target as HTMLSelectElement).value as 'total' | CookieType;
               setSelectedVariety(v);
               if (showInventory) {
-                const inv =
-                  v === 'total'
-                    ? Object.entries(inventory).reduce((s, [k, n]) => s + (isPhysicalVariety(k) ? n || 0 : 0), 0)
-                    : inventory[v] || 0;
+                const inv = v === 'total' ? physicalInventoryTotal : inventory[v] || 0;
                 setInputValue(inv > 0 ? String(inv) : '');
               }
             }}
@@ -158,21 +168,14 @@ function EstimateDistributionModal({
               <tr style={{ fontWeight: 600 }}>
                 <td>Total</td>
                 <td class="text-center">{estimatedTotal > 0 ? estimatedTotal : '—'}</td>
+                {showInventory && <td class="text-center">{physicalInventoryTotal}</td>}
                 {showInventory && (
-                  <td class="text-center">{Object.entries(inventory).reduce((s, [k, v]) => s + (isPhysicalVariety(k) ? v || 0 : 0), 0)}</td>
+                  <td
+                    class={`text-center${totalDiff !== null && totalDiff < 0 ? ' pkg-out' : totalDiff !== null && totalDiff > 0 ? ' pkg-in' : ''}`}
+                  >
+                    {totalDiff !== null ? (totalDiff > 0 ? `+${totalDiff}` : totalDiff) : '—'}
+                  </td>
                 )}
-                {showInventory &&
-                  (() => {
-                    const invTotal = Object.entries(inventory).reduce((s, [k, v]) => s + (isPhysicalVariety(k) ? v || 0 : 0), 0);
-                    const totalDiff = estimatedTotal > 0 ? invTotal - estimatedTotal : null;
-                    return (
-                      <td
-                        class={`text-center${totalDiff !== null && totalDiff < 0 ? ' pkg-out' : totalDiff !== null && totalDiff > 0 ? ' pkg-in' : ''}`}
-                      >
-                        {totalDiff !== null ? (totalDiff > 0 ? `+${totalDiff}` : totalDiff) : '—'}
-                      </td>
-                    );
-                  })()}
               </tr>
             </DataTable>
           </>
@@ -182,16 +185,8 @@ function EstimateDistributionModal({
   );
 }
 
-export function VarietyReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
+export function VarietyReport({ data }: { data: UnifiedDataset }) {
   const [showModal, setShowModal] = useState(false);
-
-  if (!data?.varieties) {
-    return (
-      <div class="report-visual">
-        <p>No data available. Please import data first.</p>
-      </div>
-    );
-  }
 
   const varieties = data.varieties;
   const varietyStats = varieties.byCookie;
@@ -210,7 +205,6 @@ export function VarietyReport({ data, banner }: { data: UnifiedDataset; banner?:
           </button>
         )}
       </div>
-      {banner}
       <p class="meta-text">Total: {varieties.total} packages sold</p>
       <DataTable columns={['Variety', 'Packages', 'Popularity']} columnAligns={[undefined, 'center', 'center']}>
         {rows.map(([variety, count]) => {

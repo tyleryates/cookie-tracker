@@ -1,24 +1,12 @@
 // Formatting and display utilities
 
 import { BOOTH_RESERVATION_TYPE, MS_PER_DAY, TRANSFER_CATEGORY, TRANSFER_TYPE } from '../constants';
-import { COOKIE_ORDER, getCookieDisplayName, sortVarietiesByOrder } from '../cookie-constants';
+import { COOKIE_ORDER, COOKIE_TYPE, getCookieDisplayName, sortVarietiesByOrder } from '../cookie-constants';
 import type { Allocation, BoothReservationImported, BoothTimeSlot, Scout, Transfer, Varieties } from '../types';
 
 // ============================================================================
 // DATE FORMATTING
 // ============================================================================
-
-/** Format date from YYYY/MM/DD to MM/DD/YYYY */
-function formatDateForDisplay(dateStr: string | null | undefined): string {
-  if (!dateStr) return '-';
-  const str = String(dateStr);
-  const match = str.match(/^(\d{4})[/-](\d{2})[/-](\d{2})/);
-  if (match) {
-    const [, year, month, day] = match;
-    return `${month}/${day}/${year}`;
-  }
-  return str;
-}
 
 /** Format full timestamp for hover (e.g., "Feb 5, 2026, 3:45 PM") */
 function formatFullTimestamp(date: string | Date | null | undefined): string {
@@ -75,13 +63,6 @@ function formatRelativeTimestamp(date: string | Date | null | undefined): string
   });
   return `${dateStr} at ${timeStr}`;
 }
-
-/** Backwards-compatible namespace — delegates to plain functions above */
-const DateFormatter = {
-  toDisplay: formatDateForDisplay,
-  toFullTimestamp: formatFullTimestamp,
-  toRelativeTimestamp: formatRelativeTimestamp
-};
 
 /** Canonical date parser — handles ISO (YYYY-MM-DD) and US (MM/DD/YYYY) formats.
  *  Single source of truth for date string parsing; all other date functions derive from this. */
@@ -241,8 +222,7 @@ function countBoothsNeedingDistribution(boothReservations: BoothReservationImpor
   const today = todayMidnight();
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   return boothReservations.filter((r) => {
-    const type = (r.booth.reservationType || '').toLowerCase();
-    if (type.includes('virtual')) return false;
+    if (isVirtualBooth(r.booth.reservationType)) return false;
     if (r.booth.isDistributed) return false;
     if (!r.timeslot.date) return true;
     const d = parseLocalDate(r.timeslot.date);
@@ -278,9 +258,9 @@ function pruneExpiredSlots(slots: string[]): string[] {
 function getVarietiesWithDefaults(varieties: Varieties | undefined): Record<string, number> {
   const complete: Record<string, number> = {};
   const safeVarieties = varieties || {};
-  COOKIE_ORDER.forEach((variety) => {
+  for (const variety of COOKIE_ORDER) {
     complete[variety] = safeVarieties[variety] || 0;
-  });
+  }
   return complete;
 }
 
@@ -294,7 +274,7 @@ function buildVarietyTooltip(varieties: Varieties): string {
 
 /** Check if a cookie variety is physical (not Cookie Share / donation-only) */
 function isPhysicalVariety(variety: string): boolean {
-  return variety !== 'COOKIE_SHARE';
+  return variety !== COOKIE_TYPE.COOKIE_SHARE;
 }
 
 /** Sum varieties across multiple allocations into a single Varieties map */
@@ -373,6 +353,11 @@ function formatMaxAge(ms: number): string {
   return `${hours} hours`;
 }
 
+/** Compare two date strings in descending order (newest first) */
+function compareDateDesc(a: string | undefined, b: string | undefined): number {
+  return new Date(b || 0).getTime() - new Date(a || 0).getTime();
+}
+
 // ============================================================================
 // EXPORTS
 // ============================================================================
@@ -380,15 +365,17 @@ function formatMaxAge(ms: number): string {
 export {
   boothTypeClass,
   buildVarietyTooltip,
+  compareDateDesc,
   countBoothsNeedingDistribution,
-  DateFormatter,
   formatBoothDate,
   formatBoothTime,
   formatCompactRange,
   formatCurrency,
+  formatFullTimestamp,
   formatDataSize,
   formatDuration,
   formatMaxAge,
+  formatRelativeTimestamp,
   formatShortDate,
   formatTime12h,
   formatTimeRange,

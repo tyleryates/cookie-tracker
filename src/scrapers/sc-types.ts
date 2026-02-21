@@ -2,7 +2,7 @@
 // Documents the shape of all SC API responses accessed by scrapers and importers.
 
 /** Cookie entry in any cookies[] array (orders, dividers, reservations) */
-export interface SCCookieEntry {
+interface SCCookieEntry {
   id?: number;
   cookieId?: number;
   quantity: number;
@@ -94,7 +94,7 @@ export interface SCReservationsResponse {
 }
 
 /** Booth info from divider responses (superset of reservation booth fields) */
-export interface SCBoothDividerBooth {
+interface SCBoothDividerBooth {
   booth_id?: string;
   store_name?: string;
   booth_name?: string;

@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../logger';
 import type SeasonalData from '../seasonal-data';
 import type { Credentials, ProgressCallback, ScrapeResults } from '../types';
 import type BoothCache from './booth-cache';
@@ -91,7 +92,7 @@ class ScraperOrchestrator {
         digitalCookie: null,
         smartCookie: null,
         success: false,
-        error: (error as Error).message,
+        error: getErrorMessage(error),
         endpointStatuses
       };
     } finally {

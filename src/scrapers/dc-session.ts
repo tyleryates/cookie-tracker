@@ -5,7 +5,7 @@ import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse,
 import { wrapper } from 'axios-cookiejar-support';
 import * as cheerio from 'cheerio';
 import { CookieJar } from 'tough-cookie';
-import { HTTP_STATUS } from '../constants';
+import { HTTP_STATUS, SESSION_TIMEOUT_MS } from '../constants';
 import Logger from '../logger';
 
 export class DigitalCookieSession {
@@ -15,7 +15,6 @@ export class DigitalCookieSession {
   userAgent = '';
   private credentials: { username: string; password: string; role?: string } | null = null;
   private lastActivityAt = 0;
-  private static readonly SESSION_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 
   constructor() {
     this.client = this.createClient();
@@ -143,7 +142,7 @@ export class DigitalCookieSession {
 
   /** Clear stored credentials if session has been idle too long */
   private expireIdleCredentials(): void {
-    if (this.credentials && this.lastActivityAt > 0 && Date.now() - this.lastActivityAt > DigitalCookieSession.SESSION_TIMEOUT_MS) {
+    if (this.credentials && this.lastActivityAt > 0 && Date.now() - this.lastActivityAt > SESSION_TIMEOUT_MS) {
       Logger.info('DC session: idle timeout, clearing stored credentials');
       this.credentials = null;
     }

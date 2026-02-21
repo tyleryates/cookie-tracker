@@ -13,6 +13,7 @@ export function registerMiscHandlers(deps: HandlerDeps): void {
   ipcMain.handle(
     'log-message',
     handleIpcError(async (_event: Electron.IpcMainInvokeEvent, line: string) => {
+      if (typeof line !== 'string' || line.length > 10000) return;
       Logger.appendLine(line);
     })
   );

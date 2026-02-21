@@ -1,20 +1,12 @@
-import type { ComponentChildren } from 'preact';
 import { SC_TRANSFER_STATUS, TRANSFER_TYPE } from '../../constants';
-import { COOKIE_ORDER, getCookieAbbreviation, getCookieColor } from '../../cookie-constants';
+import { COOKIE_ORDER } from '../../cookie-constants';
 import type { Transfer, UnifiedDataset, Varieties } from '../../types';
+import { CookieLabel } from '../components/cookie-label';
 import { DataTable } from '../components/data-table';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, formatShortDate, getTransferDisplayInfo, isPhysicalVariety } from '../format-utils';
-export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
-  if (!data?.transferBreakdowns) {
-    return (
-      <div class="report-visual">
-        <p>No data available. Please import data first.</p>
-      </div>
-    );
-  }
-
+import { buildVarietyTooltip, compareDateDesc, formatShortDate, getTransferDisplayInfo, isPhysicalVariety } from '../format-utils';
+export function InventoryReport({ data }: { data: UnifiedDataset }) {
   const troopTotals = data.troopTotals;
   const transferBreakdowns = data.transferBreakdowns;
   const varieties = data.varieties;
@@ -67,8 +59,8 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
   const physicalVarieties = COOKIE_ORDER.filter(isPhysicalVariety);
 
   // Combine all transfers into one sorted list
-  const allTransfers = [...c2tTransfers, ...t2tOutTransfers, ...t2gTransfers, ...g2tTransfers].sort(
-    (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+  const allTransfers = [...c2tTransfers, ...t2tOutTransfers, ...t2gTransfers, ...g2tTransfers].sort((a, b) =>
+    compareDateDesc(a.date, b.date)
   );
 
   const hasTransferData = data.hasTransferData;
@@ -78,7 +70,6 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
       <div class="report-header-row">
         <h3>Troop Inventory & Transfers</h3>
       </div>
-      {banner}
 
       {!hasTransferData && (
         <div class="info-box info-box-warning">
@@ -97,15 +88,11 @@ export function InventoryReport({ data, banner }: { data: UnifiedDataset; banner
       <table class="table-normal">
         <thead>
           <tr>
-            {physicalVarieties.map((v) => {
-              const color = getCookieColor(v);
-              return (
-                <th key={v} class="text-center" style={{ fontSize: '0.85em', whiteSpace: 'nowrap' }}>
-                  {color && <span class="inventory-chip-dot" style={{ background: color }} />}
-                  {getCookieAbbreviation(v)}
-                </th>
-              );
-            })}
+            {physicalVarieties.map((v) => (
+              <th key={v} class="text-center" style={{ fontSize: '0.85em', whiteSpace: 'nowrap' }}>
+                <CookieLabel variety={v} />
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>

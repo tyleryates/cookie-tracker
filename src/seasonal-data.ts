@@ -5,7 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { loadJsonFile, saveJsonFile } from './json-file-utils';
-import Logger from './logger';
+import Logger, { getErrorMessage } from './logger';
 import type { SCCookieMapEntry, SCMeResponse } from './scrapers/sc-types';
 
 export interface DCRole {
@@ -35,7 +35,7 @@ class SeasonalData {
       const p = this.filePath(name);
       if (fs.existsSync(p)) fs.unlinkSync(p);
     } catch (err) {
-      Logger.warn(`Could not delete ${name}:`, (err as Error).message);
+      Logger.warn(`Could not delete ${name}:`, getErrorMessage(err));
     }
   }
 

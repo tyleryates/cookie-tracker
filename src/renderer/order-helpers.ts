@@ -1,8 +1,17 @@
 // Shared order display helpers — status styling, tooltips, name formatting
 
-import { ORDER_STATUS_CLASS } from '../constants';
+import { DC_COLUMNS, ORDER_STATUS_CLASS, PAYMENT_METHOD } from '../constants';
 import { classifyOrderStatus } from '../order-classification';
 import type { Order } from '../types';
+
+export function getPaymentStyles(paymentMethod: string | null | undefined) {
+  const isCash = paymentMethod === PAYMENT_METHOD.CASH;
+  const isDigital = paymentMethod === PAYMENT_METHOD.CREDIT_CARD || paymentMethod === PAYMENT_METHOD.VENMO;
+  return {
+    amountClass: isCash ? 'cash-amount' : isDigital ? 'digital-amount' : '',
+    pillClass: isCash ? 'payment-pill payment-pill-cash' : isDigital ? 'payment-pill payment-pill-digital' : ''
+  };
+}
 
 function titleCase(s: string): string {
   return s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
@@ -30,12 +39,12 @@ export function isActionRequired(status: string | undefined): boolean {
 export function buildOrderTooltip(order: Order): string {
   const dc = order.metadata.dc as Record<string, string> | null;
   if (!dc) return '';
-  const shipFirst = dc['Shipping First Name'] || '';
-  const shipLast = dc['Shipping Last Name'] || '';
+  const shipFirst = dc[DC_COLUMNS.SHIPPING_FIRST_NAME] || '';
+  const shipLast = dc[DC_COLUMNS.SHIPPING_LAST_NAME] || '';
   const shipName = `${shipFirst} ${shipLast}`.trim();
   if (shipName) return titleCase(shipName);
-  const billFirst = dc['Billing First Name'] || '';
-  const billLast = dc['Billing Last Name'] || '';
+  const billFirst = dc[DC_COLUMNS.BILLING_FIRST_NAME] || '';
+  const billLast = dc[DC_COLUMNS.BILLING_LAST_NAME] || '';
   const billName = `${billFirst} ${billLast}`.trim();
   return billName ? titleCase(billName) : '';
 }

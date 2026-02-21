@@ -1,7 +1,8 @@
 // AppHeader — Top-level app header with sync pills and action buttons
 
 import * as packageJson from '../../../package.json';
-import { DateFormatter } from '../format-utils';
+import { SYNC_STATUS } from '../../constants';
+import { formatRelativeTimestamp } from '../format-utils';
 import type { computeGroupStatuses, GroupStatus } from '../sync-utils';
 
 // ============================================================================
@@ -11,14 +12,14 @@ import type { computeGroupStatuses, GroupStatus } from '../sync-utils';
 function SyncPill({ label, group }: { label: string; group: GroupStatus }) {
   let statusText: string;
   let modifier = '';
-  if (group.status === 'syncing') {
+  if (group.status === SYNC_STATUS.SYNCING) {
     statusText = 'Syncing\u2026';
     modifier = 'syncing';
-  } else if (group.status === 'error') {
+  } else if (group.status === SYNC_STATUS.ERROR) {
     statusText = 'Failed';
     modifier = 'error';
   } else if (group.lastSync) {
-    statusText = DateFormatter.toRelativeTimestamp(group.lastSync);
+    statusText = formatRelativeTimestamp(group.lastSync);
   } else {
     return null;
   }

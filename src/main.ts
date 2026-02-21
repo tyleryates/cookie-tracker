@@ -4,6 +4,7 @@ import { app, BrowserWindow } from 'electron';
 import ConfigManager from './config-manager';
 import CredentialsManager from './credentials-manager';
 import { registerAllHandlers } from './ipc-handlers';
+import { saveJsonFile } from './json-file-utils';
 import Logger from './logger';
 import ProfileManager from './profile-manager';
 import type ScraperOrchestrator from './scrapers';
@@ -134,8 +135,7 @@ function loadTimestamps(): Timestamps {
 }
 
 function saveTimestamps(timestamps: Timestamps): void {
-  if (!fs.existsSync(profileDir)) fs.mkdirSync(profileDir, { recursive: true });
-  fs.writeFileSync(timestampsPath, JSON.stringify(timestamps, null, 2));
+  saveJsonFile(timestampsPath, timestamps);
 }
 
 // Standardized IPC error handler wrapper — always wraps to { success, data/error }

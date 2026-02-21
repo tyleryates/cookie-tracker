@@ -5,6 +5,8 @@ import type { CredentialPatch, CredentialsSummary } from '../types';
 import { validateCredentialPatch } from '../validators';
 import type { HandlerDeps } from './types';
 
+const MAX_CREDENTIAL_LENGTH = 256;
+
 export function registerCredentialHandlers(deps: HandlerDeps): void {
   const { credentialsManager, handleIpcError } = deps;
 
@@ -47,8 +49,8 @@ export function registerCredentialHandlers(deps: HandlerDeps): void {
   ipcMain.handle(
     'verify-sc',
     handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { username, password }: { username: string; password: string }) => {
-      if (!username || typeof username !== 'string' || username.length > 256) throw new Error('Invalid username');
-      if (!password || typeof password !== 'string' || password.length > 256) throw new Error('Invalid password');
+      if (!username || typeof username !== 'string' || username.length > MAX_CREDENTIAL_LENGTH) throw new Error('Invalid username');
+      if (!password || typeof password !== 'string' || password.length > MAX_CREDENTIAL_LENGTH) throw new Error('Invalid password');
       const session = new SmartCookieSession();
       await session.login(username, password);
 
@@ -65,8 +67,8 @@ export function registerCredentialHandlers(deps: HandlerDeps): void {
   ipcMain.handle(
     'verify-dc',
     handleIpcError(async (_event: Electron.IpcMainInvokeEvent, { username, password }: { username: string; password: string }) => {
-      if (!username || typeof username !== 'string' || username.length > 256) throw new Error('Invalid username');
-      if (!password || typeof password !== 'string' || password.length > 256) throw new Error('Invalid password');
+      if (!username || typeof username !== 'string' || username.length > MAX_CREDENTIAL_LENGTH) throw new Error('Invalid username');
+      if (!password || typeof password !== 'string' || password.length > MAX_CREDENTIAL_LENGTH) throw new Error('Invalid password');
       const session = new DigitalCookieSession();
       const roles = await session.fetchRoles(username, password);
       return { roles };

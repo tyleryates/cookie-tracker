@@ -2,6 +2,7 @@
 // Side effects (IPC calls, timers) stay in the component; only pure state
 // transitions live here.
 
+import { SYNC_STATUS } from '../constants';
 import type { ActiveProfile, AppConfig, AppConfigPatch, EndpointSyncState, ProfileInfo, SyncState, UnifiedDataset } from '../types';
 
 // ============================================================================
@@ -133,8 +134,8 @@ const ACTION_HANDLERS: { [T in Action['type']]: ActionHandler<T> } = {
 
   SYNC_ENDPOINT_UPDATE: (state, action) => {
     const { update } = action;
-    const prev = state.syncState.endpoints[action.endpoint] || { status: 'idle', lastSync: null };
-    const isSyncing = update.status === 'syncing';
+    const prev = state.syncState.endpoints[action.endpoint] || { status: SYNC_STATUS.IDLE, lastSync: null };
+    const isSyncing = update.status === SYNC_STATUS.SYNCING;
     // Clear previous sync's timing/error when starting; preserve/update when finished
     const preserveOnSyncEnd = <T>(val: T | undefined, prevVal: T | undefined): T | undefined => (isSyncing ? undefined : (val ?? prevVal));
     return {

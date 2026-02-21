@@ -1,14 +1,71 @@
 // useSync — sync handler, booth refresh, auto-sync polling, IPC event listeners
 
 import { useCallback, useEffect, useRef } from 'preact/hooks';
-import { CHECK_INTERVAL_MS, SYNC_ENDPOINTS } from '../../constants';
-import Logger from '../../logger';
-import type { AppConfig, SyncState } from '../../types';
+import { CHECK_INTERVAL_MS, SYNC_ENDPOINTS, SYNC_STATUS } from '../../constants';
+import Logger, { getErrorMessage } from '../../logger';
+import type { AppConfig, BoothLocation, SyncState } from '../../types';
 import type { Action } from '../app-reducer';
+import { type BoothSlotSummary, encodeSlotKey, summarizeAvailableSlots } from '../available-booths-utils';
 import { pruneExpiredSlots } from '../format-utils';
 import { ipcInvoke, ipcInvokeRaw, onIpcEvent } from '../ipc';
-import { encodeSlotKey, summarizeAvailableSlots } from '../reports/available-booths-utils';
 import { filterNewSlots, formatImessageBody, formatNotificationBody, formatSyncResult, isStale, markNotified } from './sync-formatters';
+
+// ============================================================================
+// EXTRACTED HELPERS (pure functions, used by refreshBooths)
+// ============================================================================
+
+/** Build a set of "boothId|date|startTime" keys from booth location data */
+function buildAvailableSlotSet(locations: BoothLocation[]): Set<string> {
+  const slots = new Set<string>();
+  for (const loc of locations) {
+    for (const d of loc.availableDates || []) {
+      for (const s of d.timeSlots) {
+        slots.add(encodeSlotKey(loc.id, d.date, s.startTime));
+      }
+    }
+  }
+  return slots;
+}
+
+/** Send OS notification and optionally iMessage for newly available booth slots */
+function sendBoothNotifications(
+  booths: BoothSlotSummary[],
+  notified: Set<string>,
+  config: AppConfig,
+  showStatus: (msg: string, type: 'success' | 'warning' | 'error') => void
+): { newKeys: string[]; sentIMessage: boolean } {
+  const count = booths.reduce((sum, b) => sum + b.slotCount, 0);
+  let sentIMessage = false;
+  const newKeys: string[] = [];
+
+  if (count === 0) {
+    showStatus('No available booth slots found', 'success');
+    return { newKeys, sentIMessage };
+  }
+
+  // OS notification or fallback to status bar
+  const notifBody = formatNotificationBody(booths);
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    new Notification('Booths Available', { body: notifBody, tag: 'booth-availability', requireInteraction: true });
+  } else {
+    showStatus(`Booths available: ${notifBody}`, 'success');
+  }
+
+  // iMessage for new (un-notified) slots only
+  if (config.boothFinder?.imessage && config.boothFinder?.imessageRecipient) {
+    const newBooths = filterNewSlots(booths, notified);
+    if (newBooths.length > 0) {
+      markNotified(newBooths, notified);
+      sentIMessage = true;
+      ipcInvoke('send-imessage', {
+        recipient: config.boothFinder.imessageRecipient,
+        message: formatImessageBody(newBooths)
+      }).catch(() => {});
+    }
+  }
+
+  return { newKeys, sentIMessage };
+}
 
 export function useSync(
   dispatch: (action: Action) => void,
@@ -36,43 +93,39 @@ export function useSync(
       const errors: string[] = [];
       const parts: string[] = [];
 
-      if (!result.success) {
-        errors.push(result.error || 'Unknown error');
-      }
+      if (!result.success) errors.push(result.error || 'Unknown error');
 
       const scrapeData = result.success ? result.data : null;
 
-      if (scrapeData) {
-        if (scrapeData.digitalCookie?.success) {
-          parts.push('Digital Cookie downloaded');
-        } else if (scrapeData.digitalCookie?.error) {
-          errors.push(`Digital Cookie: ${scrapeData.digitalCookie.error}`);
-        }
+      if (scrapeData?.digitalCookie?.success) {
+        parts.push('Digital Cookie downloaded');
+      } else if (scrapeData?.digitalCookie?.error) {
+        errors.push(`Digital Cookie: ${scrapeData.digitalCookie.error}`);
+      }
 
-        if (scrapeData.smartCookie?.success) {
-          parts.push('Smart Cookie downloaded');
-        } else if (scrapeData.smartCookie?.error) {
-          errors.push(`Smart Cookie: ${scrapeData.smartCookie.error}`);
-        }
+      if (scrapeData?.smartCookie?.success) {
+        parts.push('Smart Cookie downloaded');
+      } else if (scrapeData?.smartCookie?.error) {
+        errors.push(`Smart Cookie: ${scrapeData.smartCookie.error}`);
+      }
 
-        if (scrapeData.error) errors.push(scrapeData.error);
+      if (scrapeData?.error) errors.push(scrapeData.error);
 
-        // Apply final per-endpoint statuses from results (authoritative, replaces progress events)
-        if (scrapeData.endpointStatuses) {
-          for (const [endpoint, info] of Object.entries(scrapeData.endpointStatuses)) {
-            dispatch({
-              type: 'SYNC_ENDPOINT_UPDATE',
-              endpoint,
-              update: {
-                status: info.status,
-                lastSync: info.lastSync,
-                durationMs: info.durationMs,
-                dataSize: info.dataSize,
-                httpStatus: info.httpStatus,
-                error: info.error
-              }
-            });
-          }
+      // Apply final per-endpoint statuses from results (authoritative, replaces progress events)
+      if (scrapeData?.endpointStatuses) {
+        for (const [endpoint, info] of Object.entries(scrapeData.endpointStatuses)) {
+          dispatch({
+            type: 'SYNC_ENDPOINT_UPDATE',
+            endpoint,
+            update: {
+              status: info.status,
+              lastSync: info.lastSync,
+              durationMs: info.durationMs,
+              dataSize: info.dataSize,
+              httpStatus: info.httpStatus,
+              error: info.error
+            }
+          });
         }
       }
 
@@ -85,7 +138,7 @@ export function useSync(
       Logger[syncMessage.logLevel](`Sync: ${syncMessage.logMsg}`);
       showStatus(syncMessage.userMsg, syncMessage.type);
     } catch (error) {
-      showStatus(`Error: ${(error as Error).message}`, 'error');
+      showStatus(`Error: ${getErrorMessage(error)}`, 'error');
       Logger.error('Sync error:', error);
     } finally {
       Logger.info('Sync: finished');
@@ -102,63 +155,36 @@ export function useSync(
       const updated = await ipcInvoke('refresh-booth-locations');
       dispatch({ type: 'UPDATE_BOOTH_LOCATIONS', boothLocations: updated });
 
-      if (config) {
-        // Prune past ignored time slots (by date, not time)
-        const prunedIgnored = pruneExpiredSlots(config.boothFinder?.ignoredSlots ?? []);
-        if (prunedIgnored.length !== (config.boothFinder?.ignoredSlots ?? []).length) {
-          dispatch({ type: 'UPDATE_CONFIG', patch: { boothFinder: { ignoredSlots: prunedIgnored } } });
-          ipcInvoke('update-config', { boothFinder: { ignoredSlots: prunedIgnored } }).catch(() => {});
-        }
+      if (!config) return;
 
-        // Build set of currently available slot keys from raw booth data
-        const currentlyAvailable = new Set<string>();
-        for (const loc of updated) {
-          for (const d of loc.availableDates || []) {
-            for (const s of d.timeSlots) {
-              currentlyAvailable.add(encodeSlotKey(loc.id, d.date, s.startTime));
-            }
-          }
-        }
+      // Prune past ignored time slots (by date, not time)
+      const prunedIgnored = pruneExpiredSlots(config.boothFinder?.ignoredSlots ?? []);
+      if (prunedIgnored.length !== (config.boothFinder?.ignoredSlots ?? []).length) {
+        dispatch({ type: 'UPDATE_CONFIG', patch: { boothFinder: { ignoredSlots: prunedIgnored } } });
+        ipcInvoke('update-config', { boothFinder: { ignoredSlots: prunedIgnored } }).catch(() => {});
+      }
 
-        // Prune notified slots no longer available — reopened slots will re-trigger
-        const prevNotifiedSlots = config.boothFinder?.notifiedSlots ?? [];
-        const notified = new Set(prevNotifiedSlots.filter((key) => currentlyAvailable.has(key)));
-        let notifiedDirty = notified.size !== prevNotifiedSlots.length;
+      // Build set of currently available slot keys from raw booth data
+      const currentlyAvailable = buildAvailableSlotSet(updated);
 
-        const booths = summarizeAvailableSlots(updated, config.boothFinder?.dayFilters ?? [], prunedIgnored);
-        const count = booths.reduce((sum, b) => sum + b.slotCount, 0);
-        if (count > 0) {
-          const notifBody = formatNotificationBody(booths);
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification('Booths Available', { body: notifBody, tag: 'booth-availability', requireInteraction: true });
-          } else {
-            showStatus(`Booths available: ${notifBody}`, 'success');
-          }
-          if (config.boothFinder?.imessage && config.boothFinder?.imessageRecipient) {
-            const newBooths = filterNewSlots(booths, notified);
-            if (newBooths.length > 0) {
-              markNotified(newBooths, notified);
-              notifiedDirty = true;
-              ipcInvoke('send-imessage', {
-                recipient: config.boothFinder.imessageRecipient,
-                message: formatImessageBody(newBooths)
-              }).catch(() => {});
-            }
-          }
-        } else {
-          showStatus('No available booth slots found', 'success');
-        }
+      // Prune notified slots no longer available — reopened slots will re-trigger
+      const prevNotifiedSlots = config.boothFinder?.notifiedSlots ?? [];
+      const notified = new Set(prevNotifiedSlots.filter((key) => currentlyAvailable.has(key)));
+      let notifiedDirty = notified.size !== prevNotifiedSlots.length;
 
-        // Persist notified set if changed (pruned stale entries or added new ones)
-        if (notifiedDirty) {
-          const updatedSlots = [...notified];
-          dispatch({ type: 'UPDATE_CONFIG', patch: { boothFinder: { notifiedSlots: updatedSlots } } });
-          ipcInvoke('update-config', { boothFinder: { notifiedSlots: updatedSlots } }).catch(() => {});
-        }
+      const booths = summarizeAvailableSlots(updated, config.boothFinder?.dayFilters ?? [], prunedIgnored);
+      const { sentIMessage } = sendBoothNotifications(booths, notified, config, showStatus);
+      if (sentIMessage) notifiedDirty = true;
+
+      // Persist notified set if changed (pruned stale entries or added new ones)
+      if (notifiedDirty) {
+        const updatedSlots = [...notified];
+        dispatch({ type: 'UPDATE_CONFIG', patch: { boothFinder: { notifiedSlots: updatedSlots } } });
+        ipcInvoke('update-config', { boothFinder: { notifiedSlots: updatedSlots } }).catch(() => {});
       }
     } catch (error) {
       Logger.error('Booth availability refresh failed:', error);
-      showStatus(`Booth refresh error: ${(error as Error).message}`, 'error');
+      showStatus(`Booth refresh error: ${getErrorMessage(error)}`, 'error');
     } finally {
       dispatch({ type: 'BOOTH_REFRESH_FINISHED' });
     }
@@ -175,7 +201,7 @@ export function useSync(
         endpoint: progress.endpoint,
         update: {
           status: progress.status,
-          lastSync: progress.status === 'synced' ? new Date().toISOString() : undefined,
+          lastSync: progress.status === SYNC_STATUS.SYNCED ? new Date().toISOString() : undefined,
           cached: progress.cached,
           durationMs: progress.durationMs,
           dataSize: progress.dataSize,
@@ -204,8 +230,8 @@ export function useSync(
   // Auto-sync polling — uses refs to read latest state without resetting the timer
   const syncStateRef = useRef(syncState);
   syncStateRef.current = syncState;
-  const reportsBusyRef = useRef(false);
-  const boothsBusyRef = useRef(false);
+  const reportsSyncInProgressRef = useRef(false);
+  const boothsRefreshInProgressRef = useRef(false);
 
   // Reports auto-sync effect
   useEffect(() => {
@@ -213,23 +239,22 @@ export function useSync(
 
     async function checkReports() {
       const state = syncStateRef.current;
-      if (state.syncing || reportsBusyRef.current) return;
+      if (state.syncing || reportsSyncInProgressRef.current) return;
 
       const stale = SYNC_ENDPOINTS.filter((ep) => ep.syncAction === 'sync').some((ep) =>
         isStale(state.endpoints[ep.id]?.lastSync, ep.maxAgeMs)
       );
+      if (!stale) return;
 
-      if (stale) {
-        reportsBusyRef.current = true;
-        Logger.debug('Auto-sync: report endpoints stale, triggering...');
-        try {
-          await sync();
-          Logger.debug('Auto-sync: reports completed');
-        } catch (error) {
-          Logger.error('Auto-sync reports error:', error);
-        } finally {
-          reportsBusyRef.current = false;
-        }
+      reportsSyncInProgressRef.current = true;
+      Logger.debug('Auto-sync: report endpoints stale, triggering...');
+      try {
+        await sync();
+        Logger.debug('Auto-sync: reports completed');
+      } catch (error) {
+        Logger.error('Auto-sync reports error:', error);
+      } finally {
+        reportsSyncInProgressRef.current = false;
       }
     }
 
@@ -244,23 +269,22 @@ export function useSync(
 
     async function checkBooths() {
       const state = syncStateRef.current;
-      if (state.refreshingBooths || boothsBusyRef.current) return;
+      if (state.refreshingBooths || boothsRefreshInProgressRef.current) return;
 
       const stale = SYNC_ENDPOINTS.filter((ep) => ep.syncAction === 'refreshBooths').some((ep) =>
         isStale(state.endpoints[ep.id]?.lastSync, ep.maxAgeMs)
       );
+      if (!stale) return;
 
-      if (stale) {
-        boothsBusyRef.current = true;
-        Logger.debug('Auto-sync: booth endpoints stale, triggering...');
-        try {
-          await refreshBooths();
-          Logger.debug('Auto-sync: booths completed');
-        } catch (error) {
-          Logger.error('Auto-sync booths error:', error);
-        } finally {
-          boothsBusyRef.current = false;
-        }
+      boothsRefreshInProgressRef.current = true;
+      Logger.debug('Auto-sync: booth endpoints stale, triggering...');
+      try {
+        await refreshBooths();
+        Logger.debug('Auto-sync: booths completed');
+      } catch (error) {
+        Logger.error('Auto-sync booths error:', error);
+      } finally {
+        boothsRefreshInProgressRef.current = false;
       }
     }
 

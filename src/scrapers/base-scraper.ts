@@ -3,7 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SyncStatus } from '../constants';
-import Logger from '../logger';
+import Logger, { getErrorMessage } from '../logger';
 import type { ProgressCallback } from '../types';
 
 /** Save data to sync/{filename} as raw JSON (no envelope).
@@ -19,7 +19,7 @@ export function savePipelineFile(dataDir: string, filename: string, data: unknow
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
     fs.renameSync(tmp, target);
   } catch (err) {
-    Logger.warn('Could not save pipeline file:', (err as Error).message);
+    Logger.warn('Could not save pipeline file:', getErrorMessage(err));
   }
 }
 

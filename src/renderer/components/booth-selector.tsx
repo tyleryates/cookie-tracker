@@ -1,6 +1,7 @@
 // BoothSelector — 2-step booth picker: toggle stores, then check individual addresses
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { getErrorMessage } from '../../logger';
 import type { BoothLocation } from '../../types';
 import { boothTypeClass, haversineDistance } from '../format-utils';
 import { ipcInvoke } from '../ipc';
@@ -34,7 +35,7 @@ export function BoothSelector({ currentBoothIds, onSave, onCancel }: BoothSelect
         }
       } catch (err) {
         if (!cancelled) {
-          setError((err as Error).message);
+          setError(getErrorMessage(err));
           setLoading(false);
         }
       }

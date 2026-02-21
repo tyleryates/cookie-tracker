@@ -1,6 +1,6 @@
 // Pure Parsing Functions for cookie data
 
-import { EXCEL_EPOCH, MS_PER_DAY, PACKAGES_PER_CASE } from '../../constants';
+import { PACKAGES_PER_CASE } from '../../constants';
 import { COOKIE_ABBR_MAP, COOKIE_COLUMN_MAP, COOKIE_ID_MAP, DC_COOKIE_COLUMNS, normalizeCookieName } from '../../cookie-constants';
 import Logger from '../../logger';
 import type { CookieType, RawDataRow, Varieties } from '../../types';
@@ -117,10 +117,4 @@ export function parseVarietiesFromSCTransfer(row: RawDataRow): Varieties {
   }
 
   return varieties as Varieties;
-}
-
-/** Parse Excel date number to ISO string */
-export function parseExcelDate(excelDate: number | null | undefined): string | null {
-  if (!excelDate || typeof excelDate !== 'number') return null;
-  return new Date(EXCEL_EPOCH.getTime() + excelDate * MS_PER_DAY).toISOString();
 }

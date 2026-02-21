@@ -6,7 +6,6 @@ import {
   boothTypeClass,
   buildVarietyTooltip,
   countBoothsNeedingDistribution,
-  DateFormatter,
   formatBoothDate,
   formatBoothTime,
   formatCompactRange,
@@ -26,28 +25,6 @@ import {
   slotOverlapsRange,
   todayMidnight
 } from '../format-utils';
-
-describe('DateFormatter.toDisplay', () => {
-  it('converts YYYY/MM/DD to MM/DD/YYYY', () => {
-    expect(DateFormatter.toDisplay('2025/02/05')).toBe('02/05/2025');
-  });
-
-  it('converts YYYY-MM-DD to MM/DD/YYYY', () => {
-    expect(DateFormatter.toDisplay('2025-02-05')).toBe('02/05/2025');
-  });
-
-  it('returns "-" for null', () => {
-    expect(DateFormatter.toDisplay(null)).toBe('-');
-  });
-
-  it('returns "-" for undefined', () => {
-    expect(DateFormatter.toDisplay(undefined)).toBe('-');
-  });
-
-  it('returns as-is for unknown format', () => {
-    expect(DateFormatter.toDisplay('February 5, 2025')).toBe('February 5, 2025');
-  });
-});
 
 describe('formatCurrency', () => {
   it('formats a positive number with $ and rounds', () => {

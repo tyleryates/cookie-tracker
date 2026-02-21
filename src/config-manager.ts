@@ -82,6 +82,52 @@ const BOOTH_ARRAY_TYPES: Partial<Record<keyof BoothFinderConfig, string>> = {
   ignoredSlots: 'string'
 };
 
+/** Migrate legacy config formats in-place. Returns true if any migration was applied. */
+function migrateLegacyConfig(disk: Record<string, any>): boolean {
+  let migrated = false;
+
+  // Migrate legacy top-level key renames (e.g. autoUpdateEnabled → autoUpdate)
+  for (const [oldKey, newKey] of Object.entries(LEGACY_TOP_LEVEL_MAP)) {
+    if (oldKey in disk && !(newKey in disk)) {
+      disk[newKey] = disk[oldKey];
+      delete disk[oldKey];
+      migrated = true;
+    }
+  }
+
+  // Migrate legacy flat booth keys into nested boothFinder
+  const hasLegacyBoothKeys = Object.keys(LEGACY_BOOTH_KEY_MAP).some((k) => k in disk);
+  if (hasLegacyBoothKeys) {
+    if (!disk.boothFinder || typeof disk.boothFinder !== 'object') {
+      disk.boothFinder = {};
+    }
+    for (const [oldKey, newKey] of Object.entries(LEGACY_BOOTH_KEY_MAP)) {
+      if (oldKey in disk) {
+        if (!(newKey in disk.boothFinder)) {
+          disk.boothFinder[newKey] = disk[oldKey];
+        }
+        delete disk[oldKey];
+      }
+    }
+    migrated = true;
+  }
+
+  // Migrate legacy DayFilter objects to "day|startTime" string format
+  if (disk.boothFinder && typeof disk.boothFinder === 'object') {
+    if (Array.isArray(disk.boothFinder.dayFilters) && disk.boothFinder.dayFilters.some((f: unknown) => typeof f === 'object')) {
+      disk.boothFinder.dayFilters = migrateDayFilters(disk.boothFinder.dayFilters);
+      migrated = true;
+    }
+    // Migrate legacy IgnoredTimeSlot objects to "boothId|date|startTime" string format
+    if (Array.isArray(disk.boothFinder.ignoredSlots) && disk.boothFinder.ignoredSlots.some((s: unknown) => typeof s === 'object')) {
+      disk.boothFinder.ignoredSlots = migrateIgnoredSlots(disk.boothFinder.ignoredSlots);
+      migrated = true;
+    }
+  }
+
+  return migrated;
+}
+
 class ConfigManager {
   private configPath: string;
 
@@ -105,54 +151,14 @@ class ConfigManager {
         return defaults;
       }
 
-      let healed = false;
+      let healed = migrateLegacyConfig(disk);
       const result: AppConfig = { ...defaults };
-
-      // Migrate legacy top-level key renames (e.g. autoUpdateEnabled → autoUpdate)
-      for (const [oldKey, newKey] of Object.entries(LEGACY_TOP_LEVEL_MAP)) {
-        if (oldKey in disk && !(newKey in disk)) {
-          disk[newKey] = disk[oldKey];
-          delete disk[oldKey];
-          healed = true;
-        }
-      }
-
-      // Migrate legacy flat booth keys into nested boothFinder
-      const hasLegacyBoothKeys = Object.keys(LEGACY_BOOTH_KEY_MAP).some((k) => k in disk);
-      if (hasLegacyBoothKeys) {
-        if (!disk.boothFinder || typeof disk.boothFinder !== 'object') {
-          disk.boothFinder = {};
-        }
-        for (const [oldKey, newKey] of Object.entries(LEGACY_BOOTH_KEY_MAP)) {
-          if (oldKey in disk) {
-            if (!(newKey in disk.boothFinder)) {
-              disk.boothFinder[newKey] = disk[oldKey];
-            }
-            delete disk[oldKey];
-          }
-        }
-        healed = true;
-      }
 
       // Pick known top-level keys
       for (const key of Object.keys(defaults) as Array<keyof typeof defaults>) {
         if (key in disk && typeof disk[key] === typeof defaults[key]) {
           (result[key] as AppConfig[typeof key]) = disk[key];
         } else if (key in disk) {
-          healed = true;
-        }
-      }
-
-      // Migrate legacy object formats to string formats
-      if (disk.boothFinder && typeof disk.boothFinder === 'object') {
-        // DayFilter objects → "day|startTime" strings
-        if (Array.isArray(disk.boothFinder.dayFilters) && disk.boothFinder.dayFilters.some((f: unknown) => typeof f === 'object')) {
-          disk.boothFinder.dayFilters = migrateDayFilters(disk.boothFinder.dayFilters);
-          healed = true;
-        }
-        // IgnoredTimeSlot objects → "boothId|date|startTime" strings
-        if (Array.isArray(disk.boothFinder.ignoredSlots) && disk.boothFinder.ignoredSlots.some((s: unknown) => typeof s === 'object')) {
-          disk.boothFinder.ignoredSlots = migrateIgnoredSlots(disk.boothFinder.ignoredSlots);
           healed = true;
         }
       }

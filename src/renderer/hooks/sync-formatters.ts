@@ -1,7 +1,7 @@
 // sync-formatters — utility functions for sync notifications and staleness checks
 
+import { type BoothSlotSummary, encodeSlotKey } from '../available-booths-utils';
 import { formatCompactRange, formatShortDate } from '../format-utils';
-import { type BoothSlotSummary, encodeSlotKey } from '../reports/available-booths-utils';
 
 // ============================================================================
 // AUTO-SYNC — staleness-based polling

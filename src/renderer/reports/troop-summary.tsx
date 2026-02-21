@@ -1,16 +1,7 @@
-import type { ComponentChildren } from 'preact';
 import type { UnifiedDataset } from '../../types';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 
-export function TroopProceedsReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
-  if (!data?.troopTotals) {
-    return (
-      <div class="report-visual">
-        <p>No data available. Please import data first.</p>
-      </div>
-    );
-  }
-
+export function TroopProceedsReport({ data }: { data: UnifiedDataset }) {
   const troopTotals = data.troopTotals;
   const packagesCredited = troopTotals.packagesCredited;
   const grossProceeds = troopTotals.grossProceeds;
@@ -67,7 +58,6 @@ export function TroopProceedsReport({ data, banner }: { data: UnifiedDataset; ba
   return (
     <div class="report-visual">
       <h3>Troop Proceeds</h3>
-      {banner}
       <StatCards stats={stats} />
     </div>
   );

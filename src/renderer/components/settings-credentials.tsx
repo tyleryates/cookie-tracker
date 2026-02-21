@@ -1,11 +1,10 @@
 // SettingsPage — Credential management with verification
-// SettingsToggles — App toggle settings, profile management
 
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import Logger from '../../logger';
+import Logger, { getErrorMessage } from '../../logger';
 import type { DCRole } from '../../seasonal-data';
-import type { AppConfig, AppConfigPatch, CredentialPatch } from '../../types';
+import type { CredentialPatch } from '../../types';
 import { ipcInvoke, ipcInvokeRaw } from '../ipc';
 
 interface SCVerifyResult {
@@ -110,8 +109,15 @@ function CredentialForm({
   );
 }
 
-export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
-  // Smart Cookie form state
+// ============================================================================
+// CREDENTIAL FORM HOOKS
+// ============================================================================
+
+function saveCredentials(patch: CredentialPatch) {
+  return ipcInvokeRaw('save-credentials', patch);
+}
+
+function useSCForm() {
   const [sc, setSc] = useState({
     username: '',
     password: '',
@@ -121,26 +127,13 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
   });
   const updateSc = (patch: Partial<typeof sc>) => setSc((prev) => ({ ...prev, ...patch }));
 
-  // Digital Cookie form state
-  const [dc, setDc] = useState({
-    username: '',
-    password: '',
-    verifying: false,
-    roles: [] as DCRole[],
-    selectedRole: '',
-    confirmed: false,
-    error: null as string | null
-  });
-  const updateDc = (patch: Partial<typeof dc>) => setDc((prev) => ({ ...prev, ...patch }));
-
-  // Load existing credentials + seasonal data on mount
+  // Load existing SC credentials + seasonal data on mount
   useEffect(() => {
     (async () => {
       try {
         const [creds, seasonal] = await Promise.all([ipcInvoke('load-credentials'), ipcInvoke('load-seasonal-data')]);
 
         updateSc({ username: creds.smartCookie.username || '' });
-        updateDc({ username: creds.digitalCookie.username || '' });
 
         // Restore SC verification status only if full credentials (including password) are present
         if (seasonal.troop && creds.smartCookie.username && creds.smartCookie.hasPassword) {
@@ -151,21 +144,11 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
             }
           });
         }
-
-        // Restore DC roles only if full credentials (including password) are present
-        if (seasonal.dcRoles && seasonal.dcRoles.length > 0 && creds.digitalCookie.username && creds.digitalCookie.hasPassword) {
-          const selectedRole = creds.digitalCookie.role || seasonal.dcRoles.find((r) => r.name.startsWith('Troop'))?.name || '';
-          updateDc({ roles: seasonal.dcRoles, confirmed: true, selectedRole });
-        }
       } catch (error) {
-        Logger.error('Error loading settings:', error);
+        Logger.error('Error loading SC settings:', error);
       }
     })();
   }, []);
-
-  const saveCredentials = async (patch: CredentialPatch) => {
-    return ipcInvokeRaw('save-credentials', patch);
-  };
 
   const handleVerifySC = async () => {
     if (!sc.username.trim() || !sc.password.trim()) {
@@ -193,13 +176,54 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
         ipcInvoke('save-seasonal-data', { troop: result.troop, cookies: result.cookies }),
         saveCredentials({ smartCookie: { username: sc.username.trim(), password: sc.password.trim() } })
       ]);
-      if (mode === 'welcome' && dc.confirmed) onComplete?.();
     } catch (error) {
-      updateSc({ error: (error as Error).message });
+      updateSc({ error: getErrorMessage(error) });
     } finally {
       updateSc({ verifying: false });
     }
   };
+
+  const handleClearSC = async () => {
+    updateSc({ username: '', password: '', verified: null, error: null });
+    await Promise.all([
+      ipcInvoke('save-seasonal-data', { troop: null, cookies: null }),
+      saveCredentials({ smartCookie: { username: '', password: '' } })
+    ]);
+  };
+
+  return { sc, updateSc, handleVerifySC, handleClearSC };
+}
+
+function useDCForm() {
+  const [dc, setDc] = useState({
+    username: '',
+    password: '',
+    verifying: false,
+    roles: [] as DCRole[],
+    selectedRole: '',
+    confirmed: false,
+    error: null as string | null
+  });
+  const updateDc = (patch: Partial<typeof dc>) => setDc((prev) => ({ ...prev, ...patch }));
+
+  // Load existing DC credentials + seasonal data on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const [creds, seasonal] = await Promise.all([ipcInvoke('load-credentials'), ipcInvoke('load-seasonal-data')]);
+
+        updateDc({ username: creds.digitalCookie.username || '' });
+
+        // Restore DC roles only if full credentials (including password) are present
+        if (seasonal.dcRoles && seasonal.dcRoles.length > 0 && creds.digitalCookie.username && creds.digitalCookie.hasPassword) {
+          const selectedRole = creds.digitalCookie.role || seasonal.dcRoles.find((r) => r.name.startsWith('Troop'))?.name || '';
+          updateDc({ roles: seasonal.dcRoles, confirmed: true, selectedRole });
+        }
+      } catch (error) {
+        Logger.error('Error loading DC settings:', error);
+      }
+    })();
+  }, []);
 
   const handleVerifyDC = async () => {
     if (!dc.username.trim() || !dc.password.trim()) {
@@ -228,7 +252,7 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
         })
       ]);
     } catch (error) {
-      updateDc({ error: (error as Error).message });
+      updateDc({ error: getErrorMessage(error) });
     } finally {
       updateDc({ verifying: false });
     }
@@ -238,15 +262,6 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
     if (!dc.selectedRole) return;
     await saveCredentials({ digitalCookie: { role: dc.selectedRole } });
     updateDc({ confirmed: true });
-    if (mode === 'welcome' && sc.verified) onComplete?.();
-  };
-
-  const handleClearSC = async () => {
-    updateSc({ username: '', password: '', verified: null, error: null });
-    await Promise.all([
-      ipcInvoke('save-seasonal-data', { troop: null, cookies: null }),
-      saveCredentials({ smartCookie: { username: '', password: '' } })
-    ]);
   };
 
   const handleClearDC = async () => {
@@ -256,6 +271,19 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
       saveCredentials({ digitalCookie: { username: '', password: '' } })
     ]);
   };
+
+  return { dc, updateDc, handleVerifyDC, handleConfirmDC, handleClearDC };
+}
+
+export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
+  const { sc, updateSc, handleVerifySC, handleClearSC } = useSCForm();
+  const { dc, updateDc, handleVerifyDC, handleConfirmDC, handleClearDC } = useDCForm();
+
+  // Handle welcome-mode completion when both credentials are verified
+  useEffect(() => {
+    if (mode !== 'welcome') return;
+    if (sc.verified && dc.confirmed) onComplete?.();
+  }, [mode, sc.verified, dc.confirmed]);
 
   return (
     <div>
@@ -347,170 +375,6 @@ export function SettingsPage({ mode, onComplete }: SettingsPageProps) {
             )
           }
         />
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// SETTINGS TOGGLES
-// ============================================================================
-
-interface SettingsTogglesProps {
-  appConfig: AppConfig | null;
-  readOnly: boolean;
-  onUpdateConfig: (patch: AppConfigPatch) => void;
-  activeProfile: import('../../types').ActiveProfile | null;
-  profiles: import('../../types').ProfileInfo[];
-  onSwitchProfile: (dirName: string) => void;
-  onDeleteProfile: (dirName: string) => void;
-  onExport: () => void;
-  hasData: boolean;
-}
-
-export function SettingsToggles({
-  appConfig,
-  readOnly,
-  onUpdateConfig,
-  activeProfile,
-  profiles,
-  onSwitchProfile,
-  onDeleteProfile,
-  onExport,
-  hasData
-}: SettingsTogglesProps) {
-  const [imessageRecipient, setImessageRecipient] = useState('');
-  const [imessageSending, setImessageSending] = useState(false);
-  const [imessageError, setImessageError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (appConfig?.boothFinder?.imessageRecipient) setImessageRecipient(appConfig.boothFinder.imessageRecipient);
-  }, [appConfig?.boothFinder?.imessageRecipient]);
-
-  return (
-    <div>
-      {profiles.length > 1 && (
-        <>
-          <h3>Profiles</h3>
-          <div class="settings-toggles">
-            {profiles.map((p) => {
-              const isActive = p.dirName === (activeProfile?.dirName || 'default');
-              const isDefault = p.dirName === 'default';
-              return (
-                <div key={p.dirName} class={`profile-row ${isActive ? 'profile-row-active' : ''}`}>
-                  <span class="profile-name">{isDefault ? 'Default' : p.name}</span>
-                  {isActive && <span class="profile-active-badge">Active</span>}
-                  {!isActive && (
-                    <button type="button" class="btn btn-secondary btn-sm" onClick={() => onSwitchProfile(p.dirName)}>
-                      Load
-                    </button>
-                  )}
-                  {!isDefault && (
-                    <button type="button" class="btn btn-secondary btn-sm" onClick={() => onDeleteProfile(p.dirName)}>
-                      Delete
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-      <h3>Settings</h3>
-      <div class="settings-toggles">
-        <label class="toggle-switch">
-          <input
-            type="checkbox"
-            checked={appConfig?.autoUpdate ?? false}
-            disabled={readOnly}
-            onChange={(e) => onUpdateConfig({ autoUpdate: (e.target as HTMLInputElement).checked })}
-          />
-          <span class="toggle-slider" />
-          <span class="toggle-label">Check for Updates</span>
-        </label>
-        {appConfig?.boothFinder && (
-          <label class="toggle-switch">
-            <input
-              type="checkbox"
-              checked={appConfig?.boothFinder?.enabled ?? false}
-              disabled={readOnly}
-              onChange={(e) => onUpdateConfig({ boothFinder: { enabled: (e.target as HTMLInputElement).checked } })}
-            />
-            <span class="toggle-slider" />
-            <span class="toggle-label">Booth Finder</span>
-          </label>
-        )}
-        {appConfig?.boothFinder?.enabled && (
-          <>
-            <label class="toggle-switch">
-              <input
-                type="checkbox"
-                checked={appConfig?.boothFinder?.imessage ?? false}
-                disabled={readOnly}
-                onChange={(e) => onUpdateConfig({ boothFinder: { imessage: (e.target as HTMLInputElement).checked } })}
-              />
-              <span class="toggle-slider" />
-              <span class="toggle-label">iMessage Alerts</span>
-            </label>
-            {appConfig?.boothFinder?.imessage && (
-              <div class="imessage-setup">
-                <div class="imessage-input-row">
-                  <input
-                    type="text"
-                    class="form-input"
-                    placeholder="Phone number or Apple ID"
-                    value={appConfig.boothFinder?.imessageRecipient ? appConfig.boothFinder.imessageRecipient : imessageRecipient}
-                    disabled={!!appConfig.boothFinder?.imessageRecipient || imessageSending}
-                    onInput={(e) => setImessageRecipient((e.target as HTMLInputElement).value)}
-                  />
-                  {!appConfig.boothFinder?.imessageRecipient ? (
-                    <button
-                      type="button"
-                      class="btn btn-secondary"
-                      disabled={!imessageRecipient.trim() || imessageSending}
-                      onClick={async () => {
-                        setImessageSending(true);
-                        setImessageError(null);
-                        try {
-                          await ipcInvoke('send-imessage', {
-                            recipient: imessageRecipient.trim(),
-                            message: 'Cookie Tracker iMessage alerts are now active!'
-                          });
-                          onUpdateConfig({ boothFinder: { imessageRecipient: imessageRecipient.trim() } });
-                        } catch (err) {
-                          setImessageError((err as Error).message);
-                        } finally {
-                          setImessageSending(false);
-                        }
-                      }}
-                    >
-                      {imessageSending ? 'Sending...' : 'Confirm'}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      class="btn btn-secondary"
-                      onClick={() => {
-                        setImessageRecipient('');
-                        setImessageError(null);
-                        onUpdateConfig({ boothFinder: { imessageRecipient: '' } });
-                      }}
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-                {imessageError && <span class="settings-error">{imessageError}</span>}
-                {!appConfig.boothFinder?.imessageRecipient && (
-                  <span class="settings-role-hint">A test message will be sent to verify delivery</span>
-                )}
-              </div>
-            )}
-          </>
-        )}
-        <button type="button" class="btn btn-secondary" style={{ alignSelf: 'flex-start' }} disabled={!hasData} onClick={onExport}>
-          Export Data
-        </button>
       </div>
     </div>
   );

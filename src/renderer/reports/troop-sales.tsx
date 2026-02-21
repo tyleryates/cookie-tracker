@@ -1,12 +1,12 @@
-import type { ComponentChildren } from 'preact';
-import { ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
+import { ORDER_TYPE } from '../../constants';
 import type { Order, Scout, SiteOrderCategory, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
+import { NoDCDataWarning } from '../components/no-dc-data-warning';
 import { ScoutCreditChips } from '../components/scout-credit-chips';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
 import { buildVarietyTooltip, formatShortDate } from '../format-utils';
-import { buildOrderTooltip, getStatusStyle, isActionRequired } from '../order-helpers';
+import { buildOrderTooltip, getPaymentStyles, getStatusStyle, isActionRequired } from '../order-helpers';
 
 const ORDER_TYPE_LABELS: Record<string, string> = {
   [ORDER_TYPE.DELIVERY]: 'Girl Delivery',
@@ -78,14 +78,7 @@ function OrderSection({
             const original = orderLookup.get(entry.orderNumber);
             const varieties = original?.varieties;
             const tip = varieties ? buildVarietyTooltip(varieties) : '';
-            const isCash = original?.paymentMethod === PAYMENT_METHOD.CASH;
-            const isDigital = original?.paymentMethod && original.paymentMethod !== PAYMENT_METHOD.CASH;
-            const amountClass = isCash ? 'cash-amount' : isDigital ? 'digital-amount' : undefined;
-            const paymentPillClass = isCash
-              ? 'payment-pill payment-pill-cash'
-              : isDigital
-                ? 'payment-pill payment-pill-digital'
-                : undefined;
+            const { amountClass, pillClass: paymentPillClass } = getPaymentStyles(original?.paymentMethod);
             const { className: statusClass, text: statusText } = original?.status
               ? getStatusStyle(original.status)
               : { className: '', text: '' };
@@ -124,7 +117,7 @@ function OrderSection({
                   <span class={amountClass}>{original ? `$${Math.round(original.amount)}` : '\u2014'}</span>
                 </td>
                 <td class="text-center">
-                  {paymentPillClass ? <span class={paymentPillClass}>{isCash ? 'Cash' : 'Digital'}</span> : '\u2014'}
+                  {paymentPillClass ? <span class={paymentPillClass}>{amountClass === 'cash-amount' ? 'Cash' : 'Digital'}</span> : '\u2014'}
                 </td>
                 <td class="text-center">
                   <span class={statusClass}>{statusText}</span>
@@ -143,7 +136,7 @@ function OrderSection({
 // Main report
 // ============================================================================
 
-export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
+export function TroopSalesReport({ data }: { data: UnifiedDataset }) {
   const siteOrders = data.siteOrders;
   const { directShip, girlDelivery } = siteOrders;
 
@@ -192,19 +185,7 @@ export function TroopSalesReport({ data, banner }: { data: UnifiedDataset; banne
           {hasUnallocated ? 'Action Required' : 'Fully Distributed'}
         </span>
       </div>
-      {banner}
-      {!data.metadata.lastImportDC && (
-        <div class="info-box info-box-warning">
-          <p class="meta-text">
-            <strong>No Digital Cookie Data</strong>
-          </p>
-          <p class="meta-text">
-            Online order details may be incomplete.
-            <br />
-            Click the refresh button in the header to download Digital Cookie data.
-          </p>
-        </div>
-      )}
+      {!data.metadata.lastImportDC && <NoDCDataWarning>Online order details may be incomplete.</NoDCDataWarning>}
       <StatCards stats={stats} />
       <OrderSection
         title="Girl Delivery"

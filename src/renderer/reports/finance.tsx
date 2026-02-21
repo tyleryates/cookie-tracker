@@ -1,7 +1,7 @@
-import type { ComponentChildren } from 'preact';
 import type { Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
+import { NoDCDataWarning } from '../components/no-dc-data-warning';
 import { STAT_COLORS, StatCards } from '../components/stat-cards';
 import { formatCurrency, formatShortDate, getActiveScouts } from '../format-utils';
 
@@ -89,15 +89,7 @@ function FinanceDetail({ scout }: { scout: Scout }) {
 // Main report component
 // ============================================================================
 
-export function FinanceReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
-  if (!data?.scouts) {
-    return (
-      <div class="report-visual">
-        <p>No data available. Please import data first.</p>
-      </div>
-    );
-  }
-
+export function FinanceReport({ data }: { data: UnifiedDataset }) {
   const sortedScouts = getActiveScouts(data.scouts).filter(([, scout]) => {
     const f = scout.totals.$financials;
     return f.cashOwed > 0 || f.paymentsTurnedIn > 0;
@@ -145,19 +137,7 @@ export function FinanceReport({ data, banner }: { data: UnifiedDataset; banner?:
       <div class="report-header-row">
         <h3>Scout Cash Report</h3>
       </div>
-      {banner}
-      {!data.metadata.lastImportDC && (
-        <div class="info-box info-box-warning">
-          <p class="meta-text">
-            <strong>No Digital Cookie Data</strong>
-          </p>
-          <p class="meta-text">
-            Cash owed amounts may be incomplete.
-            <br />
-            Click the refresh button in the header to download Digital Cookie data.
-          </p>
-        </div>
-      )}
+      {!data.metadata.lastImportDC && <NoDCDataWarning>Cash owed amounts may be incomplete.</NoDCDataWarning>}
 
       <StatCards stats={stats} />
       <DataTable columns={['Scout', 'Cash Owed', 'Paid', 'Cash Due']} className="table-normal scout-table">

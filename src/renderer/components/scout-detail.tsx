@@ -2,10 +2,10 @@
 
 import type preact from 'preact';
 import { useState } from 'preact/hooks';
-import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, PAYMENT_METHOD } from '../../constants';
+import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE } from '../../constants';
 import type { Order, Scout, Varieties } from '../../types';
-import { buildVarietyTooltip, formatShortDate, formatTimeRange, sumAllocatedVarieties } from '../format-utils';
-import { buildOrderTooltip, getStatusStyle, isActionRequired } from '../order-helpers';
+import { buildVarietyTooltip, compareDateDesc, formatShortDate, formatTimeRange, sumAllocatedVarieties } from '../format-utils';
+import { buildOrderTooltip, getPaymentStyles, getStatusStyle, isActionRequired } from '../order-helpers';
 import { DataTable } from './data-table';
 import { TooltipCell } from './tooltip-cell';
 
@@ -42,7 +42,7 @@ function AllocationDetails({ scout }: { scout: Scout }) {
     });
   }
 
-  datedRows.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  datedRows.sort((a, b) => compareDateDesc(a.date, b.date));
 
   // VB and DS summary rows first, then booth rows sorted newest-first
   const rows: preact.JSX.Element[] = [];
@@ -95,10 +95,7 @@ const INITIAL_ORDER_LIMIT = 10;
 function renderOrderRow(order: Order) {
   const tip = buildVarietyTooltip(order.varieties);
   const { className: statusClass, text: statusText } = getStatusStyle(order.status);
-  const isCash = order.paymentMethod === PAYMENT_METHOD.CASH;
-  const isDigital = order.paymentMethod && order.paymentMethod !== PAYMENT_METHOD.CASH;
-  const amountClass = isCash ? 'cash-amount' : isDigital ? 'digital-amount' : undefined;
-  const paymentPillClass = isCash ? 'payment-pill payment-pill-cash' : isDigital ? 'payment-pill payment-pill-digital' : undefined;
+  const { amountClass, pillClass: paymentPillClass } = getPaymentStyles(order.paymentMethod);
 
   return (
     <tr key={order.orderNumber}>
@@ -115,8 +112,8 @@ function renderOrderRow(order: Order) {
         <td>{order.physicalPackages || '\u2014'}</td>
       )}
       <td>{order.donations || '\u2014'}</td>
-      <td class={amountClass}>${Math.round(order.amount)}</td>
-      <td>{paymentPillClass ? <span class={paymentPillClass}>{isCash ? 'Cash' : 'Digital'}</span> : '-'}</td>
+      <td class={amountClass || undefined}>${Math.round(order.amount)}</td>
+      <td>{paymentPillClass ? <span class={paymentPillClass}>{amountClass === 'cash-amount' ? 'Cash' : 'Digital'}</span> : '-'}</td>
       <td>
         <span class={statusClass}>{statusText}</span>
       </td>

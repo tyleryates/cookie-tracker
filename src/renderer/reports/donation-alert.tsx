@@ -1,8 +1,8 @@
-import type { ComponentChildren } from 'preact';
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, OWNER } from '../../constants';
 import { isDCAutoSync } from '../../order-classification';
-import type { Order, Scout, UnifiedDataset } from '../../types';
+import type { Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
+import { NoDCDataWarning } from '../components/no-dc-data-warning';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
 
@@ -55,14 +55,14 @@ function StatusBanner({ scoutRows }: { scoutRows: ScoutDonationRow[] }) {
 function computeScoutDonations(scout: Scout): { dcTotal: number; dcAutoSync: number } {
   let dcTotal = 0;
   let dcAutoSync = 0;
-  scout.orders.forEach((order: Order) => {
+  for (const order of scout.orders) {
     if (order.donations > 0) {
       dcTotal += order.donations;
       if (isDCAutoSync(order.dcOrderType || '', order.paymentStatus || '')) {
         dcAutoSync += order.donations;
       }
     }
-  });
+  }
   return { dcTotal, dcAutoSync };
 }
 
@@ -122,15 +122,7 @@ function AdjustmentCell({ adjustment }: { adjustment: number }) {
   return <td class="status-success text-center">—</td>;
 }
 
-export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
-  if (!data?.cookieShare) {
-    return (
-      <div class="report-visual">
-        <p>No data available. Please import data first.</p>
-      </div>
-    );
-  }
-
+export function DonationAlertReport({ data }: { data: UnifiedDataset }) {
   const cookieShare = data.cookieShare;
   const scouts = data.scouts;
 
@@ -211,19 +203,7 @@ export function DonationAlertReport({ data, banner }: { data: UnifiedDataset; ba
           {isReconciled ? 'Reconciled in SC' : 'Action Required'}
         </span>
       </div>
-      {banner}
-      {!data.metadata.lastImportDC && (
-        <div class="info-box info-box-warning">
-          <p class="meta-text">
-            <strong>No Digital Cookie Data</strong>
-          </p>
-          <p class="meta-text">
-            Donation amounts may be incomplete.
-            <br />
-            Click the refresh button in the header to download Digital Cookie data.
-          </p>
-        </div>
-      )}
+      {!data.metadata.lastImportDC && <NoDCDataWarning>Donation amounts may be incomplete.</NoDCDataWarning>}
 
       <StatusBanner scoutRows={scoutRows} />
 

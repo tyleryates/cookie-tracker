@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { AppConfig, EndpointSyncState, UnifiedDataset } from '../../types';
+import { summarizeAvailableSlots } from '../available-booths-utils';
 import { countBoothsNeedingDistribution, isVirtualBooth, parseLocalDate, todayMidnight } from '../format-utils';
 import { AvailableBoothsReport } from '../reports/available-booths';
-import { summarizeAvailableSlots } from '../reports/available-booths-utils';
 import { CompletedBoothsReport } from '../reports/completed-booths';
 import { DonationAlertReport } from '../reports/donation-alert';
 import { FinanceReport } from '../reports/finance';
@@ -136,6 +136,14 @@ function renderReport({
   onSaveDayFilters,
   boothResetKey
 }: RenderReportProps) {
+  if (!unified?.scouts) {
+    return (
+      <div class="report-visual">
+        <p>No data available. Please import data first.</p>
+      </div>
+    );
+  }
+
   switch (type) {
     case 'proceeds':
       return <TroopProceedsReport data={unified} />;
@@ -185,6 +193,49 @@ function renderReport({
 // TAB BAR
 // ============================================================================
 
+function computeDropdownCounts(unified: UnifiedDataset | null, appConfig: AppConfig | null): Record<string, number> {
+  if (!unified) return {};
+  const counts: Record<string, number> = {};
+
+  // Inventory counts
+  const troopInv = unified.troopTotals.inventory;
+  if (troopInv > 0) counts.inventory = troopInv;
+  const scoutInvTotal = Object.values(unified.scouts)
+    .filter((s) => !s.isSiteOrder)
+    .reduce((sum, s) => sum + s.totals.inventory, 0);
+  if (scoutInvTotal > 0) counts['scout-inventory'] = scoutInvTotal;
+
+  // Site order counts (number of orders, excluding booth sales)
+  const siteOrderCount = unified.siteOrders.directShip.orders.length + unified.siteOrders.girlDelivery.orders.length;
+  if (siteOrderCount > 0) counts['troop-sales'] = siteOrderCount;
+
+  // Scout order counts
+  const scoutOrderCount = Object.values(unified.scouts)
+    .filter((s) => !s.isSiteOrder)
+    .reduce((sum, s) => sum + s.orders.length, 0);
+  if (scoutOrderCount > 0) counts.summary = scoutOrderCount;
+
+  // Booth counts
+  const reservations = unified.boothReservations || [];
+  const nonVirtual = reservations.filter((r) => !isVirtualBooth(r.booth.reservationType));
+  const todayLocal = todayMidnight();
+  const completed = nonVirtual.filter((r) => r.booth.isDistributed).length;
+  const upcoming = nonVirtual.filter((r) => {
+    if (r.booth.isDistributed) return false;
+    const boothDate = parseLocalDate(r.timeslot.date || '');
+    return boothDate != null && boothDate >= todayLocal;
+  }).length;
+  const needsDist = countBoothsNeedingDistribution(reservations);
+  if (completed + needsDist > 0) counts['completed-booths'] = completed + needsDist;
+  if (upcoming > 0) counts['upcoming-booths'] = upcoming;
+  const filters = appConfig?.boothFinder?.dayFilters || [];
+  const ignored = appConfig?.boothFinder?.ignoredSlots || [];
+  const availableSlots = summarizeAvailableSlots(unified.boothLocations || [], filters, ignored).reduce((sum, b) => sum + b.slotCount, 0);
+  if (availableSlots > 0) counts['available-booths'] = availableSlots;
+
+  return counts;
+}
+
 export function TabBar({ activeReport, unified, appConfig, todoCount, warningCount, onSelectReport }: TabBarProps) {
   const hasData = !!unified;
   const hc = unified?.metadata?.healthChecks;
@@ -202,48 +253,7 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
   }, [appConfig?.boothFinder?.enabled]);
 
   // Compute count badges for dropdown items
-  const dropdownCounts = useMemo<Record<string, number>>(() => {
-    if (!unified) return {};
-    const counts: Record<string, number> = {};
-
-    // Inventory counts
-    const troopInv = unified.troopTotals.inventory;
-    if (troopInv > 0) counts.inventory = troopInv;
-    const scoutInvTotal = Object.values(unified.scouts)
-      .filter((s) => !s.isSiteOrder)
-      .reduce((sum, s) => sum + s.totals.inventory, 0);
-    if (scoutInvTotal > 0) counts['scout-inventory'] = scoutInvTotal;
-
-    // Site order counts (number of orders, excluding booth sales)
-    const siteOrderCount = unified.siteOrders.directShip.orders.length + unified.siteOrders.girlDelivery.orders.length;
-    if (siteOrderCount > 0) counts['troop-sales'] = siteOrderCount;
-
-    // Scout order counts
-    const scoutOrderCount = Object.values(unified.scouts)
-      .filter((s) => !s.isSiteOrder)
-      .reduce((sum, s) => sum + s.orders.length, 0);
-    if (scoutOrderCount > 0) counts.summary = scoutOrderCount;
-
-    // Booth counts
-    const reservations = unified.boothReservations || [];
-    const nonVirtual = reservations.filter((r) => !isVirtualBooth(r.booth.reservationType));
-    const todayLocal = todayMidnight();
-    const completed = nonVirtual.filter((r) => r.booth.isDistributed).length;
-    const upcoming = nonVirtual.filter((r) => {
-      if (r.booth.isDistributed) return false;
-      const boothDate = parseLocalDate(r.timeslot.date || '');
-      return boothDate != null && boothDate >= todayLocal;
-    }).length;
-    const needsDist = countBoothsNeedingDistribution(reservations);
-    if (completed + needsDist > 0) counts['completed-booths'] = completed + needsDist;
-    if (upcoming > 0) counts['upcoming-booths'] = upcoming;
-    const filters = appConfig?.boothFinder?.dayFilters || [];
-    const ignored = appConfig?.boothFinder?.ignoredSlots || [];
-    const availableSlots = summarizeAvailableSlots(unified.boothLocations || [], filters, ignored).reduce((sum, b) => sum + b.slotCount, 0);
-    if (availableSlots > 0) counts['available-booths'] = availableSlots;
-
-    return counts;
-  }, [unified, appConfig]);
+  const dropdownCounts = useMemo(() => computeDropdownCounts(unified, appConfig), [unified, appConfig]);
 
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ left: number; top: number } | null>(null);
@@ -305,7 +315,7 @@ export function TabBar({ activeReport, unified, appConfig, todoCount, warningCou
                 <span style={{ marginLeft: '4px', fontSize: '0.7em' }}>{'\u25BE'}</span>
               </button>
               {openDropdown === tab.id && dropdownPos && (
-                <div class="tab-dropdown" style={{ left: `${dropdownPos.left}px`, top: `${dropdownPos.top}px` }}>
+                <div class="tab-dropdown" role="menu" style={{ left: `${dropdownPos.left}px`, top: `${dropdownPos.top}px` }}>
                   {tab.types.map((type) => {
                     const count = dropdownCounts[type];
                     return (

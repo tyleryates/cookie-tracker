@@ -1,14 +1,15 @@
 import type preact from 'preact';
-import type { ComponentChildren } from 'preact';
 import { ORDER_STATUS_CLASS, ORDER_TYPE, OWNER } from '../../constants';
-import { COOKIE_ORDER, getCookieAbbreviation, getCookieColor, getCookieDisplayName } from '../../cookie-constants';
+import { COOKIE_ORDER, getCookieDisplayName } from '../../cookie-constants';
 import { classifyOrderStatus } from '../../order-classification';
-import type { CookieType, Scout, Transfer, TransferBreakdowns, UnifiedDataset, Varieties } from '../../types';
+import type { CookieType, Order, Scout, Transfer, TransferBreakdowns, UnifiedDataset, Varieties } from '../../types';
+import { CookieLabel } from '../components/cookie-label';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
+import { NoDCDataWarning } from '../components/no-dc-data-warning';
 import { STAT_COLORS, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
-import { buildVarietyTooltip, formatShortDate, getActiveScouts, isPhysicalVariety } from '../format-utils';
+import { buildVarietyTooltip, compareDateDesc, formatShortDate, getActiveScouts, isPhysicalVariety } from '../format-utils';
 import { buildOrderTooltip } from '../order-helpers';
 
 // ============================================================================
@@ -73,6 +74,43 @@ function VarietyCells({ varieties, physicalVarieties }: { varieties: Varieties; 
   );
 }
 
+/** Renders individual order rows with a status pill and variety cells */
+function OrderRows({
+  orders,
+  label,
+  pillClass,
+  physicalVarieties
+}: {
+  orders: Order[];
+  label: string;
+  pillClass: string;
+  physicalVarieties: string[];
+}) {
+  return (
+    <>
+      {orders.map((o) => {
+        const orderTip = buildOrderTooltip(o);
+        const typeText = stripOrderStatus(o.dcOrderType);
+        return (
+          <tr key={o.orderNumber}>
+            <td>
+              <span class={`status-pill ${pillClass}`}>{label}</span>{' '}
+              {orderTip ? (
+                <TooltipCell tooltip={orderTip} tag="span" className="tooltip-cell">
+                  {typeText}
+                </TooltipCell>
+              ) : (
+                typeText
+              )}
+            </td>
+            <VarietyCells varieties={o.varieties} physicalVarieties={physicalVarieties} />
+          </tr>
+        );
+      })}
+    </>
+  );
+}
+
 // ============================================================================
 // Detail breakdown — variety-level inventory for a single scout
 // ============================================================================
@@ -103,7 +141,7 @@ function getScoutTransfers(scoutName: string, breakdowns: TransferBreakdowns): A
   for (const t of breakdowns.g2t) {
     if (t.from === scoutName) transfers.push({ ...t, direction: 'out' });
   }
-  transfers.sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+  transfers.sort((a, b) => compareDateDesc(a.date, b.date));
   return transfers;
 }
 
@@ -127,15 +165,11 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
 
   const renderCookieCols = () => physicalVarieties.map((v) => <col key={v} style={{ width: oneShare }} />);
   const renderCookieHeaders = () =>
-    physicalVarieties.map((v) => {
-      const color = getCookieColor(v);
-      return (
-        <th key={v} class="text-center" style={varietyHeaderStyle}>
-          {color && <span class="inventory-chip-dot" style={{ background: color }} />}
-          {getCookieAbbreviation(v)}
-        </th>
-      );
-    });
+    physicalVarieties.map((v) => (
+      <th key={v} class="text-center" style={varietyHeaderStyle}>
+        <CookieLabel variety={v} />
+      </th>
+    ));
 
   // Girl's delivery/in-hand orders split by status
   const girlOrders = scout.orders.filter(
@@ -229,46 +263,15 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
           </tr>
 
           {/* Pending orders — one row each */}
-          {pendingOrders.map((o) => {
-            const orderTip = buildOrderTooltip(o);
-            const typeText = stripOrderStatus(o.dcOrderType);
-            return (
-              <tr key={o.orderNumber}>
-                <td>
-                  <span class="status-pill status-pill-warning">Pending</span>{' '}
-                  {orderTip ? (
-                    <TooltipCell tooltip={orderTip} tag="span" className="tooltip-cell">
-                      {typeText}
-                    </TooltipCell>
-                  ) : (
-                    typeText
-                  )}
-                </td>
-                <VarietyCells varieties={o.varieties} physicalVarieties={physicalVarieties} />
-              </tr>
-            );
-          })}
+          <OrderRows orders={pendingOrders} label="Pending" pillClass="status-pill-warning" physicalVarieties={physicalVarieties} />
 
           {/* Awaiting Approval orders — one row each */}
-          {requestedOrders.map((o) => {
-            const orderTip = buildOrderTooltip(o);
-            const typeText = stripOrderStatus(o.dcOrderType);
-            return (
-              <tr key={o.orderNumber}>
-                <td>
-                  <span class="status-pill status-pill-error">Awaiting Approval</span>{' '}
-                  {orderTip ? (
-                    <TooltipCell tooltip={orderTip} tag="span" className="tooltip-cell">
-                      {typeText}
-                    </TooltipCell>
-                  ) : (
-                    typeText
-                  )}
-                </td>
-                <VarietyCells varieties={o.varieties} physicalVarieties={physicalVarieties} />
-              </tr>
-            );
-          })}
+          <OrderRows
+            orders={requestedOrders}
+            label="Awaiting Approval"
+            pillClass="status-pill-error"
+            physicalVarieties={physicalVarieties}
+          />
 
           {/* Remaining Inventory */}
           <tr>
@@ -340,15 +343,7 @@ function InventoryDetail({ scout, transferBreakdowns }: { scout: Scout; transfer
 // Main report component
 // ============================================================================
 
-export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
-  if (!data?.scouts) {
-    return (
-      <div class="report-visual">
-        <p>No data available. Please import data first.</p>
-      </div>
-    );
-  }
-
+export function ScoutInventoryReport({ data }: { data: UnifiedDataset }) {
   const negativeCount = data.troopTotals.scouts.withNegativeInventory ?? 0;
   const hasNegativeInventory = negativeCount > 0;
 
@@ -391,19 +386,7 @@ export function ScoutInventoryReport({ data, banner }: { data: UnifiedDataset; b
           </span>
         )}
       </div>
-      {banner}
-      {!data.metadata.lastImportDC && (
-        <div class="info-box info-box-warning">
-          <p class="meta-text">
-            <strong>No Digital Cookie Data</strong>
-          </p>
-          <p class="meta-text">
-            Sold amounts and inventory may be incomplete.
-            <br />
-            Click the refresh button in the header to download Digital Cookie data.
-          </p>
-        </div>
-      )}
+      {!data.metadata.lastImportDC && <NoDCDataWarning>Sold amounts and inventory may be incomplete.</NoDCDataWarning>}
       <StatCards stats={stats} />
 
       <DataTable

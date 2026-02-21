@@ -142,13 +142,6 @@
   flex: 1;
 }
 
-/* Profile list */
-.profile-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 .profile-row {
   display: flex;
   align-items: center;

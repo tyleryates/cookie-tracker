@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import Logger from './logger';
+import Logger, { getErrorMessage } from './logger';
 
 /** Load and parse a JSON file, returning null if missing or invalid */
 export function loadJsonFile<T>(filePath: string): T | null {
@@ -8,7 +8,7 @@ export function loadJsonFile<T>(filePath: string): T | null {
     if (!fs.existsSync(filePath)) return null;
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch (err) {
-    Logger.warn(`Could not load ${path.basename(filePath)}:`, (err as Error).message);
+    Logger.warn(`Could not load ${path.basename(filePath)}:`, getErrorMessage(err));
     return null;
   }
 }
@@ -23,6 +23,6 @@ export function saveJsonFile(filePath: string, data: unknown, mode?: number): vo
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2), { encoding: 'utf8', ...(mode ? { mode } : {}) });
     fs.renameSync(tmp, filePath);
   } catch (err) {
-    Logger.warn(`Could not save ${path.basename(filePath)}:`, (err as Error).message);
+    Logger.warn(`Could not save ${path.basename(filePath)}:`, getErrorMessage(err));
   }
 }

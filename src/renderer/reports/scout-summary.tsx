@@ -1,8 +1,8 @@
-import type { ComponentChildren } from 'preact';
 import { ALLOCATION_METHOD, DISPLAY_STRINGS, ORDER_TYPE, OWNER } from '../../constants';
 import type { Order, Scout, UnifiedDataset } from '../../types';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
+import { NoDCDataWarning } from '../components/no-dc-data-warning';
 import { ScoutDetailBreakdown } from '../components/scout-detail';
 import { STAT_COLORS, type Stat, StatCards } from '../components/stat-cards';
 import { TooltipCell } from '../components/tooltip-cell';
@@ -94,15 +94,7 @@ function CreditedCell({ scout }: { scout: Scout }) {
 // Main report component
 // ============================================================================
 
-export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
-  if (!data?.scouts) {
-    return (
-      <div class="report-visual">
-        <p>No data available. Please import data first.</p>
-      </div>
-    );
-  }
-
+export function ScoutSummaryReport({ data }: { data: UnifiedDataset }) {
   const sortedScouts = getActiveScouts(data.scouts).filter(([, scout]) => (scout.totals.totalSold || 0) > 0);
 
   // tallyByType splits by in-hand vs delivery vs shipped WITH donations included,
@@ -146,19 +138,7 @@ export function ScoutSummaryReport({ data, banner }: { data: UnifiedDataset; ban
           </span>
         )}
       </div>
-      {banner}
-      {!data.metadata.lastImportDC && (
-        <div class="info-box info-box-warning">
-          <p class="meta-text">
-            <strong>No Digital Cookie Data</strong>
-          </p>
-          <p class="meta-text">
-            Scout sales data may be incomplete.
-            <br />
-            Click the refresh button in the header to download Digital Cookie data.
-          </p>
-        </div>
-      )}
+      {!data.metadata.lastImportDC && <NoDCDataWarning>Scout sales data may be incomplete.</NoDCDataWarning>}
       <StatCards stats={stats} />
       <DataTable
         columns={['Scout', 'Orders', 'Delivered', 'In Person', 'Shipped', 'Credits', 'Total', 'Cash Collected', 'Digital Payments']}

@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { safeStorage } from 'electron';
 import { DEFAULT_COUNCIL_ID } from './constants';
-import Logger from './logger';
+import Logger, { getErrorMessage } from './logger';
 import type { Credentials } from './types';
 
 class CredentialsManager {
@@ -90,7 +90,7 @@ class CredentialsManager {
       Logger.error('Error saving credentials:', error);
       return {
         success: false,
-        error: (error as Error).message
+        error: getErrorMessage(error)
       };
     }
   }

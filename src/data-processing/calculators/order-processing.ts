@@ -36,7 +36,7 @@ function classifyDCOrder(isSiteOrder: boolean, dcOrderType: string): { owner: Ow
   const owner = isSiteOrder ? OWNER.TROOP : OWNER.GIRL;
   const lc = dcOrderType.toLowerCase();
 
-  if (dcOrderType === DC_ORDER_TYPE_STRINGS.DONATION) {
+  if (lc === DC_ORDER_TYPE_STRINGS.DONATION.toLowerCase()) {
     return { owner, orderType: ORDER_TYPE.DONATION };
   }
   if (lc.includes(DC_ORDER_TYPE_STRINGS.SHIPPED.toLowerCase())) {

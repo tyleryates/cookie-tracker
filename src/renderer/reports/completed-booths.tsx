@@ -1,8 +1,8 @@
 // Completed Booths Report — shows distributed and needs-distribution booths
 
-import type { ComponentChildren } from 'preact';
 import { COOKIE_TYPE } from '../../cookie-constants';
 import type { BoothReservationImported, Scout, UnifiedDataset } from '../../types';
+import { BoothInfoRow } from '../components/booth-info-row';
 import { DataTable } from '../components/data-table';
 import { ExpandableRow } from '../components/expandable-row';
 import { ScoutCreditChips } from '../components/scout-credit-chips';
@@ -174,22 +174,9 @@ function NeedsDistributionSection({ booths, hasBoothSaleWarning }: { booths: Boo
           columnAligns={[undefined, 'center', undefined, undefined]}
           className="table-normal booth-table"
         >
-          {booths.map((r) => {
-            const timeDisplay = formatBoothTime(r.timeslot.startTime, r.timeslot.endTime);
-            return (
-              <tr key={r.id}>
-                <td>
-                  <strong>{r.booth.storeName || '-'}</strong>
-                  {r.booth.address && <div class="booth-address">{r.booth.address}</div>}
-                </td>
-                <td class="text-center">
-                  <span class={`booth-type-badge ${boothTypeClass(r.booth.reservationType)}`}>{r.booth.reservationType || '-'}</span>
-                </td>
-                <td>{r.timeslot.date ? formatShortDate(r.timeslot.date) : '-'}</td>
-                <td>{timeDisplay}</td>
-              </tr>
-            );
-          })}
+          {booths.map((r) => (
+            <BoothInfoRow key={r.id} reservation={r} />
+          ))}
         </DataTable>
       )}
     </>
@@ -200,7 +187,7 @@ function NeedsDistributionSection({ booths, hasBoothSaleWarning }: { booths: Boo
 // Main report
 // ============================================================================
 
-export function CompletedBoothsReport({ data, banner }: { data: UnifiedDataset; banner?: ComponentChildren }) {
+export function CompletedBoothsReport({ data }: { data: UnifiedDataset }) {
   const booths = classifyBooths(data);
 
   const totalPackages = booths.completed.reduce((sum, r) => sum + r.physicalPackages, 0);
@@ -234,7 +221,6 @@ export function CompletedBoothsReport({ data, banner }: { data: UnifiedDataset; 
           {hasWarning ? 'Action Required' : 'Fully Distributed'}
         </span>
       </div>
-      {banner}
       <StatCards stats={stats} />
       <NeedsDistributionSection booths={booths.needsDistribution} hasBoothSaleWarning={data.siteOrders.boothSale.hasWarning} />
       <CompletedBoothsSection booths={booths.completed} scouts={data.scouts} showHeader={booths.needsDistribution.length > 0} />

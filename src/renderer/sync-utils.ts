@@ -1,12 +1,13 @@
 // Sync state utilities — pure functions for sync state management
 
-import { SYNC_ENDPOINTS } from '../constants';
-import type { EndpointSyncState, SyncState } from '../types';
+import { SYNC_ENDPOINTS, SYNC_STATUS } from '../constants';
+import type { EndpointSyncState, SyncState, Timestamps } from '../types';
+import type { Action } from './app-reducer';
 
 export function createInitialSyncState(): SyncState {
   const endpoints: Record<string, EndpointSyncState> = {};
   for (const ep of SYNC_ENDPOINTS) {
-    endpoints[ep.id] = { status: 'idle', lastSync: null };
+    endpoints[ep.id] = { status: SYNC_STATUS.IDLE, lastSync: null };
   }
   return { syncing: false, refreshingBooths: false, endpoints };
 }
@@ -35,9 +36,9 @@ export function computeGroupStatuses(
     for (const ep of eps) {
       const s = endpoints[ep.id];
       if (!s) continue;
-      if (s.status === 'synced') syncedCount++;
-      else if (s.status === 'error') errorCount++;
-      else if (s.status === 'syncing') syncingCount++;
+      if (s.status === SYNC_STATUS.SYNCED) syncedCount++;
+      else if (s.status === SYNC_STATUS.ERROR) errorCount++;
+      else if (s.status === SYNC_STATUS.SYNCING) syncingCount++;
       if (s.lastSync && (!lastSync || s.lastSync > lastSync)) lastSync = s.lastSync;
     }
 
@@ -68,4 +69,22 @@ export function computeGroupStatuses(
   }
 
   return { reports, booths };
+}
+
+/** Dispatch SYNC_ENDPOINT_UPDATE for each endpoint from persisted timestamps */
+export function hydrateEndpointTimestamps(timestamps: Timestamps, dispatch: (action: Action) => void): void {
+  for (const [endpoint, meta] of Object.entries(timestamps.endpoints)) {
+    dispatch({
+      type: 'SYNC_ENDPOINT_UPDATE',
+      endpoint,
+      update: {
+        status: meta.status,
+        lastSync: meta.lastSync ?? undefined,
+        durationMs: meta.durationMs,
+        dataSize: meta.dataSize,
+        httpStatus: meta.httpStatus,
+        error: meta.error
+      }
+    });
+  }
 }

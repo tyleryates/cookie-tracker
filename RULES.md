@@ -537,7 +537,7 @@ When a new cookie variety, order type, payment method, or transfer type appears:
 
 ## Reports
 
-The app provides thirteen reports in five tab groups plus To-Do:
+The app provides twelve reports in five tab groups plus To-Do:
 
 **To-Do** tab:
 1. **Health Check** — Aggregates all actionable items and warnings into a single view with three sections:

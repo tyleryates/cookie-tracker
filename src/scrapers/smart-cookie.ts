@@ -2,7 +2,7 @@ import { isAxiosError } from 'axios';
 import { PIPELINE_FILES, SPECIAL_IDENTIFIERS, TRANSFER_TYPE } from '../constants';
 import { normalizeCookieName } from '../cookie-constants';
 import { isC2TTransfer } from '../data-processing/utils';
-import Logger from '../logger';
+import Logger, { getErrorMessage } from '../logger';
 import type SeasonalData from '../seasonal-data';
 import type { ProgressCallback, ScrapeSourceResult } from '../types';
 import { BaseScraper, savePipelineFile } from './base-scraper';
@@ -64,8 +64,8 @@ class SmartCookieScraper extends BaseScraper {
     } catch (error) {
       const durationMs = Date.now() - startTime;
       const httpStatus = isAxiosError(error) ? error.response?.status : undefined;
-      Logger.error(`${endpoint}: failed (${durationMs}ms, HTTP ${httpStatus ?? '?'}) ${(error as Error).message}`);
-      this.sendEndpointStatus(endpoint, 'error', false, durationMs, undefined, httpStatus, (error as Error).message);
+      Logger.error(`${endpoint}: failed (${durationMs}ms, HTTP ${httpStatus ?? '?'}) ${getErrorMessage(error)}`);
+      this.sendEndpointStatus(endpoint, 'error', false, durationMs, undefined, httpStatus, getErrorMessage(error));
       if (opts.fatal) throw error;
       return opts.fallback as T;
     }
@@ -76,7 +76,7 @@ class SmartCookieScraper extends BaseScraper {
     try {
       await this.session.apiGet('/webapi/api/orders/dashboard', 'Orders dashboard', signal);
     } catch (error) {
-      Logger.warn('Warning: Could not initialize orders context:', (error as Error).message);
+      Logger.warn('Warning: Could not initialize orders context:', getErrorMessage(error));
     }
   }
 
@@ -133,7 +133,7 @@ class SmartCookieScraper extends BaseScraper {
         try {
           keyedShares[orderId] = await this.fetchVirtualCookieShare(orderId, signal);
         } catch (error) {
-          Logger.warn(`Warning: Could not fetch virtual cookie share ${orderId}:`, (error as Error).message);
+          Logger.warn(`Warning: Could not fetch virtual cookie share ${orderId}:`, getErrorMessage(error));
         }
       }
     }
@@ -218,7 +218,7 @@ class SmartCookieScraper extends BaseScraper {
               divider
             };
           } catch (error) {
-            Logger.warn(`Warning: Could not fetch booth divider for reservation ${reservationId}:`, (error as Error).message);
+            Logger.warn(`Warning: Could not fetch booth divider for reservation ${reservationId}:`, getErrorMessage(error));
             return null;
           }
         })
@@ -458,7 +458,7 @@ class SmartCookieScraper extends BaseScraper {
         return { success: false, source: 'Smart Cookie API', error: 'Sync cancelled' };
       }
       Logger.error('Smart Cookie API scraper error:', error);
-      return { success: false, source: 'Smart Cookie API', error: (error as Error).message };
+      return { success: false, source: 'Smart Cookie API', error: getErrorMessage(error) };
     }
   }
 }

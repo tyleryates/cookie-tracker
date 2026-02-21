@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { saveJsonFile } from './json-file-utils';
 import Logger from './logger';
 import type { ProfileInfo, ProfilesConfig } from './types';
 
@@ -94,8 +95,7 @@ class ProfileManager {
   }
 
   saveProfiles(config: ProfilesConfig): void {
-    if (!fs.existsSync(this.rootDataDir)) fs.mkdirSync(this.rootDataDir, { recursive: true });
-    fs.writeFileSync(this.profilesPath, JSON.stringify(config, null, 2));
+    saveJsonFile(this.profilesPath, config);
   }
 
   getActiveProfileDir(): string {

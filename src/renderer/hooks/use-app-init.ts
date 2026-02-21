@@ -7,6 +7,7 @@ import type { Action } from '../app-reducer';
 import { loadAppConfig } from '../data-loader';
 import { pruneExpiredSlots } from '../format-utils';
 import { ipcInvoke } from '../ipc';
+import { hydrateEndpointTimestamps } from '../sync-utils';
 
 export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?: { showMessages?: boolean }) => Promise<boolean>) {
   useEffect(() => {
@@ -29,20 +30,7 @@ export function useAppInit(dispatch: (action: Action) => void, loadData: (opts?:
       // so timestamps must be in state first to avoid a spurious full sync.
       try {
         const timestamps = await ipcInvoke('load-timestamps');
-        for (const [endpoint, meta] of Object.entries(timestamps.endpoints)) {
-          dispatch({
-            type: 'SYNC_ENDPOINT_UPDATE',
-            endpoint,
-            update: {
-              status: meta.status,
-              lastSync: meta.lastSync ?? undefined,
-              durationMs: meta.durationMs,
-              dataSize: meta.dataSize,
-              httpStatus: meta.httpStatus,
-              error: meta.error
-            }
-          });
-        }
+        hydrateEndpointTimestamps(timestamps, dispatch);
       } catch {
         // Non-fatal — endpoints start as idle, auto-sync will catch them
       }

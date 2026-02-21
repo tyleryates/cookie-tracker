@@ -3,11 +3,13 @@
 // but remain in this file since they're tightly coupled to App state.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'preact/hooks';
-import Logger from '../logger';
+import { SYNC_STATUS } from '../constants';
+import Logger, { getErrorMessage } from '../logger';
 import type {
   ActiveProfile,
   AppConfig,
   AppConfigPatch,
+  BoothFinderConfig,
   EndpointSyncState,
   HealthChecks,
   ProfileInfo,
@@ -18,16 +20,18 @@ import type {
 } from '../types';
 import { toActiveProfile } from '../types';
 import { type AppState, appReducer } from './app-reducer';
+import { encodeSlotKey, summarizeAvailableSlots } from './available-booths-utils';
 import { AppHeader } from './components/app-header';
 import { ReportContent, TabBar } from './components/reports-section';
-import { SettingsPage, SettingsToggles } from './components/settings-page';
-import { computeGroupStatuses, createInitialSyncState, DataHealthChecks, SyncStatusSection } from './components/sync-section';
+import { SettingsPage } from './components/settings-credentials';
+import { SettingsToggles } from './components/settings-toggles';
+import { DataHealthChecks, SyncStatusSection } from './components/sync-section';
 import { loadAppConfig } from './data-loader';
 import { countBoothsNeedingDistribution, getActiveScouts } from './format-utils';
 import { useAppInit, useDataLoader, useStatusMessage, useSync } from './hooks';
 import { ipcInvoke } from './ipc';
-import { encodeSlotKey, summarizeAvailableSlots } from './reports/available-booths-utils';
 import { HealthCheckReport } from './reports/health-check';
+import { computeGroupStatuses, createInitialSyncState, hydrateEndpointTimestamps } from './sync-utils';
 
 const initialState: AppState = {
   unified: null,
@@ -198,6 +202,29 @@ function MainContent({
 }
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Apply a partial BoothFinderConfig patch to an AppConfig, preserving existing fields. */
+function updateBoothConfig(config: AppConfig, patch: Partial<BoothFinderConfig>): AppConfig {
+  return { ...config, boothFinder: config.boothFinder ? { ...config.boothFinder, ...patch } : undefined };
+}
+
+/** Dispatch a booth config update and persist to disk in one step. */
+function dispatchAndPersistBoothConfig(
+  config: AppConfig | null,
+  patch: Partial<BoothFinderConfig>,
+  dispatch: (action: { type: 'LOAD_CONFIG' | 'IGNORE_SLOT'; config: AppConfig }) => void,
+  actionType: 'LOAD_CONFIG' | 'IGNORE_SLOT' = 'LOAD_CONFIG'
+): Promise<void> {
+  if (config) dispatch({ type: actionType, config: updateBoothConfig(config, patch) });
+  return ipcInvoke('update-config', { boothFinder: patch }).then(
+    () => {},
+    () => {}
+  );
+}
+
+// ============================================================================
 // APP
 // ============================================================================
 
@@ -233,7 +260,7 @@ export function App() {
   const handleToggleAutoSync = useCallback(
     (enabled: boolean) => {
       dispatch({ type: 'TOGGLE_AUTO_SYNC', enabled });
-      ipcInvoke('update-config', { autoSync: enabled });
+      ipcInvoke('update-config', { autoSync: enabled }).catch(() => {});
       showStatus(enabled ? 'Auto sync enabled' : 'Auto sync disabled', 'success');
     },
     [showStatus]
@@ -242,7 +269,7 @@ export function App() {
   const handleToggleAutoRefreshBooths = useCallback(
     (enabled: boolean) => {
       dispatch({ type: 'TOGGLE_AUTO_REFRESH_BOOTHS', enabled });
-      ipcInvoke('update-config', { boothFinder: { autoRefresh: enabled } });
+      ipcInvoke('update-config', { boothFinder: { autoRefresh: enabled } }).catch(() => {});
       showStatus(enabled ? 'Auto refresh booths enabled' : 'Auto refresh booths disabled', 'success');
     },
     [showStatus]
@@ -265,14 +292,8 @@ export function App() {
 
   const handleSaveBoothIds = useCallback(
     (boothIds: number[]) => {
-      const current = stateRef.current.appConfig;
-      if (current)
-        dispatch({
-          type: 'LOAD_CONFIG',
-          config: { ...current, boothFinder: current.boothFinder ? { ...current.boothFinder, ids: boothIds } : undefined }
-        });
+      dispatchAndPersistBoothConfig(stateRef.current.appConfig, { ids: boothIds }, dispatch);
       showStatus(`Booth selection saved (${boothIds.length} booth${boothIds.length === 1 ? '' : 's'})`, 'success');
-      ipcInvoke('update-config', { boothFinder: { ids: boothIds } });
       refreshBooths();
     },
     [showStatus, refreshBooths]
@@ -280,45 +301,25 @@ export function App() {
 
   const handleSaveDayFilters = useCallback(
     (filters: string[]) => {
-      const current = stateRef.current.appConfig;
-      if (current)
-        dispatch({
-          type: 'LOAD_CONFIG',
-          config: { ...current, boothFinder: current.boothFinder ? { ...current.boothFinder, dayFilters: filters } : undefined }
-        });
+      dispatchAndPersistBoothConfig(stateRef.current.appConfig, { dayFilters: filters }, dispatch);
       showStatus('Booth day filters saved', 'success');
-      ipcInvoke('update-config', { boothFinder: { dayFilters: filters } });
     },
     [showStatus]
   );
 
   const handleResetIgnored = useCallback(async () => {
-    const config = stateRef.current.appConfig;
-    if (config) {
-      dispatch({
-        type: 'IGNORE_SLOT',
-        config: { ...config, boothFinder: config.boothFinder ? { ...config.boothFinder, ignoredSlots: [] } : undefined }
-      });
-    }
-    await ipcInvoke('update-config', { boothFinder: { ignoredSlots: [] } });
+    await dispatchAndPersistBoothConfig(stateRef.current.appConfig, { ignoredSlots: [] }, dispatch, 'IGNORE_SLOT');
     showStatus('Ignored time slots cleared', 'success');
   }, [showStatus]);
 
   const handleIgnoreSlot = useCallback(async (boothId: number, date: string, startTime: string) => {
-    const config = stateRef.current.appConfig;
-    const ignored = [...(config?.boothFinder?.ignoredSlots || []), encodeSlotKey(boothId, date, startTime)];
-    if (config) {
-      dispatch({
-        type: 'IGNORE_SLOT',
-        config: { ...config, boothFinder: config.boothFinder ? { ...config.boothFinder, ignoredSlots: ignored } : undefined }
-      });
-    }
-    await ipcInvoke('update-config', { boothFinder: { ignoredSlots: ignored } });
+    const updatedIgnoredSlots = [...(stateRef.current.appConfig?.boothFinder?.ignoredSlots || []), encodeSlotKey(boothId, date, startTime)];
+    await dispatchAndPersistBoothConfig(stateRef.current.appConfig, { ignoredSlots: updatedIgnoredSlots }, dispatch, 'IGNORE_SLOT');
   }, []);
 
   const handleUpdateConfig = useCallback((patch: AppConfigPatch) => {
     dispatch({ type: 'UPDATE_CONFIG', patch });
-    ipcInvoke('update-config', patch);
+    ipcInvoke('update-config', patch).catch(() => {});
   }, []);
 
   const dispatchProfiles = useCallback(
@@ -337,20 +338,7 @@ export function App() {
     // Hydrate the new profile's endpoint timestamps
     try {
       const timestamps = await ipcInvoke('load-timestamps');
-      for (const [endpoint, meta] of Object.entries(timestamps.endpoints)) {
-        dispatch({
-          type: 'SYNC_ENDPOINT_UPDATE',
-          endpoint,
-          update: {
-            status: meta.status,
-            lastSync: meta.lastSync ?? undefined,
-            durationMs: meta.durationMs,
-            dataSize: meta.dataSize,
-            httpStatus: meta.httpStatus,
-            error: meta.error
-          }
-        });
-      }
+      hydrateEndpointTimestamps(timestamps, dispatch);
     } catch {
       // Non-fatal — endpoints start as idle
     }
@@ -368,7 +356,7 @@ export function App() {
         await reloadAfterSwitch();
         showStatus(`Switched to profile: ${pc.profiles.find((p) => p.dirName === dirName)?.name || dirName}`, 'success');
       } catch (error) {
-        showStatus(`Profile switch failed: ${(error as Error).message}`, 'error');
+        showStatus(`Profile switch failed: ${getErrorMessage(error)}`, 'error');
       }
     },
     [dispatchProfiles, reloadAfterSwitch, showStatus]
@@ -383,7 +371,7 @@ export function App() {
         if (wasActive) await reloadAfterSwitch();
         showStatus('Profile deleted', 'success');
       } catch (error) {
-        showStatus(`Delete failed: ${(error as Error).message}`, 'error');
+        showStatus(`Delete failed: ${getErrorMessage(error)}`, 'error');
       }
     },
     [dispatchProfiles, reloadAfterSwitch, showStatus]
@@ -460,7 +448,7 @@ export function App() {
         unified={state.unified}
         appConfig={state.appConfig}
         syncing={state.syncState.syncing}
-        boothSyncState={state.syncState.endpoints['sc-booth-availability'] || { status: 'idle', lastSync: null }}
+        boothSyncState={state.syncState.endpoints['sc-booth-availability'] || { status: SYNC_STATUS.IDLE, lastSync: null }}
         boothResetKey={boothResetKeyRef.current}
         readOnly={readOnly}
         availableSlotCount={availableSlotCount}
@@ -514,11 +502,9 @@ export function App() {
       <div class="app-content" ref={contentRef}>
         {content}
       </div>
-      {state.statusMessage && (
-        <div class="toast-container">
-          <div class={`toast ${state.statusMessage.type}`}>{state.statusMessage.msg}</div>
-        </div>
-      )}
+      <output class="toast-container" aria-live="polite">
+        {state.statusMessage && <div class={`toast ${state.statusMessage.type}`}>{state.statusMessage.msg}</div>}
+      </output>
     </div>
   );
 }

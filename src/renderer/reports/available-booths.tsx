@@ -1,16 +1,15 @@
 // Available Booths Report — Preact component
 // Shows booth locations with filtered availability dates/times
 
-import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { BOOTH_TIME_SLOTS, DAY_LABELS } from '../../constants';
+import { BOOTH_TIME_SLOTS, DAY_LABELS, SYNC_STATUS } from '../../constants';
 import Logger from '../../logger';
 import type { AppConfig, BoothAvailableDate, BoothLocation, BoothTimeSlot, EndpointSyncState, UnifiedDataset } from '../../types';
+import { filterAvailableDates, parseFiltersByDay, removeIgnoredSlots } from '../available-booths-utils';
 import { BoothDayFilter } from '../components/booth-day-filter';
 import { BoothSelector } from '../components/booth-selector';
-import { boothTypeClass, DateFormatter, formatBoothDate, formatTime12h, haversineDistance } from '../format-utils';
+import { boothTypeClass, formatBoothDate, formatRelativeTimestamp, formatTime12h, haversineDistance } from '../format-utils';
 import { ipcInvoke } from '../ipc';
-import { filterAvailableDates, parseFiltersByDay, removeIgnoredSlots } from './available-booths-utils';
 
 function BoothDateGroup({
   date,
@@ -45,6 +44,7 @@ function BoothDateGroup({
                   <button
                     type="button"
                     class="booth-slot-dismiss"
+                    aria-label="Ignore this time slot"
                     onClick={(e) => {
                       e.stopPropagation();
                       onIgnoreSlot(boothId, date, slot.startTime);
@@ -125,7 +125,6 @@ interface AvailableBoothsProps {
   onRefresh: () => void;
   onSaveBoothIds: (ids: number[]) => void;
   onSaveDayFilters: (filters: string[]) => void;
-  banner?: ComponentChildren;
 }
 
 export function AvailableBoothsReport({
@@ -138,8 +137,7 @@ export function AvailableBoothsReport({
   onResetIgnored,
   onRefresh,
   onSaveBoothIds,
-  onSaveDayFilters,
-  banner
+  onSaveDayFilters
 }: AvailableBoothsProps) {
   const [selecting, setSelecting] = useState(false);
   const [filtering, setFiltering] = useState(false);
@@ -154,7 +152,7 @@ export function AvailableBoothsReport({
 
   const [filtersOpen, setFiltersOpen] = useState(!isFullyConfigured);
 
-  const refreshing = syncState.status === 'syncing';
+  const refreshing = syncState.status === SYNC_STATUS.SYNCING;
 
   useEffect(() => {
     (async () => {
@@ -170,14 +168,6 @@ export function AvailableBoothsReport({
       }
     })();
   }, []);
-
-  if (!data) {
-    return (
-      <div class="report-visual">
-        <p>No data available. Please import data first.</p>
-      </div>
-    );
-  }
 
   const boothLocations = data.boothLocations || [];
 
@@ -268,11 +258,11 @@ export function AvailableBoothsReport({
   if (refreshing) {
     syncStatusText = 'Finding\u2026';
     syncStatusIcon = '';
-  } else if (syncState.status === 'error') {
+  } else if (syncState.status === SYNC_STATUS.ERROR) {
     syncStatusText = 'Last check failed';
     syncStatusIcon = '\u2717';
   } else if (syncState.lastSync) {
-    syncStatusText = DateFormatter.toRelativeTimestamp(syncState.lastSync);
+    syncStatusText = formatRelativeTimestamp(syncState.lastSync);
     syncStatusIcon = '\u2713';
   } else {
     syncStatusText = 'Not yet checked';
@@ -284,7 +274,6 @@ export function AvailableBoothsReport({
       <div class="report-header-row">
         <h3>Booth Finder</h3>
       </div>
-      {banner}
 
       {/* Control panel — filters collapsible, button + status below */}
       <div class="filter-card">
